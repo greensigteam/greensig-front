@@ -1,0 +1,7 @@
+{
+  "name": "GreenSIG AI",
+  "description": "Plateforme GreenSIG ECO MAPPING assistée par IA pour la gestion territoriale et environnementale.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
