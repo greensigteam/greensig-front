@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { User, ViewState } from '../types';
+import { fetchAllSites, type SiteFrontend } from '../services/api';
 import { Bell, X, Search, Loader2, MapPin, ChevronRight } from 'lucide-react';
 
 interface HeaderProps {
@@ -50,6 +51,22 @@ const Header: React.FC<HeaderProps> = ({
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const mobileSearchRef = useRef<HTMLDivElement>(null);
   const mobileInputRef = useRef<HTMLInputElement>(null);
+  // Sites for the header "Aller à un site" select
+  const [sites, setSites] = useState<SiteFrontend[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const s = await fetchAllSites();
+        if (mounted) setSites(s);
+      } catch (err) {
+        console.error('Erreur chargement sites header:', err);
+      }
+    };
+    load();
+    return () => { mounted = false };
+  }, []);
 
   // Close suggestions when clicking outside
   useEffect(() => {
@@ -328,9 +345,31 @@ const Header: React.FC<HeaderProps> = ({
             <select
               className="p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
               title="Aller à un site"
+              onChange={(e) => {
+                const id = e.target.value;
+                const site = sites.find(s => s.id === id);
+                if (site) {
+                  // Center map on site coordinates
+                  if (setTargetLocation) {
+                    setTargetLocation({ coordinates: site.coordinates, zoom: 16 });
+                  }
+                  if (setSearchResult) {
+                    setSearchResult({
+                      name: site.name,
+                      description: site.adresse || site.description || '',
+                      coordinates: site.coordinates,
+                      zoom: 16
+                    });
+                  }
+                }
+                // reset select to placeholder
+                (e.target as HTMLSelectElement).selectedIndex = 0;
+              }}
             >
               <option value="">Aller à un site...</option>
-              {/* Add site options dynamically here */}
+              {sites.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
             </select>
           </div>
         )}
