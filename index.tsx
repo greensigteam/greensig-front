@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import 'leaflet/dist/leaflet.css';
+import './styles/map.css';
 
 // Simple Error Boundary to catch runtime crashes (White Screen of Death)
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null, errorInfo: React.ErrorInfo | null }> {

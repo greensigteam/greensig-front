@@ -3,7 +3,7 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import { MapPage } from './pages/MapPage';
-import { MapView } from './components/MapView';
+import { OLMap } from './components/OLMap';
 import Inventory from './pages/Inventory';
 import Interventions from './pages/Interventions';
 import Teams from './pages/Teams';
@@ -276,16 +276,16 @@ function App() {
       setTargetLocation={setTargetLocation}
 
       mapComponent={
-        <MapView
+        <OLMap
           activeLayer={MAP_LAYERS[activeLayerId]}
           targetLocation={targetLocation}
           userLocation={userLocation}
-          mapRef={mapRef}
+          ref={mapRef}
           overlays={overlays}
           onObjectClick={setSelectedMapObject}
           isMeasuring={isMeasuring}
           measurePoints={measurePoints}
-          onMeasureClick={(coords) => setMeasurePoints([...measurePoints, coords])}
+          onMeasureClick={(coords: any) => setMeasurePoints([...measurePoints, coords])}
           isRouting={isRouting}
           isSidebarCollapsed={isSidebarCollapsed}
           clusteringEnabled={clusteringEnabled}

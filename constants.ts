@@ -2,16 +2,16 @@ import { LayerConfig, MapLayerType } from './types';
 import { Leaf, Sprout, Flower, Wheat, Globe, Trees, Mountain, Palmtree } from 'lucide-react';
 
 export const INITIAL_POSITION = {
-  lat: 32.2345, // Benguerir, Morocco
-  lng: -7.9543,
-  zoom: 13
+  lat: 32.2160, // UM6P Campus, Benguerir, Morocco
+  lng: -7.9370,
+  zoom: 15
 };
 
 export const MAP_LAYERS: Record<MapLayerType, LayerConfig> = {
   [MapLayerType.PLAN]: {
     id: MapLayerType.PLAN,
     name: "Plan IGN",
-    url: "https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png",
+    url: "https://a.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png",
     attribution: '&copy; OpenStreetMap France | &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxNativeZoom: 19
   },
@@ -25,7 +25,7 @@ export const MAP_LAYERS: Record<MapLayerType, LayerConfig> = {
   [MapLayerType.TERRAIN]: {
     id: MapLayerType.TERRAIN,
     name: "Relief",
-    url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+    url: "https://a.tile.opentopomap.org/{z}/{x}/{y}.png",
     attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',
     maxNativeZoom: 17
   },

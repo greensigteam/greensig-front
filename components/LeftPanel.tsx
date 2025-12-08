@@ -1,21 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
-  ChevronDown,
-  ChevronRight,
-  ChevronLeft,
   RotateCcw,
-  MapPin,
-  Minus,
-  Pentagon,
-  Square,
-  Pencil,
-  Trash2,
-  RefreshCw,
-  Save,
-  Download,
   X,
-  Info,
-  Wrench
+  Wrench,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND } from '../constants';
 
@@ -24,7 +13,7 @@ interface LeftPanelProps {
   isSidebarCollapsed?: boolean;
 }
 
-type DrawingTool = 'Point' | 'LineString' | 'Polygon' | null;
+
 
 interface SymbologyConfig {
   fillColor: string;
@@ -72,8 +61,7 @@ const createDefaultSymbology = (): Record<string, SymbologyConfig> => {
 
 const LeftPanel: React.FC<LeftPanelProps> = ({ onToggleLayer, isSidebarCollapsed = true }) => {
   const [open, setOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<'filter' | 'symbology' | 'drawing'>('filter');
-  const [activeTool, setActiveTool] = useState<DrawingTool>(null);
+  const [activeTab, setActiveTab] = useState<'filter' | 'symbology'>('filter');
   const [symbologyConfig, setSymbologyConfig] = useState<Record<string, SymbologyConfig>>(createDefaultSymbology);
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
   const [layerVisibility, setLayerVisibility] = useState<Record<string, boolean>>({});
@@ -186,10 +174,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({ onToggleLayer, isSidebarCollapsed
                 onClick={() => setActiveTab('symbology')}
                 className={`flex-1 text-xs font-bold py-2 rounded-md transition-all ${activeTab === 'symbology' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >SYMBOLOGIE</button>
-              <button
-                onClick={() => setActiveTab('drawing')}
-                className={`flex-1 text-xs font-bold py-2 rounded-md transition-all ${activeTab === 'drawing' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-              >DESSIN</button>
+
             </div>
 
             {/* Filter Content */}
@@ -593,280 +578,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({ onToggleLayer, isSidebarCollapsed
               </div>
             )}
 
-            {/* Drawing Content */}
-            {activeTab === 'drawing' && (
-              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="text-sm font-semibold text-gray-800 mb-1">Outils de Dessin</div>
-                <div className="text-xs text-gray-500 mb-2">Créez et mesurez des éléments sur la carte.</div>
 
-                {/* Active tool indicator */}
-                {activeTool && (
-                  <div className="mb-4 p-2 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                    <span className="text-xs font-medium text-emerald-700 flex items-center gap-1">
-                      Mode actif :
-                      {activeTool === 'Point' && <><MapPin className="w-3 h-3" /> Point</>}
-                      {activeTool === 'LineString' && <><Minus className="w-3 h-3" /> Ligne</>}
-                      {activeTool === 'Polygon' && <><Pentagon className="w-3 h-3" /> Polygone</>}
-                    </span>
-                    <button
-                      onClick={() => {
-                        setActiveTool(null);
-                        if ((window as any).leafletDrawing?.deactivateDrawing) {
-                          (window as any).leafletDrawing.deactivateDrawing();
-                        }
-                      }}
-                      className="ml-auto text-emerald-600 hover:text-emerald-800"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-3 gap-2 mb-4">
-                  <button
-                    title="Dessiner un Point"
-                    className={`p-3 border rounded-lg flex flex-col items-center transition-all group shadow-sm hover:shadow-md ${activeTool === 'Point'
-                      ? 'bg-emerald-500 border-emerald-600 text-white ring-2 ring-emerald-300'
-                      : 'bg-white border-gray-200 hover:border-emerald-500 hover:bg-emerald-50 text-gray-700'
-                      }`}
-                    onClick={() => {
-                      const newTool = activeTool === 'Point' ? null : 'Point';
-                      setActiveTool(newTool);
-                      if (newTool) {
-                        if ((window as any).leafletDrawing?.activateDrawing) {
-                          (window as any).leafletDrawing.activateDrawing('Point');
-                        } else if ((window as any).olDrawing?.activateDrawing) {
-                          (window as any).olDrawing.activateDrawing('Point');
-                        }
-                      } else {
-                        if ((window as any).leafletDrawing?.deactivateDrawing) {
-                          (window as any).leafletDrawing.deactivateDrawing();
-                        } else if ((window as any).olDrawing?.deactivateDrawing) {
-                          (window as any).olDrawing.deactivateDrawing();
-                        }
-                      }
-                    }}
-                  >
-                    <MapPin className={`w-5 h-5 mb-1 transition-transform ${activeTool === 'Point' ? 'scale-110' : 'group-hover:scale-110'}`} />
-                    <span className="text-[10px] font-bold uppercase tracking-wide">Point</span>
-                  </button>
-
-                  <button
-                    title="Dessiner une Ligne"
-                    className={`p-3 border rounded-lg flex flex-col items-center transition-all group shadow-sm hover:shadow-md ${activeTool === 'LineString'
-                      ? 'bg-emerald-500 border-emerald-600 text-white ring-2 ring-emerald-300'
-                      : 'bg-white border-gray-200 hover:border-emerald-500 hover:bg-emerald-50 text-gray-700'
-                      }`}
-                    onClick={() => {
-                      const newTool = activeTool === 'LineString' ? null : 'LineString';
-                      setActiveTool(newTool);
-                      if (newTool) {
-                        if ((window as any).leafletDrawing?.activateDrawing) {
-                          (window as any).leafletDrawing.activateDrawing('LineString');
-                        } else if ((window as any).olDrawing?.activateDrawing) {
-                          (window as any).olDrawing.activateDrawing('LineString');
-                        }
-                      } else {
-                        if ((window as any).leafletDrawing?.deactivateDrawing) {
-                          (window as any).leafletDrawing.deactivateDrawing();
-                        } else if ((window as any).olDrawing?.deactivateDrawing) {
-                          (window as any).olDrawing.deactivateDrawing();
-                        }
-                      }
-                    }}
-                  >
-                    <Minus className={`w-5 h-5 mb-1 transition-transform ${activeTool === 'LineString' ? 'scale-110' : 'group-hover:scale-110'}`} />
-                    <span className="text-[10px] font-bold uppercase tracking-wide">Ligne</span>
-                  </button>
-
-                  <button
-                    title="Dessiner une Zone"
-                    className={`p-3 border rounded-lg flex flex-col items-center transition-all group shadow-sm hover:shadow-md ${activeTool === 'Polygon'
-                      ? 'bg-emerald-500 border-emerald-600 text-white ring-2 ring-emerald-300'
-                      : 'bg-white border-gray-200 hover:border-emerald-500 hover:bg-emerald-50 text-gray-700'
-                      }`}
-                    onClick={() => {
-                      const newTool = activeTool === 'Polygon' ? null : 'Polygon';
-                      setActiveTool(newTool);
-                      if (newTool) {
-                        if ((window as any).leafletDrawing?.activateDrawing) {
-                          (window as any).leafletDrawing.activateDrawing('Polygon');
-                        } else if ((window as any).olDrawing?.activateDrawing) {
-                          (window as any).olDrawing.activateDrawing('Polygon');
-                        }
-                      } else {
-                        if ((window as any).leafletDrawing?.deactivateDrawing) {
-                          (window as any).leafletDrawing.deactivateDrawing();
-                        } else if ((window as any).olDrawing?.deactivateDrawing) {
-                          (window as any).olDrawing.deactivateDrawing();
-                        }
-                      }
-                    }}
-                  >
-                    <Pentagon className={`w-5 h-5 mb-1 transition-transform ${activeTool === 'Polygon' ? 'scale-110' : 'group-hover:scale-110'}`} />
-                    <span className="text-[10px] font-bold uppercase tracking-wide">Polygone</span>
-                  </button>
-                </div>
-
-                <div className="mb-4 space-y-2">
-                  <label className="text-xs font-medium text-gray-700 uppercase">Type de Végétation</label>
-                  <select
-                    id="vegetationTypeSelect"
-                    className="w-full text-sm p-2 rounded border border-gray-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
-                    onChange={(e) => {
-                      if ((window as any).leafletDrawing?.setVegetationType) {
-                        (window as any).leafletDrawing.setVegetationType(e.target.value);
-                      }
-                    }}
-                  >
-                    <option value="">Aucun (dessin simple)</option>
-                    <option value="Arbres">Arbres</option>
-                    <option value="Arbustes">Arbustes</option>
-                    <option value="Palmier">Palmier</option>
-                    <option value="Gazon">Gazon</option>
-                    <option value="Vivaces">Vivaces</option>
-                    <option value="Cactus">Cactus</option>
-                    <option value="Graminées">Graminées</option>
-                    <option value="Annuelle">Annuelle</option>
-                  </select>
-                </div>
-
-                <div className="mb-4 space-y-2">
-                  <label className="text-xs font-medium text-gray-700 uppercase">Couleur du tracé</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      defaultValue="#ff6600"
-                      className="flex-1 h-9 rounded cursor-pointer border border-gray-300"
-                      onChange={(e) => {
-                        if ((window as any).leafletDrawing?.changeDrawingColor) {
-                          (window as any).leafletDrawing.changeDrawingColor(e.target.value);
-                        } else if ((window as any).olDrawing?.changeDrawingColor) {
-                          (window as any).olDrawing.changeDrawingColor(e.target.value);
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="text-xs font-semibold text-gray-500 uppercase mb-2 mt-6">Actions</div>
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  <button
-                    className={`col-span-1 py-2 px-3 border text-xs font-medium rounded shadow-sm flex items-center justify-center gap-1.5 transition ${activeTool
-                      ? 'bg-orange-50 border-orange-300 hover:bg-orange-100 text-orange-700'
-                      : 'bg-white border-gray-300 hover:bg-gray-50 text-gray-700'
-                      }`}
-                    onClick={() => {
-                      setActiveTool(null);
-                      if ((window as any).leafletDrawing?.deactivateDrawing) {
-                        (window as any).leafletDrawing.deactivateDrawing();
-                      } else if ((window as any).olDrawing?.deactivateDrawing) {
-                        (window as any).olDrawing.deactivateDrawing();
-                      }
-                    }}
-                  >
-                    <Square className="w-3.5 h-3.5" />
-                    Arrêter
-                  </button>
-                  <button
-                    className="col-span-1 py-2 px-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-medium rounded shadow-sm flex items-center justify-center gap-1.5 transition"
-                    onClick={() => {
-                      if ((window as any).leafletDrawing?.activateModify) {
-                        (window as any).leafletDrawing.activateModify();
-                      } else if ((window as any).olDrawing?.activateModify) {
-                        (window as any).olDrawing.activateModify();
-                      }
-                    }}
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                    Modifier
-                  </button>
-
-                  <button
-                    className="col-span-1 py-2 px-3 bg-red-50 border border-red-100 hover:bg-red-100 text-red-700 text-xs font-medium rounded shadow-sm flex items-center justify-center gap-1.5 transition"
-                    onClick={() => {
-                      if ((window as any).leafletDrawing?.deleteLastDrawing) {
-                        (window as any).leafletDrawing.deleteLastDrawing();
-                      } else if ((window as any).olDrawing?.deleteLastDrawing) {
-                        (window as any).olDrawing.deleteLastDrawing();
-                      }
-                    }}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Supprimer
-                  </button>
-                  <button
-                    className="col-span-1 py-2 px-3 bg-red-50 border border-red-100 hover:bg-red-100 text-red-700 text-xs font-medium rounded shadow-sm flex items-center justify-center gap-1.5 transition"
-                    onClick={() => {
-                      if ((window as any).leafletDrawing?.clearDrawings) {
-                        (window as any).leafletDrawing.clearDrawings();
-                      } else if ((window as any).olDrawing?.clearDrawings) {
-                        (window as any).olDrawing.clearDrawings();
-                      }
-                    }}
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    Tout effacer
-                  </button>
-
-                  <div className="col-span-2 h-px bg-gray-200 my-1"></div>
-
-                  <button
-                    className="col-span-2 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded shadow-md flex items-center justify-center gap-2 transition"
-                    onClick={() => {
-                      if ((window as any).leafletDrawing?.saveDrawingsToVegetation) {
-                        (window as any).leafletDrawing.saveDrawingsToVegetation();
-                      } else if ((window as any).olDrawing?.saveDrawingsToVegetation) {
-                        (window as any).olDrawing.saveDrawingsToVegetation();
-                      }
-                    }}
-                  >
-                    <Save className="w-4 h-4" />
-                    Sauvegarder dans végétation
-                  </button>
-
-                  <button
-                    className="col-span-2 py-2.5 px-3 bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold rounded shadow-md flex items-center justify-center gap-2 transition"
-                    onClick={() => {
-                      let data = null;
-                      if ((window as any).leafletDrawing?.exportDrawingsAsGeoJSON) {
-                        data = (window as any).leafletDrawing.exportDrawingsAsGeoJSON();
-                      } else if ((window as any).olDrawing?.exportDrawingsAsGeoJSON) {
-                        data = (window as any).olDrawing.exportDrawingsAsGeoJSON();
-                      }
-                      if (!data || (data.features && data.features.length === 0)) {
-                        alert('Aucun dessin à exporter');
-                        return;
-                      }
-                      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = 'dessins_export.geojson';
-                      a.click();
-                      URL.revokeObjectURL(url);
-                    }}
-                  >
-                    <Download className="w-4 h-4" />
-                    Exporter GeoJSON
-                  </button>
-                </div>
-
-                {/* Instructions */}
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                  <div className="text-xs font-semibold text-blue-800 mb-1 flex items-center gap-1">
-                    <Info className="w-3.5 h-3.5" />
-                    Instructions
-                  </div>
-                  <ul className="text-xs text-blue-700 space-y-1">
-                    <li className="flex items-center gap-1"><MapPin className="w-3 h-3" /> <strong>Point:</strong> Cliquez pour placer</li>
-                    <li className="flex items-center gap-1"><Minus className="w-3 h-3" /> <strong>Ligne/Polygone:</strong> Cliquez pour ajouter, double-clic pour terminer</li>
-                    <li className="flex items-center gap-1"><X className="w-3 h-3" /> <strong>Annuler:</strong> Clic droit ou Échap</li>
-                  </ul>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 

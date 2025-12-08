@@ -14,7 +14,7 @@ export const SITES: Site[] = [
     {
         id: 'phenotypage',
         name: 'Phénotypage',
-        coordinates: { lat: 32.216569, lng: -7.932506 },
+        coordinates: { lat: 32.216623, lng: -7.932517 },
         description: 'Centre de phénotypage des plantes',
         category: 'RECHERCHE',
         googleMapsUrl: 'https://maps.app.goo.gl/m2b8PAB5yaHHijtT7',
@@ -23,7 +23,7 @@ export const SITES: Site[] = [
     {
         id: 'extension-modulaire',
         name: 'Extension Modulaire',
-        coordinates: { lat: 32.21609556882061, lng: -7.93369321349265 },
+        coordinates: { lat: 32.216095, lng: -7.933693 },
         description: 'Extension modulaire du campus',
         category: 'INFRASTRUCTURE',
         googleMapsUrl: 'https://maps.app.goo.gl/2pj5X3vn4awYSzgz6',
@@ -32,7 +32,7 @@ export const SITES: Site[] = [
     {
         id: 'tech-park',
         name: 'Tech Park',
-        coordinates: { lat: 32.21907513030372, lng: -7.931137173042026 },
+        coordinates: { lat: 32.219075, lng: -7.931137 },
         description: 'Parc technologique et innovation',
         category: 'INFRASTRUCTURE',
         googleMapsUrl: 'https://maps.app.goo.gl/MPEaFUHq1qdmhVm77',
@@ -41,7 +41,7 @@ export const SITES: Site[] = [
     {
         id: 'start-gate',
         name: 'Start Gate',
-        coordinates: { lat: 32.2209591171333, lng: -7.934374399999999 },
+        coordinates: { lat: 32.220959, lng: -7.934374 },
         description: 'Incubateur de startups',
         category: 'INFRASTRUCTURE',
         googleMapsUrl: 'https://maps.app.goo.gl/wM8AXgowNWLzznL27',
@@ -50,7 +50,7 @@ export const SITES: Site[] = [
     {
         id: 'dice',
         name: 'DICE',
-        coordinates: { lat: 32.22184597648751, lng: -7.934003484656879 },
+        coordinates: { lat: 32.221846, lng: -7.934003 },
         description: 'Centre de recherche DICE',
         category: 'RECHERCHE',
         googleMapsUrl: 'https://maps.app.goo.gl/c1gvWcPA5oohsyMw6',
@@ -59,7 +59,7 @@ export const SITES: Site[] = [
     {
         id: 'villas-chercheurs',
         name: 'Villas Chercheurs',
-        coordinates: { lat: 32.21285189999999, lng: -7.937114384656876 },
+        coordinates: { lat: 32.212852, lng: -7.937114 },
         description: 'Résidences pour chercheurs',
         category: 'RESIDENCE',
         googleMapsUrl: 'https://maps.app.goo.gl/68G7tVYue2ZoHfhc7',
@@ -68,7 +68,7 @@ export const SITES: Site[] = [
     {
         id: 'dome-sro',
         name: 'Dome SRO',
-        coordinates: { lat: 32.21178606753007, lng: -7.938083426985316 },
+        coordinates: { lat: 32.211786, lng: -7.938083 },
         description: 'Dôme SRO - Structure de recherche',
         category: 'RECHERCHE',
         googleMapsUrl: 'https://maps.app.goo.gl/Lu1D2jAwVQ9nXD9c8',
@@ -77,7 +77,7 @@ export const SITES: Site[] = [
     {
         id: 'hilton',
         name: 'HILTON',
-        coordinates: { lat: 32.2143739, lng: -7.938642084656878 },
+        coordinates: { lat: 32.214374, lng: -7.938642 },
         description: 'Hôtel Hilton',
         category: 'HOTELLERIE',
         googleMapsUrl: 'https://maps.app.goo.gl/BrMNKrqbkLdEuM6f9',
@@ -85,8 +85,8 @@ export const SITES: Site[] = [
     },
     {
         id: 'hopital-geriatrie',
-        name: 'Hôpital gériatrie',
-        coordinates: { lat: 32.216334345927194, lng: -7.945208315343122 },
+        name: 'Hôpital Gériatrie',
+        coordinates: { lat: 32.216334, lng: -7.945208 },
         description: 'Hôpital de gériatrie',
         category: 'SANTE',
         googleMapsUrl: 'https://maps.app.goo.gl/CpJKSkuDHWzGbM5P8',
@@ -95,7 +95,7 @@ export const SITES: Site[] = [
     {
         id: 'residences-locatives',
         name: 'Résidences Locatives',
-        coordinates: { lat: 32.21886167678545, lng: -7.947077573014683 },
+        coordinates: { lat: 32.218862, lng: -7.947078 },
         description: 'Résidences locatives',
         category: 'RESIDENCE',
         googleMapsUrl: 'https://maps.app.goo.gl/r5iuhEoZurihwQoE7',
@@ -104,7 +104,7 @@ export const SITES: Site[] = [
     {
         id: 'villas-marguerites',
         name: 'Villas Marguerites',
-        coordinates: { lat: 32.20810172214138, lng: -7.930539 },
+        coordinates: { lat: 32.208102, lng: -7.930539 },
         description: 'Villas Marguerites - Résidences',
         category: 'RESIDENCE',
         googleMapsUrl: 'https://maps.app.goo.gl/WqZBrJbNEHJTRoN38',
@@ -113,7 +113,7 @@ export const SITES: Site[] = [
     {
         id: 'cub',
         name: 'CUB',
-        coordinates: { lat: 32.21021045648196, lng: -7.935591 },
+        coordinates: { lat: 32.210210, lng: -7.935591 },
         description: 'Centre Universitaire de Benguerir',
         category: 'INFRASTRUCTURE',
         googleMapsUrl: 'https://maps.app.goo.gl/YAZuQ89ZevzdCRLbA',
