@@ -52,20 +52,19 @@ const Layout: React.FC<LayoutProps> = ({
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-emerald-950 font-sans">
 
-      {/* LAYER 0: Persistent Map Background (z-0) */}
-      <div className="absolute inset-0 z-0 pointer-events-auto">
-        {mapComponent}
-      </div>
+      {/* LAYER 0: Persistent Map Background (z-0) - visible uniquement sur la vue MAP */}
+      {currentView === 'MAP' && (
+        <div className="absolute inset-0 z-0 pointer-events-auto">
+          {mapComponent}
+        </div>
+      )}
 
-      {/* LAYER 2: Map Controls (z-600) 
-          Placed ABOVE the panel (z-500) to ensure zoom/geolocation buttons are always clickable 
-          even when the admin panel covers the map.
-          IMPORTANT: pointer-events-none IS REQUIRED here so clicks pass through to the map (z-0)
-          The controls inside (MapPage) have pointer-events-auto on interactive elements.
-      */}
-      <div className="absolute inset-0 z-[600] pointer-events-none">
-        {mapControls}
-      </div>
+      {/* LAYER 2: Map Controls (z-600) - visible uniquement sur la vue MAP */}
+      {currentView === 'MAP' && (
+        <div className="absolute inset-0 z-[600] pointer-events-none">
+          {mapControls}
+        </div>
+      )}
 
       {/* LAYER 1: Sidebar (z-700) - Positioned independently */}
       <div className="absolute left-0 top-0 h-full pointer-events-auto z-[700]">

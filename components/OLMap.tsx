@@ -19,7 +19,7 @@ import { defaults as defaultControls, ScaleLine } from 'ol/control';
 
 import { LayerConfig, Coordinates } from "../types";
 import { INITIAL_POSITION, VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND } from "../constants";
-import { SITES } from "../data/sites";
+// Note: Les sites sont maintenant chargés dynamiquement depuis l'API dans fetchData()
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -163,10 +163,11 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
     const innerMapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<Map | null>(null);
 
-    const dataLayerRef = useRef<VectorLayer<VectorSource> | null>(null); // For clusters/markers
-    const sitesLayerRef = useRef<VectorLayer<VectorSource> | null>(null); // For static sites
-    const vectorSourceRef = useRef<VectorSource | null>(null); // Raw vector source for data
-    const clusterSourceRef = useRef<Cluster | null>(null); // Cluster source wrapper
+    const dataLayerRef = useRef<VectorLayer<VectorSource> | null>(null); // For clusters/markers (objects)
+    const sitesLayerRef = useRef<VectorLayer<VectorSource> | null>(null); // For site boundaries (containers)
+    const sitesSourceRef = useRef<VectorSource | null>(null); // Source for sites polygons
+    const vectorSourceRef = useRef<VectorSource | null>(null); // Raw vector source for objects
+    const clusterSourceRef = useRef<Cluster | null>(null); // Cluster source wrapper for objects
     const popupRef = useRef<HTMLDivElement>(null);
     const popupOverlay = useRef<Overlay | null>(null);
 
@@ -253,14 +254,61 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
         });
         hoverOverlayRef.current = hoverOverlay;
 
-        // Single vector source for all data (fetched from backend API)
+        // ================================================================
+        // SITES LAYER - Separate layer for site boundaries (containers)
+        // ================================================================
+        const sitesSource = new VectorSource();
+        sitesSourceRef.current = sitesSource;
+
+        const sitesLayer = new VectorLayer({
+            source: sitesSource,
+            zIndex: 10, // Below objects layer
+            style: (feature) => {
+                const isVisible = (window as any).getVisibleLayers?.()?.includes('Site') ?? true;
+                if (!isVisible) {
+                    return new Style({});
+                }
+
+                const isHovered = feature.get('hovered') === true;
+                const isSelected = feature.get('selected') === true;
+                const siteId = feature.get('site_id');
+
+                // Generate a consistent color based on site ID
+                const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+                const colorIndex = siteId ? Math.abs(String(siteId).split('').reduce((a, b) => a + b.charCodeAt(0), 0)) % colors.length : 0;
+                const baseColor = colors[colorIndex];
+
+                return new Style({
+                    fill: new Fill({
+                        color: isSelected ? baseColor + '40' : baseColor + '20' // 25% or 12% opacity
+                    }),
+                    stroke: new Stroke({
+                        color: baseColor,
+                        width: isHovered ? 4 : isSelected ? 3 : 2,
+                        lineDash: isSelected ? [] : [8, 4] // Dashed when not selected
+                    }),
+                    text: new Text({
+                        text: feature.get('nom_site') || '',
+                        font: isHovered ? 'bold 14px sans-serif' : '12px sans-serif',
+                        fill: new Fill({ color: '#1f2937' }),
+                        stroke: new Stroke({ color: '#ffffff', width: 3 }),
+                        overflow: true,
+                        placement: 'point'
+                    })
+                });
+            }
+        });
+        sitesLayerRef.current = sitesLayer;
+
+        // ================================================================
+        // OBJECTS LAYER - For vegetation and hydraulic objects (clustered)
+        // ================================================================
         const vectorSource = new VectorSource();
         vectorSourceRef.current = vectorSource;
 
-        // Cluster source wrapping the vector source
-        // Custom geometryFunction to handle Polygon and LineString by using their centroid
+        // Cluster source wrapping the vector source (for objects only, not sites)
         const clusterSource = new Cluster({
-            distance: clusteringEnabled ? 50 : 0, // Use prop value
+            distance: clusteringEnabled ? 50 : 0,
             source: vectorSource,
             geometryFunction: (feature) => {
                 const geometry = feature.getGeometry();
@@ -271,14 +319,12 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
                 if (geomType === 'Point') {
                     return geometry as Point;
                 } else if (geomType === 'Polygon') {
-                    // Get the centroid of the polygon for clustering
                     const polygon = geometry as Polygon;
                     const extent = polygon.getExtent();
                     const centerX = (extent[0] + extent[2]) / 2;
                     const centerY = (extent[1] + extent[3]) / 2;
                     return new Point([centerX, centerY]);
                 } else if (geomType === 'LineString') {
-                    // Get the midpoint of the linestring for clustering
                     const line = geometry as LineString;
                     const coords = line.getCoordinates();
                     if (coords.length > 0) {
@@ -287,7 +333,6 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
                     }
                     return null;
                 } else if (geomType === 'MultiPolygon' || geomType === 'MultiLineString' || geomType === 'MultiPoint') {
-                    // For multi geometries, use the extent center
                     const extent = geometry.getExtent();
                     const centerX = (extent[0] + extent[2]) / 2;
                     const centerY = (extent[1] + extent[3]) / 2;
@@ -301,7 +346,7 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
 
         const dataLayer = new VectorLayer({
             source: clusterSource,
-            zIndex: 50,
+            zIndex: 50, // Above sites layer (zIndex: 10)
             style: (feature) => {
                 const features = feature.get('features');
                 if (!features || features.length === 0) {
@@ -314,11 +359,11 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
                     });
                 }
 
-                // Filter features based on visibility
+                // Filter features based on visibility (Sites are now in separate layer)
                 const visibleLayersList = (window as any).getVisibleLayers?.() || [];
                 const visibleFeatures = features.filter((f: Feature) => {
                     const type = f.get('object_type');
-                    return visibleLayersList.includes(type);
+                    return type !== 'Site' && visibleLayersList.includes(type);
                 });
 
                 // If no visible features, return empty style (hidden)
@@ -329,26 +374,26 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
                 const size = visibleFeatures.length;
 
                 if (size > 1) {
-                    // CLUSTER: Multiple features grouped together
-                    // Count sites vs other types
-                    let siteCount = 0;
-                    let otherCount = 0;
-                    let dominantColor = '#3b82f6';
+                    // CLUSTER: Multiple objects grouped together
+                    let dominantColor = '#22c55e'; // Default green for vegetation
+                    let vegCount = 0;
+                    let hydroCount = 0;
 
                     visibleFeatures.forEach((f: Feature) => {
-                        if (f.get('object_type') === 'Site') {
-                            siteCount++;
-                            dominantColor = f.get('color') || '#3b82f6';
+                        const type = f.get('object_type');
+                        if (['Arbre', 'Palmier', 'Gazon', 'Arbuste', 'Vivace', 'Cactus', 'Graminee'].includes(type)) {
+                            vegCount++;
                         } else {
-                            otherCount++;
-                            const type = f.get('object_type');
-                            if (type && OBJECT_COLORS[type]) dominantColor = OBJECT_COLORS[type];
+                            hydroCount++;
                         }
+                        if (type && OBJECT_COLORS[type]) dominantColor = OBJECT_COLORS[type];
                     });
 
-                    // If mostly sites, use site color
-                    if (siteCount > otherCount) {
-                        dominantColor = '#3b82f6'; // Blue for sites cluster
+                    // Use vegetation or hydraulic color based on majority
+                    if (hydroCount > vegCount) {
+                        dominantColor = '#0ea5e9'; // Blue for hydraulic
+                    } else {
+                        dominantColor = '#22c55e'; // Green for vegetation
                     }
 
                     return new Style({
@@ -364,42 +409,11 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
                         })
                     });
                 } else {
-                    // SINGLE FEATURE: Show individual marker
+                    // SINGLE FEATURE: Show individual object marker
                     const originalFeature = visibleFeatures[0];
                     const type = originalFeature.get('object_type');
 
-                    // Check if it's a Site
-                    if (type === 'Site') {
-                        const color = originalFeature.get('color') || '#3b82f6';
-                        const isHovered = originalFeature.get('hovered') === true;
-                        const geomType = originalFeature.getGeometry()?.getType();
-
-                        // Sites from backend have Polygon geometry (geometrie_emprise)
-                        if (geomType === 'Polygon' || geomType === 'MultiPolygon') {
-                            return new Style({
-                                fill: new Fill({
-                                    color: color + '33' // 20% opacity
-                                }),
-                                stroke: new Stroke({
-                                    color: color,
-                                    width: isHovered ? 4 : 3
-                                })
-                            });
-                        }
-
-                        // Point geometry (for backward compatibility or centroid display)
-                        return new Style({
-                            image: new Icon({
-                                src: createMarkerIcon(color, isHovered),
-                                anchor: [0.5, 1],
-                                anchorXUnits: 'fraction',
-                                anchorYUnits: 'fraction',
-                                scale: isHovered ? 1.1 : 1
-                            })
-                        });
-                    }
-
-                    // Other types (vegetation, hydrology, etc.)
+                    // Objects only (vegetation, hydrology, etc.) - Sites are in separate layer
                     const color = OBJECT_COLORS[type] || '#6b7280';
                     const symbolConfig = (window as any).getSymbologyConfig?.()?.[type];
 
@@ -442,7 +456,7 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
 
         const map = new Map({
             target: innerMapRef.current,
-            layers: [baseLayer, dataLayer],
+            layers: [baseLayer, sitesLayer, dataLayer], // Sites below objects
             view: new View({
                 center: fromLonLat([
                     INITIAL_POSITION?.lng ?? -6.8498,
@@ -467,31 +481,31 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
         // Track last hovered feature for cleanup
         let lastHoveredFeature: Feature | null = null;
 
-        // Pointer move event for hover effect on sites
+        // Pointer move event for hover effect on sites and objects
         map.on('pointermove', (evt) => {
             if (evt.dragging) {
               return;
             }
             const pixel = map.getEventPixel(evt.originalEvent);
-            const hit = map.hasFeatureAtPixel(pixel, {
+
+            // Check both sites and objects layers
+            const hitSites = map.hasFeatureAtPixel(pixel, {
+                layerFilter: (l) => l === sitesLayerRef.current
+            });
+            const hitObjects = map.hasFeatureAtPixel(pixel, {
                 layerFilter: (l) => l === dataLayerRef.current
             });
-            map.getTargetElement().style.cursor = hit ? 'pointer' : '';
+            map.getTargetElement().style.cursor = (hitSites || hitObjects) ? 'pointer' : '';
 
-            // Find cluster feature at pixel
-            const clusterFeature = map.forEachFeatureAtPixel(pixel, (feat) => feat as Feature, {
-                layerFilter: (l) => l === dataLayerRef.current
-            });
-
+            // Check for site feature first (priority to sites layer)
             let currentHoveredFeature: Feature | null = null;
-            if (clusterFeature) {
-                const featuresInCluster = clusterFeature.get('features');
-                if (featuresInCluster && featuresInCluster.length === 1) {
-                    const singleFeature = featuresInCluster[0];
-                    if (singleFeature.get('object_type') === 'Site') {
-                        currentHoveredFeature = singleFeature;
-                    }
-                }
+
+            const siteFeature = map.forEachFeatureAtPixel(pixel, (feat) => feat as Feature, {
+                layerFilter: (l) => l === sitesLayerRef.current
+            });
+
+            if (siteFeature && siteFeature.get('object_type') === 'Site') {
+                currentHoveredFeature = siteFeature;
             }
 
             if (lastHoveredFeature && lastHoveredFeature !== currentHoveredFeature) {
@@ -500,19 +514,15 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
 
             if (currentHoveredFeature) {
                 currentHoveredFeature.set('hovered', true);
-                const name = currentHoveredFeature.get('name');
-                const description = currentHoveredFeature.get('description');
-                const category = currentHoveredFeature.get('category');
-                const color = currentHoveredFeature.get('color');
+                const name = currentHoveredFeature.get('nom_site');
+                const code = currentHoveredFeature.get('code_site');
+                const superficie = currentHoveredFeature.get('superficie_totale');
+                const siteId = currentHoveredFeature.get('site_id');
 
-                // Category labels
-                const categoryLabels: Record<string, string> = {
-                    'RECHERCHE': 'Recherche',
-                    'INFRASTRUCTURE': 'Infrastructure',
-                    'RESIDENCE': 'Résidence',
-                    'SANTE': 'Santé',
-                    'HOTELLERIE': 'Hôtellerie'
-                };
+                // Generate color based on site ID
+                const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+                const colorIndex = siteId ? Math.abs(String(siteId).split('').reduce((a: number, b: string) => a + b.charCodeAt(0), 0)) % colors.length : 0;
+                const color = colors[colorIndex];
 
                 // Update tooltip content
                 hoverTooltip.innerHTML = `
@@ -528,34 +538,39 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
                         "></div>
                         <div style="flex: 1; min-width: 0;">
                             <div style="font-weight: 700; font-size: 14px; color: #1f2937; margin-bottom: 2px; line-height: 1.3;">
-                                ${name}
+                                ${name || 'Site'}
                             </div>
                             <div style="font-size: 11px; color: ${color}; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
-                                ${categoryLabels[category] || category}
+                                ${code || ''}
                             </div>
-                            <div style="font-size: 12px; color: #6b7280; line-height: 1.4;">
-                                ${description}
-                            </div>
+                            ${superficie ? `<div style="font-size: 12px; color: #6b7280; line-height: 1.4;">
+                                Surface: ${Number(superficie).toLocaleString('fr-FR')} m²
+                            </div>` : ''}
                         </div>
                     </div>
                 `;
 
-                // Use the geometry of the parent cluster for positioning
-                const geometry = clusterFeature.getGeometry() as Point;
-                hoverOverlay.setPosition(geometry.getCoordinates());
+                // Position tooltip at event coordinate
+                hoverOverlay.setPosition(evt.coordinate);
                 hoverTooltip.style.opacity = '1';
                 hoverTooltip.style.transform = 'translateY(0)';
-                setHoveredSiteId(currentHoveredFeature.get('site_id'));
+                setHoveredSiteId(siteId);
+
+                // Force redraw of sites layer
+                sitesLayerRef.current?.changed();
             } else {
                 hoverTooltip.style.opacity = '0';
                 hoverTooltip.style.transform = 'translateY(-10px)';
                 hoverOverlay.setPosition(undefined);
                 setHoveredSiteId(null);
+
+                // Force redraw if we un-hovered a site
+                if (lastHoveredFeature) {
+                    sitesLayerRef.current?.changed();
+                }
             }
 
             lastHoveredFeature = currentHoveredFeature;
-            // Force redraw to apply hover style change
-            dataLayerRef.current?.changed();
         });
 
         // Hide tooltip when mouse leaves map
@@ -563,7 +578,7 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
             if (lastHoveredFeature) {
                 lastHoveredFeature.set('hovered', false);
                 lastHoveredFeature = null;
-                dataLayerRef.current?.changed();
+                sitesLayerRef.current?.changed();
             }
             hoverTooltip.style.opacity = '0';
             hoverTooltip.style.transform = 'translateY(-10px)';
@@ -583,7 +598,37 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
 
         map.on('click', (evt) => {
             popupOverlay.current?.setPosition(undefined); // Close popup on any click first
-            const feature = map.forEachFeatureAtPixel(evt.pixel, (feat) => feat as Feature);
+
+            // First check for site click (sites layer)
+            const siteFeature = map.forEachFeatureAtPixel(evt.pixel, (feat) => feat as Feature, {
+                layerFilter: (l) => l === sitesLayerRef.current
+            });
+
+            if (siteFeature && siteFeature.get('object_type') === 'Site') {
+                const props = siteFeature.getProperties();
+                if (onObjectClick) {
+                    onObjectClick({
+                        id: props.id || props.site_id,
+                        type: 'Site',
+                        title: props.nom_site || 'Site',
+                        subtitle: props.code_site || '',
+                        attributes: {
+                            'Code': props.code_site,
+                            'Adresse': props.adresse || '-',
+                            'Surface totale': props.superficie_totale ? `${Number(props.superficie_totale).toLocaleString('fr-FR')} m²` : '-',
+                            'Date début contrat': props.date_debut_contrat || '-',
+                            'Date fin contrat': props.date_fin_contrat || '-',
+                            'Actif': props.actif ? 'Oui' : 'Non'
+                        }
+                    });
+                }
+                return;
+            }
+
+            // Then check for object click (data layer with clusters)
+            const feature = map.forEachFeatureAtPixel(evt.pixel, (feat) => feat as Feature, {
+                layerFilter: (l) => l === dataLayerRef.current
+            });
 
             if (!feature) {
                 return;
@@ -605,48 +650,19 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
                     });
                 }
             } else {
-                // Click on a single feature
+                // Click on a single object feature
                 const singleFeature = featuresInCluster[0];
                 const props = singleFeature.getProperties();
 
-                if (props.object_type === 'Site') {
-                    const siteData = SITES.find(s => s.id === props.site_id);
-                    if (onObjectClick && siteData) {
-                         const categoryLabels: Record<string, string> = {
-                            'RECHERCHE': 'Recherche',
-                            'INFRASTRUCTURE': 'Infrastructure',
-                            'RESIDENCE': 'Résidence',
-                            'SANTE': 'Santé',
-                            'HOTELLERIE': 'Hôtellerie'
-                        };
-                        onObjectClick({
-                            id: siteData.id,
-                            type: 'Site',
-                            title: siteData.name,
-                            subtitle: siteData.description,
-                            attributes: {
-                                'Catégorie': categoryLabels[siteData.category] || siteData.category,
-                                'Description': siteData.description,
-                                'Latitude': siteData.coordinates.lat.toFixed(6),
-                                'Longitude': siteData.coordinates.lng.toFixed(6),
-                                'Google Maps': siteData.googleMapsUrl,
-                                'Couleur': siteData.color
-                            }
-                        });
-                    }
-                    // Do not call showPopup for sites.
-                } else {
-                    // For other objects from API
-                    if (onObjectClick) {
-                        const name = props.nom || props.nom_site || props.marque || `${props.object_type} #${props.id}`;
-                        onObjectClick({
-                            id: props.id,
-                            type: props.object_type,
-                            title: name,
-                            subtitle: props.site_nom || '',
-                            attributes: props
-                        });
-                    }
+                if (onObjectClick) {
+                    const name = props.nom || props.marque || `${props.object_type} #${props.id}`;
+                    onObjectClick({
+                        id: props.id,
+                        type: props.object_type,
+                        title: name,
+                        subtitle: props.site_nom || '',
+                        attributes: props
+                    });
                 }
             }
         });
@@ -689,28 +705,24 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
         }
     }, [targetLocation]);
 
-    // Fetch Data Function - Uses individual endpoints in parallel
+    // Fetch Data Function - Fetches sites and objects separately
     const fetchData = async () => {
         console.log('=== fetchData START ===');
-        console.log('mapInstance.current:', !!mapInstance.current);
-        console.log('dataLayerRef.current:', !!dataLayerRef.current);
-        console.log('visibleLayers:', visibleLayers);
 
-        if (!mapInstance.current || !dataLayerRef.current) {
+        if (!mapInstance.current || !dataLayerRef.current || !sitesLayerRef.current) {
             console.log('Early return - refs not ready');
             return;
         }
 
         const geojsonFormat = new GeoJSON();
-        const allFeatures: Feature[] = [];
+        const objectFeatures: Feature[] = [];
+        const siteFeatures: Feature[] = [];
 
         // Helper function to fetch and process a single endpoint
-        const fetchEndpoint = async (endpoint: string, objectType: string) => {
+        const fetchEndpoint = async (endpoint: string, objectType: string): Promise<Feature[]> => {
             try {
                 const url = `${API_BASE_URL}/${endpoint}/`;
-                console.log(`Fetching: ${url}`);
                 const response = await fetch(url);
-                console.log(`${endpoint} status:`, response.status);
 
                 if (response.ok) {
                     const data = await response.json();
@@ -720,10 +732,8 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
                     let featureCollection = null;
 
                     if (data.results && data.results.type === 'FeatureCollection') {
-                        // Paginated GeoJSON response
                         featureCollection = data.results;
                     } else if (data.type === 'FeatureCollection') {
-                        // Direct GeoJSON response (no pagination)
                         featureCollection = data;
                     }
 
@@ -737,15 +747,16 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
 
                         features.forEach((feature, index) => {
                             feature.set('object_type', objectType);
-                            if (!feature.getId()) {
-                                const objId = feature.get('id') || index;
-                                feature.setId(`${objectType}-${objId}`);
+                            const objId = feature.get('id') || index;
+                            feature.setId(`${objectType}-${objId}`);
+
+                            // For sites, also set site_id for color generation
+                            if (objectType === 'Site') {
+                                feature.set('site_id', objId);
                             }
                         });
 
-                        allFeatures.push(...features);
-                    } else {
-                        console.warn(`${endpoint}: unexpected response format`, data);
+                        return features;
                     }
                 } else {
                     console.warn(`API ${endpoint} error:`, response.status);
@@ -753,28 +764,46 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
             } catch (err) {
                 console.warn(`Error fetching ${endpoint}:`, err);
             }
+            return [];
         };
 
-        const fetchPromises: Promise<void>[] = [];
+        // ================================================================
+        // FETCH SITES (separate layer - always fetch if Site is visible)
+        // ================================================================
+        if (visibleLayers.includes('Site')) {
+            const sites = await fetchEndpoint('sites', 'Site');
+            siteFeatures.push(...sites);
+        }
 
-        // Create fetch promises for each visible layer type
-        visibleLayers.forEach(layerType => {
+        // Update sites source
+        if (sitesSourceRef.current) {
+            sitesSourceRef.current.clear();
+            sitesSourceRef.current.addFeatures(siteFeatures);
+            console.log('Sites in source:', sitesSourceRef.current.getFeatures().length);
+        }
+
+        // ================================================================
+        // FETCH OBJECTS (clustered layer - all types except Site)
+        // ================================================================
+        const objectTypes = visibleLayers.filter(t => t !== 'Site');
+        const fetchPromises = objectTypes.map(layerType => {
             const endpoint = TYPE_TO_API[layerType];
             if (endpoint) {
-                fetchPromises.push(fetchEndpoint(endpoint, layerType));
+                return fetchEndpoint(endpoint, layerType);
             }
+            return Promise.resolve([]);
         });
 
-        // Execute all fetches in parallel
-        await Promise.all(fetchPromises);
+        const results = await Promise.all(fetchPromises);
+        results.forEach(features => objectFeatures.push(...features));
 
-        console.log('Total features fetched:', allFeatures.length);
+        console.log('Total objects fetched:', objectFeatures.length);
 
-        // Update source
+        // Update objects source
         if (vectorSourceRef.current) {
             vectorSourceRef.current.clear();
-            vectorSourceRef.current.addFeatures(allFeatures);
-            console.log('Features in source:', vectorSourceRef.current.getFeatures().length);
+            vectorSourceRef.current.addFeatures(objectFeatures);
+            console.log('Objects in source:', vectorSourceRef.current.getFeatures().length);
         }
     };
 
@@ -787,9 +816,12 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
         // Now fetch data (style function will have access to visibleLayers)
         fetchData();
 
-        // Force re-render of the data layer when visibility changes
+        // Force re-render of both layers when visibility changes
         if (dataLayerRef.current) {
             dataLayerRef.current.changed();
+        }
+        if (sitesLayerRef.current) {
+            sitesLayerRef.current.changed();
         }
 
         return () => { delete (window as any).getVisibleLayers; };

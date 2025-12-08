@@ -311,8 +311,6 @@ const Inventory: React.FC = () => {
     });
   }, [apiInventory]);
 
-  // Use API data directly (filtering is done by backend)
-  const filteredData = inventoryData;
 
   // Table columns
   const columns: Column<InventoryItem>[] = [
@@ -364,7 +362,7 @@ const Inventory: React.FC = () => {
   const handleExport = () => {
     const filename = `inventaire_${new Date().toISOString().split('T')[0]}.csv`;
     const headers = ['Type', 'Code', 'Nom', 'Site', 'Zone', 'État', 'Surface (m²)', 'Dernière Intervention'];
-    const dataToExport = filteredData.map(item => [
+    const dataToExport = inventoryData.map(item => [
       item.type,
       item.code,
       item.name,
@@ -596,38 +594,13 @@ const Inventory: React.FC = () => {
         {!isLoadingAPI && !apiError && (
           <>
             <DataTable
-              data={filteredData}
+              data={inventoryData}
               columns={columns}
               onRowClick={setSelectedItem}
-              itemsPerPage={filteredData.length} // Show all items (pagination is server-side)
+              itemsPerPage={10}
               showExport
               onExport={handleExport}
             />
-
-            {/* Server-side Pagination Controls */}
-            {apiInventory && apiInventory.count > 20 && (
-              <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-white rounded-b-lg">
-                <div className="text-sm text-gray-600">
-                  Page {currentPage} • {apiInventory.count} résultat{apiInventory.count > 1 ? 's' : ''} au total
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setCurrentPage(currentPage - 1)}
-                    disabled={!apiInventory.previous}
-                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-                  >
-                    Précédent
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={!apiInventory.next}
-                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-                  >
-                    Suivant
-                  </button>
-                </div>
-              </div>
-            )}
           </>
         )}
       </div>

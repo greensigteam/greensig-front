@@ -12,9 +12,8 @@ import {
 import { MAP_LAYERS, VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND } from '../constants';
 import { MapLayerType, Coordinates, MapSearchResult, OverlayState, MapObjectDetail } from '../types';
 import { MOCK_SITES, MOCK_INVENTORY } from '../services/mockData';
-import { SITES, Site } from '../data/sites';
 import { SitesLegend } from '../components/SitesLegend';
-import { searchObjects, geoJSONToLatLng } from '../services/api';
+import { searchObjects, geoJSONToLatLng, fetchAllSites, searchSites, SiteFrontend } from '../services/api';
 
 // Types pour la symbologie
 interface SymbologyConfig {
@@ -113,6 +112,27 @@ export const MapPage: React.FC<MapPageProps> = ({
   const [isSitesPanelOpen, setIsSitesPanelOpen] = useState(false);
   const [vegetationVisible, setVegetationVisible] = useState(true);
 
+  // Sites dynamiques chargés depuis l'API
+  const [sites, setSites] = useState<SiteFrontend[]>([]);
+  const [sitesLoading, setSitesLoading] = useState(true);
+
+  // Charger les sites depuis l'API au montage
+  useEffect(() => {
+    const loadSites = async () => {
+      try {
+        setSitesLoading(true);
+        const loadedSites = await fetchAllSites();
+        setSites(loadedSites);
+        console.log(`MapPage: ${loadedSites.length} sites chargés depuis l'API`);
+      } catch (error) {
+        console.error('Erreur chargement sites:', error);
+      } finally {
+        setSitesLoading(false);
+      }
+    };
+    loadSites();
+  }, []);
+
   // États pour les onglets Filtres/Symbologie
   const [layersPanelTab, setLayersPanelTab] = useState<'layers' | 'filters' | 'symbology'>('layers');
   const [symbologyConfig, setSymbologyConfig] = useState<Record<string, SymbologyConfig>>(createDefaultSymbology);
@@ -191,9 +211,101 @@ export const MapPage: React.FC<MapPageProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResult, setSearchResult] = useState<MapSearchResult | null>(null);
+  const [searchSuggestions, setSearchSuggestions] = useState<Array<{
+    id: string;
+    name: string;
+    type: string;
+    coordinates?: { lat: number; lng: number };
+  }>>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchContainerRef = React.useRef<HTMLDivElement>(null);
+
+  // Debounced search suggestions
+  useEffect(() => {
+    if (searchQuery.length < 2) {
+      setSearchSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const suggestions: Array<{ id: string; name: string; type: string; coordinates?: { lat: number; lng: number } }> = [];
+
+        // 1. Recherche dans les sites chargés (local, instantané)
+        const normalizedQuery = searchQuery.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const matchedSites = sites.filter(s => {
+          const name = s.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          const code = (s.code_site || '').toLowerCase();
+          return name.includes(normalizedQuery) || code.includes(normalizedQuery);
+        }).slice(0, 3);
+
+        matchedSites.forEach(site => {
+          suggestions.push({
+            id: `site-${site.id}`,
+            name: site.name,
+            type: 'Site',
+            coordinates: site.coordinates
+          });
+        });
+
+        // 2. Recherche API backend (si moins de 5 suggestions)
+        if (suggestions.length < 5) {
+          try {
+            const apiResults = await searchObjects(searchQuery);
+            apiResults.slice(0, 5 - suggestions.length).forEach(result => {
+              if (result.location) {
+                suggestions.push({
+                  id: result.id,
+                  name: result.name,
+                  type: result.type,
+                  coordinates: geoJSONToLatLng(result.location.coordinates)
+                });
+              }
+            });
+          } catch (error) {
+            console.error('Erreur suggestions API:', error);
+          }
+        }
+
+        setSearchSuggestions(suggestions);
+        setShowSuggestions(suggestions.length > 0);
+      } catch (error) {
+        console.error('Erreur suggestions:', error);
+      }
+    }, 300); // Debounce 300ms
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, sites]);
+
+  // Fermer les suggestions en cliquant ailleurs
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Handler pour sélectionner une suggestion
+  const handleSuggestionClick = (suggestion: typeof searchSuggestions[0]) => {
+    if (suggestion.coordinates) {
+      setSearchQuery(suggestion.name);
+      setSearchResult({
+        name: suggestion.name,
+        description: suggestion.type,
+        coordinates: suggestion.coordinates,
+        zoom: 18
+      });
+      setTargetLocation({ coordinates: suggestion.coordinates, zoom: 18 });
+      setShowSuggestions(false);
+    }
+  };
 
   // Handler pour naviguer vers un site
-  const handleSiteClick = (site: Site) => {
+  const handleSiteClick = (site: SiteFrontend) => {
     setTargetLocation({ coordinates: site.coordinates, zoom: 17 });
     setSearchResult({
       name: site.name,
@@ -203,78 +315,40 @@ export const MapPage: React.FC<MapPageProps> = ({
     });
   };
 
-  // Local Search Implementation (User 1.1.6)
+  // Local Search Implementation - Utilise les sites dynamiques depuis l'API
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
 
     setIsSearching(true);
     setSearchResult(null);
 
-    // Simulate search delay for local search
-    setTimeout(async () => {
+    try {
       // Normalisation de la requête (minuscules, sans accents)
       const query = searchQuery.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-      // 1. Recherche prioritaire dans les 12 SITES (Nom, Description, Catégorie)
-      const site = SITES.find(s => {
+      // 1. Recherche prioritaire dans les sites chargés depuis l'API
+      const matchedSite = sites.find(s => {
         const name = s.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const desc = s.description.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const code = (s.code_site || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const cat = s.category.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-        return name.includes(query) || desc.includes(query) || cat.includes(query);
+        return name.includes(query) || desc.includes(query) || code.includes(query) || cat.includes(query);
       });
 
-      if (site) {
+      if (matchedSite) {
         setSearchResult({
-          name: site.name,
-          description: `${site.category} - ${site.description}`,
-          coordinates: site.coordinates,
+          name: matchedSite.name,
+          description: `${matchedSite.category} - ${matchedSite.description}`,
+          coordinates: matchedSite.coordinates,
           zoom: 18
         });
-        setTargetLocation({ coordinates: site.coordinates, zoom: 18 });
+        setTargetLocation({ coordinates: matchedSite.coordinates, zoom: 18 });
         setIsSearching(false);
         return;
       }
 
-      // 2. Recherche secondaire dans les MOCK_SITES (anciens)
-      const mockSite = MOCK_SITES.find(s => s.name.toLowerCase().includes(query));
-      if (mockSite) {
-        setSearchResult({
-          name: mockSite.name,
-          description: `Site - ${mockSite.address}`,
-          coordinates: mockSite.coordinates,
-          zoom: 18
-        });
-        setTargetLocation({ coordinates: mockSite.coordinates, zoom: 18 });
-        setIsSearching(false);
-        return;
-      }
-
-      // 3. Recherche dans l'Inventaire (local mock - fallback)
-      const item = MOCK_INVENTORY.find(i =>
-        i.name.toLowerCase().includes(query) ||
-        i.type.toLowerCase().includes(query)
-      );
-
-      if (item) {
-        const parentSite = MOCK_SITES.find(s => s.id === item.siteId);
-        const coords = parentSite ? {
-          lat: parentSite.coordinates.lat + 0.0001,
-          lng: parentSite.coordinates.lng + 0.0001
-        } : { lat: 48.8566, lng: 2.3522 };
-
-        setSearchResult({
-          name: item.name,
-          description: `Inventaire (${item.type}) - Code: ${item.code}`,
-          coordinates: coords,
-          zoom: 20
-        });
-        setTargetLocation({ coordinates: coords, zoom: 20 });
-        setIsSearching(false);
-        return;
-      }
-
-      // 4. Recherche API Django (Sites, SousSites, Arbres du backend)
+      // 2. Recherche API Django (Sites, SousSites, Arbres du backend)
       try {
         const apiResults = await searchObjects(searchQuery);
         if (apiResults && apiResults.length > 0) {
@@ -283,7 +357,7 @@ export const MapPage: React.FC<MapPageProps> = ({
             const coords = geoJSONToLatLng(firstResult.location.coordinates);
             setSearchResult({
               name: firstResult.name,
-              description: `${firstResult.type} (Backend)`,
+              description: `${firstResult.type} (API)`,
               coordinates: coords,
               zoom: 18
             });
@@ -297,7 +371,21 @@ export const MapPage: React.FC<MapPageProps> = ({
         // Continue vers Nominatim si l'API échoue
       }
 
-      // 5. Fallback to Nominatim external search
+      // 3. Fallback: recherche dans les données mock (pour compatibilité)
+      const mockSite = MOCK_SITES.find(s => s.name.toLowerCase().includes(query));
+      if (mockSite) {
+        setSearchResult({
+          name: mockSite.name,
+          description: `Site - ${mockSite.address}`,
+          coordinates: mockSite.coordinates,
+          zoom: 18
+        });
+        setTargetLocation({ coordinates: mockSite.coordinates, zoom: 18 });
+        setIsSearching(false);
+        return;
+      }
+
+      // 4. Fallback to Nominatim external search
       try {
         const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`);
         if (!response.ok) {
@@ -321,10 +409,10 @@ export const MapPage: React.FC<MapPageProps> = ({
       } catch (error) {
         console.error("Error during Nominatim search:", error);
         alert("Une erreur est survenue lors de la recherche externe. Vérifiez votre connexion internet.");
-      } finally {
-        setIsSearching(false);
       }
-    }, 250); // Reduced delay
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const handleGeolocation = () => {
@@ -502,33 +590,75 @@ export const MapPage: React.FC<MapPageProps> = ({
         {!isPanelOpen && (
           <>
             {/* Search Group */}
-            <div className="flex gap-2 w-72 md:w-96 shrink-0">
-              <div className="flex-1 bg-white/90 backdrop-blur-md shadow-xl rounded-xl flex items-center p-1 border border-white/20 ring-1 ring-black/5 transition-all focus-within:ring-2 focus-within:ring-emerald-600/50">
-                <div className="p-2.5 text-slate-400">
-                  {isSearching ? <Loader2 className="w-5 h-5 animate-spin text-emerald-600" /> : <Search className="w-5 h-5" />}
+            <div className="flex gap-2 w-72 md:w-96 shrink-0" ref={searchContainerRef}>
+              <div className="flex-1 relative">
+                <div className="bg-white/90 backdrop-blur-md shadow-xl rounded-xl flex items-center p-1 border border-white/20 ring-1 ring-black/5 transition-all focus-within:ring-2 focus-within:ring-emerald-600/50">
+                  <div className="p-2.5 text-slate-400">
+                    {isSearching ? <Loader2 className="w-5 h-5 animate-spin text-emerald-600" /> : <Search className="w-5 h-5" />}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Rechercher un site, équipement..."
+                    className="flex-1 bg-transparent outline-none text-slate-700 placeholder:text-slate-400 text-sm font-medium h-9 w-full min-w-0"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSearchQuery(value);
+                      if (value.trim() === '') {
+                        setSearchResult(null);
+                        setShowSuggestions(false);
+                      }
+                    }}
+                    onFocus={() => {
+                      if (searchSuggestions.length > 0) {
+                        setShowSuggestions(true);
+                      }
+                    }}
+                    onKeyDown={handleKeyDown}
+                    disabled={isSearching}
+                  />
+                  <button
+                    onClick={handleSearch}
+                    className="p-2.5 text-slate-400 hover:text-emerald-600 border-l border-slate-100 transition-colors disabled:opacity-50"
+                    disabled={isSearching}
+                  >
+                    <Navigation className="w-4 h-4" />
+                  </button>
                 </div>
-                <input
-                  type="text"
-                  placeholder="Rechercher..."
-                  className="flex-1 bg-transparent outline-none text-slate-700 placeholder:text-slate-400 text-sm font-medium h-9 w-full min-w-0"
-                  value={searchQuery}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setSearchQuery(value);
-                    if (value.trim() === '') {
-                      setSearchResult(null);
-                    }
-                  }}
-                  onKeyDown={handleKeyDown}
-                  disabled={isSearching}
-                />
-                <button
-                  onClick={handleSearch}
-                  className="p-2.5 text-slate-400 hover:text-emerald-600 border-l border-slate-100 transition-colors disabled:opacity-50"
-                  disabled={isSearching}
-                >
-                  <Navigation className="w-4 h-4" />
-                </button>
+
+                {/* Suggestions Dropdown */}
+                {showSuggestions && searchSuggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white/95 backdrop-blur-md rounded-xl shadow-xl border border-white/20 ring-1 ring-black/5 overflow-hidden z-[100]">
+                    {searchSuggestions.map((suggestion, index) => (
+                      <button
+                        key={suggestion.id}
+                        onClick={() => handleSuggestionClick(suggestion)}
+                        className={`w-full px-4 py-3 flex items-center gap-3 hover:bg-emerald-50 transition-colors text-left ${
+                          index !== searchSuggestions.length - 1 ? 'border-b border-slate-100' : ''
+                        }`}
+                      >
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                          {suggestion.type === 'Site' ? (
+                            <MapIcon className="w-4 h-4 text-emerald-600" />
+                          ) : suggestion.type === 'Arbre' ? (
+                            <Trees className="w-4 h-4 text-green-600" />
+                          ) : (
+                            <Navigation className="w-4 h-4 text-blue-600" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm text-slate-800 truncate">
+                            {suggestion.name}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {suggestion.type}
+                          </div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <button
@@ -550,7 +680,7 @@ export const MapPage: React.FC<MapPageProps> = ({
               </button>
             </div>
 
-            {/* Site Dropdown (Moved inline) */}
+            {/* Site Dropdown - Sites dynamiques depuis l'API */}
             <div className="bg-white/90 backdrop-blur-md shadow-xl rounded-xl p-1 border border-white/20 ring-1 ring-black/5 flex items-center w-64 shrink-0">
               <div className="p-2 text-slate-400">
                 <MapIcon className="w-4 h-4" />
@@ -560,7 +690,7 @@ export const MapPage: React.FC<MapPageProps> = ({
                 onChange={(e) => {
                   const siteId = e.target.value;
                   if (!siteId) return;
-                  const site = SITES.find(s => s.id === siteId);
+                  const site = sites.find(s => s.id === siteId);
                   if (site) {
                     setTargetLocation({ coordinates: site.coordinates, zoom: 17 });
                     setSearchResult({
@@ -572,9 +702,12 @@ export const MapPage: React.FC<MapPageProps> = ({
                   }
                 }}
                 defaultValue=""
+                disabled={sitesLoading}
               >
-                <option value="" disabled>Aller à un site...</option>
-                {SITES.map(site => (
+                <option value="" disabled>
+                  {sitesLoading ? 'Chargement...' : `Aller à un site (${sites.length})...`}
+                </option>
+                {sites.map(site => (
                   <option key={site.id} value={site.id}>
                     {site.name}
                   </option>
