@@ -21,7 +21,7 @@ import { LayerConfig, Coordinates } from "../types";
 import { INITIAL_POSITION, VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND } from "../constants";
 import { SITES } from "../data/sites";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
 // SVG Icons for site categories
 const createSiteIcon = (color: string, category: string, isHovered: boolean = false): string => {
@@ -253,29 +253,49 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
         });
         hoverOverlayRef.current = hoverOverlay;
 
-        // Single vector source for all data (sites + API data)
+        // Single vector source for all data (fetched from backend API)
         const vectorSource = new VectorSource();
         vectorSourceRef.current = vectorSource;
 
-        // Add static sites to the vector source
-        SITES.forEach(site => {
-            const feature = new Feature({
-                geometry: new Point(fromLonLat([site.coordinates.lng, site.coordinates.lat])),
-                name: site.name,
-                description: site.description,
-                category: site.category,
-                color: site.color,
-                object_type: 'Site',
-                site_id: site.id
-            });
-            feature.setId(site.id);
-            vectorSource.addFeature(feature);
-        });
-
         // Cluster source wrapping the vector source
+        // Custom geometryFunction to handle Polygon and LineString by using their centroid
         const clusterSource = new Cluster({
             distance: clusteringEnabled ? 50 : 0, // Use prop value
-            source: vectorSource
+            source: vectorSource,
+            geometryFunction: (feature) => {
+                const geometry = feature.getGeometry();
+                if (!geometry) return null;
+
+                const geomType = geometry.getType();
+
+                if (geomType === 'Point') {
+                    return geometry as Point;
+                } else if (geomType === 'Polygon') {
+                    // Get the centroid of the polygon for clustering
+                    const polygon = geometry as Polygon;
+                    const extent = polygon.getExtent();
+                    const centerX = (extent[0] + extent[2]) / 2;
+                    const centerY = (extent[1] + extent[3]) / 2;
+                    return new Point([centerX, centerY]);
+                } else if (geomType === 'LineString') {
+                    // Get the midpoint of the linestring for clustering
+                    const line = geometry as LineString;
+                    const coords = line.getCoordinates();
+                    if (coords.length > 0) {
+                        const midIndex = Math.floor(coords.length / 2);
+                        return new Point(coords[midIndex]);
+                    }
+                    return null;
+                } else if (geomType === 'MultiPolygon' || geomType === 'MultiLineString' || geomType === 'MultiPoint') {
+                    // For multi geometries, use the extent center
+                    const extent = geometry.getExtent();
+                    const centerX = (extent[0] + extent[2]) / 2;
+                    const centerY = (extent[1] + extent[3]) / 2;
+                    return new Point([centerX, centerY]);
+                }
+
+                return null;
+            }
         });
         clusterSourceRef.current = clusterSource;
 
@@ -352,7 +372,22 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
                     if (type === 'Site') {
                         const color = originalFeature.get('color') || '#3b82f6';
                         const isHovered = originalFeature.get('hovered') === true;
+                        const geomType = originalFeature.getGeometry()?.getType();
 
+                        // Sites from backend have Polygon geometry (geometrie_emprise)
+                        if (geomType === 'Polygon' || geomType === 'MultiPolygon') {
+                            return new Style({
+                                fill: new Fill({
+                                    color: color + '33' // 20% opacity
+                                }),
+                                stroke: new Stroke({
+                                    color: color,
+                                    width: isHovered ? 4 : 3
+                                })
+                            });
+                        }
+
+                        // Point geometry (for backward compatibility or centroid display)
                         return new Style({
                             image: new Icon({
                                 src: createMarkerIcon(color, isHovered),
@@ -422,6 +457,12 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
         map.addOverlay(hoverOverlay);
 
         mapInstance.current = map;
+
+        // Initial data fetch after map is ready
+        // Use setTimeout to ensure map is fully rendered
+        setTimeout(() => {
+            fetchData();
+        }, 500);
 
         // Track last hovered feature for cleanup
         let lastHoveredFeature: Feature | null = null;
@@ -648,74 +689,109 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
         }
     }, [targetLocation]);
 
-    // Fetch Data Function
+    // Fetch Data Function - Uses individual endpoints in parallel
     const fetchData = async () => {
-        if (!mapInstance.current || !dataLayerRef.current) return;
+        console.log('=== fetchData START ===');
+        console.log('mapInstance.current:', !!mapInstance.current);
+        console.log('dataLayerRef.current:', !!dataLayerRef.current);
+        console.log('visibleLayers:', visibleLayers);
 
-        const view = mapInstance.current.getView();
-        const zoom = view.getZoom()!;
-        const extent = view.calculateExtent(mapInstance.current.getSize());
-        const bbox = transformExtent(extent, 'EPSG:3857', 'EPSG:4326');
-        // format: west,south,east,north
-        const bboxStr = `${bbox[0]},${bbox[1]},${bbox[2]},${bbox[3]}`;
+        if (!mapInstance.current || !dataLayerRef.current) {
+            console.log('Early return - refs not ready');
+            return;
+        }
 
-        const apiTypes = visibleLayers.length > 0
-            ? visibleLayers.map(type => TYPE_TO_API[type] || type.toLowerCase()).join(',')
-            : '';
-        const types = apiTypes ? `&types=${apiTypes}` : '';
+        const geojsonFormat = new GeoJSON();
+        const allFeatures: Feature[] = [];
 
-        try {
-            const response = await fetch(`${API_BASE_URL}/map/?bbox=${bboxStr}&zoom=${zoom}${types}`);
-            if (response.ok) {
-                const data = await response.json();
-                const geojsonFormat = new GeoJSON();
-                // Read features and transform to map projection
-                const features = geojsonFormat.readFeatures(data, {
-                    featureProjection: 'EPSG:3857'
-                });
+        // Helper function to fetch and process a single endpoint
+        const fetchEndpoint = async (endpoint: string, objectType: string) => {
+            try {
+                const url = `${API_BASE_URL}/${endpoint}/`;
+                console.log(`Fetching: ${url}`);
+                const response = await fetch(url);
+                console.log(`${endpoint} status:`, response.status);
 
-                // Update source directly using the ref
-                if (vectorSourceRef.current) {
-                    vectorSourceRef.current.clear();
+                if (response.ok) {
+                    const data = await response.json();
 
-                    // Re-add static sites if they should be visible
-                    const showSites = visibleLayers.includes('Site');
-                    if (showSites) {
-                        SITES.forEach(site => {
-                            const feature = new Feature({
-                                geometry: new Point(fromLonLat([site.coordinates.lng, site.coordinates.lat])),
-                                name: site.name,
-                                description: site.description,
-                                category: site.category,
-                                color: site.color,
-                                object_type: 'Site',
-                                site_id: site.id
-                            });
-                            feature.setId(site.id);
-                            vectorSourceRef.current?.addFeature(feature);
-                        });
+                    // DRF GeoFeatureModelSerializer with pagination returns:
+                    // { count, next, previous, results: { type: 'FeatureCollection', features: [...] } }
+                    let featureCollection = null;
+
+                    if (data.results && data.results.type === 'FeatureCollection') {
+                        // Paginated GeoJSON response
+                        featureCollection = data.results;
+                    } else if (data.type === 'FeatureCollection') {
+                        // Direct GeoJSON response (no pagination)
+                        featureCollection = data;
                     }
 
-                    vectorSourceRef.current.addFeatures(features);
+                    if (featureCollection && featureCollection.features) {
+                        console.log(`${endpoint}: ${featureCollection.features.length} features`);
+
+                        const features = geojsonFormat.readFeatures(featureCollection, {
+                            dataProjection: 'EPSG:4326',
+                            featureProjection: 'EPSG:3857'
+                        });
+
+                        features.forEach((feature, index) => {
+                            feature.set('object_type', objectType);
+                            if (!feature.getId()) {
+                                const objId = feature.get('id') || index;
+                                feature.setId(`${objectType}-${objId}`);
+                            }
+                        });
+
+                        allFeatures.push(...features);
+                    } else {
+                        console.warn(`${endpoint}: unexpected response format`, data);
+                    }
+                } else {
+                    console.warn(`API ${endpoint} error:`, response.status);
                 }
+            } catch (err) {
+                console.warn(`Error fetching ${endpoint}:`, err);
             }
-        } catch (err) {
-            console.error("Error fetching map data", err);
+        };
+
+        const fetchPromises: Promise<void>[] = [];
+
+        // Create fetch promises for each visible layer type
+        visibleLayers.forEach(layerType => {
+            const endpoint = TYPE_TO_API[layerType];
+            if (endpoint) {
+                fetchPromises.push(fetchEndpoint(endpoint, layerType));
+            }
+        });
+
+        // Execute all fetches in parallel
+        await Promise.all(fetchPromises);
+
+        console.log('Total features fetched:', allFeatures.length);
+
+        // Update source
+        if (vectorSourceRef.current) {
+            vectorSourceRef.current.clear();
+            vectorSourceRef.current.addFeatures(allFeatures);
+            console.log('Features in source:', vectorSourceRef.current.getFeatures().length);
         }
     };
 
-    // Re-fetch when layers change
+    // Expose visibleLayers to window for style function to access AND fetch data
     useEffect(() => {
-        fetchData();
-    }, [visibleLayers]);
-
-    // Expose visibleLayers to window for style function to access
-    useEffect(() => {
+        // IMPORTANT: Set getVisibleLayers BEFORE fetching data
+        // The style function uses this to filter visible features
         (window as any).getVisibleLayers = () => visibleLayers;
+
+        // Now fetch data (style function will have access to visibleLayers)
+        fetchData();
+
         // Force re-render of the data layer when visibility changes
         if (dataLayerRef.current) {
             dataLayerRef.current.changed();
         }
+
         return () => { delete (window as any).getVisibleLayers; };
     }, [visibleLayers]);
 

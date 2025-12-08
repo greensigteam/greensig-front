@@ -313,59 +313,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({ onToggleLayer, isSidebarCollapsed
                   </div>
                 </div>
 
-                <div className="border-t border-gray-100 pt-3 space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-gray-700 uppercase flex items-center gap-2">
-                      État / Statut
-                    </label>
-                    <select
-                      className="w-full text-sm p-2 rounded border border-gray-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none bg-white"
-                      value={statusFilter}
-                      onChange={(e) => {
-                        setStatusFilter(e.target.value);
-                        console.log("Filter by status:", e.target.value);
-                      }}
-                    >
-                      <option value="all">Tous les statuts</option>
-                      <option value="service" className="text-green-600">En Service / Actif</option>
-                      <option value="maintenance" className="text-orange-600">En Maintenance</option>
-                      <option value="hors_service" className="text-red-600">Hors Service</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-gray-700 uppercase flex items-center gap-2">
-                      Filtre Temporel
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <span className="text-[10px] text-gray-500 mb-0.5 block">Du</span>
-                        <input
-                          type="date"
-                          value={startDateFilter}
-                          onChange={(e) => setStartDateFilter(e.target.value)}
-                          className="w-full text-xs p-1.5 rounded border border-gray-300 focus:border-emerald-500 outline-none"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-gray-500 mb-0.5 block">Au</span>
-                        <input
-                          type="date"
-                          value={endDateFilter}
-                          onChange={(e) => setEndDateFilter(e.target.value)}
-                          className="w-full text-xs p-1.5 rounded border border-gray-300 focus:border-emerald-500 outline-none"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={resetAllFilters}
-                    className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded transition-colors flex items-center justify-center gap-1"
-                  >
-                    <RotateCcw className="w-3 h-3" /> Réinitialiser les filtres
-                  </button>
-                </div>
+                {/* ...existing code... */}
               </div>
             )}
 
