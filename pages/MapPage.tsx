@@ -490,31 +490,7 @@ export const MapPage: React.FC<MapPageProps> = ({
     }
   };
 
-  // Configuration de la légende dynamique
-  const legendItems = [
-    {
-      key: 'greenSpaces',
-      label: 'Espace Vert Public',
-      renderIcon: () => <span className="w-3 h-3 rounded bg-emerald-500 shadow-sm ring-1 ring-black/5"></span>
-    },
-    {
-      key: 'networks',
-      label: 'Réseaux / Canalisations',
-      renderIcon: () => <span className="w-3 h-3 rounded bg-blue-500 shadow-sm ring-1 ring-black/5"></span>
-    },
-    {
-      key: 'works',
-      label: 'Intervention en cours',
-      renderIcon: () => <span className="w-3 h-3 rounded-full bg-orange-500 shadow-sm ring-1 ring-black/5 border-2 border-white"></span>
-    },
-    {
-      key: 'parcels',
-      label: 'Parcelle Cadastrale',
-      renderIcon: () => <span className="w-3 h-3 rounded border border-slate-400 border-dashed bg-slate-100"></span>
-    }
-  ];
 
-  const activeOverlayCount = Object.values(overlays).filter(Boolean).length;
 
   return (
     <>
@@ -881,18 +857,7 @@ export const MapPage: React.FC<MapPageProps> = ({
                     <Trees className="w-3 h-3" /> Options
                   </h4>
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                      <div className="flex items-center gap-2">
-                        <div className={`p-1 rounded-md ${vegetationVisible ? 'bg-emerald-50 text-emerald-600' : 'bg-white text-slate-400'}`}>
-                          <Trees className="w-3.5 h-3.5" />
-                        </div>
-                        <span className="text-xs font-medium">Végétation</span>
-                      </div>
-                      <label className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${vegetationVisible ? 'bg-emerald-500' : 'bg-slate-300'}`}>
-                        <input type="checkbox" className="hidden" checked={vegetationVisible} onChange={(e) => setVegetationVisible(e.target.checked)} />
-                        <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${vegetationVisible ? 'translate-x-4' : 'translate-x-0'}`} />
-                      </label>
-                    </div>
+                    {/* Option 'Végétation' supprimée */}
                     <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100">
                       <div className="flex items-center gap-2">
                         <div className={`p-1 rounded-md ${clusteringEnabled ? 'bg-blue-50 text-blue-600' : 'bg-white text-slate-400'}`}>
@@ -908,38 +873,7 @@ export const MapPage: React.FC<MapPageProps> = ({
                   </div>
                 </div>
 
-                {/* Données Métier */}
-                <div>
-                  <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <Grid className="w-3 h-3" /> Données Métier
-                  </h4>
-                  <div className="space-y-2">
-                    {legendItems.map((item) => {
-                      const key = item.key as keyof OverlayState;
-                      const isActive = overlays[key];
-                      const Icon = key === 'networks' ? Zap : key === 'greenSpaces' ? Trees : key === 'works' ? Hammer : Grid;
-                      const colorClass = key === 'networks' ? 'text-blue-600' : key === 'greenSpaces' ? 'text-emerald-600' : key === 'works' ? 'text-orange-600' : 'text-slate-600';
-
-                      return (
-                        <div
-                          key={key}
-                          className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100 cursor-pointer hover:border-slate-200 transition-colors"
-                          onClick={() => onToggleOverlay(key)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className={`p-1 bg-white rounded-md shadow-sm ${isActive ? colorClass : 'text-slate-400'}`}>
-                              <Icon className="w-3.5 h-3.5" />
-                            </div>
-                            <span className={`text-xs font-medium ${isActive ? 'text-slate-700' : 'text-slate-500'}`}>{item.label}</span>
-                          </div>
-                          <div className={`w-9 h-5 rounded-full p-0.5 transition-colors ${isActive ? 'bg-emerald-500' : 'bg-slate-300'}`}>
-                            <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${isActive ? 'translate-x-4' : 'translate-x-0'}`} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                {/* Section Données Métier supprimée */}
               </div>
             )}
 
@@ -1234,78 +1168,12 @@ export const MapPage: React.FC<MapPageProps> = ({
             )}
           </div>
 
-          <div className="p-3 bg-slate-50 border-t border-slate-100 text-center">
-            <button className="text-xs text-emerald-600 font-medium hover:underline flex items-center justify-center gap-1 mx-auto">
-              <Plus className="w-3 h-3" /> Ajouter une couche WMS/WFS
-            </button>
-          </div>
+      
         </div>
       )}
 
-      {/* 3. Floating Bottom Right Panel Stack (Legend + Sites) */}
-      <div className="absolute bottom-8 right-4 pointer-events-auto flex flex-row gap-3 items-end z-50">
 
-
-
-        {/* Dynamic Legend Panel */}
-        <div className="bg-white/90 backdrop-blur-md rounded-xl shadow-xl border border-white/20 w-64 ring-1 ring-black/5 transition-all overflow-hidden">
-          {/* Header - Always Visible - Clickable to Toggle */}
-          <div
-            className={`flex justify-between items-center p-3 cursor-pointer hover:bg-slate-50 transition-colors ${isLegendOpen ? 'border-b border-slate-100' : ''}`}
-            onClick={() => setIsLegendOpen(!isLegendOpen)}
-          >
-            <h4 className="text-xs font-bold uppercase text-slate-500 tracking-wider flex items-center gap-2">
-              <Info className="w-3 h-3" /> Légende
-              {activeOverlayCount > 0 && <span className="bg-emerald-100 text-emerald-700 px-1.5 rounded-full text-[9px]">{activeOverlayCount}</span>}
-            </h4>
-            <div className="text-slate-400">
-              {isLegendOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
-            </div>
-          </div>
-
-          {/* Content - Conditionally Visible */}
-          {isLegendOpen && (
-            <div className="p-4 pt-3 animate-in slide-in-from-top-2 duration-200">
-              <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
-                {legendItems.map((item) => {
-                  const isActive = overlays[item.key as keyof OverlayState];
-
-                  // Render grayed out if inactive, normal if active
-                  return (
-                    <div
-                      key={item.key}
-                      className={`flex items-center gap-3 text-xs font-medium transition-all duration-300 ${isActive ? 'text-slate-700 opacity-100' : 'text-slate-400 opacity-50 grayscale'
-                        }`}
-                    >
-                      {item.renderIcon()}
-                      <span>{item.label}</span>
-                      <div className="ml-auto">
-                        {isActive ? <Eye className="w-3 h-3 text-slate-400" /> : <EyeOff className="w-3 h-3 text-slate-300" />}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {activeOverlayCount === 0 && (
-                  <div className="text-xs text-slate-400 italic text-center py-2 border-t border-dashed border-slate-200 mt-2">
-                    Aucune couche métier active
-                  </div>
-                )}
-              </div>
-
-              {/* Info Fond de carte - Dynamic */}
-              <div className="mt-3 pt-2 border-t border-slate-200/50">
-                <div className="text-[10px] text-slate-400 flex justify-between items-center">
-                  <span>Fond de plan:</span>
-                  <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full truncate max-w-[120px]">
-                    {MAP_LAYERS[activeLayerId].name}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* 3. Floating Bottom Right Panel Stack (Legend + Sites) - Section métier supprimée */}
 
 
       {/* 4. Zoom Controls & Pan Control */}
