@@ -187,6 +187,82 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
         getZoom: () => {
             return mapInstance.current?.getView().getZoom() || 0;
         },
+        getCenter: (): Coordinates | null => {
+            if (!mapInstance.current) return null;
+            const center = mapInstance.current.getView().getCenter();
+            if (!center) return null;
+            const [lng, lat] = toLonLat(center);
+            return { lat, lng };
+        },
+        getMapElement: () => {
+            return innerMapRef.current;
+        },
+        exportCanvas: (): Promise<string> => {
+            return new Promise((resolve, reject) => {
+                if (!mapInstance.current) {
+                    reject(new Error('Map not initialized'));
+                    return;
+                }
+
+                const map = mapInstance.current;
+
+                // Force a render and wait for completion
+                map.once('rendercomplete', () => {
+                    try {
+                        const mapCanvas = document.createElement('canvas');
+                        const size = map.getSize();
+                        if (!size) {
+                            reject(new Error('Map size not available'));
+                            return;
+                        }
+
+                        mapCanvas.width = size[0];
+                        mapCanvas.height = size[1];
+                        const mapContext = mapCanvas.getContext('2d');
+
+                        if (!mapContext) {
+                            reject(new Error('Could not get canvas context'));
+                            return;
+                        }
+
+                        // Get all canvas elements from the map viewport
+                        const mapViewport = map.getViewport();
+                        const canvases = mapViewport.querySelectorAll('canvas');
+
+                        canvases.forEach((canvas) => {
+                            if (canvas.width > 0) {
+                                const opacity = (canvas.parentNode as HTMLElement)?.style?.opacity || '1';
+                                mapContext.globalAlpha = parseFloat(opacity);
+
+                                // Get the transform from the canvas style
+                                const transform = canvas.style.transform;
+                                const matrix = transform
+                                    .match(/matrix\(([^)]+)\)/)?.[1]
+                                    ?.split(',')
+                                    .map(Number) || [1, 0, 0, 1, 0, 0];
+
+                                mapContext.setTransform(
+                                    matrix[0], matrix[1], matrix[2],
+                                    matrix[3], matrix[4], matrix[5]
+                                );
+
+                                mapContext.drawImage(canvas, 0, 0);
+                            }
+                        });
+
+                        mapContext.globalAlpha = 1;
+                        mapContext.setTransform(1, 0, 0, 1, 0, 0);
+
+                        resolve(mapCanvas.toDataURL('image/png'));
+                    } catch (err) {
+                        reject(err);
+                    }
+                });
+
+                // Trigger render
+                map.renderSync();
+            });
+        },
         invalidateSize: () => {
             mapInstance.current?.updateSize();
         },
@@ -219,7 +295,8 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
             source: new XYZ({
                 url: activeLayer.url,
                 maxZoom: activeLayer.maxNativeZoom || 19,
-                attributions: activeLayer.attribution
+                attributions: activeLayer.attribution,
+                crossOrigin: 'anonymous'
             })
         });
 
@@ -301,12 +378,13 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
         sitesLayerRef.current = sitesLayer;
 
         // ================================================================
-        // OBJECTS LAYER - For vegetation and hydraulic objects (clustered)
+        // OBJECTS LAYER - For vegetation and hydraulic objects
         // ================================================================
         const vectorSource = new VectorSource();
         vectorSourceRef.current = vectorSource;
 
         // Cluster source wrapping the vector source (for objects only, not sites)
+        // Only used when clustering is enabled
         const clusterSource = new Cluster({
             distance: clusteringEnabled ? 50 : 0,
             source: vectorSource,
@@ -344,80 +422,114 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
         });
         clusterSourceRef.current = clusterSource;
 
+        // Use cluster source only if clustering is enabled, otherwise use raw vector source
         const dataLayer = new VectorLayer({
-            source: clusterSource,
+            source: clusteringEnabled ? clusterSource : vectorSource,
             zIndex: 50, // Above sites layer (zIndex: 10)
             style: (feature) => {
-                const features = feature.get('features');
-                if (!features || features.length === 0) {
-                    return new Style({
-                        image: new CircleStyle({
-                            radius: 6,
-                            fill: new Fill({ color: '#6b7280' }),
-                            stroke: new Stroke({ color: '#fff', width: 2 })
-                        })
-                    });
-                }
-
-                // Filter features based on visibility (Sites are now in separate layer)
                 const visibleLayersList = (window as any).getVisibleLayers?.() || [];
-                const visibleFeatures = features.filter((f: Feature) => {
-                    const type = f.get('object_type');
-                    return type !== 'Site' && visibleLayersList.includes(type);
-                });
 
-                // If no visible features, return empty style (hidden)
-                if (visibleFeatures.length === 0) {
-                    return new Style({});
-                }
+                // Check if this is a clustered feature or a raw feature
+                const clusterFeatures = feature.get('features');
 
-                const size = visibleFeatures.length;
+                if (clusterFeatures && clusterFeatures.length > 0) {
+                    // ============================================
+                    // CLUSTERED MODE: Feature comes from ClusterSource
+                    // ============================================
 
-                if (size > 1) {
-                    // CLUSTER: Multiple objects grouped together
-                    let dominantColor = '#22c55e'; // Default green for vegetation
-                    let vegCount = 0;
-                    let hydroCount = 0;
-
-                    visibleFeatures.forEach((f: Feature) => {
+                    // Filter features based on visibility
+                    const visibleFeatures = clusterFeatures.filter((f: Feature) => {
                         const type = f.get('object_type');
-                        if (['Arbre', 'Palmier', 'Gazon', 'Arbuste', 'Vivace', 'Cactus', 'Graminee'].includes(type)) {
-                            vegCount++;
-                        } else {
-                            hydroCount++;
-                        }
-                        if (type && OBJECT_COLORS[type]) dominantColor = OBJECT_COLORS[type];
+                        return type !== 'Site' && visibleLayersList.includes(type);
                     });
 
-                    // Use vegetation or hydraulic color based on majority
-                    if (hydroCount > vegCount) {
-                        dominantColor = '#0ea5e9'; // Blue for hydraulic
-                    } else {
-                        dominantColor = '#22c55e'; // Green for vegetation
+                    // If no visible features, return empty style (hidden)
+                    if (visibleFeatures.length === 0) {
+                        return new Style({});
                     }
 
-                    return new Style({
-                        image: new CircleStyle({
-                            radius: 18 + Math.min(size * 2, 20),
-                            stroke: new Stroke({ color: '#fff', width: 3 }),
-                            fill: new Fill({ color: dominantColor })
-                        }),
-                        text: new Text({
-                            text: size.toString(),
-                            fill: new Fill({ color: '#fff' }),
-                            font: 'bold 14px sans-serif'
-                        })
-                    });
-                } else {
-                    // SINGLE FEATURE: Show individual object marker
-                    const originalFeature = visibleFeatures[0];
-                    const type = originalFeature.get('object_type');
+                    const size = visibleFeatures.length;
 
-                    // Objects only (vegetation, hydrology, etc.) - Sites are in separate layer
+                    if (size > 1) {
+                        // CLUSTER: Multiple objects grouped together
+                        let dominantColor = '#22c55e'; // Default green for vegetation
+                        let vegCount = 0;
+                        let hydroCount = 0;
+
+                        visibleFeatures.forEach((f: Feature) => {
+                            const type = f.get('object_type');
+                            if (['Arbre', 'Palmier', 'Gazon', 'Arbuste', 'Vivace', 'Cactus', 'Graminee'].includes(type)) {
+                                vegCount++;
+                            } else {
+                                hydroCount++;
+                            }
+                            if (type && OBJECT_COLORS[type]) dominantColor = OBJECT_COLORS[type];
+                        });
+
+                        // Use vegetation or hydraulic color based on majority
+                        if (hydroCount > vegCount) {
+                            dominantColor = '#0ea5e9'; // Blue for hydraulic
+                        } else {
+                            dominantColor = '#22c55e'; // Green for vegetation
+                        }
+
+                        return new Style({
+                            image: new CircleStyle({
+                                radius: 18 + Math.min(size * 2, 20),
+                                stroke: new Stroke({ color: '#fff', width: 3 }),
+                                fill: new Fill({ color: dominantColor })
+                            }),
+                            text: new Text({
+                                text: size.toString(),
+                                fill: new Fill({ color: '#fff' }),
+                                font: 'bold 14px sans-serif'
+                            })
+                        });
+                    } else {
+                        // SINGLE FEATURE in cluster: Show individual object marker
+                        const originalFeature = visibleFeatures[0];
+                        const type = originalFeature.get('object_type');
+                        const color = OBJECT_COLORS[type] || '#6b7280';
+                        const symbolConfig = (window as any).getSymbologyConfig?.()?.[type];
+
+                        if (originalFeature.getGeometry()?.getType() === 'Point') {
+                            return new Style({
+                                image: new CircleStyle({
+                                    radius: 8,
+                                    fill: new Fill({ color: symbolConfig?.fillColor || color }),
+                                    stroke: new Stroke({ color: '#fff', width: 2 })
+                                })
+                            });
+                        } else {
+                            return new Style({
+                                fill: new Fill({
+                                    color: symbolConfig?.fillColor
+                                        ? symbolConfig.fillColor + Math.round((symbolConfig.fillOpacity || 0.5) * 255).toString(16).padStart(2, '0')
+                                        : color + '4d'
+                                }),
+                                stroke: new Stroke({
+                                    color: symbolConfig?.strokeColor || color,
+                                    width: symbolConfig?.strokeWidth || 2
+                                })
+                            });
+                        }
+                    }
+                } else {
+                    // ============================================
+                    // NON-CLUSTERED MODE: Raw feature from VectorSource
+                    // ============================================
+                    const type = feature.get('object_type');
+
+                    // Check visibility
+                    if (!type || type === 'Site' || !visibleLayersList.includes(type)) {
+                        return new Style({});
+                    }
+
                     const color = OBJECT_COLORS[type] || '#6b7280';
                     const symbolConfig = (window as any).getSymbologyConfig?.()?.[type];
+                    const geomType = feature.getGeometry()?.getType();
 
-                    if (originalFeature.getGeometry()?.getType() === 'Point') {
+                    if (geomType === 'Point') {
                         return new Style({
                             image: new CircleStyle({
                                 radius: 8,
@@ -425,7 +537,15 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
                                 stroke: new Stroke({ color: '#fff', width: 2 })
                             })
                         });
+                    } else if (geomType === 'LineString' || geomType === 'MultiLineString') {
+                        return new Style({
+                            stroke: new Stroke({
+                                color: symbolConfig?.strokeColor || color,
+                                width: symbolConfig?.strokeWidth || 3
+                            })
+                        });
                     } else {
+                        // Polygon
                         return new Style({
                             fill: new Fill({
                                 color: symbolConfig?.fillColor
@@ -599,7 +719,67 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
         map.on('click', (evt) => {
             popupOverlay.current?.setPosition(undefined); // Close popup on any click first
 
-            // First check for site click (sites layer)
+            // FIRST: Check for object click (data layer) - priority over sites
+            const feature = map.forEachFeatureAtPixel(evt.pixel, (feat) => feat as Feature, {
+                layerFilter: (l) => l === dataLayerRef.current
+            });
+
+            if (feature) {
+                // Check if this is a clustered feature or a raw feature
+                const featuresInCluster = feature.get('features');
+
+                if (featuresInCluster && featuresInCluster.length > 0) {
+                    // CLUSTERED MODE
+                    if (featuresInCluster.length > 1) {
+                        // Click on a cluster: zoom in
+                        const view = map.getView();
+                        if (view.getZoom()! < 19) {
+                            view.animate({
+                                center: (feature.getGeometry() as Point).getCoordinates(),
+                                zoom: view.getZoom()! + 2,
+                                duration: 500
+                            });
+                        }
+                    } else {
+                        // Click on a single object feature in cluster
+                        const singleFeature = featuresInCluster[0];
+                        const props = singleFeature.getProperties();
+
+                        if (onObjectClick) {
+                            const name = props.nom || props.marque || `${props.object_type} #${props.id}`;
+                            onObjectClick({
+                                id: props.id,
+                                type: props.object_type,
+                                title: name,
+                                subtitle: props.site_nom || '',
+                                attributes: props
+                            });
+                        }
+                    }
+                    return; // Object found, don't check sites
+                } else {
+                    // NON-CLUSTERED MODE: Raw feature
+                    const props = feature.getProperties();
+                    const type = props.object_type;
+
+                    // Only handle non-Site objects here
+                    if (type && type !== 'Site') {
+                        if (onObjectClick) {
+                            const name = props.nom || props.marque || `${type} #${props.id}`;
+                            onObjectClick({
+                                id: props.id,
+                                type: type,
+                                title: name,
+                                subtitle: props.site_nom || '',
+                                attributes: props
+                            });
+                        }
+                        return; // Object found, don't check sites
+                    }
+                }
+            }
+
+            // THEN: Check for site click (sites layer) - only if no object was clicked
             const siteFeature = map.forEachFeatureAtPixel(evt.pixel, (feat) => feat as Feature, {
                 layerFilter: (l) => l === sitesLayerRef.current
             });
@@ -620,48 +800,6 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
                             'Date fin contrat': props.date_fin_contrat || '-',
                             'Actif': props.actif ? 'Oui' : 'Non'
                         }
-                    });
-                }
-                return;
-            }
-
-            // Then check for object click (data layer with clusters)
-            const feature = map.forEachFeatureAtPixel(evt.pixel, (feat) => feat as Feature, {
-                layerFilter: (l) => l === dataLayerRef.current
-            });
-
-            if (!feature) {
-                return;
-            }
-
-            const featuresInCluster = feature.get('features');
-            if (!featuresInCluster || featuresInCluster.length === 0) {
-                return;
-            }
-
-            if (featuresInCluster.length > 1) {
-                // Click on a cluster: zoom in
-                const view = map.getView();
-                if (view.getZoom()! < 19) {
-                    view.animate({
-                        center: (feature.getGeometry() as Point).getCoordinates(),
-                        zoom: view.getZoom()! + 2,
-                        duration: 500
-                    });
-                }
-            } else {
-                // Click on a single object feature
-                const singleFeature = featuresInCluster[0];
-                const props = singleFeature.getProperties();
-
-                if (onObjectClick) {
-                    const name = props.nom || props.marque || `${props.object_type} #${props.id}`;
-                    onObjectClick({
-                        id: props.id,
-                        type: props.object_type,
-                        title: name,
-                        subtitle: props.site_nom || '',
-                        attributes: props
                     });
                 }
             }
@@ -685,7 +823,8 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
             baseLayer.setSource(new XYZ({
                 url: activeLayer.url,
                 maxZoom: activeLayer.maxNativeZoom || 19,
-                attributions: activeLayer.attribution
+                attributions: activeLayer.attribution,
+                crossOrigin: 'anonymous'
             }));
         }
     }, [activeLayer]);
@@ -827,16 +966,17 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
         return () => { delete (window as any).getVisibleLayers; };
     }, [visibleLayers]);
 
-    // Handle clustering toggle
+    // Handle clustering toggle - switch between cluster source and raw vector source
     useEffect(() => {
         if (!dataLayerRef.current || !vectorSourceRef.current || !clusterSourceRef.current) return;
 
         if (clusteringEnabled) {
-            // Enable clustering - set cluster source with distance
-            clusterSourceRef.current.setDistance(40);
+            // Enable clustering - use cluster source with distance
+            clusterSourceRef.current.setDistance(50);
+            dataLayerRef.current.setSource(clusterSourceRef.current);
         } else {
-            // Disable clustering - set distance to 0 (no clustering)
-            clusterSourceRef.current.setDistance(0);
+            // Disable clustering - use raw vector source directly (no clustering at all)
+            dataLayerRef.current.setSource(vectorSourceRef.current);
         }
 
         // Force layer refresh

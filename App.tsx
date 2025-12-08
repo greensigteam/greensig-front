@@ -213,6 +213,21 @@ function App() {
     return 6;
   };
 
+  const getMapCenter = () => {
+    if (mapRef.current) return mapRef.current.getCenter();
+    return null;
+  };
+
+  const getMapElement = () => {
+    if (mapRef.current) return mapRef.current.getMapElement();
+    return null;
+  };
+
+  const exportMapCanvas = async (): Promise<string | null> => {
+    if (mapRef.current) return mapRef.current.exportCanvas();
+    return null;
+  };
+
   const toggleOverlay = (key: keyof OverlayState) => {
     setOverlays(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -300,6 +315,9 @@ function App() {
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
           getCurrentZoom={getCurrentZoom}
+          getMapCenter={getMapCenter}
+          getMapElement={getMapElement}
+          exportMapCanvas={exportMapCanvas}
           isPanelOpen={currentView !== 'MAP'}
           onToggleMap={toggleMapMode}
           overlays={overlays}

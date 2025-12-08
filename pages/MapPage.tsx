@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
 import {
   Search, Layers, Plus, Minus, Navigation, Crosshair, Filter,
   Loader2, Locate, Maximize2, LayoutTemplate, X,
@@ -13,7 +11,7 @@ import { MAP_LAYERS, VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND } from '../constants'
 import { MapLayerType, Coordinates, MapSearchResult, OverlayState, MapObjectDetail } from '../types';
 import { MOCK_SITES, MOCK_INVENTORY } from '../services/mockData';
 import { SitesLegend } from '../components/SitesLegend';
-import { searchObjects, geoJSONToLatLng, fetchAllSites, searchSites, SiteFrontend } from '../services/api';
+import { searchObjects, geoJSONToLatLng, fetchAllSites, searchSites, SiteFrontend, exportPDF, downloadBlob } from '../services/api';
 
 // Types pour la symbologie
 interface SymbologyConfig {
@@ -65,6 +63,9 @@ interface MapPageProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   getCurrentZoom: () => number;
+  getMapCenter?: () => Coordinates | null;
+  getMapElement?: () => HTMLDivElement | null;
+  exportMapCanvas?: () => Promise<string | null>;
   isPanelOpen?: boolean;
   onToggleMap?: () => void;
   overlays: OverlayState;
@@ -90,6 +91,9 @@ export const MapPage: React.FC<MapPageProps> = ({
   onZoomIn,
   onZoomOut,
   getCurrentZoom,
+  getMapCenter,
+  getMapElement,
+  exportMapCanvas,
   isPanelOpen = true,
   onToggleMap,
   overlays,
@@ -523,51 +527,52 @@ export const MapPage: React.FC<MapPageProps> = ({
     setShowZoomWarning(false);
   };
 
+  const [isExporting, setIsExporting] = useState(false);
+
   const handleExportPDF = async () => {
     try {
-      // Find the active element (likely the button) to blur it
+      setIsExporting(true);
+
+      // Blur active element
       const btn = document.activeElement as HTMLElement;
       if (btn) btn.blur();
 
-      const originalTitle = document.title;
-      document.title = "Export en cours...";
+      // Export map canvas using OpenLayers native method (avoids CORS issues)
+      const mapImageBase64 = await exportMapCanvas?.();
+      if (!mapImageBase64) {
+        throw new Error("Impossible d'exporter l'image de la carte");
+      }
 
-      // We capture the body to get the full view including overlays
-      const element = document.body;
+      // Get current map state
+      const center = getMapCenter?.() || { lat: 32.219, lng: -7.934 };
+      const zoom = getCurrentZoom();
 
-      const canvas = await html2canvas(element, {
-        useCORS: true,
-        logging: false,
-        allowTaint: true,
-        backgroundColor: '#ffffff'
+      // Build visible layers object from layerVisibility state
+      const visibleLayers: Record<string, boolean> = {};
+      Object.entries(layerVisibility).forEach(([key, value]) => {
+        // Convert type names to backend format (lowercase)
+        const backendKey = key.toLowerCase().replace(/\s+/g, '');
+        visibleLayers[backendKey] = value;
       });
 
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: 'a4'
+      // Call the backend API
+      const pdfBlob = await exportPDF({
+        title: 'Export Carte GreenSIG',
+        mapImageBase64,
+        visibleLayers,
+        center: [center.lng, center.lat],
+        zoom
       });
 
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-
-      const ratio = imgProps.width / imgProps.height;
-      const width = pdfWidth;
-      const height = width / ratio;
-
-      const y = (pdfHeight - height) / 2;
-
-      pdf.addImage(imgData, 'PNG', 0, Math.max(0, y), width, height);
-
+      // Download the PDF
       const date = new Date().toISOString().split('T')[0];
-      pdf.save(`greensig_carte_${date}.pdf`);
+      downloadBlob(pdfBlob, `greensig_carte_${date}.pdf`);
 
-      document.title = originalTitle;
     } catch (error) {
       console.error("Erreur lors de l'export PDF:", error);
-      alert("Une erreur est survenue lors de la génération du PDF.");
+      alert("Une erreur est survenue lors de la génération du PDF. Vérifiez que le serveur backend est accessible.");
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -778,10 +783,11 @@ export const MapPage: React.FC<MapPageProps> = ({
 
           <button
             onClick={handleExportPDF}
-            className="p-3 hover:bg-slate-50 text-slate-600 transition-colors"
-            title="Exporter en PDF"
+            disabled={isExporting}
+            className={`p-3 transition-colors ${isExporting ? 'bg-emerald-50 text-emerald-600 cursor-wait' : 'hover:bg-slate-50 text-slate-600'}`}
+            title={isExporting ? "Export en cours..." : "Exporter en PDF"}
           >
-            <Printer className="w-5 h-5" />
+            {isExporting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Printer className="w-5 h-5" />}
           </button>
         </div>
       </div>
