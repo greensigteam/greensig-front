@@ -3,7 +3,7 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import { MapPage } from './pages/MapPage';
-import { MapView } from './components/MapView';
+import { OLMap } from './components/OLMap';
 import Inventory from './pages/Inventory';
 import Interventions from './pages/Interventions';
 import Teams from './pages/Teams';
@@ -213,6 +213,21 @@ function App() {
     return 6;
   };
 
+  const getMapCenter = () => {
+    if (mapRef.current) return mapRef.current.getCenter();
+    return null;
+  };
+
+  const getMapElement = () => {
+    if (mapRef.current) return mapRef.current.getMapElement();
+    return null;
+  };
+
+  const exportMapCanvas = async (): Promise<string | null> => {
+    if (mapRef.current) return mapRef.current.exportCanvas();
+    return null;
+  };
+
   const toggleOverlay = (key: keyof OverlayState) => {
     setOverlays(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -276,16 +291,16 @@ function App() {
       setTargetLocation={setTargetLocation}
 
       mapComponent={
-        <MapView
+        <OLMap
           activeLayer={MAP_LAYERS[activeLayerId]}
           targetLocation={targetLocation}
           userLocation={userLocation}
-          mapRef={mapRef}
+          ref={mapRef}
           overlays={overlays}
           onObjectClick={setSelectedMapObject}
           isMeasuring={isMeasuring}
           measurePoints={measurePoints}
-          onMeasureClick={(coords) => setMeasurePoints([...measurePoints, coords])}
+          onMeasureClick={(coords: any) => setMeasurePoints([...measurePoints, coords])}
           isRouting={isRouting}
           isSidebarCollapsed={isSidebarCollapsed}
           clusteringEnabled={clusteringEnabled}
@@ -300,6 +315,9 @@ function App() {
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
           getCurrentZoom={getCurrentZoom}
+          getMapCenter={getMapCenter}
+          getMapElement={getMapElement}
+          exportMapCanvas={exportMapCanvas}
           isPanelOpen={currentView !== 'MAP'}
           onToggleMap={toggleMapMode}
           overlays={overlays}

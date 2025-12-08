@@ -83,9 +83,11 @@ export function DataTable<T extends { id: string }>({
                 </div>
             )}
 
-            {/* Table */}
-            <div className="overflow-x-auto">
-                <table className="w-full">
+            {/* Table with scroll area and sticky pagination */}
+            <div className="relative border-b border-gray-200">
+                <div className="max-h-[500px] overflow-auto">
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
                     <thead className="bg-gray-50 border-b border-gray-200">
                         <tr>
                             {columns.map((column) => (
@@ -132,50 +134,48 @@ export function DataTable<T extends { id: string }>({
                             ))
                         )}
                     </tbody>
-                </table>
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-                <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-                    <div className="text-sm text-gray-600">
-                        Affichage {startIndex + 1} à {Math.min(endIndex, sortedData.length)} sur {sortedData.length}
+                        </table>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => goToPage(1)}
-                            disabled={currentPage === 1}
-                            className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <ChevronsLeft className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={() => goToPage(currentPage - 1)}
-                            disabled={currentPage === 1}
-                            className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        <span className="px-3 py-1 text-sm">
-                            Page {currentPage} sur {totalPages}
-                        </span>
-                        <button
-                            onClick={() => goToPage(currentPage + 1)}
-                            disabled={currentPage === totalPages}
-                            className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <ChevronRight className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={() => goToPage(totalPages)}
-                            disabled={currentPage === totalPages}
-                            className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <ChevronsRight className="w-4 h-4" />
-                        </button>
+
+                    {/* Sticky pagination inside scroll area */}
+                    <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-3">
+                        <div className="flex items-center justify-between">
+                            <div className="text-sm text-gray-600">Affichage {startIndex + 1} à {Math.min(endIndex, sortedData.length)} sur {sortedData.length}</div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => goToPage(1)}
+                                    disabled={currentPage === 1}
+                                    className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <ChevronsLeft className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => goToPage(currentPage - 1)}
+                                    disabled={currentPage === 1}
+                                    className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <ChevronLeft className="w-4 h-4" />
+                                </button>
+                                <span className="px-3 py-1 text-sm">Page {currentPage} sur {totalPages > 0 ? totalPages : 1}</span>
+                                <button
+                                    onClick={() => goToPage(currentPage + 1)}
+                                    disabled={currentPage === totalPages || totalPages === 0}
+                                    className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <ChevronRight className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => goToPage(totalPages)}
+                                    disabled={currentPage === totalPages || totalPages === 0}
+                                    className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <ChevronsRight className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            )}
+            </div>
         </div>
     );
 }

@@ -2,16 +2,16 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Filter, X, MapPin, Calendar, FileText, Leaf, Droplet, AlertCircle } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
-import { MOCK_INVENTORY, MOCK_SITES, InventoryItem, getSiteById } from '../services/mockData';
-import { fetchInventory, ApiError, type InventoryResponse, type InventoryFilters } from '../services/api';
+import { MOCK_INVENTORY, InventoryItem } from '../services/mockData';
+import { fetchInventory, ApiError, type InventoryResponse, type InventoryFilters, fetchAllSites, type SiteFrontend } from '../services/api';
 
 // Inventory Detail Modal
 const InventoryDetailModal: React.FC<{
   item: InventoryItem;
+  site?: SiteFrontend | null;
   onClose: () => void;
-}> = ({ item, onClose }) => {
+}> = ({ item, site, onClose }) => {
   const [activeTab, setActiveTab] = useState<'info' | 'photos' | 'location' | 'history'>('info');
-  const site = getSiteById(item.siteId);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -21,7 +21,7 @@ const InventoryDetailModal: React.FC<{
           <div>
             <h2 className="text-2xl font-bold text-gray-900">{item.name}</h2>
             <p className="text-sm text-gray-500 mt-1">
-              {item.code} • {site?.name} • {item.zone}
+              {item.code} • {site?.name || item.siteId} • {item.zone}
             </p>
           </div>
           <button
@@ -134,7 +134,7 @@ const InventoryDetailModal: React.FC<{
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-500">Adresse</label>
-                <p className="mt-1 text-gray-900">{site?.address}</p>
+                <p className="mt-1 text-gray-900">{site?.adresse || site?.description || item.siteId}</p>
               </div>
             </div>
           )}
@@ -202,6 +202,23 @@ const Inventory: React.FC = () => {
   const [apiInventory, setApiInventory] = useState<InventoryResponse | null>(null);
   const [isLoadingAPI, setIsLoadingAPI] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+
+  // Sites fetched from backend (replace MOCK_SITES)
+  const [sites, setSites] = useState<SiteFrontend[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadSites = async () => {
+      try {
+        const s = await fetchAllSites();
+        if (mounted) setSites(s);
+      } catch (err) {
+        console.error('Erreur chargement sites:', err);
+      }
+    };
+    loadSites();
+    return () => { mounted = false };
+  }, []);
 
   // Current page for pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -289,12 +306,15 @@ const Inventory: React.FC = () => {
 
       const featureId = feature.id ?? props.id ?? 0;
 
+      // Try to map returned site name to a known site id (if sites were loaded)
+      const matchedSite = sites.find(s => s.name && props.site_nom && s.name.toLowerCase() === String(props.site_nom).toLowerCase());
+
       return {
         id: featureId.toString(),
         type: typeMapping[props.object_type] || 'equipement',
         code: props.code || `${props.object_type}-${featureId}`,
         name: props.nom || `${props.object_type} ${featureId}`,
-        siteId: props.site_nom || 'unknown',
+        siteId: matchedSite ? matchedSite.id : (props.site_nom || 'unknown'),
         zone: props.sous_site_nom || props.site_nom || 'Non définie',
         state: 'bon' as const,
         species: props.famille || undefined,
@@ -309,10 +329,8 @@ const Inventory: React.FC = () => {
         photos: [],
       };
     });
-  }, [apiInventory]);
+  }, [apiInventory, sites]);
 
-  // Use API data directly (filtering is done by backend)
-  const filteredData = inventoryData;
 
   // Table columns
   const columns: Column<InventoryItem>[] = [
@@ -333,7 +351,10 @@ const Inventory: React.FC = () => {
     {
       key: 'siteId',
       label: 'Site',
-      render: (item) => getSiteById(item.siteId)?.name || '-'
+      render: (item) => {
+        const site = sites.find(s => s.id === item.siteId);
+        return site?.name || item.siteId || '-';
+      }
     },
     {
       key: 'zone',
@@ -364,16 +385,19 @@ const Inventory: React.FC = () => {
   const handleExport = () => {
     const filename = `inventaire_${new Date().toISOString().split('T')[0]}.csv`;
     const headers = ['Type', 'Code', 'Nom', 'Site', 'Zone', 'État', 'Surface (m²)', 'Dernière Intervention'];
-    const dataToExport = filteredData.map(item => [
-      item.type,
-      item.code,
-      item.name,
-      getSiteById(item.siteId)?.name || '-',
-      item.zone,
-      item.state,
-      item.surface || '',
-      item.lastIntervention ? new Date(item.lastIntervention).toLocaleDateString('fr-FR') : ''
-    ]);
+    const dataToExport = inventoryData.map(item => {
+      const site = sites.find(s => s.id === item.siteId);
+      return [
+        item.type,
+        item.code,
+        item.name,
+        site?.name || item.siteId || '-',
+        item.zone,
+        item.state,
+        item.surface || '',
+        item.lastIntervention ? new Date(item.lastIntervention).toLocaleDateString('fr-FR') : ''
+      ];
+    });
 
     if (dataToExport.length === 0) {
       alert("Aucune donnée à exporter.");
@@ -545,7 +569,7 @@ const Inventory: React.FC = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
               >
                 <option value="all">Tous</option>
-                {MOCK_SITES.map((site) => (
+                {sites.map((site) => (
                   <option key={site.id} value={site.id}>
                     {site.name}
                   </option>
@@ -569,7 +593,7 @@ const Inventory: React.FC = () => {
       )}
 
       {/* Data Table */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-auto min-h-[400px]">
         {/* Loading State */}
         {isLoadingAPI && (
           <div className="flex items-center justify-center h-64">
@@ -596,45 +620,24 @@ const Inventory: React.FC = () => {
         {!isLoadingAPI && !apiError && (
           <>
             <DataTable
-              data={filteredData}
+              data={inventoryData}
               columns={columns}
               onRowClick={setSelectedItem}
-              itemsPerPage={filteredData.length} // Show all items (pagination is server-side)
+              itemsPerPage={10}
               showExport
               onExport={handleExport}
             />
-
-            {/* Server-side Pagination Controls */}
-            {apiInventory && apiInventory.count > 20 && (
-              <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-white rounded-b-lg">
-                <div className="text-sm text-gray-600">
-                  Page {currentPage} • {apiInventory.count} résultat{apiInventory.count > 1 ? 's' : ''} au total
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setCurrentPage(currentPage - 1)}
-                    disabled={!apiInventory.previous}
-                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-                  >
-                    Précédent
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={!apiInventory.next}
-                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-                  >
-                    Suivant
-                  </button>
-                </div>
-              </div>
-            )}
           </>
         )}
       </div>
 
       {/* Detail Modal */}
       {selectedItem && (
-        <InventoryDetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />
+        <InventoryDetailModal
+          item={selectedItem}
+          site={sites.find(s => s.id === selectedItem.siteId) || undefined}
+          onClose={() => setSelectedItem(null)}
+        />
       )}
     </div>
   );

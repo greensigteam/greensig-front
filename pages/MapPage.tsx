@@ -1,20 +1,59 @@
-import React, { useState } from 'react';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
+import React, { useState, useEffect } from 'react';
 import {
   Search, Layers, Plus, Minus, Navigation, Crosshair, Filter,
   Loader2, Locate, Maximize2, LayoutTemplate, X,
   Map as MapIcon, Image as ImageIcon, Mountain,
   Grid, Zap, Trees, Hammer, Info, Eye, EyeOff, AlertTriangle,
   Ruler, Printer, Calendar as CalendarIcon, FileText,
-  ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GitCommit
+  ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GitCommit, RotateCcw
 } from 'lucide-react';
-import { MAP_LAYERS } from '../constants';
+import { MAP_LAYERS, VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND } from '../constants';
 import { MapLayerType, Coordinates, MapSearchResult, OverlayState, MapObjectDetail } from '../types';
 import { MOCK_SITES, MOCK_INVENTORY } from '../services/mockData';
-import { SITES, Site } from '../data/sites';
 import { SitesLegend } from '../components/SitesLegend';
-import { searchObjects, geoJSONToLatLng } from '../services/api';
+import { searchObjects, geoJSONToLatLng, fetchAllSites, searchSites, SiteFrontend, exportPDF, downloadBlob } from '../services/api';
+
+// Types pour la symbologie
+interface SymbologyConfig {
+  fillColor: string;
+  fillOpacity: number;
+  strokeColor: string;
+  strokeWidth: number;
+}
+
+// Configuration par défaut de la symbologie
+const createDefaultSymbology = (): Record<string, SymbologyConfig> => {
+  const config: Record<string, SymbologyConfig> = {};
+
+  SITE_LEGEND.forEach(item => {
+    config[item.type] = {
+      fillColor: item.color,
+      fillOpacity: 0.2,
+      strokeColor: item.color,
+      strokeWidth: 3
+    };
+  });
+
+  VEG_LEGEND.forEach(item => {
+    config[item.type] = {
+      fillColor: item.color,
+      fillOpacity: 0.6,
+      strokeColor: item.color,
+      strokeWidth: 2
+    };
+  });
+
+  HYDRO_LEGEND.forEach(item => {
+    config[item.type] = {
+      fillColor: item.color,
+      fillOpacity: 0.8,
+      strokeColor: item.color,
+      strokeWidth: 2
+    };
+  });
+
+  return config;
+};
 
 interface MapPageProps {
   activeLayerId: MapLayerType;
@@ -24,6 +63,9 @@ interface MapPageProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   getCurrentZoom: () => number;
+  getMapCenter?: () => Coordinates | null;
+  getMapElement?: () => HTMLDivElement | null;
+  exportMapCanvas?: () => Promise<string | null>;
   isPanelOpen?: boolean;
   onToggleMap?: () => void;
   overlays: OverlayState;
@@ -36,6 +78,7 @@ interface MapPageProps {
   measurePoints?: Coordinates[];
   isRouting?: boolean;
   setIsRouting?: (isRouting: boolean) => void;
+  onToggleLayer?: (layerId: string, visible: boolean) => void;
   clusteringEnabled?: boolean;
   setClusteringEnabled?: (enabled: boolean) => void;
 }
@@ -48,6 +91,9 @@ export const MapPage: React.FC<MapPageProps> = ({
   onZoomIn,
   onZoomOut,
   getCurrentZoom,
+  getMapCenter,
+  getMapElement,
+  exportMapCanvas,
   isPanelOpen = true,
   onToggleMap,
   overlays,
@@ -60,6 +106,7 @@ export const MapPage: React.FC<MapPageProps> = ({
   measurePoints = [],
   isRouting = false,
   setIsRouting,
+  onToggleLayer,
   clusteringEnabled = true,
   setClusteringEnabled,
 }) => {
@@ -69,13 +116,200 @@ export const MapPage: React.FC<MapPageProps> = ({
   const [isSitesPanelOpen, setIsSitesPanelOpen] = useState(false);
   const [vegetationVisible, setVegetationVisible] = useState(true);
 
+  // Sites dynamiques chargés depuis l'API
+  const [sites, setSites] = useState<SiteFrontend[]>([]);
+  const [sitesLoading, setSitesLoading] = useState(true);
+
+  // Charger les sites depuis l'API au montage
+  useEffect(() => {
+    const loadSites = async () => {
+      try {
+        setSitesLoading(true);
+        const loadedSites = await fetchAllSites();
+        setSites(loadedSites);
+        console.log(`MapPage: ${loadedSites.length} sites chargés depuis l'API`);
+      } catch (error) {
+        console.error('Erreur chargement sites:', error);
+      } finally {
+        setSitesLoading(false);
+      }
+    };
+    loadSites();
+  }, []);
+
+  // États pour les onglets Filtres/Symbologie
+  const [layersPanelTab, setLayersPanelTab] = useState<'layers' | 'filters' | 'symbology'>('layers');
+  const [symbologyConfig, setSymbologyConfig] = useState<Record<string, SymbologyConfig>>(createDefaultSymbology);
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+  const [layerVisibility, setLayerVisibility] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    [...SITE_LEGEND, ...VEG_LEGEND, ...HYDRO_LEGEND].forEach(item => {
+      initial[item.type] = true;
+    });
+    return initial;
+  });
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [startDateFilter, setStartDateFilter] = useState<string>('');
+  const [endDateFilter, setEndDateFilter] = useState<string>('');
+
+  // Helper function to toggle map layer via window
+  const toggleMapLayerVisibility = (layerId: string, visible: boolean) => {
+    if ((window as any).toggleMapLayer) {
+      (window as any).toggleMapLayer(layerId, visible);
+    }
+    if (onToggleLayer) onToggleLayer(layerId, visible);
+  };
+
+  // Fonctions pour les filtres
+  const resetAllFilters = () => {
+    setStatusFilter('all');
+    setStartDateFilter('');
+    setEndDateFilter('');
+    const newVisibility: Record<string, boolean> = {};
+    [...SITE_LEGEND, ...VEG_LEGEND, ...HYDRO_LEGEND].forEach(item => {
+      newVisibility[item.type] = true;
+      toggleMapLayerVisibility(item.type, true);
+    });
+    setLayerVisibility(newVisibility);
+  };
+
+  // Fonctions pour la symbologie
+  const toggleExpanded = (type: string) => {
+    setExpandedItems(prev => ({ ...prev, [type]: !prev[type] }));
+  };
+
+  const updateSymbology = (type: string, field: keyof SymbologyConfig, value: string | number) => {
+    setSymbologyConfig(prev => ({
+      ...prev,
+      [type]: { ...prev[type], [field]: value }
+    }));
+    if ((window as any).updateLayerSymbology) {
+      (window as any).updateLayerSymbology(type, { ...symbologyConfig[type], [field]: value });
+    }
+  };
+
+  const resetSymbology = (type: string) => {
+    const vegItem = VEG_LEGEND.find(v => v.type === type);
+    const hydroItem = HYDRO_LEGEND.find(h => h.type === type);
+    const item = vegItem || hydroItem;
+    if (item) {
+      const defaultConfig: SymbologyConfig = {
+        fillColor: item.color,
+        fillOpacity: vegItem ? 0.6 : 0.8,
+        strokeColor: item.color,
+        strokeWidth: 2
+      };
+      setSymbologyConfig(prev => ({ ...prev, [type]: defaultConfig }));
+      if ((window as any).updateLayerSymbology) {
+        (window as any).updateLayerSymbology(type, defaultConfig);
+      }
+    }
+  };
+
+  // Expose symbology config to window for map access
+  useEffect(() => {
+    (window as any).getSymbologyConfig = () => symbologyConfig;
+  }, [symbologyConfig]);
+
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResult, setSearchResult] = useState<MapSearchResult | null>(null);
+  const [searchSuggestions, setSearchSuggestions] = useState<Array<{
+    id: string;
+    name: string;
+    type: string;
+    coordinates?: { lat: number; lng: number };
+  }>>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchContainerRef = React.useRef<HTMLDivElement>(null);
+
+  // Debounced search suggestions
+  useEffect(() => {
+    if (searchQuery.length < 2) {
+      setSearchSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const suggestions: Array<{ id: string; name: string; type: string; coordinates?: { lat: number; lng: number } }> = [];
+
+        // 1. Recherche dans les sites chargés (local, instantané)
+        const normalizedQuery = searchQuery.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const matchedSites = sites.filter(s => {
+          const name = s.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          const code = (s.code_site || '').toLowerCase();
+          return name.includes(normalizedQuery) || code.includes(normalizedQuery);
+        }).slice(0, 3);
+
+        matchedSites.forEach(site => {
+          suggestions.push({
+            id: `site-${site.id}`,
+            name: site.name,
+            type: 'Site',
+            coordinates: site.coordinates
+          });
+        });
+
+        // 2. Recherche API backend (si moins de 5 suggestions)
+        if (suggestions.length < 5) {
+          try {
+            const apiResults = await searchObjects(searchQuery);
+            apiResults.slice(0, 5 - suggestions.length).forEach(result => {
+              if (result.location) {
+                suggestions.push({
+                  id: result.id,
+                  name: result.name,
+                  type: result.type,
+                  coordinates: geoJSONToLatLng(result.location.coordinates)
+                });
+              }
+            });
+          } catch (error) {
+            console.error('Erreur suggestions API:', error);
+          }
+        }
+
+        setSearchSuggestions(suggestions);
+        setShowSuggestions(suggestions.length > 0);
+      } catch (error) {
+        console.error('Erreur suggestions:', error);
+      }
+    }, 300); // Debounce 300ms
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, sites]);
+
+  // Fermer les suggestions en cliquant ailleurs
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Handler pour sélectionner une suggestion
+  const handleSuggestionClick = (suggestion: typeof searchSuggestions[0]) => {
+    if (suggestion.coordinates) {
+      setSearchQuery(suggestion.name);
+      setSearchResult({
+        name: suggestion.name,
+        description: suggestion.type,
+        coordinates: suggestion.coordinates,
+        zoom: 18
+      });
+      setTargetLocation({ coordinates: suggestion.coordinates, zoom: 18 });
+      setShowSuggestions(false);
+    }
+  };
 
   // Handler pour naviguer vers un site
-  const handleSiteClick = (site: Site) => {
+  const handleSiteClick = (site: SiteFrontend) => {
     setTargetLocation({ coordinates: site.coordinates, zoom: 17 });
     setSearchResult({
       name: site.name,
@@ -85,78 +319,40 @@ export const MapPage: React.FC<MapPageProps> = ({
     });
   };
 
-  // Local Search Implementation (User 1.1.6)
+  // Local Search Implementation - Utilise les sites dynamiques depuis l'API
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
 
     setIsSearching(true);
     setSearchResult(null);
 
-    // Simulate search delay for local search
-    setTimeout(async () => {
+    try {
       // Normalisation de la requête (minuscules, sans accents)
       const query = searchQuery.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-      // 1. Recherche prioritaire dans les 12 SITES (Nom, Description, Catégorie)
-      const site = SITES.find(s => {
+      // 1. Recherche prioritaire dans les sites chargés depuis l'API
+      const matchedSite = sites.find(s => {
         const name = s.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const desc = s.description.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const code = (s.code_site || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const cat = s.category.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-        return name.includes(query) || desc.includes(query) || cat.includes(query);
+        return name.includes(query) || desc.includes(query) || code.includes(query) || cat.includes(query);
       });
 
-      if (site) {
+      if (matchedSite) {
         setSearchResult({
-          name: site.name,
-          description: `${site.category} - ${site.description}`,
-          coordinates: site.coordinates,
+          name: matchedSite.name,
+          description: `${matchedSite.category} - ${matchedSite.description}`,
+          coordinates: matchedSite.coordinates,
           zoom: 18
         });
-        setTargetLocation({ coordinates: site.coordinates, zoom: 18 });
+        setTargetLocation({ coordinates: matchedSite.coordinates, zoom: 18 });
         setIsSearching(false);
         return;
       }
 
-      // 2. Recherche secondaire dans les MOCK_SITES (anciens)
-      const mockSite = MOCK_SITES.find(s => s.name.toLowerCase().includes(query));
-      if (mockSite) {
-        setSearchResult({
-          name: mockSite.name,
-          description: `Site - ${mockSite.address}`,
-          coordinates: mockSite.coordinates,
-          zoom: 18
-        });
-        setTargetLocation({ coordinates: mockSite.coordinates, zoom: 18 });
-        setIsSearching(false);
-        return;
-      }
-
-      // 3. Recherche dans l'Inventaire (local mock - fallback)
-      const item = MOCK_INVENTORY.find(i =>
-        i.name.toLowerCase().includes(query) ||
-        i.type.toLowerCase().includes(query)
-      );
-
-      if (item) {
-        const parentSite = MOCK_SITES.find(s => s.id === item.siteId);
-        const coords = parentSite ? {
-          lat: parentSite.coordinates.lat + 0.0001,
-          lng: parentSite.coordinates.lng + 0.0001
-        } : { lat: 48.8566, lng: 2.3522 };
-
-        setSearchResult({
-          name: item.name,
-          description: `Inventaire (${item.type}) - Code: ${item.code}`,
-          coordinates: coords,
-          zoom: 20
-        });
-        setTargetLocation({ coordinates: coords, zoom: 20 });
-        setIsSearching(false);
-        return;
-      }
-
-      // 4. Recherche API Django (Sites, SousSites, Arbres du backend)
+      // 2. Recherche API Django (Sites, SousSites, Arbres du backend)
       try {
         const apiResults = await searchObjects(searchQuery);
         if (apiResults && apiResults.length > 0) {
@@ -165,7 +361,7 @@ export const MapPage: React.FC<MapPageProps> = ({
             const coords = geoJSONToLatLng(firstResult.location.coordinates);
             setSearchResult({
               name: firstResult.name,
-              description: `${firstResult.type} (Backend)`,
+              description: `${firstResult.type} (API)`,
               coordinates: coords,
               zoom: 18
             });
@@ -179,7 +375,21 @@ export const MapPage: React.FC<MapPageProps> = ({
         // Continue vers Nominatim si l'API échoue
       }
 
-      // 5. Fallback to Nominatim external search
+      // 3. Fallback: recherche dans les données mock (pour compatibilité)
+      const mockSite = MOCK_SITES.find(s => s.name.toLowerCase().includes(query));
+      if (mockSite) {
+        setSearchResult({
+          name: mockSite.name,
+          description: `Site - ${mockSite.address}`,
+          coordinates: mockSite.coordinates,
+          zoom: 18
+        });
+        setTargetLocation({ coordinates: mockSite.coordinates, zoom: 18 });
+        setIsSearching(false);
+        return;
+      }
+
+      // 4. Fallback to Nominatim external search
       try {
         const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`);
         if (!response.ok) {
@@ -203,10 +413,10 @@ export const MapPage: React.FC<MapPageProps> = ({
       } catch (error) {
         console.error("Error during Nominatim search:", error);
         alert("Une erreur est survenue lors de la recherche externe. Vérifiez votre connexion internet.");
-      } finally {
-        setIsSearching(false);
       }
-    }, 250); // Reduced delay
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const handleGeolocation = () => {
@@ -317,51 +527,52 @@ export const MapPage: React.FC<MapPageProps> = ({
     setShowZoomWarning(false);
   };
 
+  const [isExporting, setIsExporting] = useState(false);
+
   const handleExportPDF = async () => {
     try {
-      // Find the active element (likely the button) to blur it
+      setIsExporting(true);
+
+      // Blur active element
       const btn = document.activeElement as HTMLElement;
       if (btn) btn.blur();
 
-      const originalTitle = document.title;
-      document.title = "Export en cours...";
+      // Export map canvas using OpenLayers native method (avoids CORS issues)
+      const mapImageBase64 = await exportMapCanvas?.();
+      if (!mapImageBase64) {
+        throw new Error("Impossible d'exporter l'image de la carte");
+      }
 
-      // We capture the body to get the full view including overlays
-      const element = document.body;
+      // Get current map state
+      const center = getMapCenter?.() || { lat: 32.219, lng: -7.934 };
+      const zoom = getCurrentZoom();
 
-      const canvas = await html2canvas(element, {
-        useCORS: true,
-        logging: false,
-        allowTaint: true,
-        backgroundColor: '#ffffff'
+      // Build visible layers object from layerVisibility state
+      const visibleLayers: Record<string, boolean> = {};
+      Object.entries(layerVisibility).forEach(([key, value]) => {
+        // Convert type names to backend format (lowercase)
+        const backendKey = key.toLowerCase().replace(/\s+/g, '');
+        visibleLayers[backendKey] = value;
       });
 
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: 'a4'
+      // Call the backend API
+      const pdfBlob = await exportPDF({
+        title: 'Export Carte GreenSIG',
+        mapImageBase64,
+        visibleLayers,
+        center: [center.lng, center.lat],
+        zoom
       });
 
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-
-      const ratio = imgProps.width / imgProps.height;
-      const width = pdfWidth;
-      const height = width / ratio;
-
-      const y = (pdfHeight - height) / 2;
-
-      pdf.addImage(imgData, 'PNG', 0, Math.max(0, y), width, height);
-
+      // Download the PDF
       const date = new Date().toISOString().split('T')[0];
-      pdf.save(`greensig_carte_${date}.pdf`);
+      downloadBlob(pdfBlob, `greensig_carte_${date}.pdf`);
 
-      document.title = originalTitle;
     } catch (error) {
       console.error("Erreur lors de l'export PDF:", error);
-      alert("Une erreur est survenue lors de la génération du PDF.");
+      alert("Une erreur est survenue lors de la génération du PDF. Vérifiez que le serveur backend est accessible.");
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -372,31 +583,7 @@ export const MapPage: React.FC<MapPageProps> = ({
     }
   };
 
-  // Configuration de la légende dynamique
-  const legendItems = [
-    {
-      key: 'greenSpaces',
-      label: 'Espace Vert Public',
-      renderIcon: () => <span className="w-3 h-3 rounded bg-emerald-500 shadow-sm ring-1 ring-black/5"></span>
-    },
-    {
-      key: 'networks',
-      label: 'Réseaux / Canalisations',
-      renderIcon: () => <span className="w-3 h-3 rounded bg-blue-500 shadow-sm ring-1 ring-black/5"></span>
-    },
-    {
-      key: 'works',
-      label: 'Intervention en cours',
-      renderIcon: () => <span className="w-3 h-3 rounded-full bg-orange-500 shadow-sm ring-1 ring-black/5 border-2 border-white"></span>
-    },
-    {
-      key: 'parcels',
-      label: 'Parcelle Cadastrale',
-      renderIcon: () => <span className="w-3 h-3 rounded border border-slate-400 border-dashed bg-slate-100"></span>
-    }
-  ];
 
-  const activeOverlayCount = Object.values(overlays).filter(Boolean).length;
 
   return (
     <>
@@ -408,33 +595,75 @@ export const MapPage: React.FC<MapPageProps> = ({
         {!isPanelOpen && (
           <>
             {/* Search Group */}
-            <div className="flex gap-2 w-72 md:w-96 shrink-0">
-              <div className="flex-1 bg-white/90 backdrop-blur-md shadow-xl rounded-xl flex items-center p-1 border border-white/20 ring-1 ring-black/5 transition-all focus-within:ring-2 focus-within:ring-emerald-600/50">
-                <div className="p-2.5 text-slate-400">
-                  {isSearching ? <Loader2 className="w-5 h-5 animate-spin text-emerald-600" /> : <Search className="w-5 h-5" />}
+            <div className="flex gap-2 w-72 md:w-96 shrink-0" ref={searchContainerRef}>
+              <div className="flex-1 relative">
+                <div className="bg-white/90 backdrop-blur-md shadow-xl rounded-xl flex items-center p-1 border border-white/20 ring-1 ring-black/5 transition-all focus-within:ring-2 focus-within:ring-emerald-600/50">
+                  <div className="p-2.5 text-slate-400">
+                    {isSearching ? <Loader2 className="w-5 h-5 animate-spin text-emerald-600" /> : <Search className="w-5 h-5" />}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Rechercher un site, équipement..."
+                    className="flex-1 bg-transparent outline-none text-slate-700 placeholder:text-slate-400 text-sm font-medium h-9 w-full min-w-0"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSearchQuery(value);
+                      if (value.trim() === '') {
+                        setSearchResult(null);
+                        setShowSuggestions(false);
+                      }
+                    }}
+                    onFocus={() => {
+                      if (searchSuggestions.length > 0) {
+                        setShowSuggestions(true);
+                      }
+                    }}
+                    onKeyDown={handleKeyDown}
+                    disabled={isSearching}
+                  />
+                  <button
+                    onClick={handleSearch}
+                    className="p-2.5 text-slate-400 hover:text-emerald-600 border-l border-slate-100 transition-colors disabled:opacity-50"
+                    disabled={isSearching}
+                  >
+                    <Navigation className="w-4 h-4" />
+                  </button>
                 </div>
-                <input
-                  type="text"
-                  placeholder="Rechercher..."
-                  className="flex-1 bg-transparent outline-none text-slate-700 placeholder:text-slate-400 text-sm font-medium h-9 w-full min-w-0"
-                  value={searchQuery}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setSearchQuery(value);
-                    if (value.trim() === '') {
-                      setSearchResult(null);
-                    }
-                  }}
-                  onKeyDown={handleKeyDown}
-                  disabled={isSearching}
-                />
-                <button
-                  onClick={handleSearch}
-                  className="p-2.5 text-slate-400 hover:text-emerald-600 border-l border-slate-100 transition-colors disabled:opacity-50"
-                  disabled={isSearching}
-                >
-                  <Navigation className="w-4 h-4" />
-                </button>
+
+                {/* Suggestions Dropdown */}
+                {showSuggestions && searchSuggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white/95 backdrop-blur-md rounded-xl shadow-xl border border-white/20 ring-1 ring-black/5 overflow-hidden z-[100]">
+                    {searchSuggestions.map((suggestion, index) => (
+                      <button
+                        key={suggestion.id}
+                        onClick={() => handleSuggestionClick(suggestion)}
+                        className={`w-full px-4 py-3 flex items-center gap-3 hover:bg-emerald-50 transition-colors text-left ${
+                          index !== searchSuggestions.length - 1 ? 'border-b border-slate-100' : ''
+                        }`}
+                      >
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                          {suggestion.type === 'Site' ? (
+                            <MapIcon className="w-4 h-4 text-emerald-600" />
+                          ) : suggestion.type === 'Arbre' ? (
+                            <Trees className="w-4 h-4 text-green-600" />
+                          ) : (
+                            <Navigation className="w-4 h-4 text-blue-600" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm text-slate-800 truncate">
+                            {suggestion.name}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {suggestion.type}
+                          </div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <button
@@ -456,7 +685,7 @@ export const MapPage: React.FC<MapPageProps> = ({
               </button>
             </div>
 
-            {/* Site Dropdown (Moved inline) */}
+            {/* Site Dropdown - Sites dynamiques depuis l'API */}
             <div className="bg-white/90 backdrop-blur-md shadow-xl rounded-xl p-1 border border-white/20 ring-1 ring-black/5 flex items-center w-64 shrink-0">
               <div className="p-2 text-slate-400">
                 <MapIcon className="w-4 h-4" />
@@ -466,7 +695,7 @@ export const MapPage: React.FC<MapPageProps> = ({
                 onChange={(e) => {
                   const siteId = e.target.value;
                   if (!siteId) return;
-                  const site = SITES.find(s => s.id === siteId);
+                  const site = sites.find(s => s.id === siteId);
                   if (site) {
                     setTargetLocation({ coordinates: site.coordinates, zoom: 17 });
                     setSearchResult({
@@ -478,9 +707,12 @@ export const MapPage: React.FC<MapPageProps> = ({
                   }
                 }}
                 defaultValue=""
+                disabled={sitesLoading}
               >
-                <option value="" disabled>Aller à un site...</option>
-                {SITES.map(site => (
+                <option value="" disabled>
+                  {sitesLoading ? 'Chargement...' : `Aller à un site (${sites.length})...`}
+                </option>
+                {sites.map(site => (
                   <option key={site.id} value={site.id}>
                     {site.name}
                   </option>
@@ -547,25 +779,15 @@ export const MapPage: React.FC<MapPageProps> = ({
 
           <div className="h-px bg-slate-100 w-full" />
 
-          {setIsRouting && (
-            <>
-              <button
-                onClick={() => setIsRouting(!isRouting)}
-                className={`p-3 transition-colors ${isRouting ? 'bg-emerald-50 text-emerald-600' : 'hover:bg-slate-50 text-slate-600'}`}
-                title="Calculer un itinéraire"
-              >
-                <GitCommit className="w-5 h-5" />
-              </button>
-              <div className="h-px bg-slate-100 w-full" />
-            </>
-          )}
+
 
           <button
             onClick={handleExportPDF}
-            className="p-3 hover:bg-slate-50 text-slate-600 transition-colors"
-            title="Exporter en PDF"
+            disabled={isExporting}
+            className={`p-3 transition-colors ${isExporting ? 'bg-emerald-50 text-emerald-600 cursor-wait' : 'hover:bg-slate-50 text-slate-600'}`}
+            title={isExporting ? "Export en cours..." : "Exporter en PDF"}
           >
-            <Printer className="w-5 h-5" />
+            {isExporting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Printer className="w-5 h-5" />}
           </button>
         </div>
       </div>
@@ -573,31 +795,68 @@ export const MapPage: React.FC<MapPageProps> = ({
       {/* Selected Object Detail Card */}
       {selectedObject && (
         <div className="absolute top-20 right-4 w-80 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-white/40 animate-slide-in pointer-events-auto ring-1 ring-black/5 z-50 overflow-hidden">
-          <div className="h-24 bg-gradient-to-br from-emerald-600 to-teal-700 relative p-4 flex flex-col justify-end">
+          <div
+            className={`h-28 relative p-4 flex flex-col justify-end ${
+              selectedObject.type !== 'Site'
+                ? 'bg-gradient-to-br from-emerald-600 to-teal-700'
+                : ''
+            }`}
+            style={
+              selectedObject.type === 'Site'
+                ? { backgroundColor: selectedObject.attributes?.Couleur as string || '#3b82f6' }
+                : {}
+            }
+          >
             <button
               onClick={onCloseObjectDetail}
               className="absolute top-3 right-3 text-white/70 hover:text-white bg-black/10 hover:bg-black/20 rounded-full p-1 transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
-            <span className="text-[10px] font-bold text-emerald-100 uppercase tracking-wider bg-black/20 px-2 py-0.5 rounded w-fit mb-1">
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded w-fit mb-1 ${
+              selectedObject.type === 'Site' ? 'text-blue-100 bg-black/20' : 'text-emerald-100 bg-black/20'
+            }`}>
               {selectedObject.type}
             </span>
             <h3 className="text-lg font-bold text-white leading-tight">{selectedObject.title}</h3>
+            {selectedObject.attributes?.['Catégorie'] && selectedObject.type === 'Site' && (
+              <span className="text-xs text-white/80 mt-1">{selectedObject.attributes['Catégorie']}</span>
+            )}
           </div>
           <div className="p-4 space-y-4">
             <p className="text-sm text-slate-500 font-medium">{selectedObject.subtitle}</p>
 
             <div className="grid grid-cols-2 gap-3">
               {Object.entries(selectedObject.attributes).map(([key, value]) => {
-                // Ignorer les champs géométriques et les objets complexes
+                // Ignorer les champs géométriques, objets complexes et certains champs pour les sites
                 if (key === 'centroid' || key === 'center' || key === 'geometry' || typeof value === 'object') {
                   return null;
+                }
+                // Pour les sites, ignorer Description (déjà affiché) et Couleur
+                if (selectedObject.type === 'Site' && (key === 'Description' || key === 'Couleur')) {
+                  return null;
+                }
+                // Traitement spécial pour Google Maps
+                if (key === 'Google Maps' && typeof value === 'string' && value.startsWith('http')) {
+                  return (
+                    <div key={key} className="col-span-2 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                      <div className="text-[10px] text-blue-400 uppercase font-bold mb-1">{key}</div>
+                      <a
+                        href={value}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-2 hover:underline"
+                      >
+                        <Navigation className="w-4 h-4" />
+                        Ouvrir dans Google Maps
+                      </a>
+                    </div>
+                  );
                 }
                 return (
                   <div key={key} className="bg-slate-50 p-2 rounded-lg border border-slate-100">
                     <div className="text-[10px] text-slate-400 uppercase font-bold">{key}</div>
-                    <div className="text-sm font-semibold text-slate-700">{value}</div>
+                    <div className="text-sm font-semibold text-slate-700 truncate" title={String(value)}>{value}</div>
                   </div>
                 );
               })}
@@ -611,20 +870,41 @@ export const MapPage: React.FC<MapPageProps> = ({
             )}
 
             <div className="flex gap-2 mt-2">
-              <button className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-xs font-bold transition-colors">
-                Créer Intervention
-              </button>
-              <button className="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1">
-                <FileText className="w-3 h-3" /> Historique
-              </button>
+              {selectedObject.type === 'Site' ? (
+                <>
+                  <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1">
+                    <Eye className="w-3 h-3" /> Voir détails
+                  </button>
+                  <button
+                    onClick={() => {
+                      const googleMapsUrl = selectedObject.attributes?.['Google Maps'];
+                      if (googleMapsUrl && typeof googleMapsUrl === 'string') {
+                        window.open(googleMapsUrl, '_blank');
+                      }
+                    }}
+                    className="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1"
+                  >
+                    <Navigation className="w-3 h-3" /> Itinéraire
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-xs font-bold transition-colors">
+                    Créer Intervention
+                  </button>
+                  <button className="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1">
+                    <FileText className="w-3 h-3" /> Historique
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Layers Panel Overlay */}
+      {/* Layers Panel Overlay avec onglets */}
       {showLayers && (
-        <div className="absolute top-4 right-16 pointer-events-auto w-80 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-white/40 animate-slide-in origin-top-right ring-1 ring-black/5 overflow-hidden flex flex-col max-h-[calc(100vh-2rem)] z-50">
+        <div className="absolute top-4 right-16 pointer-events-auto w-96 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-white/40 animate-slide-in origin-top-right ring-1 ring-black/5 overflow-hidden flex flex-col max-h-[calc(100vh-2rem)] z-50">
           <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-white/50">
             <div className="flex items-center gap-2">
               <Layers className="w-4 h-4 text-emerald-600" />
@@ -638,223 +918,401 @@ export const MapPage: React.FC<MapPageProps> = ({
             </button>
           </div>
 
-          <div className="p-4 space-y-6 overflow-y-auto custom-scrollbar">
-            {/* Base Maps Section */}
-            <div>
-              <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                <MapIcon className="w-3 h-3" /> Fonds de plan
-              </h4>
-              <div className="grid grid-cols-3 gap-3">
-                {Object.values(MAP_LAYERS).map(layer => {
-                  let Icon = MapIcon;
-                  if (layer.id === 'SATELLITE') Icon = ImageIcon;
-                  if (layer.id === 'TERRAIN') Icon = Mountain;
-                  if (layer.id === 'NAVIGATION') Icon = Navigation;
+          {/* Onglets */}
+          <div className="flex p-2 bg-slate-50 border-b border-slate-100">
+            <button
+              onClick={() => setLayersPanelTab('layers')}
+              className={`flex-1 text-xs font-bold py-2 px-3 rounded-lg transition-all ${layersPanelTab === 'layers' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <span className="flex items-center justify-center gap-1.5">
+                <Layers className="w-3 h-3" /> COUCHES
+              </span>
+            </button>
+            <button
+              onClick={() => setLayersPanelTab('filters')}
+              className={`flex-1 text-xs font-bold py-2 px-3 rounded-lg transition-all ${layersPanelTab === 'filters' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <span className="flex items-center justify-center gap-1.5">
+                <Filter className="w-3 h-3" /> FILTRES
+              </span>
+            </button>
+            <button
+              onClick={() => setLayersPanelTab('symbology')}
+              className={`flex-1 text-xs font-bold py-2 px-3 rounded-lg transition-all ${layersPanelTab === 'symbology' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <span className="flex items-center justify-center gap-1.5">
+                <Grid className="w-3 h-3" /> SYMBOLES
+              </span>
+            </button>
+          </div>
 
-                  const isActive = activeLayerId === layer.id;
+          <div className="p-4 space-y-4 overflow-y-auto custom-scrollbar" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+            {/* Onglet COUCHES */}
+            {layersPanelTab === 'layers' && (
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                {/* Base Maps Section */}
+                <div className="mb-6">
+                  <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <MapIcon className="w-3 h-3" /> Fonds de plan
+                  </h4>
+                  <div className="grid grid-cols-4 gap-2">
+                    {Object.values(MAP_LAYERS).map(layer => {
+                      let Icon = MapIcon;
+                      if (layer.id === 'SATELLITE') Icon = ImageIcon;
+                      if (layer.id === 'TERRAIN') Icon = Mountain;
+                      if (layer.id === 'NAVIGATION') Icon = Navigation;
 
-                  return (
-                    <button
-                      key={layer.id}
-                      onClick={() => setActiveLayerId(layer.id)}
-                      className={`
-                        relative flex flex-col items-center gap-2 p-2 rounded-xl border transition-all duration-200 group
-                        ${isActive
-                          ? 'border-emerald-500 bg-emerald-50/50 text-emerald-800 ring-1 ring-emerald-500/20'
-                          : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white'}
-                      `}
-                    >
-                      <div className={`p-2 rounded-lg transition-colors ${isActive ? 'bg-emerald-100 text-emerald-600' : 'bg-white shadow-sm text-slate-400 group-hover:text-slate-600'}`}>
-                        <Icon className="w-5 h-5" />
-                      </div>
-                      <span className="text-[10px] font-bold truncate w-full text-center">
-                        {layer.name.split(' ')[0]}
-                      </span>
+                      const isActive = activeLayerId === layer.id;
 
-                      {isActive && (
-                        <div className="absolute top-1 right-1 w-2 h-2 bg-emerald-500 rounded-full ring-2 ring-white"></div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Overlays Section */}
-            <div>
-              <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                <Grid className="w-3 h-3" /> Données Métier
-              </h4>
-              {/* Cartographic toggles (moved from LeftPanel) */}
-              <div className="mb-3">
-                <div className="text-xs text-slate-400 mb-2">Options Cartographiques</div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-1 rounded-md ${clusteringEnabled ? 'bg-emerald-50 text-emerald-600' : 'bg-white text-slate-400'}`}>
-                        <Zap className="w-4 h-4" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">Activer Clustering</span>
-                        <span className="text-xs text-slate-400">Regroupe les points proches</span>
-                      </div>
-                    </div>
-                    <label className={`w-11 h-6 rounded-full p-1 transition-colors cursor-pointer ${clusteringEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`}>
-                      <input
-                        type="checkbox"
-                        className="hidden"
-                        checked={clusteringEnabled}
-                        onChange={(e) => {
-                          if (setClusteringEnabled) {
-                            setClusteringEnabled(e.target.checked);
-                          }
-                          console.log('clustering', e.target.checked);
-                        }}
-                      />
-                      <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ease-in-out ${clusteringEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
-                    </label>
+                      return (
+                        <button
+                          key={layer.id}
+                          onClick={() => setActiveLayerId(layer.id)}
+                          className={`
+                            relative flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all duration-200 group
+                            ${isActive
+                              ? 'border-emerald-500 bg-emerald-50/50 text-emerald-800 ring-1 ring-emerald-500/20'
+                              : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white'}
+                          `}
+                        >
+                          <div className={`p-1.5 rounded-lg transition-colors ${isActive ? 'bg-emerald-100 text-emerald-600' : 'bg-white shadow-sm text-slate-400 group-hover:text-slate-600'}`}>
+                            <Icon className="w-4 h-4" />
+                          </div>
+                          <span className="text-[9px] font-bold truncate w-full text-center">
+                            {layer.name.split(' ')[0]}
+                          </span>
+                          {isActive && (
+                            <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-emerald-500 rounded-full ring-2 ring-white"></div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
+                </div>
 
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-1 rounded-md ${vegetationVisible ? 'bg-emerald-50 text-emerald-600' : 'bg-white text-slate-400'}`}>
-                        <Trees className="w-4 h-4" />
+                {/* Options Cartographiques */}
+                <div className="mb-4">
+                  <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <Trees className="w-3 h-3" /> Options
+                  </h4>
+                  <div className="space-y-2">
+                    {/* Option 'Végétation' supprimée */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <div className={`p-1 rounded-md ${clusteringEnabled ? 'bg-blue-50 text-blue-600' : 'bg-white text-slate-400'}`}>
+                          <Layers className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-xs font-medium">Clustering</span>
                       </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">Végétation</span>
-                        <span className="text-xs text-slate-400">Afficher / masquer la couche végétation</span>
-                      </div>
+                      <label className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${clusteringEnabled ? 'bg-blue-500' : 'bg-slate-300'}`}>
+                        <input type="checkbox" className="hidden" checked={clusteringEnabled} onChange={(e) => setClusteringEnabled?.(e.target.checked)} />
+                        <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${clusteringEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                      </label>
                     </div>
-                    <label className={`w-11 h-6 rounded-full p-1 transition-colors ${vegetationVisible ? 'bg-emerald-500' : 'bg-slate-300'}`}>
-                      <input type="checkbox" className="hidden" checked={vegetationVisible} onChange={(e) => { setVegetationVisible(e.target.checked); console.log('vegetation', e.target.checked); }} />
-                      <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ease-in-out ${vegetationVisible ? 'translate-x-5' : 'translate-x-0'}`} />
-                    </label>
+                  </div>
+                </div>
+
+                {/* Section Données Métier supprimée */}
+              </div>
+            )}
+
+            {/* Onglet FILTRES */}
+            {layersPanelTab === 'filters' && (
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="text-sm font-semibold text-gray-800 mb-2">Recherche par Type</div>
+
+                <div className="flex gap-2 mb-4">
+                  <button
+                    onClick={() => {
+                      const newVisibility: Record<string, boolean> = {};
+                      [...SITE_LEGEND, ...VEG_LEGEND, ...HYDRO_LEGEND].forEach(item => {
+                        newVisibility[item.type] = true;
+                        toggleMapLayerVisibility(item.type, true);
+                      });
+                      setLayerVisibility(prev => ({ ...prev, ...newVisibility }));
+                    }}
+                    className="flex-1 py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-medium rounded-lg transition-colors border border-emerald-200"
+                  >
+                    Tout sélectionner
+                  </button>
+                  <button
+                    onClick={() => {
+                      const newVisibility: Record<string, boolean> = {};
+                      [...SITE_LEGEND, ...VEG_LEGEND, ...HYDRO_LEGEND].forEach(item => {
+                        newVisibility[item.type] = false;
+                        toggleMapLayerVisibility(item.type, false);
+                      });
+                      setLayerVisibility(prev => ({ ...prev, ...newVisibility }));
+                    }}
+                    className="flex-1 py-1.5 px-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-medium rounded-lg transition-colors border border-red-200"
+                  >
+                    Tout désélectionner
+                  </button>
+                </div>
+
+                {/* Sites Section */}
+                <div className="mb-3">
+                  <div className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1 flex items-center gap-1">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                    Sites
+                  </div>
+                  <div className="space-y-1 pl-1">
+                    {SITE_LEGEND.map(item => (
+                      <div key={item.type} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded transition-colors">
+                        <input
+                          type="checkbox"
+                          id={`filter-${item.type}`}
+                          checked={layerVisibility[item.type] !== false}
+                          onChange={(e) => {
+                            const visible = e.target.checked;
+                            setLayerVisibility(prev => ({ ...prev, [item.type]: visible }));
+                            toggleMapLayerVisibility(item.type, visible);
+                          }}
+                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer border-gray-300"
+                        />
+                        <label htmlFor={`filter-${item.type}`} className="flex items-center gap-2 cursor-pointer flex-1 select-none">
+                          <span className="w-4 h-4 rounded shadow-sm border border-black/10" style={{ backgroundColor: item.color }}></span>
+                          <span className="text-sm text-gray-700 font-medium">{item.type}</span>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Végétation Section */}
+                <div className="mb-3">
+                  <div className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1 flex items-center gap-1">
+                    <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                    Végétation
+                  </div>
+                  <div className="space-y-1 pl-1">
+                    {VEG_LEGEND.map(item => (
+                      <div key={item.type} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded transition-colors">
+                        <input
+                          type="checkbox"
+                          id={`filter-${item.type}`}
+                          checked={layerVisibility[item.type] !== false}
+                          onChange={(e) => {
+                            const visible = e.target.checked;
+                            setLayerVisibility(prev => ({ ...prev, [item.type]: visible }));
+                            toggleMapLayerVisibility(item.type, visible);
+                          }}
+                          className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer border-gray-300"
+                        />
+                        <label htmlFor={`filter-${item.type}`} className="flex items-center gap-2 cursor-pointer flex-1 select-none">
+                          <span className="w-4 h-4 rounded shadow-sm border border-black/10" style={{ backgroundColor: item.color }}></span>
+                          <span className="text-sm text-gray-700 font-medium">{item.type}</span>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Hydrologie Section */}
+                <div className="mb-4">
+                  <div className="text-xs font-semibold text-cyan-600 uppercase tracking-wide mb-1 flex items-center gap-1">
+                    <span className="w-2 h-2 bg-cyan-500 rounded-full"></span>
+                    Hydrologie
+                  </div>
+                  <div className="space-y-1 pl-1">
+                    {HYDRO_LEGEND.map(item => (
+                      <div key={item.type} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded transition-colors">
+                        <input
+                          type="checkbox"
+                          id={`filter-${item.type}`}
+                          checked={layerVisibility[item.type] !== false}
+                          onChange={(e) => {
+                            const visible = e.target.checked;
+                            setLayerVisibility(prev => ({ ...prev, [item.type]: visible }));
+                            toggleMapLayerVisibility(item.type, visible);
+                          }}
+                          className="w-4 h-4 rounded text-cyan-600 focus:ring-cyan-500 cursor-pointer border-gray-300"
+                        />
+                        <label htmlFor={`filter-${item.type}`} className="flex items-center gap-2 cursor-pointer flex-1 select-none">
+                          <span className="w-4 h-4 rounded-full shadow-sm border border-black/10" style={{ backgroundColor: item.color }}></span>
+                          <span className="text-sm text-gray-700 font-medium">{item.type}</span>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ...existing code... */}
+              </div>
+            )}
+
+            {/* Onglet SYMBOLOGIE */}
+            {layersPanelTab === 'symbology' && (
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="text-sm font-semibold text-gray-800 mb-1">Gestion de la Symbologie</div>
+                <div className="text-xs text-gray-500 mb-4">Personnalisez l'apparence des couches.</div>
+
+                {/* Vegetation Section */}
+                <div className="mb-4">
+                  <div className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-2 flex items-center gap-1">
+                    <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                    Végétation
+                  </div>
+                  <div className="space-y-1 max-h-[200px] overflow-y-auto custom-scrollbar pr-1">
+                    {VEG_LEGEND.map(item => {
+                      const config = symbologyConfig[item.type];
+                      const isExpanded = expandedItems[item.type];
+                      const Icon = item.icon;
+
+                      return (
+                        <div key={item.type} className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                          <div
+                            className="flex items-center justify-between p-2 cursor-pointer hover:bg-gray-50 transition-colors"
+                            onClick={() => toggleExpanded(item.type)}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="w-5 h-5 rounded border-2 border-white shadow-sm" style={{ backgroundColor: config?.fillColor || item.color }} />
+                              <Icon className="w-3.5 h-3.5" style={{ color: config?.fillColor || item.color }} />
+                              <span className="text-xs font-medium text-gray-700">{item.type}</span>
+                            </div>
+                            {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" /> : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />}
+                          </div>
+
+                          {isExpanded && (
+                            <div className="p-3 pt-0 space-y-2.5 border-t border-gray-100 bg-gray-50">
+                              <div className="flex items-center justify-between">
+                                <label className="text-[10px] text-gray-600">Couleur remplissage</label>
+                                <input
+                                  type="color"
+                                  value={config?.fillColor || item.color}
+                                  onChange={(e) => updateSymbology(item.type, 'fillColor', e.target.value)}
+                                  className="w-7 h-5 rounded cursor-pointer border border-gray-300"
+                                />
+                              </div>
+                              <div>
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="text-[10px] text-gray-600">Opacité</label>
+                                  <span className="text-[10px] text-gray-500">{Math.round((config?.fillOpacity || 0.6) * 100)}%</span>
+                                </div>
+                                <input
+                                  type="range" min="0" max="100"
+                                  value={(config?.fillOpacity || 0.6) * 100}
+                                  onChange={(e) => updateSymbology(item.type, 'fillOpacity', Number(e.target.value) / 100)}
+                                  className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                />
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <label className="text-[10px] text-gray-600">Couleur contour</label>
+                                <input
+                                  type="color"
+                                  value={config?.strokeColor || item.color}
+                                  onChange={(e) => updateSymbology(item.type, 'strokeColor', e.target.value)}
+                                  className="w-7 h-5 rounded cursor-pointer border border-gray-300"
+                                />
+                              </div>
+                              <div>
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="text-[10px] text-gray-600">Épaisseur</label>
+                                  <span className="text-[10px] text-gray-500">{config?.strokeWidth || 2}px</span>
+                                </div>
+                                <input
+                                  type="range" min="1" max="10"
+                                  value={config?.strokeWidth || 2}
+                                  onChange={(e) => updateSymbology(item.type, 'strokeWidth', Number(e.target.value))}
+                                  className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                />
+                              </div>
+                              <button
+                                onClick={() => resetSymbology(item.type)}
+                                className="w-full py-1 px-2 bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-medium rounded flex items-center justify-center gap-1 transition-colors"
+                              >
+                                <RotateCcw className="w-2.5 h-2.5" /> Réinitialiser
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Hydrology Section */}
+                <div>
+                  <div className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2 flex items-center gap-1">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                    Hydrologie
+                  </div>
+                  <div className="space-y-1 max-h-[180px] overflow-y-auto custom-scrollbar pr-1">
+                    {HYDRO_LEGEND.map(item => {
+                      const config = symbologyConfig[item.type];
+                      const isExpanded = expandedItems[item.type];
+
+                      return (
+                        <div key={item.type} className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                          <div
+                            className="flex items-center justify-between p-2 cursor-pointer hover:bg-gray-50 transition-colors"
+                            onClick={() => toggleExpanded(item.type)}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="w-5 h-5 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: config?.fillColor || item.color }} />
+                              <span className="text-xs font-medium text-gray-700">{item.type}</span>
+                            </div>
+                            {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" /> : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />}
+                          </div>
+
+                          {isExpanded && (
+                            <div className="p-3 pt-0 space-y-2.5 border-t border-gray-100 bg-gray-50">
+                              <div className="flex items-center justify-between">
+                                <label className="text-[10px] text-gray-600">Couleur</label>
+                                <input
+                                  type="color"
+                                  value={config?.fillColor || item.color}
+                                  onChange={(e) => updateSymbology(item.type, 'fillColor', e.target.value)}
+                                  className="w-7 h-5 rounded cursor-pointer border border-gray-300"
+                                />
+                              </div>
+                              <div>
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="text-[10px] text-gray-600">Opacité</label>
+                                  <span className="text-[10px] text-gray-500">{Math.round((config?.fillOpacity || 0.8) * 100)}%</span>
+                                </div>
+                                <input
+                                  type="range" min="0" max="100"
+                                  value={(config?.fillOpacity || 0.8) * 100}
+                                  onChange={(e) => updateSymbology(item.type, 'fillOpacity', Number(e.target.value) / 100)}
+                                  className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                />
+                              </div>
+                              <div>
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="text-[10px] text-gray-600">Épaisseur</label>
+                                  <span className="text-[10px] text-gray-500">{config?.strokeWidth || 2}px</span>
+                                </div>
+                                <input
+                                  type="range" min="1" max="10"
+                                  value={config?.strokeWidth || 2}
+                                  onChange={(e) => updateSymbology(item.type, 'strokeWidth', Number(e.target.value))}
+                                  className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                />
+                              </div>
+                              <button
+                                onClick={() => resetSymbology(item.type)}
+                                className="w-full py-1 px-2 bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-medium rounded flex items-center justify-center gap-1 transition-colors"
+                              >
+                                <RotateCcw className="w-2.5 h-2.5" /> Réinitialiser
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
-              <div className="space-y-3">
-                {legendItems.map((item) => {
-                  const key = item.key as keyof OverlayState;
-                  const isActive = overlays[key];
-                  const Icon = key === 'networks' ? Zap : key === 'greenSpaces' ? Trees : key === 'works' ? Hammer : Grid;
-                  const colorClass = key === 'networks' ? 'text-blue-600' : key === 'greenSpaces' ? 'text-emerald-600' : key === 'works' ? 'text-orange-600' : 'text-slate-600';
-
-                  return (
-                    <div
-                      key={key}
-                      className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 cursor-pointer hover:border-slate-200 transition-colors group"
-                      onClick={() => onToggleOverlay(key)}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`p-1.5 bg-white rounded-md shadow-sm transition-colors ${isActive ? colorClass : 'text-slate-400'}`}>
-                          <Icon className="w-4 h-4" />
-                        </div>
-                        <div className="flex flex-col">
-                          <span className={`text-sm font-medium ${isActive ? 'text-slate-700' : 'text-slate-500'}`}>{item.label}</span>
-                        </div>
-                      </div>
-                      <div className={`w-11 h-6 rounded-full p-1 transition-colors duration-200 ease-in-out ${isActive ? 'bg-emerald-500' : 'bg-slate-300'}`}>
-                        <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ease-in-out ${isActive ? 'translate-x-5' : 'translate-x-0'}`} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            )}
           </div>
 
-          <div className="p-3 bg-slate-50 border-t border-slate-100 text-center">
-            <button className="text-xs text-emerald-600 font-medium hover:underline flex items-center justify-center gap-1">
-              <Plus className="w-3 h-3" /> Ajouter une couche WMS/WFS
-            </button>
-          </div>
+      
         </div>
       )}
 
-      {/* 3. Floating Bottom Right Panel Stack (Legend + Sites) */}
-      <div className="absolute bottom-8 right-4 pointer-events-auto flex flex-row gap-3 items-end z-50">
 
-        {/* Sites Legend Panel - Collapsible, Closed by Default */}
-        <div className="bg-white/90 backdrop-blur-md rounded-xl shadow-xl border border-white/20 w-72 ring-1 ring-black/5 transition-all overflow-hidden">
-          <div
-            className={`flex justify-between items-center p-3 cursor-pointer hover:bg-slate-50 transition-colors ${isSitesPanelOpen ? 'border-b border-slate-100' : ''}`}
-            onClick={() => setIsSitesPanelOpen(!isSitesPanelOpen)}
-          >
-            <h4 className="text-xs font-bold uppercase text-slate-500 tracking-wider flex items-center gap-2">
-              <MapIcon className="w-3 h-3 text-emerald-600" /> Légende
-              <span className="bg-emerald-100 text-emerald-700 px-1.5 rounded-full text-[9px]">{SITES.length}</span>
-            </h4>
-            <div className="text-slate-400">
-              {isSitesPanelOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
-            </div>
-          </div>
-
-          {isSitesPanelOpen && (
-            <div className="overflow-y-auto custom-scrollbar max-h-[400px] animate-in slide-in-from-top-2 duration-200">
-              <SitesLegend onSiteClick={handleSiteClick} />
-            </div>
-          )}
-        </div>
-
-        {/* Dynamic Legend Panel */}
-        <div className="bg-white/90 backdrop-blur-md rounded-xl shadow-xl border border-white/20 w-64 ring-1 ring-black/5 transition-all overflow-hidden">
-          {/* Header - Always Visible - Clickable to Toggle */}
-          <div
-            className={`flex justify-between items-center p-3 cursor-pointer hover:bg-slate-50 transition-colors ${isLegendOpen ? 'border-b border-slate-100' : ''}`}
-            onClick={() => setIsLegendOpen(!isLegendOpen)}
-          >
-            <h4 className="text-xs font-bold uppercase text-slate-500 tracking-wider flex items-center gap-2">
-              <Info className="w-3 h-3" /> Légende
-              {activeOverlayCount > 0 && <span className="bg-emerald-100 text-emerald-700 px-1.5 rounded-full text-[9px]">{activeOverlayCount}</span>}
-            </h4>
-            <div className="text-slate-400">
-              {isLegendOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
-            </div>
-          </div>
-
-          {/* Content - Conditionally Visible */}
-          {isLegendOpen && (
-            <div className="p-4 pt-3 animate-in slide-in-from-top-2 duration-200">
-              <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
-                {legendItems.map((item) => {
-                  const isActive = overlays[item.key as keyof OverlayState];
-
-                  // Render grayed out if inactive, normal if active
-                  return (
-                    <div
-                      key={item.key}
-                      className={`flex items-center gap-3 text-xs font-medium transition-all duration-300 ${isActive ? 'text-slate-700 opacity-100' : 'text-slate-400 opacity-50 grayscale'
-                        }`}
-                    >
-                      {item.renderIcon()}
-                      <span>{item.label}</span>
-                      <div className="ml-auto">
-                        {isActive ? <Eye className="w-3 h-3 text-slate-400" /> : <EyeOff className="w-3 h-3 text-slate-300" />}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {activeOverlayCount === 0 && (
-                  <div className="text-xs text-slate-400 italic text-center py-2 border-t border-dashed border-slate-200 mt-2">
-                    Aucune couche métier active
-                  </div>
-                )}
-              </div>
-
-              {/* Info Fond de carte - Dynamic */}
-              <div className="mt-3 pt-2 border-t border-slate-200/50">
-                <div className="text-[10px] text-slate-400 flex justify-between items-center">
-                  <span>Fond de plan:</span>
-                  <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full truncate max-w-[120px]">
-                    {MAP_LAYERS[activeLayerId].name}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* 3. Floating Bottom Right Panel Stack (Legend + Sites) - Section métier supprimée */}
 
 
       {/* 4. Zoom Controls & Pan Control */}
@@ -882,13 +1340,7 @@ export const MapPage: React.FC<MapPageProps> = ({
           </button>
         </div>
 
-        <button
-          className="w-9 h-9 bg-white/90 backdrop-blur shadow-lg rounded-lg flex items-center justify-center text-slate-600 hover:text-emerald-600 border border-white/20 hover:bg-slate-50 transition-colors"
-          title="Centrer sur ma position"
-          onClick={handleGeolocation}
-        >
-          <Crosshair className="w-4 h-4" />
-        </button>
+
       </div>
 
       {/* Confirmation Dialog for Low Zoom */}

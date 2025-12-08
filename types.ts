@@ -111,7 +111,7 @@ export interface OverlayState {
 // User 1.1.5 - Detailed Object Interface
 export interface MapObjectDetail {
   id: string;
-  type: 'PARCELLE' | 'RESEAU' | 'ESPACE_VERT' | 'CHANTIER';
+  type: 'PARCELLE' | 'RESEAU' | 'ESPACE_VERT' | 'CHANTIER' | 'Site';
   title: string;
   subtitle: string;
   attributes: Record<string, string>;
