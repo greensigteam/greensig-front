@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   LayoutDashboard, Map as MapIcon, Package, Calendar,
-  Wrench, AlertTriangle, Users, BarChart3,
+  Wrench, AlertTriangle, Users, UserCog, BarChart3,
   LogOut, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { ViewState, Role } from '../types';
@@ -29,15 +29,15 @@ const Sidebar: React.FC<SidebarProps> = ({
   // Operator: Dashboard, Map, Inventory, Interventions, Claims (read/update)
   // Client: Handled via ClientPortal, so no sidebar items needed for Client here (or minimal)
   const menuItems = [
-    { id: 'DASHBOARD', label: 'Tableau de bord', icon: LayoutDashboard, roles: ['ADMIN', 'OPERATOR'] },
-    { id: 'MAP', label: 'Cartographie', icon: MapIcon, roles: ['ADMIN', 'OPERATOR'] },
-    { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['ADMIN', 'OPERATOR'] },
-    { id: 'PLANNING', label: 'Planification', icon: Calendar, roles: ['ADMIN'] },
-    { id: 'INTERVENTIONS', label: 'Interventions', icon: Wrench, roles: ['ADMIN', 'OPERATOR'] },
-    { id: 'CLAIMS', label: 'Réclamations', icon: AlertTriangle, roles: ['ADMIN', 'OPERATOR'] }, // Operator needs access to treat claims (User 6.6.10)
+    { id: 'DASHBOARD', label: 'Tableau de bord', icon: LayoutDashboard, roles: ['ADMIN', 'OPERATEUR'] },
+    { id: 'MAP', label: 'Cartographie', icon: MapIcon, roles: ['ADMIN', 'OPERATEUR'] },
+    { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['ADMIN', 'OPERATEUR', 'CLIENT'] },
+    { id: 'PLANNING', label: 'Planning', icon: Calendar, roles: ['ADMIN', 'OPERATEUR', 'CLIENT'] },
+    { id: 'INTERVENTIONS', label: 'Interventions', icon: Wrench, roles: ['ADMIN', 'OPERATEUR', 'CLIENT'] },
+    { id: 'CLAIMS', label: 'Réclamations', icon: AlertTriangle, roles: ['ADMIN', 'OPERATEUR', 'CLIENT'] },
     { id: 'TEAMS', label: 'Équipes', icon: Users, roles: ['ADMIN'] },
+    { id: 'USERS', label: 'Utilisateurs', icon: UserCog, roles: ['ADMIN'] },
     { id: 'REPORTING', label: 'Rapports', icon: BarChart3, roles: ['ADMIN'] },
-    { id: 'CLIENT_PORTAL', label: 'Mon Espace', icon: LayoutDashboard, roles: ['CLIENT'] },
   ];
 
   const filteredItems = menuItems.filter(item => item.roles.includes(userRole));

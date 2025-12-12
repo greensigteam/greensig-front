@@ -19,6 +19,7 @@ import { defaults as defaultControls, ScaleLine } from 'ol/control';
 
 import { LayerConfig, Coordinates } from "../types";
 import { INITIAL_POSITION, VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND } from "../constants";
+import { apiFetch } from "../services/apiFetch";
 // Note: Les sites sont maintenant chargés dynamiquement depuis l'API dans fetchData()
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
@@ -861,7 +862,7 @@ export const OLMap = React.forwardRef<any, OLMapProps>(({
         const fetchEndpoint = async (endpoint: string, objectType: string): Promise<Feature[]> => {
             try {
                 const url = `${API_BASE_URL}/${endpoint}/`;
-                const response = await fetch(url);
+                const response = await apiFetch(url);
 
                 if (response.ok) {
                     const data = await response.json();

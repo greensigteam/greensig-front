@@ -11,15 +11,24 @@ import Planning from './pages/Planning';
 import Claims from './pages/Claims';
 import Reporting from './pages/Reporting';
 import ClientPortal from './pages/ClientPortal';
+import Users from './pages/Users';
 import LoadingScreen from './components/LoadingScreen';
 import { User, ViewState, MapLayerType, Coordinates, OverlayState, MapObjectDetail } from './types';
 import { MAP_LAYERS } from './constants';
 import { MapSearchResult } from './types';
 import { searchObjects } from './services/api';
+import { apiFetch, clearAuthTokens } from './services/apiFetch';
+
+// Verifier si un token existe au chargement (avant le rendu)
+const hasExistingToken = () => {
+  return !!localStorage.getItem('token');
+};
 
 function App() {
-  const [isLoading, setIsLoading] = useState(true);
+  // Si un token existe, pas besoin du LoadingScreen avec video
+  const [showVideoLoading, setShowVideoLoading] = useState(!hasExistingToken());
   const [user, setUser] = useState<User | null>(null);
+  const [isRestoringSession, setIsRestoringSession] = useState(true);
   const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
   const [lastNonMapView, setLastNonMapView] = useState<ViewState>('DASHBOARD');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
@@ -177,6 +186,65 @@ function App() {
     console.log("GreenSIG Application v1.0.1 Mounted");
   }, []);
 
+  // Ecouter l'evenement de deconnexion automatique (session expiree)
+  useEffect(() => {
+    const handleAuthLogout = () => {
+      console.log('Session expiree, deconnexion...');
+      setUser(null);
+    };
+
+    window.addEventListener('auth:logout', handleAuthLogout);
+    return () => window.removeEventListener('auth:logout', handleAuthLogout);
+  }, []);
+
+  // Restaurer la session utilisateur au chargement de la page
+  useEffect(() => {
+    const restoreSession = async () => {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        setIsRestoringSession(false);
+        return;
+      }
+
+      try {
+        // Utiliser apiFetch qui gere automatiquement le refresh token
+        const response = await apiFetch('/api/users/me/');
+
+        if (response.ok) {
+          const userRaw = await response.json();
+          // Reconstruire l'objet user
+          // Mappe le rôle pour correspondre aux valeurs attendues par le frontend
+
+          const backendRole = Array.isArray(userRaw.roles) && userRaw.roles.length > 0
+            ? userRaw.roles[0]
+            : userRaw.type_utilisateur || 'CLIENT';
+          const restoredUser: User = {
+            id: userRaw.id,
+            name: userRaw.full_name || `${userRaw.prenom} ${userRaw.nom}`,
+            email: userRaw.email,
+            role: backendRole,
+            avatar: undefined
+          };
+
+          setUser(restoredUser);
+          console.log('Session restauree pour:', restoredUser.name);
+        } else {
+          // Token invalide ou expiré, nettoyer les tokens
+          console.log('Token invalide, suppression...');
+          clearAuthTokens();
+        }
+      } catch (error) {
+        console.error('Erreur restauration session:', error);
+        clearAuthTokens();
+      } finally {
+        setIsRestoringSession(false);
+      }
+    };
+
+    restoreSession();
+  }, []);
+
   // Update initial view based on role
   useEffect(() => {
     if (user) {
@@ -247,15 +315,51 @@ function App() {
     }
   };
 
-  if (isLoading) {
-    return <LoadingScreen onLoadingComplete={() => setIsLoading(false)} minDuration={3000} />;
+  // Gestion du chargement:
+  // - Si pas de token (nouvelle visite): LoadingScreen avec video
+  // - Si token existe (refresh/retour): Simple spinner rapide
+  if (isRestoringSession) {
+    if (showVideoLoading) {
+      // Premiere visite ou apres deconnexion: afficher la video
+      return <LoadingScreen onLoadingComplete={() => setShowVideoLoading(false)} minDuration={3000} />;
+    } else {
+      // Session existante (refresh): afficher un spinner simple
+      return (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-white">
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-emerald-500 border-t-transparent"></div>
+            <p className="text-slate-600 text-sm">Restauration de la session...</p>
+          </div>
+        </div>
+      );
+    }
   }
 
+  // Si pas de token apres verification, afficher d'abord la video puis le login
   if (!user) {
+    if (showVideoLoading) {
+      return <LoadingScreen onLoadingComplete={() => setShowVideoLoading(false)} minDuration={3000} />;
+    }
     return <Login onLogin={setUser} />;
   }
 
   const renderPanelContent = () => {
+    // Pour les clients, chaque vue du menu doit afficher l'onglet correspondant du portail client
+    if (user.role === 'CLIENT') {
+      switch (currentView) {
+        case 'INVENTORY':
+          return <ClientPortal user={user} forcedTab="inventory" />;
+        case 'PLANNING':
+          return <ClientPortal user={user} forcedTab="planning" />;
+        case 'INTERVENTIONS':
+          return <ClientPortal user={user} forcedTab="interventions" />;
+        case 'CLAIMS':
+          return <ClientPortal user={user} forcedTab="claims" />;
+        default:
+          return <ClientPortal user={user} forcedTab="inventory" />;
+      }
+    }
+    // Pour les autres rôles, comportement inchangé
     switch (currentView) {
       case 'DASHBOARD': return <Dashboard />;
       case 'INVENTORY': return <Inventory />;
@@ -264,8 +368,9 @@ function App() {
       case 'PLANNING': return <Planning />;
       case 'CLAIMS': return <Claims />;
       case 'REPORTING': return <Reporting />;
+      case 'USERS': return <Users />;
       case 'CLIENT_PORTAL': return <ClientPortal user={user} />;
-      case 'MAP': return null; // Map view has no side panel content
+      case 'MAP': return null;
       default: return <Dashboard />;
     }
   };
@@ -275,7 +380,10 @@ function App() {
       currentView={currentView}
       onNavigate={handleNavigate}
       user={user}
-      onLogout={() => setUser(null)}
+      onLogout={() => {
+        clearAuthTokens();
+        setUser(null);
+      }}
       isSidebarCollapsed={isSidebarCollapsed}
       onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
 

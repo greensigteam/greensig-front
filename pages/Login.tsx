@@ -1,33 +1,68 @@
 
+
 import React, { useState } from 'react';
-import { User, Role } from '../types';
 import { Lock, Mail, UserCircle } from 'lucide-react';
+
+import { User, Role } from '../types';
+
 
 interface LoginProps {
   onLogin: (user: User) => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  const [email, setEmail] = useState('admin@greensig.fr');
-  const [password, setPassword] = useState('password');
-  const [role, setRole] = useState<Role>('ADMIN');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [userInfo, setUserInfo] = useState<User | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
-    // Simulate API call
-    setTimeout(() => {
-      onLogin({
-        id: '1',
-        name: 'Utilisateur ' + role,
-        email,
-        role,
-        avatar: role[0]
+    setError(null);
+    try {
+      // Authentification JWT
+      const resp = await fetch('/api/token/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       });
+      const data = await resp.json();
+      if (resp.ok && data.access) {
+        // Stocker les deux tokens (access et refresh)
+        localStorage.setItem('token', data.access);
+        if (data.refresh) {
+          localStorage.setItem('refreshToken', data.refresh);
+        }
+        // Récupérer le profil utilisateur connecté
+        const meResp = await fetch('/api/users/me/', {
+          headers: { Authorization: `Bearer ${data.access}` },
+        });
+        if (!meResp.ok) throw new Error('Impossible de récupérer le profil utilisateur');
+        const userRaw = await meResp.json();
+        // Map backend role string to Role type
+        const backendRole = Array.isArray(userRaw.roles) && userRaw.roles.length > 0
+          ? userRaw.roles[0]
+          : userRaw.type_utilisateur || 'CLIENT';
+        const user: User = {
+          id: userRaw.id,
+          name: userRaw.full_name || `${userRaw.prenom} ${userRaw.nom}`,
+          email: userRaw.email,
+          role: backendRole,
+          avatar: undefined // add avatar if available
+        };
+        setUserInfo(user);
+        onLogin(user);
+      } else {
+        setError('Identifiants invalides');
+      }
+    } catch (err) {
+      setError('Erreur de connexion');
+    } finally {
       setIsLoading(false);
-    }, 800);
+    }
   };
 
   return (
@@ -50,26 +85,15 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700">Sélectionnez votre rôle</label>
-            <div className="grid grid-cols-3 gap-2 p-1 bg-slate-50 border border-slate-200 rounded-lg">
-              {(['ADMIN', 'OPERATOR', 'CLIENT'] as Role[]).map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setRole(r)}
-                  className={`text-xs font-bold py-2 rounded-md transition-all ${role === r
-                    ? 'bg-white text-emerald-700 shadow-sm border border-emerald-100'
-                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
-                    }`}
-                >
-                  {r === 'OPERATOR' ? 'OPÉRATEUR' : r}
-                </button>
-              ))}
-            </div>
+        {userInfo && (
+          <div className="p-6 text-center border-b border-slate-100">
+            <div className="text-lg font-bold text-emerald-800 mb-1">Bienvenue, {userInfo.name || userInfo.email}</div>
+            <div className="text-sm text-slate-500">Rôle : <span className="font-semibold text-emerald-700">{userInfo.role}</span></div>
           </div>
+        )}
 
+        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          {error && <div className="text-red-600 text-sm text-center mb-2">{error}</div>}
           <div className="space-y-4">
             <div className="relative">
               <Mail className="absolute left-3 top-3 w-5 h-5 text-emerald-600/50" />

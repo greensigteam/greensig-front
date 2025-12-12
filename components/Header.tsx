@@ -29,6 +29,7 @@ const VIEW_TITLES: Record<ViewState, string> = {
   'INTERVENTIONS': 'Rapports Terrain',
   'CLAIMS': 'Signalements',
   'TEAMS': 'Équipes',
+  'USERS': 'Utilisateurs',
   'REPORTING': 'Statistiques',
   'CLIENT_PORTAL': 'Espace Client'
 };
@@ -46,6 +47,10 @@ const Header: React.FC<HeaderProps> = ({
   setSearchResult,
   onGeolocation
 }) => {
+  // Vérification de la présence de l'utilisateur
+  if (!user) {
+    return <header className="p-4 text-center text-red-600 bg-white">Utilisateur non connecté</header>;
+  }
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
@@ -312,10 +317,11 @@ const Header: React.FC<HeaderProps> = ({
           <div className="hidden md:flex flex-col items-end">
             <span className="text-xs font-bold text-slate-700 leading-none">{user.name}</span>
             <span className="text-[10px] font-medium text-emerald-600 uppercase tracking-wide">{user.role}</span>
+            <span className="text-[10px] text-slate-500">{user.email}</span>
           </div>
 
           <div className="w-8 h-8 md:w-9 md:h-9 bg-gradient-to-tr from-emerald-600 to-teal-500 rounded-lg flex items-center justify-center text-white font-bold shadow-sm ring-2 ring-white text-xs md:text-sm">
-            {user.avatar || user.name.charAt(0)}
+            {user.avatar || (user.name ? user.name.charAt(0) : '')}
           </div>
         </div>
 

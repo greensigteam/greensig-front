@@ -15,11 +15,19 @@ import {
 
 interface ClientPortalProps {
     user: { name: string; email: string };
+    forcedTab?: 'inventory' | 'planning' | 'interventions' | 'claims';
 }
 
 // User 7.7.1: Client Portal - Read-only views
-const ClientPortal: React.FC<ClientPortalProps> = ({ user }) => {
-    const [activeTab, setActiveTab] = useState<'inventory' | 'planning' | 'interventions' | 'claims'>('inventory');
+const ClientPortal: React.FC<ClientPortalProps> = ({ user, forcedTab }) => {
+    const [activeTab, setActiveTab] = useState<'inventory' | 'planning' | 'interventions' | 'claims'>(forcedTab || 'inventory');
+
+    // Si forcedTab change, synchroniser l'onglet actif
+    React.useEffect(() => {
+        if (forcedTab && forcedTab !== activeTab) {
+            setActiveTab(forcedTab);
+        }
+    }, [forcedTab]);
     const [selectedItem, setSelectedItem] = useState<any>(null);
 
     // Mock client data - in real app, filter by client ID

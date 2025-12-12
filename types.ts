@@ -1,6 +1,6 @@
 
-export type Role = 'ADMIN' | 'OPERATOR' | 'CLIENT';
-export type ViewState = 'LOGIN' | 'DASHBOARD' | 'MAP' | 'INVENTORY' | 'PLANNING' | 'INTERVENTIONS' | 'CLAIMS' | 'TEAMS' | 'REPORTING' | 'CLIENT_PORTAL';
+export type Role = 'ADMIN' | 'OPERATEUR' | 'CLIENT';
+export type ViewState = 'LOGIN' | 'DASHBOARD' | 'MAP' | 'INVENTORY' | 'PLANNING' | 'INTERVENTIONS' | 'CLAIMS' | 'TEAMS' | 'USERS' | 'REPORTING' | 'CLIENT_PORTAL';
 
 export interface User {
   id: string;
