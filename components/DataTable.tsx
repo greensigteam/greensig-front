@@ -15,7 +15,11 @@ export interface DataTableProps<T> {
     itemsPerPage?: number;
     showExport?: boolean;
     onExport?: () => void;
-    keyField?: keyof T;  // Champ a utiliser comme cle unique (defaut: 'id')
+    // Server-side pagination
+    serverSide?: boolean;
+    totalItems?: number;
+    currentPage?: number;
+    onPageChange?: (page: number) => void;
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -25,21 +29,17 @@ export function DataTable<T extends Record<string, any>>({
     itemsPerPage = 20,
     showExport = false,
     onExport,
-    keyField
+    serverSide = false,
+    totalItems = 0,
+    currentPage: externalCurrentPage = 1,
+    onPageChange
 }: DataTableProps<T>) {
-    // Determiner la cle a utiliser pour les lignes
-    const getRowKey = (item: T, index: number): string => {
-        if (keyField && item[keyField] !== undefined) {
-            return String(item[keyField]);
-        }
-        // Fallback: chercher id, utilisateur, ou utiliser l'index
-        if (item.id !== undefined) return String(item.id);
-        if (item.utilisateur !== undefined) return String(item.utilisateur);
-        return String(index);
-    };
-    const [currentPage, setCurrentPage] = useState(1);
+    const [localCurrentPage, setLocalCurrentPage] = useState(1);
     const [sortColumn, setSortColumn] = useState<string | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+    // Use external or local state
+    const currentPage = serverSide ? externalCurrentPage : localCurrentPage;
 
     // Sorting
     const sortedData = useMemo(() => {
@@ -57,10 +57,20 @@ export function DataTable<T extends Record<string, any>>({
     }, [data, sortColumn, sortDirection]);
 
     // Pagination
-    const totalPages = Math.ceil(sortedData.length / itemsPerPage);
+    const totalPages = serverSide
+        ? Math.ceil(totalItems / itemsPerPage)
+        : Math.ceil(sortedData.length / itemsPerPage);
+
     const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const currentData = sortedData.slice(startIndex, endIndex);
+
+    const currentData = serverSide
+        ? sortedData // Show all data (it's already the current page)
+        : sortedData.slice(startIndex, startIndex + itemsPerPage);
+
+    // Pagination variables for display
+    const displayTotalItems = serverSide ? totalItems : sortedData.length;
+    const displayStartIndex = (currentPage - 1) * itemsPerPage;
+    const displayEndIndex = Math.min(displayStartIndex + itemsPerPage, displayTotalItems);
 
     const handleSort = (columnKey: string, sortable?: boolean) => {
         if (sortable === false) return;
@@ -74,7 +84,12 @@ export function DataTable<T extends Record<string, any>>({
     };
 
     const goToPage = (page: number) => {
-        setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+        const newPage = Math.max(1, Math.min(page, totalPages));
+        if (serverSide && onPageChange) {
+            onPageChange(newPage);
+        } else {
+            setLocalCurrentPage(newPage);
+        }
     };
 
     return (
@@ -83,7 +98,7 @@ export function DataTable<T extends Record<string, any>>({
             {showExport && (
                 <div className="p-4 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
                     <div className="text-sm text-gray-600">
-                        {sortedData.length} élément{sortedData.length > 1 ? 's' : ''}
+                        {displayTotalItems} élément{displayTotalItems > 1 ? 's' : ''}
                     </div>
                     <button
                         onClick={onExport}
@@ -95,101 +110,95 @@ export function DataTable<T extends Record<string, any>>({
                 </div>
             )}
 
-            {/* Table with scroll area - scroll horizontal et vertical */}
-            <div className="flex-1 min-h-0 overflow-auto">
-                <table className="w-full min-w-max">
-                    <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
-                        <tr>
-                            {columns.map((column) => (
-                                <th
-                                    key={String(column.key)}
-                                    onClick={() => handleSort(String(column.key), column.sortable)}
-                                    className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 ${column.sortable !== false ? 'cursor-pointer hover:bg-gray-100' : ''
-                                        }`}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        {column.label}
-                                        {column.sortable !== false && sortColumn === column.key && (
-                                            <span className="text-emerald-600">
-                                                {sortDirection === 'asc' ? '↑' : '↓'}
-                                            </span>
-                                        )}
-                                    </div>
-                                </th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {currentData.length === 0 ? (
-                            <tr>
-                                <td colSpan={columns.length} className="px-6 py-8 text-center text-gray-500">
-                                    Aucune donnée disponible
-                                </td>
-                            </tr>
-                        ) : (
-                            currentData.map((item, index) => (
-                                <tr
-                                    key={getRowKey(item, startIndex + index)}
-                                    onClick={() => onRowClick?.(item)}
-                                    className={`${onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''} transition-colors`}
-                                >
+            {/* Table with scroll area and sticky pagination */}
+            <div className="relative border-b border-gray-200">
+                <div className="max-h-[500px] overflow-auto">
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead className="bg-gray-50 border-b border-gray-200">
+                                <tr>
                                     {columns.map((column) => (
-                                        <td key={String(column.key)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {column.render
-                                                ? column.render(item)
-                                                : String(item[column.key as keyof T] || '-')}
-                                        </td>
+                                        <th
+                                            key={String(column.key)}
+                                            onClick={() => handleSort(String(column.key), column.sortable)}
+                                            className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${column.sortable !== false ? 'cursor-pointer hover:bg-gray-100' : ''
+                                                }`}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                {column.label}
+                                                {column.sortable !== false && sortColumn === column.key && (
+                                                    <span className="text-emerald-600">
+                                                        {sortDirection === 'asc' ? '↑' : '↓'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </th>
                                     ))}
                                 </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {currentData.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={columns.length} className="px-6 py-8 text-center text-gray-500">
+                                            Aucune donnée disponible
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    currentData.map((item) => (
+                                        <tr
+                                            key={item.id}
+                                            onClick={() => onRowClick?.(item)}
+                                            className={`${onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''} transition-colors`}
+                                        >
+                                            {columns.map((column) => (
+                                                <td key={String(column.key)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                    {column.render
+                                                        ? column.render(item)
+                                                        : String(item[column.key as keyof T] || '-')}
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
 
-            {/* Pagination - toujours visible en bas */}
-            {totalPages > 0 && (
-                <div className="bg-white border-t border-gray-200 px-6 py-3 flex-shrink-0">
-                    <div className="flex items-center justify-between">
-                        <div className="text-sm text-gray-600">
-                            Affichage {sortedData.length > 0 ? startIndex + 1 : 0} à {Math.min(endIndex, sortedData.length)} sur {sortedData.length}
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => goToPage(1)}
-                                disabled={currentPage === 1}
-                                className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Premiere page"
-                            >
-                                <ChevronsLeft className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={() => goToPage(currentPage - 1)}
-                                disabled={currentPage === 1}
-                                className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Page precedente"
-                            >
-                                <ChevronLeft className="w-4 h-4" />
-                            </button>
-                            <span className="px-3 py-1 text-sm font-medium">
-                                Page {currentPage} sur {totalPages}
-                            </span>
-                            <button
-                                onClick={() => goToPage(currentPage + 1)}
-                                disabled={currentPage === totalPages}
-                                className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Page suivante"
-                            >
-                                <ChevronRight className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={() => goToPage(totalPages)}
-                                disabled={currentPage === totalPages}
-                                className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Derniere page"
-                            >
-                                <ChevronsRight className="w-4 h-4" />
-                            </button>
+                    {/* Sticky pagination inside scroll area */}
+                    <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-3">
+                        <div className="flex items-center justify-between">
+                            <div className="text-sm text-gray-600">Affichage {displayStartIndex + 1} à {displayEndIndex} sur {displayTotalItems}</div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => goToPage(1)}
+                                    disabled={currentPage === 1}
+                                    className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <ChevronsLeft className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => goToPage(currentPage - 1)}
+                                    disabled={currentPage === 1}
+                                    className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <ChevronLeft className="w-4 h-4" />
+                                </button>
+                                <span className="px-3 py-1 text-sm">Page {currentPage} sur {totalPages > 0 ? totalPages : 1}</span>
+                                <button
+                                    onClick={() => goToPage(currentPage + 1)}
+                                    disabled={currentPage === totalPages || totalPages === 0}
+                                    className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <ChevronRight className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => goToPage(totalPages)}
+                                    disabled={currentPage === totalPages || totalPages === 0}
+                                    className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <ChevronsRight className="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
