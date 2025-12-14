@@ -220,7 +220,7 @@ export async function fetchAllSites(forceRefresh = false): Promise<SiteFrontend[
 
     // Charger toutes les pages
     while (hasMore) {
-      const response = await fetch(`${API_BASE_URL}/sites/?page=${page}`)
+      const response = await apiFetch(`${API_BASE_URL}/sites/?page=${page}`)
       const data = await handleResponse<SiteResponse>(response)
 
       // Gérer les deux formats possibles (avec ou sans FeatureCollection)
@@ -308,7 +308,7 @@ export function clearSitesCache() {
 // Anciennes fonctions conservées pour compatibilité
 export async function fetchSites(page = 1): Promise<SiteResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/sites/?page=${page}`)
+    const response = await apiFetch(`${API_BASE_URL}/sites/?page=${page}`)
     return handleResponse<SiteResponse>(response)
   } catch (error) {
     logger.error('Erreur fetchSites:', error)
@@ -318,7 +318,7 @@ export async function fetchSites(page = 1): Promise<SiteResponse> {
 
 export async function fetchSiteById(id: number) {
   try {
-    const response = await fetch(`${API_BASE_URL}/sites/${id}/`)
+    const response = await apiFetch(`${API_BASE_URL}/sites/${id}/`)
     return handleResponse(response)
   } catch (error) {
     logger.error(`Erreur fetchSiteById(${id}):`, error)
@@ -440,7 +440,7 @@ export async function fetchArbres(filters?: { page?: number; taille?: string; fa
   if (filters?.famille) params.append('famille__icontains', filters.famille)
   if (filters?.site) params.append('site', filters.site.toString())
 
-  const response = await fetch(`${API_BASE_URL}/arbres/?${params}`)
+  const response = await apiFetch(`${API_BASE_URL}/arbres/?${params}`)
   return handleResponse(response)
 }
 
@@ -449,7 +449,7 @@ export async function fetchGazons(filters?: { page?: number; site?: number }) {
   if (filters?.page) params.append('page', filters.page.toString())
   if (filters?.site) params.append('site', filters.site.toString())
 
-  const response = await fetch(`${API_BASE_URL}/gazons/?${params}`)
+  const response = await apiFetch(`${API_BASE_URL}/gazons/?${params}`)
   return handleResponse(response)
 }
 
@@ -473,7 +473,7 @@ export async function searchObjects(query: string): Promise<SearchResult[]> {
   if (query.length < 2) return []
 
   try {
-    const response = await fetch(`${API_BASE_URL}/search/?q=${encodeURIComponent(query)}`)
+    const response = await apiFetch(`${API_BASE_URL}/search/?q=${encodeURIComponent(query)}`)
     return handleResponse<SearchResult[]>(response)
   } catch (error) {
     logger.error('Erreur searchObjects:', error)
@@ -529,7 +529,7 @@ export interface Statistics {
 
 export async function fetchStatistics(): Promise<Statistics> {
   try {
-    const response = await fetch(`${API_BASE_URL}/statistics/`)
+    const response = await apiFetch(`${API_BASE_URL}/statistics/`)
     return handleResponse<Statistics>(response)
   } catch (error) {
     logger.error('Erreur fetchStatistics:', error)
@@ -551,7 +551,7 @@ export interface ExportPDFRequest {
 
 export async function exportPDF(data: ExportPDFRequest): Promise<Blob> {
   try {
-    const response = await fetch(`${API_BASE_URL}/export/pdf/`, {
+    const response = await apiFetch(`${API_BASE_URL}/export/pdf/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -579,7 +579,7 @@ export async function exportData(
   format: 'csv' | 'xlsx'
 ): Promise<Blob> {
   try {
-    const response = await fetch(`${API_BASE_URL}/export/${model}/?format=${format}`)
+    const response = await apiFetch(`${API_BASE_URL}/export/${model}/?format=${format}`)
 
     if (!response.ok) {
       throw new ApiError(`Erreur export ${format.toUpperCase()}: ${response.status}`, response.status)

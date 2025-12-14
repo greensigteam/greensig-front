@@ -22,7 +22,7 @@ export interface DataTableProps<T> {
     onPageChange?: (page: number) => void;
 }
 
-export function DataTable<T extends { id: string }>({
+export function DataTable<T extends Record<string, any>>({
     data,
     columns,
     onRowClick,
@@ -93,10 +93,10 @@ export function DataTable<T extends { id: string }>({
     };
 
     return (
-        <div className="bg-white rounded-lg shadow">
+        <div className="bg-white h-full flex flex-col">
             {/* Header with Export */}
             {showExport && (
-                <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+                <div className="p-4 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
                     <div className="text-sm text-gray-600">
                         {displayTotalItems} élément{displayTotalItems > 1 ? 's' : ''}
                     </div>
@@ -202,7 +202,7 @@ export function DataTable<T extends { id: string }>({
                         </div>
                     </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 }

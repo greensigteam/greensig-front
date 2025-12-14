@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Map as MapIcon, Package, Calendar,
-  Wrench, AlertTriangle, Users, BarChart3,
+  Wrench, AlertTriangle, Users, UserCog, BarChart3,
   LogOut, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { ViewState, Role } from '../types';
@@ -42,8 +42,8 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'INTERVENTIONS', label: 'Interventions', icon: Wrench, roles: ['ADMIN', 'OPERATOR'] },
     { id: 'CLAIMS', label: 'Réclamations', icon: AlertTriangle, roles: ['ADMIN', 'OPERATOR'] },
     { id: 'TEAMS', label: 'Équipes', icon: Users, roles: ['ADMIN'] },
+    { id: 'USERS', label: 'Utilisateurs', icon: UserCog, roles: ['ADMIN'] },
     { id: 'REPORTING', label: 'Rapports', icon: BarChart3, roles: ['ADMIN'] },
-    { id: 'CLIENT_PORTAL', label: 'Mon Espace', icon: LayoutDashboard, roles: ['CLIENT'] },
   ];
 
   const filteredItems = menuItems.filter(item => item.roles.includes(userRole));
