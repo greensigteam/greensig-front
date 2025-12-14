@@ -20,6 +20,9 @@ export interface DataTableProps<T> {
     totalItems?: number;
     currentPage?: number;
     onPageChange?: (page: number) => void;
+
+    // Custom key for rows (defaults to 'id')
+    rowKey?: string | ((item: T) => string);
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -32,7 +35,8 @@ export function DataTable<T extends Record<string, any>>({
     serverSide = false,
     totalItems = 0,
     currentPage: externalCurrentPage = 1,
-    onPageChange
+    onPageChange,
+    rowKey = 'id'
 }: DataTableProps<T>) {
     const [localCurrentPage, setLocalCurrentPage] = useState(1);
     const [sortColumn, setSortColumn] = useState<string | null>(null);
@@ -144,21 +148,28 @@ export function DataTable<T extends Record<string, any>>({
                                         </td>
                                     </tr>
                                 ) : (
-                                    currentData.map((item) => (
-                                        <tr
-                                            key={item.id}
-                                            onClick={() => onRowClick?.(item)}
-                                            className={`${onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''} transition-colors`}
-                                        >
-                                            {columns.map((column) => (
-                                                <td key={String(column.key)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                    {column.render
-                                                        ? column.render(item)
-                                                        : String(item[column.key as keyof T] || '-')}
-                                                </td>
-                                            ))}
-                                        </tr>
-                                    ))
+                                    currentData.map((item, index) => {
+                                        const key = typeof rowKey === 'function'
+                                            ? rowKey(item)
+                                            : (item[rowKey] ? String(item[rowKey]) : `row-${index}`);
+
+                                        return (
+                                            <tr
+                                                key={key}
+                                                onClick={() => onRowClick?.(item)}
+                                                className={`${onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''} transition-colors`}
+                                            >
+                                                {columns.map((column) => (
+                                                    <td key={String(column.key)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                        {column.render
+                                                            ? column.render(item)
+                                                            : String(item[column.key as keyof T] || '-')}
+                                                    </td>
+                                                ))}
+                                            </tr>
+
+                                        );
+                                    })
                                 )}
                             </tbody>
                         </table>
@@ -202,7 +213,7 @@ export function DataTable<T extends Record<string, any>>({
                         </div>
                     </div>
                 </div>
-            )}
-        </div>
+            </div>
+        </div >
     );
 }

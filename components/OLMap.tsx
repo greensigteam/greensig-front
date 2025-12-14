@@ -27,6 +27,7 @@ import { useMeasurementTools } from '../hooks/useMeasurementTools';
 import { useMapContext } from '../contexts/MapContext';
 import { useSelection } from '../contexts/SelectionContext';
 import logger from '../services/logger';
+import { apiFetch } from '../services/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -498,7 +499,7 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
 
       const url = `${API_BASE_URL}/map/?bbox=${west},${south},${east},${north}&types=${typesParam}&zoom=${zoom}`;
 
-      const response = await fetch(url);
+      const response = await apiFetch(url);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const data = await response.json();

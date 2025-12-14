@@ -24,6 +24,7 @@ const viewToPath: Record<ViewState, string> = {
   TEAMS: '/teams',
   REPORTING: '/reporting',
   CLIENT_PORTAL: '/client',
+  USERS: '/users',
 };
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -73,11 +74,11 @@ const Sidebar: React.FC<SidebarProps> = ({
         ) : (
           <div className="max-w-[160px] w-full mx-auto">
             <div className="inline-block bg-transparent rounded-sm p-0 overflow-hidden h-14 flex items-center justify-center">
-                <img
-                  src="/logofinal.png"
-                  alt="GreenSIG Logo"
-                  className="w-auto h-10 object-contain"
-                />
+              <img
+                src="/logofinal.png"
+                alt="GreenSIG Logo"
+                className="w-auto h-10 object-contain"
+              />
             </div>
           </div>
         )}

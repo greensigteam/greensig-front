@@ -4,9 +4,45 @@
  * Base URL configurée via .env (VITE_API_BASE_URL)
  */
 
+export const hasExistingToken = () => {
+  return !!localStorage.getItem('token');
+};
+
 import logger from './logger';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+
+// Wrapper fetch pour ajouter automatiquement le token
+export async function apiFetch(url: string, options: RequestInit = {}) {
+  const token = localStorage.getItem('token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  } as HeadersInit;
+
+  if (token) {
+    (headers as any)['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  });
+
+  if (response.status === 401) {
+    // Token expiré ou invalide
+    console.warn('Token invalide ou expiré, redirection login...');
+    localStorage.removeItem('token');
+    window.location.href = '/';
+  }
+
+  return response;
+}
+
+export async function fetchCurrentUser(): Promise<any> {
+  const response = await apiFetch(`${API_BASE_URL}/users/me/`);
+  return handleResponse(response);
+}
 
 // ==============================================================================
 // GESTION DES ERREURS
@@ -370,7 +406,7 @@ export async function fetchInventory(filters?: Record<string, string | number>):
     }
 
     const url = `${API_BASE_URL}/inventory/?${params}`;
-    const response = await fetch(url);
+    const response = await apiFetch(url);
     return handleResponse<InventoryResponse>(response);
   } catch (error) {
     logger.error('Erreur fetchInventory:', error);
@@ -683,7 +719,7 @@ export async function fetchFilterOptions(type?: string): Promise<FilterOptions> 
 
   try {
     const url = `${API_BASE_URL}/inventory/filter-options/?${params}`;
-    const response = await fetch(url)
+    const response = await apiFetch(url)
     return handleResponse<FilterOptions>(response)
   } catch (error) {
     logger.error('Erreur fetchFilterOptions:', error)

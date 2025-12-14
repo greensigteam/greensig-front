@@ -18,6 +18,7 @@ import LoadingScreen from './components/LoadingScreen';
 import { User, ViewState, MapLayerType, Coordinates, OverlayState, MapObjectDetail, UserLocation, Measurement, MeasurementType } from './types';
 import { MAP_LAYERS } from './constants';
 import { MapSearchResult } from './types';
+import { hasExistingToken, fetchCurrentUser } from './services/api';
 import { searchObjects } from './services/api';
 import { useSearch, Site } from './hooks/useSearch';
 import { useGeolocation } from './hooks/useGeolocation';
@@ -32,6 +33,7 @@ const EMPTY_SITES: Site[] = [];
 function App() {
   // Si un token existe, pas besoin du LoadingScreen avec video
   const [showVideoLoading, setShowVideoLoading] = useState(!hasExistingToken());
+  const [isRestoringSession, setIsRestoringSession] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
 
@@ -161,6 +163,39 @@ function App() {
 
   useEffect(() => {
     console.log("GreenSIG Application v1.0.1 Mounted");
+
+    // Restore session
+    const checkSession = async () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          const userRaw = await fetchCurrentUser();
+
+          // Determine role (default to first available or CLIENT)
+          let role: any = 'CLIENT';
+          if (Array.isArray(userRaw.roles) && userRaw.roles.length > 0) {
+            role = userRaw.roles[0];
+          } else if (userRaw.type_utilisateur) {
+            role = userRaw.type_utilisateur;
+          }
+
+          const user: User = {
+            id: userRaw.id,
+            name: userRaw.full_name || `${userRaw.prenom || ''} ${userRaw.nom || ''}`.trim() || userRaw.email,
+            email: userRaw.email,
+            role: role,
+            avatar: undefined
+          };
+          setUser(user);
+        } catch (error) {
+          console.error("Session restoration failed", error);
+          localStorage.removeItem('token');
+        }
+      }
+      setIsRestoringSession(false);
+    };
+
+    checkSession();
   }, []);
 
   useEffect(() => {
@@ -326,6 +361,7 @@ function App() {
                   <Route path="inventory/:objectType/:objectId" element={<InventoryDetailPage />} />
                   <Route path="interventions" element={<Interventions />} />
                   <Route path="teams" element={<Teams />} />
+                  <Route path="users" element={<Users />} />
                   <Route path="planning" element={<Planning />} />
                   <Route path="claims" element={<Claims />} />
                   <Route path="reporting" element={<Reporting />} />
