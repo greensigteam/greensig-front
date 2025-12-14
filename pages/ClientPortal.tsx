@@ -20,7 +20,6 @@ interface ClientPortalProps {
 // User 7.7.1: Client Portal - Read-only views
 const ClientPortal: React.FC<ClientPortalProps> = ({ user }) => {
     const [activeTab, setActiveTab] = useState<'inventory' | 'planning' | 'interventions' | 'claims'>('inventory');
-    const [selectedItem, setSelectedItem] = useState<any>(null);
 
     // Mock client data - in real app, filter by client ID
     const clientSites = MOCK_SITES.filter(site => site.client === 'M. Ahmed Benali' || user.name.includes('Ahmed'));

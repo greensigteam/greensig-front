@@ -4,6 +4,8 @@
  * Base URL configurée via .env (VITE_API_BASE_URL)
  */
 
+import logger from './logger';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
 // ==============================================================================
@@ -121,8 +123,11 @@ function calculatePolygonCentroid(coordinates: number[][][]): { lat: number; lng
   const n = ring.length - 1 // Exclure le point de fermeture (dernier = premier)
 
   for (let i = 0; i < n; i++) {
-    sumLng += ring[i][0]
-    sumLat += ring[i][1]
+    const coord = ring[i];
+    if (coord) {
+      sumLng += coord[0];
+      sumLat += coord[1];
+    }
   }
 
   return {
@@ -244,15 +249,15 @@ export async function fetchAllSites(forceRefresh = false): Promise<SiteFrontend[
     sitesCache = transformedSites
     sitesCacheTimestamp = now
 
-    console.log(`Sites chargés: ${transformedSites.length} sites depuis l'API`)
+    logger.info(`Sites chargés: ${transformedSites.length} sites depuis l'API`)
     return transformedSites
 
   } catch (error) {
-    console.error('Erreur fetchAllSites:', error)
+    logger.error('Erreur fetchAllSites:', error)
 
     // Retourner le cache même expiré en cas d'erreur
     if (sitesCache) {
-      console.warn('Utilisation du cache expiré suite à une erreur')
+      logger.warn('Utilisation du cache expiré suite à une erreur')
       return sitesCache
     }
 
@@ -306,7 +311,7 @@ export async function fetchSites(page = 1): Promise<SiteResponse> {
     const response = await fetch(`${API_BASE_URL}/sites/?page=${page}`)
     return handleResponse<SiteResponse>(response)
   } catch (error) {
-    console.error('Erreur fetchSites:', error)
+    logger.error('Erreur fetchSites:', error)
     throw error
   }
 }
@@ -316,7 +321,7 @@ export async function fetchSiteById(id: number) {
     const response = await fetch(`${API_BASE_URL}/sites/${id}/`)
     return handleResponse(response)
   } catch (error) {
-    console.error(`Erreur fetchSiteById(${id}):`, error)
+    logger.error(`Erreur fetchSiteById(${id}):`, error)
     throw error
   }
 }
@@ -355,23 +360,74 @@ export interface InventoryResponse {
   }>
 }
 
-export async function fetchInventory(filters?: InventoryFilters): Promise<InventoryResponse> {
+export async function fetchInventory(filters?: Record<string, string | number>): Promise<InventoryResponse> {
   try {
-    const params = new URLSearchParams()
-    if (filters?.type) params.append('type', filters.type)
-    if (filters?.site) params.append('site', filters.site.toString())
-    if (filters?.search) params.append('search', filters.search)
-    if (filters?.page) params.append('page', filters.page.toString())
-    if (filters?.page_size) params.append('page_size', filters.page_size.toString())
+    const params = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        params.append(key, String(value));
+      });
+    }
 
-    const url = `${API_BASE_URL}/inventory/?${params}`
-    const response = await fetch(url)
-    return handleResponse<InventoryResponse>(response)
+    const url = `${API_BASE_URL}/inventory/?${params}`;
+    const response = await fetch(url);
+    return handleResponse<InventoryResponse>(response);
   } catch (error) {
-    console.error('Erreur fetchInventory:', error)
-    throw error
+    logger.error('Erreur fetchInventory:', error);
+    throw error;
   }
 }
+
+const typeToPathMap: Record<string, string> = {
+  arbre: 'arbres',
+  palmier: 'palmiers',
+  gazon: 'gazons',
+  arbuste: 'arbustes',
+  vivace: 'vivaces',
+  cactus: 'cactus',
+  graminee: 'graminees',
+  puit: 'puits',
+  pompe: 'pompes',
+  vanne: 'vannes',
+  clapet: 'clapets',
+  canalisation: 'canalisations',
+  aspersion: 'aspersions',
+  goutte: 'gouttes',
+  ballon: 'ballons',
+};
+
+export async function fetchInventoryItem(objectType: string, objectId: string): Promise<any> {
+  const pathSegment = typeToPathMap[objectType.toLowerCase()];
+
+  // If type is not in the mapping (e.g., 'equipement'), use the unified inventory endpoint
+  if (!pathSegment) {
+    logger.info(`Type inconnu '${objectType}', utilisation de l'endpoint unifié`);
+    try {
+      const response = await fetchInventory({ id: parseInt(objectId) });
+      if (response.results && response.results.length > 0) {
+        return response.results[0]; // Return the first (and should be only) result
+      } else {
+        const errorMessage = `Objet non trouvé avec ID: ${objectId}`;
+        logger.error(errorMessage);
+        throw new ApiError(errorMessage, 404);
+      }
+    } catch (error) {
+      logger.error(`Erreur fetchInventoryItem via unified endpoint (${objectType}, ${objectId}):`, error);
+      throw error;
+    }
+  }
+
+  // Otherwise, use the type-specific endpoint
+  try {
+    const url = `${API_BASE_URL}/${pathSegment}/${objectId}/`;
+    const response = await fetch(url);
+    return handleResponse<any>(response);
+  } catch (error) {
+    logger.error(`Erreur fetchInventoryItem(${objectType}, ${objectId}):`, error);
+    throw error;
+  }
+}
+
 
 // ==============================================================================
 // ENDPOINTS SPÉCIFIQUES PAR TYPE (optionnel, si besoin)
@@ -420,7 +476,7 @@ export async function searchObjects(query: string): Promise<SearchResult[]> {
     const response = await fetch(`${API_BASE_URL}/search/?q=${encodeURIComponent(query)}`)
     return handleResponse<SearchResult[]>(response)
   } catch (error) {
-    console.error('Erreur searchObjects:', error)
+    logger.error('Erreur searchObjects:', error)
     throw error
   }
 }
@@ -476,7 +532,7 @@ export async function fetchStatistics(): Promise<Statistics> {
     const response = await fetch(`${API_BASE_URL}/statistics/`)
     return handleResponse<Statistics>(response)
   } catch (error) {
-    console.error('Erreur fetchStatistics:', error)
+    logger.error('Erreur fetchStatistics:', error)
     throw error
   }
 }
@@ -509,7 +565,7 @@ export async function exportPDF(data: ExportPDFRequest): Promise<Blob> {
 
     return response.blob()
   } catch (error) {
-    console.error('Erreur exportPDF:', error)
+    logger.error('Erreur exportPDF:', error)
     throw error
   }
 }
@@ -531,7 +587,7 @@ export async function exportData(
 
     return response.blob()
   } catch (error) {
-    console.error(`Erreur exportData(${model}, ${format}):`, error)
+    logger.error(`Erreur exportData(${model}, ${format}):`, error)
     throw error
   }
 }
@@ -571,5 +627,74 @@ export function latLngToGeoJSON(latLng: { lat: number; lng: number }): [number, 
   return [latLng.lng, latLng.lat]
 }
 
+/**
+ * Update an inventory item
+ * @param objectType - Type of object (arbre, gazon, puit, etc.)
+ * @param objectId - ID of the object
+ * @param data - Partial object data to update
+ * @returns Updated object in GeoJSON format
+ */
+export async function updateInventoryItem(
+  objectType: string,
+  objectId: string,
+  data: Partial<any>
+): Promise<any> {
+  const endpoint = typeToPathMap[objectType.toLowerCase()];
+
+  if (!endpoint) {
+    throw new ApiError(`Type d'objet non supporté: ${objectType}`);
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/${endpoint}/${objectId}/`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    return await handleResponse<any>(response);
+  } catch (error) {
+    logger.error(`Error updating ${objectType} #${objectId}:`, error);
+    throw error;
+  }
+}
+
 // Exporter l'erreur pour usage dans les composants
 export { ApiError }
+
+// ==============================================================================
+// OPTIONS DE FILTRAGE
+// ==============================================================================
+
+export interface FilterOptions {
+  sites: Array<{ id: number; name: string }>
+  zones: string[]
+  families: string[]
+  materials: string[]
+  sizes: string[]
+  states: string[]
+}
+
+export async function fetchFilterOptions(type?: string): Promise<FilterOptions> {
+  const params = new URLSearchParams()
+  if (type) params.append('type', type)
+
+  try {
+    const url = `${API_BASE_URL}/inventory/filter-options/?${params}`;
+    const response = await fetch(url)
+    return handleResponse<FilterOptions>(response)
+  } catch (error) {
+    logger.error('Erreur fetchFilterOptions:', error)
+    // Return empty options on error to prevent UI crash
+    return {
+      sites: [],
+      zones: [],
+      families: [],
+      materials: [],
+      sizes: [],
+      states: []
+    }
+  }
+}

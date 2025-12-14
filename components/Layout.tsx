@@ -1,15 +1,14 @@
 
 import React from 'react';
+import { useLocation, Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
-import { ViewState, User } from '../types';
+import { ViewState, User, MapSearchResult, SearchSuggestion, TargetLocation } from '../types';
 
 interface LayoutProps {
-  children: React.ReactNode; // The content of the active module (Panel)
-  mapComponent: React.ReactNode; // The persistent map background
-  mapControls: React.ReactNode; // The floating map controls (Search, Zoom, etc.)
-  currentView: ViewState;
-  onNavigate: (view: ViewState) => void;
+  children: React.ReactNode;
+  mapComponent: React.ReactNode;
+  mapControls: React.ReactNode;
   user: User;
   onLogout: () => void;
   isSidebarCollapsed: boolean;
@@ -20,19 +19,17 @@ interface LayoutProps {
   setSearchQuery?: (q: string) => void;
   onSearch?: () => void;
   isSearching?: boolean;
-  searchResult?: any;
-  searchSuggestions?: any[];
+  searchResult?: MapSearchResult | null;
+  searchSuggestions?: SearchSuggestion[];
   onGeolocation?: () => void;
-  setSearchResult?: (res: any) => void;
-  setTargetLocation?: (loc: any) => void;
+  setSearchResult?: (res: MapSearchResult | null) => void;
+  setTargetLocation?: (loc: TargetLocation | null) => void;
 }
 
 const Layout: React.FC<LayoutProps> = ({
   children,
   mapComponent,
   mapControls,
-  currentView,
-  onNavigate,
   user,
   onLogout,
   isSidebarCollapsed,
@@ -47,20 +44,20 @@ const Layout: React.FC<LayoutProps> = ({
   setSearchResult,
   setTargetLocation
 }) => {
-  const panelOpen = currentView !== 'MAP';
+  const location = useLocation();
+  const isMapView = location.pathname === '/map' || location.pathname === '/';
+  const panelOpen = !isMapView;
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-emerald-950 font-sans">
 
-      {/* LAYER 0: Persistent Map Background (z-0) - visible uniquement sur la vue MAP */}
-      {currentView === 'MAP' && (
-        <div className="absolute inset-0 z-0 pointer-events-auto">
-          {mapComponent}
-        </div>
-      )}
+      {/* LAYER 0: Persistent Map Background (z-0) - always there but interactive only on map view */}
+      <div className={`absolute inset-0 z-0 ${isMapView ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+        {mapComponent}
+      </div>
 
-      {/* LAYER 2: Map Controls (z-600) - visible uniquement sur la vue MAP */}
-      {currentView === 'MAP' && (
+      {/* LAYER 2: Map Controls (z-600) - visible only on map view */}
+      {isMapView && (
         <div className="absolute inset-0 z-[600] pointer-events-none">
           {mapControls}
         </div>
@@ -71,8 +68,6 @@ const Layout: React.FC<LayoutProps> = ({
         <Sidebar
           collapsed={isSidebarCollapsed}
           onToggle={onToggleSidebar}
-          currentView={currentView}
-          onNavigate={onNavigate}
           onLogout={onLogout}
           userRole={user.role}
         />
@@ -97,10 +92,7 @@ const Layout: React.FC<LayoutProps> = ({
             <div className="shrink-0">
               <Header
                 user={user}
-                currentView={currentView}
                 collapsed={false}
-                onClose={() => onNavigate('MAP')}
-
                 // Search pass-through
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
@@ -116,7 +108,7 @@ const Layout: React.FC<LayoutProps> = ({
 
             {/* Panel Content */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-0 bg-slate-50/50">
-              {children}
+              <Outlet />
             </div>
           </>
         )}

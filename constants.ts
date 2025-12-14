@@ -1,5 +1,5 @@
 import { LayerConfig, MapLayerType } from './types';
-import { Leaf, Sprout, Flower, Wheat, Globe, Trees, Mountain, Palmtree } from 'lucide-react';
+import { Leaf, Sprout, Wheat, Globe, Trees, Mountain, Palmtree } from 'lucide-react';
 
 export const INITIAL_POSITION = {
   lat: 32.2160, // UM6P Campus, Benguerir, Morocco

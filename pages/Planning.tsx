@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, Plus, Users, Clock, MapPin, Filter } from 'lucide-react';
+import { Calendar, Plus, Users, Clock, MapPin } from 'lucide-react';
 import { StatusBadge } from '../components/StatusBadge';
 import {
     MOCK_INTERVENTIONS,

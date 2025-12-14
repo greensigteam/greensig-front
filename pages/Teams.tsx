@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
-import { Plus, Users, UserCheck, Calendar, TrendingUp } from 'lucide-react';
+import { Plus, UserCheck, Calendar } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
-import { StatusBadge } from '../components/StatusBadge';
 import {
   MOCK_TEAMS,
   MOCK_TEAM_MEMBERS,
   Team,
-  TeamMember,
-  getTeamMembers
+  TeamMember
 } from '../services/mockData';
 
 // User 5.5.1: Create Team Form

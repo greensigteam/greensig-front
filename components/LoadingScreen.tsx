@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import logger from '../services/logger';
 
 interface LoadingScreenProps {
     onLoadingComplete: () => void;
@@ -13,7 +14,6 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
     const [minTimeElapsed, setMinTimeElapsed] = useState(false);
     const [fadeOut, setFadeOut] = useState(false);
     const [videoError, setVideoError] = useState(false);
-    const [videoLoaded, setVideoLoaded] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
     const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -25,7 +25,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
 
         // Fallback: Force completion after max duration if video doesn't load/play
         fallbackTimerRef.current = setTimeout(() => {
-            console.warn('Loading screen fallback triggered - forcing completion');
+            logger.warn('Loading screen fallback triggered - forcing completion');
             setVideoEnded(true);
             setMinTimeElapsed(true);
         }, minDuration + 5000); // 5 seconds after minimum duration
@@ -48,10 +48,11 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
             }, 800); // Match the transition duration
             return () => clearTimeout(fadeOutTimer);
         }
+        return undefined;
     }, [videoEnded, minTimeElapsed, onLoadingComplete]);
 
     const handleVideoEnd = () => {
-        console.log('Video ended successfully');
+        logger.debug('Video ended successfully');
         setVideoEnded(true);
         if (fallbackTimerRef.current) {
             clearTimeout(fallbackTimerRef.current);
@@ -59,23 +60,23 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
     };
 
     const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
-        console.error('Video loading error:', e);
+        logger.error('Video loading error:', e);
         setVideoError(true);
         // If video fails, just wait for minimum time then complete
         setVideoEnded(true);
     };
 
     const handleVideoLoaded = () => {
-        console.log('Video loaded successfully');
-        setVideoLoaded(true);
+        logger.debug('Video loaded successfully');
+        // Video loaded - no state needed, just logging
     };
 
     const handleCanPlay = () => {
-        console.log('Video can play');
+        logger.debug('Video can play');
         // Ensure video plays
         if (videoRef.current) {
             videoRef.current.play().catch(err => {
-                console.error('Video play error:', err);
+                logger.error('Video play error:', err);
                 setVideoError(true);
                 setVideoEnded(true);
             });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, TrendingUp, Users, AlertTriangle, Calendar } from 'lucide-react';
+import { BarChart3, TrendingUp, Users, AlertTriangle } from 'lucide-react';
 
 // User 8.8.1: Global Dashboard & Reporting
 const Reporting: React.FC = () => {
