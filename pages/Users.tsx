@@ -165,39 +165,39 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated, r
       return;
     }
 
-    // If OPERATEUR is selected, require matricule
-    if (selectedRole === 'OPERATEUR' && !matricule.trim()) {
-      setError("Le matricule est requis pour un opérateur");
+    // If OPERATEUR or CHEF_EQUIPE is selected, require matricule
+    if ((selectedRole === 'OPERATEUR' || selectedRole === 'CHEF_EQUIPE') && !matricule.trim()) {
+      setError("Le matricule est requis pour un opérateur/chef d'équipe");
       return;
     }
 
     setLoading(true);
     try {
       // Nouvelle logique : comportement par rôle (single-role forms)
-      if (selectedRole === 'OPERATEUR') {
-        const operateur = await createOperateur({
-          email: formData.email,
-          nom: formData.nom,
-          prenom: formData.prenom,
-          password: formData.password,
-          numeroImmatriculation: matricule,
-          dateEmbauche: new Date().toISOString().split('T')[0],
-          telephone: ''
-        });
-        // Recherche l'opérateur créé par email pour obtenir son ID
-        const { results } = await fetchOperateurs({ search: formData.email });
-        const op = results && results.length > 0 ? results[0] : null;
-        if (op) {
-          for (const comp of selectedCompetences) {
-            await affecterCompetence(op.utilisateur, comp);
+        if (selectedRole === 'OPERATEUR' || selectedRole === 'CHEF_EQUIPE') {
+          const operateur = await createOperateur({
+            email: formData.email,
+            nom: formData.nom,
+            prenom: formData.prenom,
+            password: formData.password,
+            numeroImmatriculation: matricule || '',
+            dateEmbauche: new Date().toISOString().split('T')[0],
+            telephone: ''
+          });
+          // Recherche l'opérateur créé par email pour obtenir son ID
+          const { results } = await fetchOperateurs({ search: formData.email });
+          const op = results && results.length > 0 ? results[0] : null;
+          if (op) {
+            for (const comp of selectedCompetences) {
+              await affecterCompetence(op.utilisateur, comp);
+            }
+            // Si le rôle sélectionné est CHEF_EQUIPE, attribuer le rôle au user/operateur
+            if (selectedRole === 'CHEF_EQUIPE') {
+              const roleObj = roleObjects.find(r => r.nomRole === 'CHEF_EQUIPE');
+              if (roleObj) await attribuerRole(op.utilisateur.toString(), roleObj.id.toString());
+            }
           }
-          // Attribuer le rôle correspondant si nécessaire (par ex. CHEF_EQUIPE)
-          if (selectedRole && selectedRole !== 'OPERATEUR') {
-            const roleObj = roleObjects.find(r => r.nomRole === selectedRole);
-            if (roleObj) await attribuerRole(op.utilisateur.toString(), roleObj.id.toString());
-          }
-        }
-      } else {
+        } else {
         // Cas classique : création utilisateur puis attribution des rôles
         const user = await createUtilisateur({
           email: formData.email,
@@ -354,13 +354,13 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated, r
                       ))}
                     </div>
                   </div>
-                  {selectedRole === 'OPERATEUR' && (
+                  {(selectedRole === 'OPERATEUR' || selectedRole === 'CHEF_EQUIPE') && (
                     <div className="mt-4">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Matricule <span className="text-red-500">*</span>
                       </label>
                       <input
-                        required
+                        required={selectedRole === 'OPERATEUR'}
                         type="text"
                         value={matricule}
                         onChange={(e) => setMatricule(e.target.value)}
@@ -487,13 +487,13 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ user, onClose, onTogg
   }, [user, operateurs]);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
         <div className="p-6 border-b border-gray-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className={`p-3 rounded-full ${user.roles.includes('ADMIN') ? 'bg-purple-100' :
-                user.roles.includes('OPERATEUR') ? 'bg-blue-100' :
-                  user.roles.includes('CHEF_EQUIPE') ? 'bg-yellow-100' :
-                    user.roles.includes('CLIENT') ? 'bg-green-100' : 'bg-gray-100'
+              user.roles.includes('OPERATEUR') ? 'bg-blue-100' :
+                user.roles.includes('CHEF_EQUIPE') ? 'bg-yellow-100' :
+                  user.roles.includes('CLIENT') ? 'bg-green-100' : 'bg-gray-100'
               }`}>
               {user.roles.includes('ADMIN') ? (
                 <Shield className="w-6 h-6 text-purple-600" />
@@ -515,7 +515,7 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ user, onClose, onTogg
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto flex-1">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium text-gray-500">Email</label>
@@ -666,8 +666,8 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ user, onClose, onTogg
           <button
             onClick={() => onToggleActive(user.id, !user.actif)}
             className={`flex-1 px-4 py-2 rounded-lg flex items-center justify-center gap-2 ${user.actif
-                ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                : 'bg-green-100 text-green-700 hover:bg-green-200'
+              ? 'bg-red-100 text-red-700 hover:bg-red-200'
+              : 'bg-green-100 text-green-700 hover:bg-green-200'
               }`}
           >
             {user.actif ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
@@ -817,14 +817,14 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
         <div className="p-6 border-b border-gray-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className={`p-3 rounded-full ${user.roles.includes('ADMIN') ? 'bg-purple-100' :
-                user.roles.includes('OPERATEUR') ? 'bg-blue-100' :
-                  user.roles.includes('CHEF_EQUIPE') ? 'bg-yellow-100' :
-                    user.roles.includes('CLIENT') ? 'bg-green-100' : 'bg-gray-100'
+              user.roles.includes('OPERATEUR') ? 'bg-blue-100' :
+                user.roles.includes('CHEF_EQUIPE') ? 'bg-yellow-100' :
+                  user.roles.includes('CLIENT') ? 'bg-green-100' : 'bg-gray-100'
               }`}>
               <Edit2 className={`w-5 h-5 ${user.roles.includes('ADMIN') ? 'text-purple-600' :
-                  user.roles.includes('OPERATEUR') ? 'text-blue-600' :
-                    user.roles.includes('CHEF_EQUIPE') ? 'text-yellow-600' :
-                      user.roles.includes('CLIENT') ? 'text-green-600' : 'text-gray-600'
+                user.roles.includes('OPERATEUR') ? 'text-blue-600' :
+                  user.roles.includes('CHEF_EQUIPE') ? 'text-yellow-600' :
+                    user.roles.includes('CLIENT') ? 'text-green-600' : 'text-gray-600'
                 }`} />
             </div>
             <div>
@@ -1234,12 +1234,12 @@ const Users: React.FC = () => {
     {
       key: 'fullName',
       label: 'Nom',
-      render: (u) => (
+      render: (u: Utilisateur) => (
         <div className="flex items-center gap-3">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${u.roles.includes('ADMIN') ? 'bg-purple-100' :
-              u.roles.includes('OPERATEUR') ? 'bg-blue-100' :
-                u.roles.includes('CHEF_EQUIPE') ? 'bg-yellow-100' :
-                  u.roles.includes('CLIENT') ? 'bg-green-100' : 'bg-gray-100'
+            u.roles.includes('OPERATEUR') ? 'bg-blue-100' :
+              u.roles.includes('CHEF_EQUIPE') ? 'bg-yellow-100' :
+                u.roles.includes('CLIENT') ? 'bg-green-100' : 'bg-gray-100'
             }`}>
             {u.roles.includes('ADMIN') ? (
               <Shield className="w-4 h-4 text-purple-600" />
@@ -1262,13 +1262,13 @@ const Users: React.FC = () => {
     {
       key: 'roles',
       label: 'Roles',
-      render: (u) => u.roles.length > 0 ? (
+      render: (u: Utilisateur) => u.roles.length > 0 ? (
         <div className="flex flex-wrap gap-1">
-          {u.roles.slice(0, 2).map((role) => (
+          {u.roles.slice(0, 5).map((role: NomRole) => (
             <RoleBadge key={role} role={role} />
           ))}
-          {u.roles.length > 2 && (
-            <span className="text-xs text-gray-500">+{u.roles.length - 2}</span>
+          {u.roles.length > 5 && (
+            <span className="text-xs text-gray-500">+{u.roles.length - 5}</span>
           )}
         </div>
       ) : '-',
@@ -1277,12 +1277,12 @@ const Users: React.FC = () => {
     {
       key: 'dateCreation',
       label: 'Cree le',
-      render: (u) => new Date(u.dateCreation).toLocaleDateString('fr-FR')
+      render: (u: Utilisateur) => new Date(u.dateCreation).toLocaleDateString('fr-FR')
     },
     {
       key: 'actif',
       label: 'Statut',
-      render: (u) => (
+      render: (u: Utilisateur) => (
         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${u.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
           }`}>
           {u.actif ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
@@ -1302,9 +1302,9 @@ const Users: React.FC = () => {
   }
 
   return (
-    <div className="p-4 sm:p-6 h-full flex flex-col">
+    <div className="p-4 sm:p-6 h-full flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 flex-shrink-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Gestion des Utilisateurs</h1>
           <p className="text-gray-500 mt-1">Administrateurs, operateurs et clients</p>
@@ -1361,21 +1361,21 @@ const Users: React.FC = () => {
       )}
 
       {/* Tabs */}
-      <div className="mb-4 flex border-b border-gray-200">
+      <div className="mb-4 flex border-b border-gray-200 flex-shrink-0">
         <button
-          onClick={() => setActiveTab('tous')}
+          onClick={() => { setActiveTab('tous'); setRoleFilter(null); }}
           className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'tous'
-              ? 'border-emerald-500 text-emerald-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+            ? 'border-emerald-500 text-emerald-600'
+            : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
         >
           Tous ({utilisateurs.length})
         </button>
         <button
-          onClick={() => setActiveTab('admins')}
+          onClick={() => { setActiveTab('admins'); setRoleFilter(null); }}
           className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'admins'
-              ? 'border-emerald-500 text-emerald-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+            ? 'border-emerald-500 text-emerald-600'
+            : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
         >
           <span className="flex items-center gap-2">
@@ -1384,10 +1384,10 @@ const Users: React.FC = () => {
           </span>
         </button>
         <button
-          onClick={() => setActiveTab('operateurs')}
+          onClick={() => { setActiveTab('operateurs'); setRoleFilter(null); }}
           className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'operateurs'
-              ? 'border-emerald-500 text-emerald-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+            ? 'border-emerald-500 text-emerald-600'
+            : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
         >
           <span className="flex items-center gap-2">
@@ -1396,10 +1396,10 @@ const Users: React.FC = () => {
           </span>
         </button>
         <button
-          onClick={() => setActiveTab('chefs')}
+          onClick={() => { setActiveTab('chefs'); setRoleFilter(null); }}
           className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'chefs'
-              ? 'border-emerald-500 text-emerald-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+            ? 'border-emerald-500 text-emerald-600'
+            : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
         >
           <span className="flex items-center gap-2">
@@ -1408,10 +1408,10 @@ const Users: React.FC = () => {
           </span>
         </button>
         <button
-          onClick={() => setActiveTab('clients')}
+          onClick={() => { setActiveTab('clients'); setRoleFilter(null); }}
           className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'clients'
-              ? 'border-emerald-500 text-emerald-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+            ? 'border-emerald-500 text-emerald-600'
+            : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
         >
           <span className="flex items-center gap-2">
@@ -1422,7 +1422,7 @@ const Users: React.FC = () => {
       </div>
 
       {/* Filtres et recherche */}
-      <div className="mb-4 flex gap-4 items-center">
+      <div className="mb-4 flex gap-4 items-center flex-shrink-0">
         <div className="relative max-w-md flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
@@ -1449,9 +1449,9 @@ const Users: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden bg-white rounded-lg border border-gray-200">
+      <div className="flex-1 min-h-0 overflow-auto bg-white rounded-lg border border-gray-200">
         <DataTable
-          data={filteredUsers.map(u => ({ ...u, id: String(u.id) }))}
+          data={filteredUsers}
           columns={[
             ...columns,
             {

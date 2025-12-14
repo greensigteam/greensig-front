@@ -101,7 +101,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
 
   useEffect(() => {
     const loadComps = async () => {
-      if (!userRoles.includes('OPERATEUR')) return;
+      if (!(userRoles.includes('OPERATEUR') || userRoles.includes('CHEF_EQUIPE'))) return;
       try {
         const all = await fetchCompetences();
         setAllCompetences(all);
@@ -162,7 +162,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
         await updateClient(clientData.utilisateur, clientUpdate);
       }
 
-      if (userRoles && userRoles.includes('OPERATEUR')) {
+      if (userRoles && (userRoles.includes('OPERATEUR') || userRoles.includes('CHEF_EQUIPE'))) {
         // if operateur profile exists, update it; otherwise create one
         if (operateurInfo) {
           const operateurUpdate: OperateurUpdate = {
@@ -182,7 +182,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
               prenom: formData.prenom,
               password: Math.random().toString(36).slice(-8),
               numeroImmatriculation: operateurFields.numeroImmatriculation || `OP-${user.id}`,
-              dateEmbauche: new Date().toISOString().split('T')[0],
+              dateEmbauche: new Date().toISOString().split('T')[0] as string,
               telephone: operateurFields.telephone || ''
             });
             setOperateurInfo(created as OperateurList);
@@ -206,18 +206,16 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
         <div className="p-6 border-b border-gray-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className={`p-3 rounded-full ${
-              userRoles.includes('ADMIN') ? 'bg-purple-100' :
+            <div className={`p-3 rounded-full ${userRoles.includes('ADMIN') ? 'bg-purple-100' :
               userRoles.includes('OPERATEUR') ? 'bg-blue-100' :
-              userRoles.includes('CHEF_EQUIPE') ? 'bg-yellow-100' :
-              userRoles.includes('CLIENT') ? 'bg-green-100' : 'bg-gray-100'
-            }`}>
-              <Edit2 className={`w-5 h-5 ${
-                userRoles.includes('ADMIN') ? 'text-purple-600' :
+                userRoles.includes('CHEF_EQUIPE') ? 'bg-yellow-100' :
+                  userRoles.includes('CLIENT') ? 'bg-green-100' : 'bg-gray-100'
+              }`}>
+              <Edit2 className={`w-5 h-5 ${userRoles.includes('ADMIN') ? 'text-purple-600' :
                 userRoles.includes('OPERATEUR') ? 'text-blue-600' :
-                userRoles.includes('CHEF_EQUIPE') ? 'text-yellow-600' :
-                userRoles.includes('CLIENT') ? 'text-green-600' : 'text-gray-600'
-              }`} />
+                  userRoles.includes('CHEF_EQUIPE') ? 'text-yellow-600' :
+                    userRoles.includes('CLIENT') ? 'text-green-600' : 'text-gray-600'
+                }`} />
             </div>
             <div>
               <h2 className="text-xl font-bold text-gray-900">Modifier l'utilisateur</h2>
@@ -339,14 +337,12 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
               <button
                 type="button"
                 onClick={() => setFormData({ ...formData, actif: !formData.actif })}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  formData.actif ? 'bg-emerald-600' : 'bg-gray-300'
-                }`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.actif ? 'bg-emerald-600' : 'bg-gray-300'
+                  }`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    formData.actif ? 'translate-x-6' : 'translate-x-1'
-                  }`}
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.actif ? 'translate-x-6' : 'translate-x-1'
+                    }`}
                 />
               </button>
               <span className={`text-sm ${formData.actif ? 'text-emerald-600' : 'text-gray-500'}`}>
@@ -415,7 +411,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
               </>
             )}
 
-            {userRoles.includes('OPERATEUR') && (
+            {(userRoles.includes('OPERATEUR') || userRoles.includes('CHEF_EQUIPE')) && (
               <>
                 <hr className="my-4" />
                 <h3 className="font-medium text-gray-900 flex items-center gap-2">
@@ -459,7 +455,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
                             prenom: formData.prenom,
                             password: Math.random().toString(36).slice(-8),
                             numeroImmatriculation: operateurFields.numeroImmatriculation || `OP-${user.id}`,
-                            dateEmbauche: new Date().toISOString().split('T')[0],
+                            dateEmbauche: new Date().toISOString().split('T')[0] as string,
                             telephone: operateurFields.telephone || ''
                           });
                           setOperateurInfo(created as OperateurList);

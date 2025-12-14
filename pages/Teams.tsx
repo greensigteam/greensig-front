@@ -304,25 +304,25 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
                     </label>
                   ))
                 )}
+              </div>
             </div>
-          </div>
 
-          <div className="p-6 border-t border-gray-200 flex gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-            >
-              {loading ? 'Creation...' : 'Creer'}
-            </button>
-          </div>
+            <div className="p-6 border-t border-gray-200 flex gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {loading ? 'Creation...' : 'Creer'}
+              </button>
+            </div>
           </div>
         </form>
       </div>
@@ -496,7 +496,7 @@ const OperateurDetailModal: React.FC<OperateurDetailModalProps> = ({ operateur, 
                 {operateur.utilisateurDetail?.roles && operateur.utilisateurDetail.roles.length > 0 ? (
                   operateur.utilisateurDetail.roles.map((r) => (
                     <span key={r} className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                      {NOM_ROLE_LABELS[r as any] || r}
+                      {NOM_ROLE_LABELS[r as keyof typeof NOM_ROLE_LABELS] || r}
                     </span>
                   ))
                 ) : (
@@ -515,11 +515,10 @@ const OperateurDetailModal: React.FC<OperateurDetailModalProps> = ({ operateur, 
           {/* Disponibilite */}
           <div>
             <label className="text-sm font-medium text-gray-500 mb-2 block">Disponibilite</label>
-            <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg ${
-              operateur.estDisponible
-                ? 'bg-green-100 text-green-800'
-                : 'bg-red-100 text-red-800'
-            }`}>
+            <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg ${operateur.estDisponible
+              ? 'bg-green-100 text-green-800'
+              : 'bg-red-100 text-red-800'
+              }`}>
               {operateur.estDisponible ? (
                 <UserCheck className="w-4 h-4" />
               ) : (
@@ -604,9 +603,8 @@ const EquipeDetailModal: React.FC<EquipeDetailModalProps> = ({ equipe, onClose }
             <div>
               <label className="text-sm font-medium text-gray-500">Statut</label>
               <div className="mt-1">
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  equipe.actif ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                }`}>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${equipe.actif ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                  }`}>
                   {equipe.actif ? 'Active' : 'Inactive'}
                 </span>
               </div>
@@ -889,7 +887,7 @@ const Teams: React.FC = () => {
     .filter(e => e.actif)
     .filter(e =>
       e.nomEquipe.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      e.chefEquipeNom.toLowerCase().includes(searchQuery.toLowerCase())
+      (e.chefEquipeNom || '').toLowerCase().includes(searchQuery.toLowerCase())
     );
 
   const filteredOperateurs = operateurs.filter(o =>
@@ -974,9 +972,8 @@ const Teams: React.FC = () => {
       key: 'actif',
       label: 'Actif',
       render: (e) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-          e.actif ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-        }`}>
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${e.actif ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+          }`}>
           {e.actif ? 'Oui' : 'Non'}
         </span>
       ),
@@ -1031,38 +1028,37 @@ const Teams: React.FC = () => {
       key: 'estDisponible',
       label: 'Disponible',
       render: (o) => (
-        <span className={`inline-flex items-center gap-1 ${
-          o.estDisponible ? 'text-green-600' : 'text-red-600'
-        }`}>
+        <span className={`inline-flex items-center gap-1 ${o.estDisponible ? 'text-green-600' : 'text-red-600'
+          }`}>
           {o.estDisponible ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
         </span>
       ),
       sortable: false
     }
     ,
-          {
-            key: 'actions',
-            label: 'Actions',
-            render: (o) => (
-              <div className="flex gap-1">
-                <button
-                  className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-                  title="Modifier"
-                  onClick={(ev) => { ev.stopPropagation(); const u = utilisateurs.find(us => us.id === o.utilisateur); if (u) setEditingUser(u); }}
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
-                <button
-                  className="p-1 text-red-600 hover:bg-red-100 rounded"
-                  title="Supprimer"
-                  onClick={(ev) => { ev.stopPropagation(); setDeleteOperateurId(o.utilisateur); }}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ),
-            sortable: false
-          }
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (o) => (
+        <div className="flex gap-1">
+          <button
+            className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+            title="Modifier"
+            onClick={(ev) => { ev.stopPropagation(); const u = utilisateurs.find(us => us.id === o.utilisateur); if (u) setEditingUser(u); }}
+          >
+            <Edit2 className="w-4 h-4" />
+          </button>
+          <button
+            className="p-1 text-red-600 hover:bg-red-100 rounded"
+            title="Supprimer"
+            onClick={(ev) => { ev.stopPropagation(); setDeleteOperateurId(o.utilisateur); }}
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      ),
+      sortable: false
+    }
   ];
 
   const absencesColumns: Column<Absence>[] = [
@@ -1259,11 +1255,10 @@ const Teams: React.FC = () => {
       <div className="mb-4 flex border-b border-gray-200 flex-shrink-0">
         <button
           onClick={() => setActiveTab('equipes')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-            activeTab === 'equipes'
-              ? 'border-emerald-500 text-emerald-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'equipes'
+            ? 'border-emerald-500 text-emerald-600'
+            : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
         >
           <span className="flex items-center gap-2">
             <Users className="w-4 h-4" />
@@ -1272,11 +1267,10 @@ const Teams: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('operateurs')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-            activeTab === 'operateurs'
-              ? 'border-emerald-500 text-emerald-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'operateurs'
+            ? 'border-emerald-500 text-emerald-600'
+            : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
         >
           <span className="flex items-center gap-2">
             <UserCheck className="w-4 h-4" />
@@ -1285,11 +1279,10 @@ const Teams: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('competences')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-            activeTab === 'competences'
-              ? 'border-emerald-500 text-emerald-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'competences'
+            ? 'border-emerald-500 text-emerald-600'
+            : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
         >
           <span className="flex items-center gap-2">
             <Award className="w-4 h-4" />
@@ -1298,11 +1291,10 @@ const Teams: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('absences')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-            activeTab === 'absences'
-              ? 'border-emerald-500 text-emerald-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'absences'
+            ? 'border-emerald-500 text-emerald-600'
+            : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
         >
           <span className="flex items-center gap-2">
             <Calendar className="w-4 h-4" />
@@ -1316,11 +1308,10 @@ const Teams: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('historique')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-            activeTab === 'historique'
-              ? 'border-emerald-500 text-emerald-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'historique'
+            ? 'border-emerald-500 text-emerald-600'
+            : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
         >
           <span className="flex items-center gap-2">
             <Clock className="w-4 h-4" />
@@ -1346,7 +1337,7 @@ const Teams: React.FC = () => {
       {/* Content */}
       <div className="flex-1 min-h-0 bg-white rounded-lg border border-gray-200 overflow-hidden">
         {activeTab === 'equipes' && (
-          <div className="h-full">
+          <div className="h-full overflow-auto">
             <DataTable
               data={filteredEquipes}
               columns={equipesColumns}
@@ -1357,7 +1348,7 @@ const Teams: React.FC = () => {
         )}
 
         {activeTab === 'operateurs' && (
-          <div className="h-full">
+          <div className="h-full overflow-auto">
             <DataTable
               data={filteredOperateurs}
               columns={operateursColumns}
@@ -1462,21 +1453,19 @@ const Teams: React.FC = () => {
             <div className="flex border-b border-gray-200 px-4 flex-shrink-0 bg-white">
               <button
                 onClick={() => setCompetenceSubTab('list')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-                  competenceSubTab === 'list'
-                    ? 'border-emerald-500 text-emerald-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
+                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${competenceSubTab === 'list'
+                  ? 'border-emerald-500 text-emerald-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
               >
                 Liste des competences
               </button>
               <button
                 onClick={() => setCompetenceSubTab('matrix')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-                  competenceSubTab === 'matrix'
-                    ? 'border-emerald-500 text-emerald-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
+                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${competenceSubTab === 'matrix'
+                  ? 'border-emerald-500 text-emerald-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
               >
                 Matrice operateurs
               </button>
