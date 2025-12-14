@@ -456,7 +456,7 @@ export async function fetchInventoryItem(objectType: string, objectId: string): 
   // Otherwise, use the type-specific endpoint
   try {
     const url = `${API_BASE_URL}/${pathSegment}/${objectId}/`;
-    const response = await fetch(url);
+    const response = await apiFetch(url);
     return handleResponse<any>(response);
   } catch (error) {
     logger.error(`Erreur fetchInventoryItem(${objectType}, ${objectId}):`, error);
