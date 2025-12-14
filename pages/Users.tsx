@@ -247,7 +247,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated, r
               </div>
             )}
             <Tab.Group selectedIndex={tabIndex} onChange={setTabIndex}>
-                  <Tab.List className="flex space-x-2 border-b mb-4">
+              <Tab.List className="flex space-x-2 border-b mb-4">
                 <Tab className={({ selected }) =>
                   selected ? 'px-4 py-2 border-b-2 border-emerald-500 font-semibold' : 'px-4 py-2 text-gray-500'}>
                   Informations
@@ -490,12 +490,11 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ user, onClose, onTogg
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
         <div className="p-6 border-b border-gray-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className={`p-3 rounded-full ${
-              user.roles.includes('ADMIN') ? 'bg-purple-100' :
-              user.roles.includes('OPERATEUR') ? 'bg-blue-100' :
-              user.roles.includes('CHEF_EQUIPE') ? 'bg-yellow-100' :
-              user.roles.includes('CLIENT') ? 'bg-green-100' : 'bg-gray-100'
-            }`}>
+            <div className={`p-3 rounded-full ${user.roles.includes('ADMIN') ? 'bg-purple-100' :
+                user.roles.includes('OPERATEUR') ? 'bg-blue-100' :
+                  user.roles.includes('CHEF_EQUIPE') ? 'bg-yellow-100' :
+                    user.roles.includes('CLIENT') ? 'bg-green-100' : 'bg-gray-100'
+              }`}>
               {user.roles.includes('ADMIN') ? (
                 <Shield className="w-6 h-6 text-purple-600" />
               ) : user.roles.includes('OPERATEUR') ? (
@@ -528,9 +527,8 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ user, onClose, onTogg
             <div>
               <label className="text-sm font-medium text-gray-500">Statut</label>
               <p className="mt-1">
-                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                  user.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                }`}>
+                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${user.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  }`}>
                   {user.actif ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
                   {user.actif ? 'Actif' : 'Inactif'}
                 </span>
@@ -667,11 +665,10 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ user, onClose, onTogg
           </button>
           <button
             onClick={() => onToggleActive(user.id, !user.actif)}
-            className={`flex-1 px-4 py-2 rounded-lg flex items-center justify-center gap-2 ${
-              user.actif
+            className={`flex-1 px-4 py-2 rounded-lg flex items-center justify-center gap-2 ${user.actif
                 ? 'bg-red-100 text-red-700 hover:bg-red-200'
                 : 'bg-green-100 text-green-700 hover:bg-green-200'
-            }`}
+              }`}
           >
             {user.actif ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
             {user.actif ? 'Desactiver' : 'Reactiver'}
@@ -819,18 +816,16 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
         <div className="p-6 border-b border-gray-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className={`p-3 rounded-full ${
-              user.roles.includes('ADMIN') ? 'bg-purple-100' :
-              user.roles.includes('OPERATEUR') ? 'bg-blue-100' :
-              user.roles.includes('CHEF_EQUIPE') ? 'bg-yellow-100' :
-              user.roles.includes('CLIENT') ? 'bg-green-100' : 'bg-gray-100'
-            }`}>
-              <Edit2 className={`w-5 h-5 ${
-                user.roles.includes('ADMIN') ? 'text-purple-600' :
-                user.roles.includes('OPERATEUR') ? 'text-blue-600' :
-                user.roles.includes('CHEF_EQUIPE') ? 'text-yellow-600' :
-                user.roles.includes('CLIENT') ? 'text-green-600' : 'text-gray-600'
-              }`} />
+            <div className={`p-3 rounded-full ${user.roles.includes('ADMIN') ? 'bg-purple-100' :
+                user.roles.includes('OPERATEUR') ? 'bg-blue-100' :
+                  user.roles.includes('CHEF_EQUIPE') ? 'bg-yellow-100' :
+                    user.roles.includes('CLIENT') ? 'bg-green-100' : 'bg-gray-100'
+              }`}>
+              <Edit2 className={`w-5 h-5 ${user.roles.includes('ADMIN') ? 'text-purple-600' :
+                  user.roles.includes('OPERATEUR') ? 'text-blue-600' :
+                    user.roles.includes('CHEF_EQUIPE') ? 'text-yellow-600' :
+                      user.roles.includes('CLIENT') ? 'text-green-600' : 'text-gray-600'
+                }`} />
             </div>
             <div>
               <h2 className="text-xl font-bold text-gray-900">Modifier l'utilisateur</h2>
@@ -953,14 +948,12 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
               <button
                 type="button"
                 onClick={() => setFormData({ ...formData, actif: !formData.actif })}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  formData.actif ? 'bg-emerald-600' : 'bg-gray-300'
-                }`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.actif ? 'bg-emerald-600' : 'bg-gray-300'
+                  }`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    formData.actif ? 'translate-x-6' : 'translate-x-1'
-                  }`}
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.actif ? 'translate-x-6' : 'translate-x-1'
+                    }`}
                 />
               </button>
               <span className={`text-sm ${formData.actif ? 'text-emerald-600' : 'text-gray-500'}`}>
@@ -1234,7 +1227,7 @@ const Users: React.FC = () => {
       );
     }
     return true;
-  }).filter(u => u.actif);
+  });
 
   // Columns
   const columns = [
@@ -1243,12 +1236,11 @@ const Users: React.FC = () => {
       label: 'Nom',
       render: (u) => (
         <div className="flex items-center gap-3">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            u.roles.includes('ADMIN') ? 'bg-purple-100' :
-            u.roles.includes('OPERATEUR') ? 'bg-blue-100' :
-            u.roles.includes('CHEF_EQUIPE') ? 'bg-yellow-100' :
-            u.roles.includes('CLIENT') ? 'bg-green-100' : 'bg-gray-100'
-          }`}>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${u.roles.includes('ADMIN') ? 'bg-purple-100' :
+              u.roles.includes('OPERATEUR') ? 'bg-blue-100' :
+                u.roles.includes('CHEF_EQUIPE') ? 'bg-yellow-100' :
+                  u.roles.includes('CLIENT') ? 'bg-green-100' : 'bg-gray-100'
+            }`}>
             {u.roles.includes('ADMIN') ? (
               <Shield className="w-4 h-4 text-purple-600" />
             ) : u.roles.includes('OPERATEUR') ? (
@@ -1291,9 +1283,8 @@ const Users: React.FC = () => {
       key: 'actif',
       label: 'Statut',
       render: (u) => (
-        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-          u.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-        }`}>
+        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${u.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          }`}>
           {u.actif ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
           {u.actif ? 'Actif' : 'Inactif'}
         </span>
@@ -1373,21 +1364,19 @@ const Users: React.FC = () => {
       <div className="mb-4 flex border-b border-gray-200">
         <button
           onClick={() => setActiveTab('tous')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-            activeTab === 'tous'
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'tous'
               ? 'border-emerald-500 text-emerald-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
+            }`}
         >
           Tous ({utilisateurs.length})
         </button>
         <button
           onClick={() => setActiveTab('admins')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-            activeTab === 'admins'
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'admins'
               ? 'border-emerald-500 text-emerald-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
+            }`}
         >
           <span className="flex items-center gap-2">
             <Shield className="w-4 h-4" />
@@ -1396,11 +1385,10 @@ const Users: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('operateurs')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-            activeTab === 'operateurs'
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'operateurs'
               ? 'border-emerald-500 text-emerald-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
+            }`}
         >
           <span className="flex items-center gap-2">
             <UserCheck className="w-4 h-4" />
@@ -1409,11 +1397,10 @@ const Users: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('chefs')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-            activeTab === 'chefs'
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'chefs'
               ? 'border-emerald-500 text-emerald-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
+            }`}
         >
           <span className="flex items-center gap-2">
             <Award className="w-4 h-4" />
@@ -1422,11 +1409,10 @@ const Users: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('clients')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-            activeTab === 'clients'
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'clients'
               ? 'border-emerald-500 text-emerald-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
+            }`}
         >
           <span className="flex items-center gap-2">
             <Building2 className="w-4 h-4" />
