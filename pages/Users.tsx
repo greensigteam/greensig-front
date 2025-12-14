@@ -119,9 +119,9 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated, r
   const [competences, setCompetences] = useState<Competence[]>([]);
   const [selectedCompetences, setSelectedCompetences] = useState<{ competenceId: number; niveau: NiveauCompetence }[]>([]);
 
-  // Fetch competences when OPERATEUR or CHEF_EQUIPE is selected
+  // Fetch competences when OPERATEUR is selected
   useEffect(() => {
-    if (selectedRole === 'OPERATEUR' || selectedRole === 'CHEF_EQUIPE') {
+    if (selectedRole === 'OPERATEUR') {
       fetchCompetences().then(setCompetences);
     }
   }, [selectedRole]);
@@ -174,30 +174,30 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated, r
     setLoading(true);
     try {
       // Nouvelle logique : comportement par rôle (single-role forms)
-        if (selectedRole === 'OPERATEUR' || selectedRole === 'CHEF_EQUIPE') {
-          const operateur = await createOperateur({
-            email: formData.email,
-            nom: formData.nom,
-            prenom: formData.prenom,
-            password: formData.password,
-            numeroImmatriculation: matricule || '',
-            dateEmbauche: new Date().toISOString().split('T')[0],
-            telephone: ''
-          });
-          // Recherche l'opérateur créé par email pour obtenir son ID
-          const { results } = await fetchOperateurs({ search: formData.email });
-          const op = results && results.length > 0 ? results[0] : null;
-          if (op) {
-            for (const comp of selectedCompetences) {
-              await affecterCompetence(op.utilisateur, comp);
-            }
-            // Si le rôle sélectionné est CHEF_EQUIPE, attribuer le rôle au user/operateur
-            if (selectedRole === 'CHEF_EQUIPE') {
-              const roleObj = roleObjects.find(r => r.nomRole === 'CHEF_EQUIPE');
-              if (roleObj) await attribuerRole(op.utilisateur.toString(), roleObj.id.toString());
-            }
+      if (selectedRole === 'OPERATEUR') {
+        const operateur = await createOperateur({
+          email: formData.email,
+          nom: formData.nom,
+          prenom: formData.prenom,
+          password: formData.password,
+          numeroImmatriculation: matricule,
+          dateEmbauche: new Date().toISOString().split('T')[0],
+          telephone: ''
+        });
+        // Recherche l'opérateur créé par email pour obtenir son ID
+        const { results } = await fetchOperateurs({ search: formData.email });
+        const op = results && results.length > 0 ? results[0] : null;
+        if (op) {
+          for (const comp of selectedCompetences) {
+            await affecterCompetence(op.utilisateur, comp);
           }
-        } else {
+          // Attribuer le rôle correspondant si nécessaire (par ex. CHEF_EQUIPE)
+          if (selectedRole && selectedRole !== 'OPERATEUR') {
+            const roleObj = roleObjects.find(r => r.nomRole === selectedRole);
+            if (roleObj) await attribuerRole(op.utilisateur.toString(), roleObj.id.toString());
+          }
+        }
+      } else {
         // Cas classique : création utilisateur puis attribution des rôles
         const user = await createUtilisateur({
           email: formData.email,
@@ -252,7 +252,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated, r
                   selected ? 'px-4 py-2 border-b-2 border-emerald-500 font-semibold' : 'px-4 py-2 text-gray-500'}>
                   Informations
                 </Tab>
-                {(selectedRole === 'OPERATEUR' || selectedRole === 'CHEF_EQUIPE') && (
+                {selectedRole === 'OPERATEUR' && (
                   <Tab className={({ selected }) =>
                     selected ? 'px-4 py-2 border-b-2 border-emerald-500 font-semibold' : 'px-4 py-2 text-gray-500'}>
                     Compétences
@@ -360,7 +360,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated, r
                         Matricule <span className="text-red-500">*</span>
                       </label>
                       <input
-                        required={selectedRole === 'OPERATEUR'}
+                        required
                         type="text"
                         value={matricule}
                         onChange={(e) => setMatricule(e.target.value)}
@@ -370,7 +370,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated, r
                     </div>
                   )}
                 </Tab.Panel>
-                {(selectedRole === 'OPERATEUR' || selectedRole === 'CHEF_EQUIPE') && (
+                {selectedRole === 'OPERATEUR' && (
                   <Tab.Panel>
                     {/* Onglet Compétences */}
                     <div className="mb-2 text-sm text-gray-600">Sélectionnez les compétences à affecter à l'opérateur (optionnel).</div>
