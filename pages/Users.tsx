@@ -114,9 +114,9 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated })
   const [competences, setCompetences] = useState<Competence[]>([]);
   const [selectedCompetences, setSelectedCompetences] = useState<{ competenceId: number; niveau: NiveauCompetence }[]>([]);
 
-  // Fetch competences when OPERATEUR is selected
+  // Fetch competences when OPERATEUR or CHEF_EQUIPE is selected
   useEffect(() => {
-    if (selectedRole === 'OPERATEUR') {
+    if (selectedRole === 'OPERATEUR' || selectedRole === 'CHEF_EQUIPE') {
       fetchCompetences().then(setCompetences);
     }
   }, [selectedRole]);
@@ -257,7 +257,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated })
                   selected ? 'px-4 py-2 border-b-2 border-emerald-500 font-semibold' : 'px-4 py-2 text-gray-500'}>
                   Informations
                 </Tab>
-                {selectedRole === 'OPERATEUR' && (
+                {(selectedRole === 'OPERATEUR' || selectedRole === 'CHEF_EQUIPE') && (
                   <Tab className={({ selected }) =>
                     selected ? 'px-4 py-2 border-b-2 border-emerald-500 font-semibold' : 'px-4 py-2 text-gray-500'}>
                     Compétences
@@ -375,7 +375,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated })
                     </div>
                   )}
                 </Tab.Panel>
-                {selectedRole === 'OPERATEUR' && (
+                {(selectedRole === 'OPERATEUR' || selectedRole === 'CHEF_EQUIPE') && (
                   <Tab.Panel>
                     {/* Onglet Compétences */}
                     <div className="mb-2 text-sm text-gray-600">Sélectionnez les compétences à affecter à l'opérateur (optionnel).</div>
