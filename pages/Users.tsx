@@ -1266,11 +1266,11 @@ const Users: React.FC = () => {
       label: 'Roles',
       render: (u: Utilisateur) => u.roles.length > 0 ? (
         <div className="flex flex-wrap gap-1">
-          {u.roles.slice(0, 2).map((role: NomRole) => (
+          {u.roles.slice(0, 5).map((role: NomRole) => (
             <RoleBadge key={role} role={role} />
           ))}
-          {u.roles.length > 2 && (
-            <span className="text-xs text-gray-500">+{u.roles.length - 2}</span>
+          {u.roles.length > 5 && (
+            <span className="text-xs text-gray-500">+{u.roles.length - 5}</span>
           )}
         </div>
       ) : '-',
@@ -1365,7 +1365,7 @@ const Users: React.FC = () => {
       {/* Tabs */}
       <div className="mb-4 flex border-b border-gray-200 flex-shrink-0">
         <button
-          onClick={() => setActiveTab('tous')}
+          onClick={() => { setActiveTab('tous'); setRoleFilter(null); }}
           className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'tous'
             ? 'border-emerald-500 text-emerald-600'
             : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -1374,7 +1374,7 @@ const Users: React.FC = () => {
           Tous ({utilisateurs.length})
         </button>
         <button
-          onClick={() => setActiveTab('admins')}
+          onClick={() => { setActiveTab('admins'); setRoleFilter(null); }}
           className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'admins'
             ? 'border-emerald-500 text-emerald-600'
             : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -1386,7 +1386,7 @@ const Users: React.FC = () => {
           </span>
         </button>
         <button
-          onClick={() => setActiveTab('operateurs')}
+          onClick={() => { setActiveTab('operateurs'); setRoleFilter(null); }}
           className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'operateurs'
             ? 'border-emerald-500 text-emerald-600'
             : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -1398,7 +1398,7 @@ const Users: React.FC = () => {
           </span>
         </button>
         <button
-          onClick={() => setActiveTab('chefs')}
+          onClick={() => { setActiveTab('chefs'); setRoleFilter(null); }}
           className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'chefs'
             ? 'border-emerald-500 text-emerald-600'
             : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -1410,7 +1410,7 @@ const Users: React.FC = () => {
           </span>
         </button>
         <button
-          onClick={() => setActiveTab('clients')}
+          onClick={() => { setActiveTab('clients'); setRoleFilter(null); }}
           className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'clients'
             ? 'border-emerald-500 text-emerald-600'
             : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -1451,7 +1451,7 @@ const Users: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-h-0 overflow-hidden bg-white rounded-lg border border-gray-200">
+      <div className="flex-1 min-h-0 overflow-auto bg-white rounded-lg border border-gray-200">
         <DataTable
           data={filteredUsers}
           columns={[
