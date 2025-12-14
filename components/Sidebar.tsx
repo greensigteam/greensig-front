@@ -26,15 +26,15 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   // User Roles Configuration
   // Admin: All access
-  // Operator: Dashboard, Map, Inventory, Interventions, Claims (read/update)
+  // chef d'équipe: Dashboard, Map, Inventory, Interventions, Claims (read/update)
   // Client: Handled via ClientPortal, so no sidebar items needed for Client here (or minimal)
   const menuItems = [
-    { id: 'DASHBOARD', label: 'Tableau de bord', icon: LayoutDashboard, roles: ['ADMIN', 'OPERATEUR'] },
-    { id: 'MAP', label: 'Cartographie', icon: MapIcon, roles: ['ADMIN', 'OPERATEUR'] },
-    { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['ADMIN', 'OPERATEUR', 'CLIENT'] },
-    { id: 'PLANNING', label: 'Planning', icon: Calendar, roles: ['ADMIN', 'OPERATEUR', 'CLIENT'] },
-    { id: 'INTERVENTIONS', label: 'Interventions', icon: Wrench, roles: ['ADMIN', 'OPERATEUR', 'CLIENT'] },
-    { id: 'CLAIMS', label: 'Réclamations', icon: AlertTriangle, roles: ['ADMIN', 'OPERATEUR', 'CLIENT'] },
+    { id: 'DASHBOARD', label: 'Tableau de bord', icon: LayoutDashboard, roles: ['ADMIN','CHEF_EQUIPE'] },
+    { id: 'MAP', label: 'Cartographie', icon: MapIcon, roles: ['ADMIN','CHEF_EQUIPE'] },
+    { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['ADMIN','CHEF_EQUIPE','CLIENT'] },
+    { id: 'PLANNING', label: 'Planning', icon: Calendar, roles: ['ADMIN','CHEF_EQUIPE', 'CLIENT'] },
+    { id: 'INTERVENTIONS', label: 'Interventions', icon: Wrench, roles: ['ADMIN','CHEF_EQUIPE', 'CLIENT'] },
+    { id: 'CLAIMS', label: 'Réclamations', icon: AlertTriangle, roles: ['ADMIN','CHEF_EQUIPE', 'CLIENT'] },
     { id: 'TEAMS', label: 'Équipes', icon: Users, roles: ['ADMIN'] },
     { id: 'USERS', label: 'Utilisateurs', icon: UserCog, roles: ['ADMIN'] },
     { id: 'REPORTING', label: 'Rapports', icon: BarChart3, roles: ['ADMIN'] },

@@ -16,7 +16,6 @@ import {
   Absence,
   HistoriqueEquipeOperateur,
   StatistiquesUtilisateurs,
-  TypeUtilisateur,
   StatutOperateur,
   CategorieCompetence,
   NiveauCompetence,
@@ -65,7 +64,7 @@ export const MOCK_COMPETENCES: Competence[] = [
   // Techniques et operationnelles
   {
     id: 1,
-    nomCompetence: 'Utilisation de tondeuse',
+      roles: ['ADMIN'],
     categorie: 'TECHNIQUE',
     categorieDisplay: 'Techniques et operationnelles',
     description: "Maitrise de l'utilisation des tondeuses a gazon professionnelles",
@@ -77,7 +76,7 @@ export const MOCK_COMPETENCES: Competence[] = [
     categorie: 'TECHNIQUE',
     categorieDisplay: 'Techniques et operationnelles',
     description: "Maitrise de l'utilisation des debroussailleuses",
-    ordreAffichage: 2
+      roles: ['OPERATEUR', 'CHEF_EQUIPE'],
   },
   {
     id: 3,
@@ -89,7 +88,7 @@ export const MOCK_COMPETENCES: Competence[] = [
   },
   {
     id: 4,
-    nomCompetence: 'Desherbage manuel et mecanique',
+      roles: ['OPERATEUR'],
     categorie: 'TECHNIQUE',
     categorieDisplay: 'Techniques et operationnelles',
     description: "Techniques de desherbage manuel et utilisation d'outils mecaniques",
@@ -101,7 +100,7 @@ export const MOCK_COMPETENCES: Competence[] = [
     categorie: 'TECHNIQUE',
     categorieDisplay: 'Techniques et operationnelles',
     description: "Techniques de binage pour l'aeration des sols",
-    ordreAffichage: 5
+      roles: ['OPERATEUR'],
   },
   {
     id: 6,
@@ -113,7 +112,7 @@ export const MOCK_COMPETENCES: Competence[] = [
   },
   {
     id: 7,
-    nomCompetence: 'Taille de nettoyage',
+      roles: ['OPERATEUR', 'CHEF_EQUIPE'],
     categorie: 'TECHNIQUE',
     categorieDisplay: 'Techniques et operationnelles',
     description: "Taille d'entretien et de nettoyage des vegetaux",
@@ -125,7 +124,7 @@ export const MOCK_COMPETENCES: Competence[] = [
     categorie: 'TECHNIQUE',
     categorieDisplay: 'Techniques et operationnelles',
     description: 'Taille ornementale et art topiaire',
-    ordreAffichage: 8
+      roles: ['OPERATEUR'],
   },
   {
     id: 9,
@@ -137,7 +136,7 @@ export const MOCK_COMPETENCES: Competence[] = [
   },
   {
     id: 10,
-    nomCompetence: 'Elagage de palmiers',
+      roles: ['CLIENT'],
     categorie: 'TECHNIQUE',
     categorieDisplay: 'Techniques et operationnelles',
     description: "Techniques specialisees d'elagage de palmiers",
@@ -149,7 +148,7 @@ export const MOCK_COMPETENCES: Competence[] = [
     categorie: 'TECHNIQUE',
     categorieDisplay: 'Techniques et operationnelles',
     description: "Nettoyage general des espaces verts et sites d'intervention",
-    ordreAffichage: 11
+      roles: ['OPERATEUR'],
   },
   // Organisationnelles et humaines
   {

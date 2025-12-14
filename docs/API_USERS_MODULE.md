@@ -30,7 +30,7 @@ Documentation des endpoints et conventions de nommage pour le module `api_users`
 |---------------------|----------------------|-------------|
 | `id` | `id` | Identifiant unique |
 | `utilisateur` | `utilisateur` | FK vers Utilisateur |
-| `type_utilisateur` | `typeUtilisateur` | Type: ADMIN, OPERATEUR, CLIENT |
+| `roles` | `roles` | Array of: ADMIN, OPERATEUR, CLIENT, CHEF_EQUIPE |
 | `date_creation` | `dateCreation` | Date de creation |
 | `derniere_connexion` | `derniereConnexion` | Derniere connexion |
 | `nom_structure` | `nomStructure` | Nom de la structure client |
@@ -66,7 +66,7 @@ Documentation des endpoints et conventions de nommage pour le module `api_users`
 
 ```typescript
 // Types d'utilisateurs
-type TypeUtilisateur = 'ADMIN' | 'OPERATEUR' | 'CLIENT';
+type NomRole = 'ADMIN' | 'OPERATEUR' | 'CLIENT' | 'CHEF_EQUIPE';
 
 // Statuts operateur
 type StatutOperateur = 'ACTIF' | 'INACTIF' | 'EN_CONGE';
@@ -105,7 +105,7 @@ interface Utilisateur {
   nom: string;
   prenom: string;
   fullName: string;
-  typeUtilisateur: TypeUtilisateur;
+  roles: NomRole[];
   dateCreation: string; // ISO date
   actif: boolean;
   derniereConnexion: string | null;
@@ -118,7 +118,7 @@ interface UtilisateurCreate {
   prenom: string;
   password: string;
   passwordConfirm: string;
-  typeUtilisateur?: TypeUtilisateur;
+  roles?: NomRole[];
   actif?: boolean;
 }
 
@@ -366,7 +366,7 @@ interface StatistiquesUtilisateurs {
   utilisateurs: {
     total: number;
     actifs: number;
-    parType: Record<TypeUtilisateur, number>;
+    parRole: Record<NomRole, number>;
   };
   operateurs: {
     total: number;

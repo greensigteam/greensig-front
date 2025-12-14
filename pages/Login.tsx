@@ -10,7 +10,8 @@ interface LoginProps {
   onLogin: (user: User) => void;
 }
 
-const ROLES: Role[] = ['ADMIN', 'OPERATEUR', 'CLIENT'];
+// Seuls les chefs d'équipe peuvent se connecter dans la partie opérateurs
+const ROLES: Role[] = ['ADMIN', 'CHEF_EQUIPE', 'CLIENT'];
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
@@ -52,7 +53,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         } else {
           roles = ['CLIENT'];
         }
-        if (!roles.includes(selectedRole)) {
+        // Si l'utilisateur sélectionne OPÉRATEUR (CHEF ÉQUIPE), il doit avoir le rôle CHEF_EQUIPE
+        if (selectedRole === 'CHEF_EQUIPE' && !roles.includes('CHEF_EQUIPE')) {
+          setError("Seuls les chefs d'équipe peuvent accéder à la partie opérateurs.");
+          setIsLoading(false);
+          return;
+        }
+        // Pour les autres rôles, vérification classique
+        if (selectedRole !== 'CHEF_EQUIPE' && !roles.includes(selectedRole)) {
           setError("Vous n'avez pas accès à ce rôle.");
           setIsLoading(false);
           return;

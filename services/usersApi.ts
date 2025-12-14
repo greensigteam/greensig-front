@@ -23,6 +23,7 @@ import {
   EquipeDetail,
   EquipeCreate,
   EquipeUpdate,
+  CategorieCompetence,
   EquipeStatut,
   AffecterMembres,
   Absence,
@@ -190,9 +191,7 @@ export async function fetchUtilisateurs(
         u.email.toLowerCase().includes(search)
       );
     }
-    if (filters.typeUtilisateur) {
-      results = results.filter(u => u.typeUtilisateur === filters.typeUtilisateur);
-    }
+    // Filtrage par rôle déjà géré côté frontend
     if (filters.actif !== undefined) {
       results = results.filter(u => u.actif === filters.actif);
     }
@@ -233,7 +232,7 @@ export async function createUtilisateur(data: UtilisateurCreate): Promise<Utilis
       nom: data.nom,
       prenom: data.prenom,
       fullName: `${data.prenom} ${data.nom}`,
-      typeUtilisateur: data.typeUtilisateur || 'OPERATEUR',
+      // typeUtilisateur supprimé, gestion par roles uniquement
       dateCreation: new Date().toISOString(),
       actif: data.actif ?? true,
       derniereConnexion: null,
@@ -432,6 +431,59 @@ export async function fetchCompetences(
   return response.results;
 }
 
+export async function createCompetence(
+  data: { nomCompetence: string; categorie: CategorieCompetence; description?: string; ordreAffichage?: number }
+): Promise<Competence> {
+  if (API_MODE === 'mock') {
+    await delay(150);
+    const newId = Math.max(...MOCK_COMPETENCES.map(c => c.id)) + 1;
+    const newComp: Competence = {
+      id: newId,
+      nomCompetence: data.nomCompetence,
+      categorie: data.categorie,
+      categorieDisplay: data.categorie,
+      description: data.description || '',
+      ordreAffichage: data.ordreAffichage || 0
+    };
+    MOCK_COMPETENCES.push(newComp);
+    return newComp;
+  }
+
+  return fetchApi<Competence>(`${USERS_API_URL}/competences/`, {
+    method: 'POST',
+    body: JSON.stringify(camelToSnake(data as Record<string, unknown>))
+  });
+}
+
+export async function updateCompetence(
+  id: number,
+  data: { nomCompetence?: string; categorie?: CategorieCompetence; description?: string; ordreAffichage?: number }
+): Promise<Competence> {
+  if (API_MODE === 'mock') {
+    await delay(150);
+    const idx = MOCK_COMPETENCES.findIndex(c => c.id === id);
+    if (idx === -1) throw new ApiError(404, 'Competence non trouvee');
+    Object.assign(MOCK_COMPETENCES[idx], data);
+    return MOCK_COMPETENCES[idx];
+  }
+
+  return fetchApi<Competence>(`${USERS_API_URL}/competences/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(camelToSnake(data as Record<string, unknown>))
+  });
+}
+
+export async function deleteCompetence(id: number): Promise<void> {
+  if (API_MODE === 'mock') {
+    await delay(100);
+    const idx = MOCK_COMPETENCES.findIndex(c => c.id === id);
+    if (idx !== -1) MOCK_COMPETENCES.splice(idx, 1);
+    return;
+  }
+
+  await fetchApi<void>(`${USERS_API_URL}/competences/${id}/`, { method: 'DELETE' });
+}
+
 // ============================================================================
 // OPERATEURS
 // ============================================================================
@@ -585,10 +637,48 @@ export async function fetchChefsPotentiels(): Promise<OperateurList[]> {
     return getChefsPotentiels();
   }
 
-  const response = await fetchApi<OperateurList[]>(
-    `${USERS_API_URL}/operateurs/chefs_potentiels/`
-  );
-  return response;
+  // Récupérer à la fois les opérateurs pouvant être chef (par compétence)
+  // et les utilisateurs qui se sont vus attribuer le rôle `CHEF_EQUIPE`.
+  const operateursRes = await fetchApi<OperateurList[]>(`${USERS_API_URL}/operateurs/chefs_potentiels/`);
+
+  // Les utilisateurs avec le rôle CHEF_EQUIPE
+  const usersRes = await fetchApi<PaginatedResponse<Utilisateur>>(
+    `${USERS_API_URL}/utilisateurs/?role=CHEF_EQUIPE&actif=true`
+  ).catch(() => ({ results: [] } as PaginatedResponse<Utilisateur>));
+
+  const usersAsOperateurs: OperateurList[] = (usersRes && usersRes.results ? usersRes.results : []).map(u => ({
+    utilisateur: u.id,
+    email: u.email,
+    nom: u.nom,
+    prenom: u.prenom,
+    fullName: u.fullName || `${u.prenom} ${u.nom}`,
+    actif: u.actif,
+    numeroImmatriculation: '',
+    statut: null as any,
+    equipe: null as any,
+    equipeNom: null as any,
+    dateEmbauche: null as any,
+    telephone: '',
+    photo: null as any,
+    estChefEquipe: true,
+    estDisponible: false
+  }));
+
+  // Merge unique by `utilisateur` id
+  const merged: OperateurList[] = [];
+  const seen = new Set<number>();
+  for (const op of operateursRes) {
+    merged.push(op);
+    seen.add(op.utilisateur);
+  }
+  for (const u of usersAsOperateurs) {
+    if (!seen.has(u.utilisateur)) {
+      merged.push(u);
+      seen.add(u.utilisateur);
+    }
+  }
+
+  return merged;
 }
 
 export async function fetchCompetencesOperateur(
@@ -693,7 +783,7 @@ export async function fetchEquipeById(id: number): Promise<EquipeDetail> {
 export async function createEquipe(data: EquipeCreate): Promise<EquipeList> {
   if (API_MODE === 'mock') {
     await delay(300);
-    const chef = getOperateurById(data.chefEquipe);
+    const chef = data.chefEquipe ? getOperateurById(data.chefEquipe) : null;
     const newEquipe: EquipeList = {
       id: Math.max(...MOCK_EQUIPES.map(e => e.id)) + 1,
       nomEquipe: data.nomEquipe,
@@ -702,17 +792,19 @@ export async function createEquipe(data: EquipeCreate): Promise<EquipeList> {
       specialite: data.specialite || '',
       actif: data.actif ?? true,
       dateCreation: new Date().toISOString().split('T')[0],
-      nombreMembres: (data.membres?.length || 0) + 1,
+      nombreMembres: (data.membres?.length || 0) + (data.chefEquipe ? 1 : 0),
       statutOperationnel: 'COMPLETE'
     };
     MOCK_EQUIPES.push(newEquipe);
 
     // Mettre a jour le chef
-    const chefIdx = MOCK_OPERATEURS.findIndex(o => o.utilisateur === data.chefEquipe);
-    if (chefIdx !== -1) {
-      MOCK_OPERATEURS[chefIdx].estChefEquipe = true;
-      MOCK_OPERATEURS[chefIdx].equipe = newEquipe.id;
-      MOCK_OPERATEURS[chefIdx].equipeNom = newEquipe.nomEquipe;
+    if (data.chefEquipe) {
+      const chefIdx = MOCK_OPERATEURS.findIndex(o => o.utilisateur === data.chefEquipe);
+      if (chefIdx !== -1) {
+        MOCK_OPERATEURS[chefIdx].estChefEquipe = true;
+        MOCK_OPERATEURS[chefIdx].equipe = newEquipe.id;
+        MOCK_OPERATEURS[chefIdx].equipeNom = newEquipe.nomEquipe;
+      }
     }
 
     return newEquipe;
@@ -828,6 +920,33 @@ export async function fetchEquipeStatut(equipeId: number): Promise<EquipeStatut>
 
   return fetchApi<EquipeStatut>(
     `${USERS_API_URL}/equipes/${equipeId}/statut/`
+  );
+}
+
+export async function retirerMembre(
+  equipeId: number,
+  operateurId: number
+): Promise<EquipeDetail> {
+  if (API_MODE === 'mock') {
+    await delay(200);
+    const idx = MOCK_OPERATEURS.findIndex(o => o.utilisateur === operateurId);
+    if (idx !== -1) {
+      MOCK_OPERATEURS[idx].equipe = null;
+      MOCK_OPERATEURS[idx].equipeNom = null;
+    }
+    const equipeIdx = MOCK_EQUIPES.findIndex(e => e.id === equipeId);
+    if (equipeIdx !== -1) {
+      MOCK_EQUIPES[equipeIdx].nombreMembres = getOperateursByEquipe(equipeId).length;
+    }
+    return getEquipeDetail(equipeId)!;
+  }
+
+  return fetchApi<EquipeDetail>(
+    `${USERS_API_URL}/equipes/${equipeId}/retirer_membre/`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ operateur_id: operateurId })
+    }
   );
 }
 
@@ -990,6 +1109,52 @@ export async function fetchAbsencesAValider(): Promise<Absence[]> {
   }
 
   return fetchApi<Absence[]>(`${USERS_API_URL}/absences/a_valider/`);
+}
+
+export async function updateAbsence(
+  id: number,
+  data: AbsenceUpdate
+): Promise<Absence> {
+  if (API_MODE === 'mock') {
+    await delay(200);
+    const idx = MOCK_ABSENCES.findIndex(a => a.id === id);
+    if (idx === -1) {
+      throw new ApiError(404, 'Absence non trouvee');
+    }
+    Object.assign(MOCK_ABSENCES[idx], data);
+    // Recalculer la duree si les dates ont change
+    if (data.dateDebut || data.dateFin) {
+      const dateDebut = data.dateDebut || MOCK_ABSENCES[idx].dateDebut;
+      const dateFin = data.dateFin || MOCK_ABSENCES[idx].dateFin;
+      MOCK_ABSENCES[idx].dureeJours = Math.ceil(
+        (new Date(dateFin).getTime() - new Date(dateDebut).getTime()) /
+        (1000 * 60 * 60 * 24)
+      ) + 1;
+    }
+    return MOCK_ABSENCES[idx];
+  }
+
+  return fetchApi<Absence>(`${USERS_API_URL}/absences/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
+  });
+}
+
+export async function annulerAbsence(id: number): Promise<Absence> {
+  if (API_MODE === 'mock') {
+    await delay(200);
+    const idx = MOCK_ABSENCES.findIndex(a => a.id === id);
+    if (idx === -1) {
+      throw new ApiError(404, 'Absence non trouvee');
+    }
+    MOCK_ABSENCES[idx].statut = 'ANNULEE';
+    MOCK_ABSENCES[idx].statutDisplay = 'Annulee';
+    return MOCK_ABSENCES[idx];
+  }
+
+  return fetchApi<Absence>(`${USERS_API_URL}/absences/${id}/annuler/`, {
+    method: 'POST'
+  });
 }
 
 // ============================================================================

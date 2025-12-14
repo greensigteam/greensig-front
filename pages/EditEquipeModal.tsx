@@ -1,6 +1,14 @@
-import React, { useState } from 'react';
-import { EquipeList, EquipeUpdate } from '../types/users';
-import { updateEquipe } from '../services/usersApi';
+import React, { useState, useEffect } from 'react';
+import { X, Users, UserPlus, UserMinus, AlertCircle, Save, UserCheck } from 'lucide-react';
+import { EquipeList, EquipeUpdate, OperateurList } from '../types/users';
+import {
+  updateEquipe,
+  fetchEquipeMembres,
+  fetchOperateurs,
+  fetchChefsPotentiels,
+  affecterMembres,
+  retirerMembre
+} from '../services/usersApi';
 
 interface EditEquipeModalProps {
   equipe: EquipeList;
@@ -17,12 +25,46 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'info' | 'membres'>('info');
+
+  // Members management
+  const [membres, setMembres] = useState<OperateurList[]>([]);
+  const [availableOperateurs, setAvailableOperateurs] = useState<OperateurList[]>([]);
+  const [chefsPotentiels, setChefsPotentiels] = useState<OperateurList[]>([]);
+  const [loadingMembres, setLoadingMembres] = useState(true);
+  const [memberAction, setMemberAction] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadMembres();
+  }, [equipe.id]);
+
+  const loadMembres = async () => {
+    setLoadingMembres(true);
+    try {
+      const [membresRes, operateursRes, chefsRes] = await Promise.all([
+        fetchEquipeMembres(equipe.id),
+        fetchOperateurs({ sansEquipe: true }),
+        fetchChefsPotentiels()
+      ]);
+      setMembres(membresRes);
+      setAvailableOperateurs(operateursRes.results);
+      setChefsPotentiels(chefsRes);
+    } catch (err) {
+      console.error('Erreur chargement membres:', err);
+    } finally {
+      setLoadingMembres(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    let newValue: string | boolean = value;
+    let newValue: string | boolean | number = value;
     if (type === 'checkbox') {
       newValue = (e.target as HTMLInputElement).checked;
+    }
+    if (name === 'chefEquipe') {
+      // Treat empty string as null to allow removing the chef
+      newValue = value === '' ? null : Number(value);
     }
     setForm(f => ({
       ...f,
@@ -45,28 +87,314 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
     }
   };
 
+  const handleAddMembre = async (operateurId: number) => {
+    setMemberAction(`add-${operateurId}`);
+    try {
+      const currentMemberIds = membres.map(m => m.utilisateur);
+      await affecterMembres(equipe.id, { operateurs: [...currentMemberIds, operateurId] });
+      await loadMembres();
+    } catch (err: any) {
+      console.error('affecterMembres error:', err);
+      // Prefer server-provided details when available
+      const serverData = err?.data || err?.response || null;
+      setError(serverData ? JSON.stringify(serverData) : (err.message || "Erreur lors de l'ajout du membre"));
+    } finally {
+      setMemberAction(null);
+    }
+  };
+
+  const handleRemoveMembre = async (operateurId: number) => {
+    setMemberAction(`remove-${operateurId}`);
+    try {
+      await retirerMembre(equipe.id, operateurId);
+      await loadMembres();
+    } catch (err: any) {
+      console.error('retirerMembre error:', err);
+      const serverData = err?.data || err?.response || null;
+      setError(serverData ? JSON.stringify(serverData) : (err.message || 'Erreur lors du retrait du membre'));
+    } finally {
+      setMemberAction(null);
+    }
+  };
+
+  // Combine current chef with chefs potentiels for the dropdown
+  const chefOptions = [
+    ...chefsPotentiels,
+    ...membres.filter(m => m.estChefEquipe || m.utilisateur === equipe.chefEquipe)
+  ].filter((op, index, self) =>
+    index === self.findIndex(o => o.utilisateur === op.utilisateur)
+  );
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md flex flex-col gap-4">
-        <h2 className="text-lg font-bold">Modifier l'équipe</h2>
-        <label className="flex flex-col gap-1">
-          <span>Nom</span>
-          <input name="nomEquipe" value={form.nomEquipe || ''} onChange={handleChange} className="border rounded px-2 py-1" required />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span>Spécialité</span>
-          <input name="specialite" value={form.specialite || ''} onChange={handleChange} className="border rounded px-2 py-1" />
-        </label>
-        <label className="flex items-center gap-2">
-          <input type="checkbox" name="actif" checked={!!form.actif} onChange={handleChange} />
-          <span>Active</span>
-        </label>
-        {error && <div className="text-red-600 text-sm">{error}</div>}
-        <div className="flex gap-2 justify-end">
-          <button type="button" className="px-4 py-2 bg-gray-200 rounded" onClick={onClose} disabled={loading}>Annuler</button>
-          <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded" disabled={loading}>Enregistrer</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-full bg-emerald-100">
+              <Users className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Modifier l'equipe</h2>
+              <p className="text-sm text-gray-500">{equipe.nomEquipe}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+            <X className="w-5 h-5" />
+          </button>
         </div>
-      </form>
+
+        {/* Tabs */}
+        <div className="flex border-b border-gray-200">
+          <button
+            type="button"
+            onClick={() => setActiveTab('info')}
+            className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 -mb-px ${
+              activeTab === 'info'
+                ? 'border-emerald-500 text-emerald-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Informations
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('membres')}
+            className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 -mb-px ${
+              activeTab === 'membres'
+                ? 'border-emerald-500 text-emerald-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Membres ({membres.length})
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
+          {error && (
+            <div className="m-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <span className="text-sm">{error}</span>
+            </div>
+          )}
+
+          {activeTab === 'info' && (
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nom de l'equipe <span className="text-red-500">*</span>
+                </label>
+                <input
+                  name="nomEquipe"
+                  value={form.nomEquipe || ''}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Specialite
+                </label>
+                <input
+                  name="specialite"
+                  value={form.specialite || ''}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                  placeholder="Ex: Entretien general"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Chef d'equipe (optionnel)
+                  </label>
+                  <select
+                    name="chefEquipe"
+                    value={form.chefEquipe ?? ''}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                  >
+                    <option value="">-- Aucun --</option>
+                    <option disabled value="divider">──────────</option>
+                    <option value="">Selectionner un chef</option>
+                  {chefOptions.map((op) => (
+                    <option key={op.utilisateur} value={op.utilisateur}>
+                      {op.fullName} ({op.numeroImmatriculation})
+                      {op.utilisateur === equipe.chefEquipe ? ' (actuel)' : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Seuls les operateurs avec la competence "Gestion d'equipe" sont affiches
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 py-2">
+                <label className="text-sm font-medium text-gray-700">Statut de l'equipe</label>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, actif: !form.actif })}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    form.actif ? 'bg-emerald-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      form.actif ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <span className={`text-sm ${form.actif ? 'text-emerald-600' : 'text-gray-500'}`}>
+                  {form.actif ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Enregistrer
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {activeTab === 'membres' && (
+            <div className="p-6 space-y-6">
+              {loadingMembres ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-4 border-emerald-500 border-t-transparent"></div>
+                </div>
+              ) : (
+                <>
+                  {/* Current members */}
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      Membres actuels ({membres.length})
+                    </h3>
+                    {membres.length === 0 ? (
+                      <p className="text-sm text-gray-500 p-4 bg-gray-50 rounded-lg">
+                        Aucun membre dans cette equipe
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {membres.map((membre) => (
+                          <div
+                            key={membre.utilisateur}
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                membre.utilisateur === equipe.chefEquipe
+                                  ? 'bg-emerald-200'
+                                  : 'bg-gray-200'
+                              }`}>
+                                {membre.utilisateur === equipe.chefEquipe ? (
+                                  <UserCheck className="w-4 h-4 text-emerald-700" />
+                                ) : (
+                                  <Users className="w-4 h-4 text-gray-600" />
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900">{membre.fullName}</p>
+                                <p className="text-xs text-gray-500">{membre.numeroImmatriculation}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {membre.utilisateur === equipe.chefEquipe ? (
+                                <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
+                                  Chef d'equipe
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => handleRemoveMembre(membre.utilisateur)}
+                                  disabled={memberAction === `remove-${membre.utilisateur}`}
+                                  className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg disabled:opacity-50"
+                                  title="Retirer de l'equipe"
+                                >
+                                  {memberAction === `remove-${membre.utilisateur}` ? (
+                                    <div className="w-4 h-4 border-2 border-red-600/30 border-t-red-600 rounded-full animate-spin" />
+                                  ) : (
+                                    <UserMinus className="w-4 h-4" />
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Available operators */}
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                      <UserPlus className="w-4 h-4" />
+                      Operateurs disponibles ({availableOperateurs.length})
+                    </h3>
+                    {availableOperateurs.length === 0 ? (
+                      <p className="text-sm text-gray-500 p-4 bg-gray-50 rounded-lg">
+                        Aucun operateur disponible
+                      </p>
+                    ) : (
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {availableOperateurs.map((op) => (
+                          <div
+                            key={op.utilisateur}
+                            className="flex items-center justify-between p-3 bg-blue-50 rounded-lg"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-blue-200 rounded-full flex items-center justify-center">
+                                <Users className="w-4 h-4 text-blue-600" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900">{op.fullName}</p>
+                                <p className="text-xs text-gray-500">{op.numeroImmatriculation}</p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleAddMembre(op.utilisateur)}
+                              disabled={memberAction === `add-${op.utilisateur}`}
+                              className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded-lg disabled:opacity-50"
+                              title="Ajouter a l'equipe"
+                            >
+                              {memberAction === `add-${op.utilisateur}` ? (
+                                <div className="w-4 h-4 border-2 border-emerald-600/30 border-t-emerald-600 rounded-full animate-spin" />
+                              ) : (
+                                <UserPlus className="w-4 h-4" />
+                              )}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

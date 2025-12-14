@@ -7,13 +7,12 @@
 // ENUMERATIONS
 // ============================================================================
 
-export type TypeUtilisateur = 'ADMIN' | 'OPERATEUR' | 'CLIENT';
 
 export type StatutOperateur = 'ACTIF' | 'INACTIF' | 'EN_CONGE';
 
 export type CategorieCompetence = 'TECHNIQUE' | 'ORGANISATIONNELLE';
 
-export type NiveauCompetence = 'NON' | 'DEBUTANT' | 'INTERMEDIAIRE' | 'EXPERT' | 'AUTORISE';
+export type NiveauCompetence = 'NON' | 'DEBUTANT' | 'INTERMEDIAIRE' | 'EXPERT';
 
 export type TypeAbsence = 'CONGE' | 'MALADIE' | 'FORMATION' | 'AUTRE';
 
@@ -27,11 +26,6 @@ export type NomRole = 'ADMIN' | 'CLIENT' | 'CHEF_EQUIPE' | 'OPERATEUR';
 // LABELS POUR L'AFFICHAGE
 // ============================================================================
 
-export const TYPE_UTILISATEUR_LABELS: Record<TypeUtilisateur, string> = {
-  ADMIN: 'Administrateur',
-  OPERATEUR: 'Operateur',
-  CLIENT: 'Client'
-};
 
 export const STATUT_OPERATEUR_LABELS: Record<StatutOperateur, string> = {
   ACTIF: 'Actif',
@@ -48,8 +42,7 @@ export const NIVEAU_COMPETENCE_LABELS: Record<NiveauCompetence, string> = {
   NON: 'Non maitrise',
   DEBUTANT: 'Debutant',
   INTERMEDIAIRE: 'Intermediaire',
-  EXPERT: 'Expert',
-  AUTORISE: 'Autorise'
+  EXPERT: 'Expert'
 };
 
 export const TYPE_ABSENCE_LABELS: Record<TypeAbsence, string> = {
@@ -89,7 +82,6 @@ export interface Utilisateur {
   nom: string;
   prenom: string;
   fullName: string;
-  typeUtilisateur: TypeUtilisateur;
   dateCreation: string;
   actif: boolean;
   derniereConnexion: string | null;
@@ -102,7 +94,6 @@ export interface UtilisateurCreate {
   prenom: string;
   password: string;
   passwordConfirm: string;
-  typeUtilisateur?: TypeUtilisateur;
   actif?: boolean;
 }
 
@@ -112,7 +103,6 @@ export interface UtilisateurUpdate {
   email?: string;
   actif?: boolean;
 }
-
 export interface ChangePassword {
   oldPassword: string;
   newPassword: string;
@@ -136,7 +126,6 @@ export interface UtilisateurRole {
   utilisateurEmail: string;
   role: number;
   roleNom: string;
-  dateAttribution: string;
 }
 
 // ============================================================================
@@ -276,8 +265,8 @@ export interface OperateurUpdate {
 export interface EquipeList {
   id: number;
   nomEquipe: string;
-  chefEquipe: number;
-  chefEquipeNom: string;
+  chefEquipe: number | null;
+  chefEquipeNom: string | null;
   specialite: string;
   actif: boolean;
   dateCreation: string;
@@ -286,13 +275,13 @@ export interface EquipeList {
 }
 
 export interface EquipeDetail extends EquipeList {
-  chefEquipeDetail: OperateurList;
+  chefEquipeDetail: OperateurList | null;
   membres: OperateurList[];
 }
 
 export interface EquipeCreate {
   nomEquipe: string;
-  chefEquipe: number;
+  chefEquipe?: number | null;
   specialite?: string;
   actif?: boolean;
   membres?: number[];
@@ -300,7 +289,7 @@ export interface EquipeCreate {
 
 export interface EquipeUpdate {
   nomEquipe?: string;
-  chefEquipe?: number;
+  chefEquipe?: number | null;
   specialite?: string;
   actif?: boolean;
 }
@@ -395,7 +384,7 @@ export interface StatistiquesUtilisateurs {
   utilisateurs: {
     total: number;
     actifs: number;
-    parType: Record<TypeUtilisateur, number>;
+    parRole: Record<NomRole, number>;
   };
   operateurs: {
     total: number;
@@ -437,7 +426,6 @@ export interface PaginatedResponse<T> {
 
 export interface UtilisateurFilters {
   search?: string;
-  typeUtilisateur?: TypeUtilisateur;
   actif?: boolean;
   role?: NomRole;
   dateCreationMin?: string;
@@ -528,8 +516,7 @@ export const NIVEAU_COMPETENCE_COLORS: Record<NiveauCompetence, { bg: string; te
   NON: { bg: 'bg-gray-100', text: 'text-gray-500' },
   DEBUTANT: { bg: 'bg-blue-100', text: 'text-blue-700' },
   INTERMEDIAIRE: { bg: 'bg-yellow-100', text: 'text-yellow-700' },
-  EXPERT: { bg: 'bg-green-100', text: 'text-green-700' },
-  AUTORISE: { bg: 'bg-purple-100', text: 'text-purple-700' }
+  EXPERT: { bg: 'bg-green-100', text: 'text-green-700' }
 };
 
 export const TYPE_ABSENCE_COLORS: Record<TypeAbsence, { bg: string; text: string }> = {
@@ -538,3 +525,18 @@ export const TYPE_ABSENCE_COLORS: Record<TypeAbsence, { bg: string; text: string
   FORMATION: { bg: 'bg-purple-100', text: 'text-purple-800' },
   AUTRE: { bg: 'bg-gray-100', text: 'text-gray-800' }
 };
+
+// Valeur par défaut utilisée par les badges lorsque la clé est absente
+export const DEFAULT_BADGE = { bg: 'bg-gray-100', text: 'text-gray-800' };
+
+// Helper sûr pour récupérer les couleurs d'un mapping de badges.
+// Si `key` est indéfini ou non présent dans `map`, retourne `DEFAULT_BADGE`.
+export function getBadgeColors<T extends string>(
+  map: Record<T, { bg: string; text: string }>,
+  key?: T | null
+): { bg: string; text: string } {
+  if (key && (map as any)[key]) {
+    return (map as any)[key];
+  }
+  return DEFAULT_BADGE;
+}

@@ -78,7 +78,7 @@ export function DataTable<T extends Record<string, any>>({
     };
 
     return (
-        <div className="bg-white rounded-lg shadow h-full flex flex-col">
+        <div className="bg-white h-full flex flex-col">
             {/* Header with Export */}
             {showExport && (
                 <div className="p-4 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
