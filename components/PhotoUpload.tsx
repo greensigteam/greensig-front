@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Camera, X, Upload } from 'lucide-react';
+import { Camera, X } from 'lucide-react';
 
 export interface PhotoUploadProps {
     photos: string[];

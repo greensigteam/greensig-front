@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { MOCK_KPIS, MOCK_TASKS, MOCK_CLAIMS } from '../store';
-import { TrendingUp, TrendingDown, Minus, Calendar, AlertTriangle, CheckCircle2, AlertCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Calendar, AlertTriangle, AlertCircle } from 'lucide-react';
 import { fetchStatistics, type Statistics } from '../services/api';
 
 const Dashboard: React.FC = () => {

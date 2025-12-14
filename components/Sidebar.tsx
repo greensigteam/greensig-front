@@ -1,4 +1,5 @@
 import React from 'react';
+import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Map as MapIcon, Package, Calendar,
   Wrench, AlertTriangle, Users, UserCog, BarChart3,
@@ -7,17 +8,25 @@ import {
 import { ViewState, Role } from '../types';
 
 interface SidebarProps {
-  currentView: ViewState;
-  onNavigate: (view: ViewState) => void;
   onLogout: () => void;
   userRole: Role;
   collapsed: boolean;
   onToggle: () => void;
 }
 
+const viewToPath: Record<ViewState, string> = {
+  DASHBOARD: '/dashboard',
+  MAP: '/map',
+  INVENTORY: '/inventory',
+  PLANNING: '/planning',
+  INTERVENTIONS: '/interventions',
+  CLAIMS: '/claims',
+  TEAMS: '/teams',
+  REPORTING: '/reporting',
+  CLIENT_PORTAL: '/client',
+};
+
 const Sidebar: React.FC<SidebarProps> = ({
-  currentView,
-  onNavigate,
   onLogout,
   userRole,
   collapsed,
@@ -25,16 +34,13 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
 
   // User Roles Configuration
-  // Admin: All access
-  // chef d'équipe: Dashboard, Map, Inventory, Interventions, Claims (read/update)
-  // Client: Handled via ClientPortal, so no sidebar items needed for Client here (or minimal)
   const menuItems = [
-    { id: 'DASHBOARD', label: 'Tableau de bord', icon: LayoutDashboard, roles: ['ADMIN','CHEF_EQUIPE'] },
-    { id: 'MAP', label: 'Cartographie', icon: MapIcon, roles: ['ADMIN','CHEF_EQUIPE'] },
-    { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['ADMIN','CHEF_EQUIPE','CLIENT'] },
-    { id: 'PLANNING', label: 'Planning', icon: Calendar, roles: ['ADMIN','CHEF_EQUIPE', 'CLIENT'] },
-    { id: 'INTERVENTIONS', label: 'Interventions', icon: Wrench, roles: ['ADMIN','CHEF_EQUIPE', 'CLIENT'] },
-    { id: 'CLAIMS', label: 'Réclamations', icon: AlertTriangle, roles: ['ADMIN','CHEF_EQUIPE', 'CLIENT'] },
+    { id: 'DASHBOARD', label: 'Tableau de bord', icon: LayoutDashboard, roles: ['ADMIN', 'OPERATOR'] },
+    { id: 'MAP', label: 'Cartographie', icon: MapIcon, roles: ['ADMIN', 'OPERATOR'] },
+    { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['ADMIN', 'OPERATOR'] },
+    { id: 'PLANNING', label: 'Planification', icon: Calendar, roles: ['ADMIN'] },
+    { id: 'INTERVENTIONS', label: 'Interventions', icon: Wrench, roles: ['ADMIN', 'OPERATOR'] },
+    { id: 'CLAIMS', label: 'Réclamations', icon: AlertTriangle, roles: ['ADMIN', 'OPERATOR'] },
     { id: 'TEAMS', label: 'Équipes', icon: Users, roles: ['ADMIN'] },
     { id: 'USERS', label: 'Utilisateurs', icon: UserCog, roles: ['ADMIN'] },
     { id: 'REPORTING', label: 'Rapports', icon: BarChart3, roles: ['ADMIN'] },
@@ -80,41 +86,42 @@ const Sidebar: React.FC<SidebarProps> = ({
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 custom-scrollbar">
         <ul className="space-y-1 px-2">
-          {filteredItems.map((item) => {
-            const isActive = currentView === item.id;
-            return (
-              <li key={item.id}>
-                <button
-                  onClick={() => onNavigate(item.id as ViewState)}
-                  className={`
-                    w-full flex items-center rounded-lg transition-all duration-200 group relative
-                    ${collapsed ? 'justify-center p-2.5' : 'px-3 py-2.5 gap-3'}
-                    ${isActive
-                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/30 ring-1 ring-emerald-400/20'
-                      : 'hover:bg-emerald-800/30 text-emerald-200/70 hover:text-white'}
-                  `}
-                  title={collapsed ? item.label : ''}
-                >
-                  <item.icon
-                    className={`
-                      shrink-0 transition-colors
-                      ${collapsed ? 'w-6 h-6' : 'w-5 h-5'}
-                      ${isActive ? 'text-white' : 'text-emerald-300/70 group-hover:text-white'}
-                    `}
-                  />
+          {filteredItems.map((item) => (
+            <li key={item.id}>
+              <NavLink
+                to={viewToPath[item.id as ViewState]}
+                className={({ isActive }) =>
+                  `w-full flex items-center rounded-lg transition-all duration-200 group relative
+                  ${collapsed ? 'justify-center p-2.5' : 'px-3 py-2.5 gap-3'}
+                  ${isActive
+                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/30 ring-1 ring-emerald-400/20'
+                    : 'hover:bg-emerald-800/30 text-emerald-200/70 hover:text-white'}`
+                }
+                title={collapsed ? item.label : ''}
+              >
+                {({ isActive }) => (
+                  <>
+                    <item.icon
+                      className={`
+                        shrink-0 transition-colors
+                        ${collapsed ? 'w-6 h-6' : 'w-5 h-5'}
+                        ${isActive ? 'text-white' : 'text-emerald-300/70 group-hover:text-white'}
+                      `}
+                    />
 
-                  {!collapsed && (
-                    <span className="font-medium text-sm whitespace-nowrap">{item.label}</span>
-                  )}
+                    {!collapsed && (
+                      <span className="font-medium text-sm whitespace-nowrap">{item.label}</span>
+                    )}
 
-                  {/* Active Indicator Strip */}
-                  {isActive && !collapsed && (
-                    <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-white/80" />
-                  )}
-                </button>
-              </li>
-            );
-          })}
+                    {/* Active Indicator Strip */}
+                    {isActive && !collapsed && (
+                      <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-white/80" />
+                    )}
+                  </>
+                )}
+              </NavLink>
+            </li>
+          ))}
         </ul>
       </nav>
 
