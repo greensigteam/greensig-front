@@ -58,7 +58,7 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    let newValue: string | boolean | number = value;
+    let newValue: string | boolean | number | null = value;
     if (type === 'checkbox') {
       newValue = (e.target as HTMLInputElement).checked;
     }
@@ -149,22 +149,20 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
           <button
             type="button"
             onClick={() => setActiveTab('info')}
-            className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 -mb-px ${
-              activeTab === 'info'
+            className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 -mb-px ${activeTab === 'info'
                 ? 'border-emerald-500 text-emerald-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+              }`}
           >
             Informations
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('membres')}
-            className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 -mb-px ${
-              activeTab === 'membres'
+            className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 -mb-px ${activeTab === 'membres'
                 ? 'border-emerald-500 text-emerald-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+              }`}
           >
             Membres ({membres.length})
           </button>
@@ -209,17 +207,17 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Chef d'equipe (optionnel)
-                  </label>
-                  <select
-                    name="chefEquipe"
-                    value={form.chefEquipe ?? ''}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                  >
-                    <option value="">-- Aucun --</option>
-                    <option disabled value="divider">──────────</option>
-                    <option value="">Selectionner un chef</option>
+                  Chef d'equipe (optionnel)
+                </label>
+                <select
+                  name="chefEquipe"
+                  value={form.chefEquipe ?? ''}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                >
+                  <option value="">-- Aucun --</option>
+                  <option disabled value="divider">──────────</option>
+                  <option value="">Selectionner un chef</option>
                   {chefOptions.map((op) => (
                     <option key={op.utilisateur} value={op.utilisateur}>
                       {op.fullName} ({op.numeroImmatriculation})
@@ -237,14 +235,12 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
                 <button
                   type="button"
                   onClick={() => setForm({ ...form, actif: !form.actif })}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    form.actif ? 'bg-emerald-600' : 'bg-gray-300'
-                  }`}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.actif ? 'bg-emerald-600' : 'bg-gray-300'
+                    }`}
                 >
                   <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      form.actif ? 'translate-x-6' : 'translate-x-1'
-                    }`}
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${form.actif ? 'translate-x-6' : 'translate-x-1'
+                      }`}
                   />
                 </button>
                 <span className={`text-sm ${form.actif ? 'text-emerald-600' : 'text-gray-500'}`}>
@@ -304,11 +300,10 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
                             className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                           >
                             <div className="flex items-center gap-3">
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                                membre.utilisateur === equipe.chefEquipe
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${membre.utilisateur === equipe.chefEquipe
                                   ? 'bg-emerald-200'
                                   : 'bg-gray-200'
-                              }`}>
+                                }`}>
                                 {membre.utilisateur === equipe.chefEquipe ? (
                                   <UserCheck className="w-4 h-4 text-emerald-700" />
                                 ) : (

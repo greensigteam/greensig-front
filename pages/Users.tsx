@@ -1,14 +1,12 @@
 import {
   Utilisateur,
-  UtilisateurCreate,
-  UtilisateurUpdate,
   Client,
-  ClientCreate,
-  ClientUpdate,
-  OperateurCreate,
-  OperateurUpdate,
   OperateurList,
   OperateurDetail,
+  OperateurCreate,
+  UtilisateurUpdate,
+  ClientUpdate,
+  OperateurUpdate,
   Role,
   NomRole,
   NOM_ROLE_LABELS,
@@ -19,7 +17,6 @@ import {
 } from '../types/users';
 import React, { useState, useEffect } from 'react';
 import {
-  Plus,
   Users as UsersIcon,
   UserPlus,
   UserCheck,
@@ -33,14 +30,13 @@ import {
   Eye,
   EyeOff,
   Mail,
-  Phone,
   Calendar,
   Award,
   Check,
   AlertCircle,
   Save
 } from 'lucide-react';
-import { DataTable, Column } from '../components/DataTable';
+import { DataTable } from '../components/DataTable';
 import { Tab } from '@headlessui/react';
 
 // ...existing code...
@@ -90,10 +86,9 @@ const RoleBadge: React.FC<{ role: NomRole }> = ({ role }) => {
 interface CreateUserModalProps {
   onClose: () => void;
   onCreated: () => void;
-  roles: NomRole[];
 }
 
-const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated, roles }) => {
+const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated }) => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +100,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated, r
   // Role selection (single role now)
   const [selectedRole, setSelectedRole] = useState<NomRole | null>(null);
   // Rôles de l'utilisateur courant (pour vérifier si c'est un admin)
-  const [currentUserRoles, setCurrentUserRoles] = useState<NomRole[]>([]);
+
   const [formData, setFormData] = useState({
     email: '',
     nom: '',
@@ -174,30 +169,40 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated, r
     setLoading(true);
     try {
       // Nouvelle logique : comportement par rôle (single-role forms)
-        if (selectedRole === 'OPERATEUR' || selectedRole === 'CHEF_EQUIPE') {
-          const operateur = await createOperateur({
-            email: formData.email,
-            nom: formData.nom,
-            prenom: formData.prenom,
-            password: formData.password,
-            numeroImmatriculation: matricule || '',
-            dateEmbauche: new Date().toISOString().split('T')[0],
-            telephone: ''
-          });
-          // Recherche l'opérateur créé par email pour obtenir son ID
-          const { results } = await fetchOperateurs({ search: formData.email });
-          const op = results && results.length > 0 ? results[0] : null;
-          if (op) {
-            for (const comp of selectedCompetences) {
-              await affecterCompetence(op.utilisateur, comp);
-            }
-            // Si le rôle sélectionné est CHEF_EQUIPE, attribuer le rôle au user/operateur
-            if (selectedRole === 'CHEF_EQUIPE') {
-              const roleObj = roleObjects.find(r => r.nomRole === 'CHEF_EQUIPE');
-              if (roleObj) await attribuerRole(op.utilisateur.toString(), roleObj.id.toString());
-            }
+      if (selectedRole === 'OPERATEUR' || selectedRole === 'CHEF_EQUIPE') {
+        const operateurData: OperateurCreate = {
+          email: formData.email,
+          nom: formData.nom,
+          prenom: formData.prenom,
+          password: formData.password,
+          numeroImmatriculation: matricule || '',
+          dateEmbauche: new Date().toISOString().split('T')[0] as string,
+          telephone: ''
+        };
+
+        const operateurResponse = await createOperateur(operateurData);
+        // L'ID de l'opérateur est l'ID de l'utilisateur (primary_key)
+        const operateurId = operateurResponse.utilisateur;
+
+        // Si le rôle sélectionné est CHEF_EQUIPE, l'ajouter
+        // (createOperateur attribue déjà OPERATEUR par défaut via le backend, ou on peut le forcer)
+        if (selectedRole === 'CHEF_EQUIPE') {
+          const chefRole = roleObjects.find(r => r.nomRole === 'CHEF_EQUIPE');
+          if (chefRole) {
+            await attribuerRole(String(operateurId), String(chefRole.id));
           }
-        } else {
+        }
+
+        // Ajouter les compétences
+        if (selectedCompetences.length > 0) {
+          for (const comp of selectedCompetences) {
+            await affecterCompetence(operateurId, {
+              competenceId: comp.competenceId,
+              niveau: comp.niveau
+            });
+          }
+        }
+      } else {
         // Cas classique : création utilisateur puis attribution des rôles
         const user = await createUtilisateur({
           email: formData.email,
@@ -1126,7 +1131,6 @@ const Users: React.FC = () => {
   const [utilisateurs, setUtilisateurs] = useState<Utilisateur[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [operateurs, setOperateurs] = useState<OperateurList[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
   const [stats, setStats] = useState<{
     total: number;
     actifs: number;
@@ -1149,18 +1153,15 @@ const Users: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [utilisateursRes, clientsRes, operateursRes, rolesRes, statsRes] = await Promise.all([
+      const [utilisateursRes, clientsRes, operateursRes] = await Promise.all([
         fetchUtilisateurs(),
         fetchClients(),
-        fetchOperateurs(),
-        fetchRoles(),
-        fetchStatistiquesUtilisateurs()
+        fetchOperateurs()
       ]);
 
       setUtilisateurs(utilisateursRes.results);
       setClients(clientsRes.results);
       setOperateurs(operateursRes.results);
-      setRoles(rolesRes);
       // Calcul local à partir de la liste d'utilisateurs pour s'assurer que
       // les cartes statistiques reflètent les rôles (un utilisateur peut avoir plusieurs rôles).
       const users = utilisateursRes.results || [];
@@ -1497,7 +1498,6 @@ const Users: React.FC = () => {
         <CreateUserModal
           onClose={() => setShowCreateUser(false)}
           onCreated={loadData}
-          roles={roles.map(r => r.nomRole)}
         />
       )}
 

@@ -16,7 +16,7 @@ import {
   Eye
 } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
-import { StatusBadge } from '../components/StatusBadge';
+
 import EditEquipeModal from './EditEquipeModal';
 import CreateAbsenceModal from './CreateAbsenceModal';
 import AbsenceDetailModal from './AbsenceDetailModal';
@@ -33,7 +33,7 @@ import {
   Absence,
   Competence,
   CategorieCompetence,
-  CompetenceOperateur,
+
   StatutOperateur,
   StatutEquipe,
   StatutAbsence,
@@ -50,7 +50,7 @@ import {
   TYPE_ABSENCE_LABELS,
   TYPE_ABSENCE_COLORS,
   getBadgeColors,
-  DEFAULT_BADGE,
+
   NOM_ROLE_LABELS,
   Utilisateur,
   Client
