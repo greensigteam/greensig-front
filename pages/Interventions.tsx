@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { Calendar, Clock, MapPin, Users, Play, CheckCircle, XCircle, Camera } from 'lucide-react';
+import { Calendar, Clock, MapPin, Users, Play, CheckCircle, XCircle } from 'lucide-react';
 import { StatusBadge } from '../components/StatusBadge';
 import { PhotoUpload } from '../components/PhotoUpload';
 import {
   MOCK_INTERVENTIONS,
-  MOCK_SITES,
   Intervention,
   getSiteById,
   getTeamById,

@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   RotateCcw,
-  X,
-  Wrench,
   ChevronDown,
   ChevronRight
 } from 'lucide-react';
@@ -65,25 +63,6 @@ const LeftPanel: React.FC<LeftPanelProps> = ({ onToggleLayer, isSidebarCollapsed
   const [symbologyConfig, setSymbologyConfig] = useState<Record<string, SymbologyConfig>>(createDefaultSymbology);
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
   const [layerVisibility, setLayerVisibility] = useState<Record<string, boolean>>({});
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [startDateFilter, setStartDateFilter] = useState<string>('');
-  const [endDateFilter, setEndDateFilter] = useState<string>('');
-
-  const resetAllFilters = () => {
-    setStatusFilter('all');
-    setStartDateFilter('');
-    setEndDateFilter('');
-
-    // Reset visual checkboxes - ALL layers (Sites + Vég + Hydro)
-    const newVisibility: Record<string, boolean> = {};
-
-    [...SITE_LEGEND, ...VEG_LEGEND, ...HYDRO_LEGEND].forEach(item => {
-      newVisibility[item.type] = true;
-      if (onToggleLayer) onToggleLayer(item.type, true);
-    });
-
-    setLayerVisibility(newVisibility);
-  };
 
   // Toggle expanded state for a symbology item
   const toggleExpanded = (type: string) => {

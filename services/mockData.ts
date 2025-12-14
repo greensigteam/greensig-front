@@ -19,12 +19,12 @@ export interface Site {
 
 export interface InventoryItem {
   id: string;
-  type: 'arbre' | 'gazon' | 'reseau' | 'equipement' | 'parcelle';
+  type: 'arbre' | 'gazon' | 'reseau' | 'equipement' | 'parcelle' | 'palmier' | 'arbuste' | 'vivace' | 'cactus' | 'graminee' | 'puit' | 'pompe' | 'vanne' | 'clapet' | 'canalisation' | 'aspersion' | 'goutte' | 'ballon';
   code: string;
   name: string;
   siteId: string;
   zone: string;
-  state: 'bon' | 'moyen' | 'mauvais';
+  state: 'bon' | 'moyen' | 'mauvais' | 'critique';
   surface?: number; // m² (pour gazon, parcelles)
   species?: string; // (pour arbres)
   height?: number; // m (pour arbres)

@@ -73,11 +73,19 @@ export interface Coordinates {
   lng: number;
 }
 
+// User 1.1.10 - Geolocation with accuracy
+export interface UserLocation extends Coordinates {
+  accuracy?: number; // Accuracy radius in meters
+}
+
 export interface MapSearchResult {
   name: string;
   coordinates: Coordinates;
   description: string;
   zoom?: number;
+  // For highlighting the found object (User 1.1.6 enhancement)
+  objectId?: string;
+  objectType?: string;
 }
 
 export enum MapLayerType {
@@ -118,3 +126,108 @@ export interface MapObjectDetail {
   lastIntervention?: string;
   nextIntervention?: string;
 }
+
+// ========================
+// PHASE 4.3: TypeScript Strict Typing - New Interfaces
+// ========================
+
+/**
+ * MapHandle - Interface for Map component imperative handle
+ * Replaces `mapRef: any` with strongly typed ref
+ */
+export interface MapHandle {
+  zoomIn: () => void;
+  zoomOut: () => void;
+  getZoom: () => number;
+  getCenter: () => Coordinates | null;
+  getMapElement: () => HTMLDivElement | null;
+  exportCanvas: () => Promise<string | null>;
+  invalidateSize: () => void;
+}
+
+/**
+ * SymbologyConfig - Layer symbology configuration
+ * Replaces `symbologyConfig: any` in OLMap components
+ */
+export interface SymbologyConfig {
+  color?: string;
+  size?: number;
+  opacity?: number;
+  strokeColor?: string;
+  strokeWidth?: number;
+  fillColor?: string;
+  icon?: string;
+}
+
+/**
+ * SearchSuggestion - Autocomplete suggestion interface
+ * Moved from useSearch.ts for global access
+ * Replaces `searchSuggestions: any[]` in Layout/Header
+ */
+export interface SearchSuggestion {
+  id: string;
+  name: string;
+  type: string;
+  coordinates?: Coordinates;
+}
+
+/**
+ * TargetLocation - Map navigation target
+ * Replaces `loc: any` in setTargetLocation callbacks
+ */
+export interface TargetLocation {
+  coordinates: Coordinates;
+  zoom?: number;
+}
+
+// ========================
+// OpenLayers Type Re-exports
+// ========================
+// Re-export OpenLayers types to avoid importing ol in every component
+
+import OLMapBrowserEvent from 'ol/MapBrowserEvent';
+import type { EventsKey as OLEventsKey } from 'ol/events';
+import type { Feature as OLFeature } from 'ol';
+import type { Geometry as OLGeometry } from 'ol/geom';
+
+export type MapBrowserEvent<T = UIEvent> = OLMapBrowserEvent<T>;
+export type EventsKey = OLEventsKey;
+export type Feature<G extends OLGeometry = OLGeometry> = OLFeature<G>;
+export type Geometry = OLGeometry;
+
+export type MeasurementType = 'distance' | 'area';
+
+export interface Measurement {
+  id: string;
+  type: MeasurementType;
+  value: string;
+  timestamp: number;
+}
+
+// ==============================================================================
+// FILTRES AVANCÉS - Re-export depuis filters.ts
+// ==============================================================================
+export type {
+  AdvancedFilters,
+  FilterOptions,
+  SiteOption,
+  FilterRanges,
+  SavedFilter,
+  FilterPanelProps,
+  FilterBadgesProps,
+  RangeFilterProps,
+  DateRangeFilterProps,
+  SavedFiltersProps,
+  FilterSectionProps,
+  UseAdvancedFiltersReturn,
+  UseSavedFiltersReturn,
+  StateType,
+  SizeType
+} from './types/filters';
+
+export {
+  filtersToQueryParams,
+  countActiveFilters,
+  getFilterLabel,
+  isArray
+} from './types/filters';

@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, Filter, X, MapPin, Calendar, FileText, Leaf, Droplet, AlertCircle } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
 import { MOCK_INVENTORY, InventoryItem } from '../services/mockData';
-import { fetchInventory, ApiError, type InventoryResponse, type InventoryFilters, fetchAllSites, type SiteFrontend } from '../services/api';
+import { fetchInventory, ApiError, type InventoryResponse, type InventoryFilters, fetchAllSites, type SiteFrontend, fetchFilterOptions } from '../services/api';
 
 // Inventory Detail Modal
 const InventoryDetailModal: React.FC<{
@@ -176,18 +177,21 @@ const HYDROLOGY_TYPES = ['Puit', 'Pompe', 'Vanne', 'Clapet', 'Canalisation', 'As
 
 // Main Inventory Component
 const Inventory: React.FC = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [mainTab, setMainTab] = useState<'tous' | 'vegetation' | 'hydrologie'>('tous');
 
   // Advanced Filters
   const [filters, setFilters] = useState({
     type: 'all',
     state: 'all',
-    site: 'all'
+    site: 'all',
+    intervention: 'all',
+    family: 'all' // Nouveau filtre famille
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [families, setFamilies] = useState<string[]>([]); // État pour stocker la liste des familles
 
   // Debounce search term (500ms delay)
   useEffect(() => {
@@ -208,6 +212,8 @@ const Inventory: React.FC = () => {
 
   useEffect(() => {
     let mounted = true;
+
+    // Charger les sites
     const loadSites = async () => {
       try {
         const s = await fetchAllSites();
@@ -216,7 +222,21 @@ const Inventory: React.FC = () => {
         console.error('Erreur chargement sites:', err);
       }
     };
+
+    // Charger les familles
+    const loadFamilies = async () => {
+      try {
+        const options = await fetchFilterOptions();
+        if (mounted && options.families) {
+          setFamilies(options.families);
+        }
+      } catch (err) {
+        console.error('Erreur chargement familles:', err);
+      }
+    };
+
     loadSites();
+    loadFamilies();
     return () => { mounted = false };
   }, []);
 
@@ -226,7 +246,7 @@ const Inventory: React.FC = () => {
   // Reset page when switching tabs
   useEffect(() => {
     setCurrentPage(1);
-    setFilters({ type: 'all', state: 'all', site: 'all' });
+    setFilters({ type: 'all', state: 'all', site: 'all', intervention: 'all', family: 'all' });
   }, [mainTab]);
 
   // Fetch inventory from API on mount and when filters change
@@ -235,24 +255,60 @@ const Inventory: React.FC = () => {
       setIsLoadingAPI(true);
       setApiError(null);
       try {
-        // Build filters object
-        const apiFilters: InventoryFilters = {
+        const apiFilters: Record<string, string | number> = {
           page: currentPage,
           page_size: 20
         };
 
         // Apply type filter based on active tab and selected filter
-        if (mainTab === 'vegetation' && filters.type !== 'all') {
-          apiFilters.type = filters.type; // Arbre, Palmier, etc.
-        } else if (mainTab === 'hydrologie' && filters.type !== 'all') {
-          apiFilters.type = filters.type; // Puit, Pompe, etc.
-        } else if (mainTab === 'tous' && filters.type !== 'all') {
-          apiFilters.type = filters.type;
+        // New logic: only add filter if not 'all'
+        if (mainTab === 'vegetation') {
+          if (filters.type !== 'all') {
+            apiFilters.type = filters.type;
+          } else {
+            apiFilters.type = VEGETATION_TYPES.join(',');
+          }
+        } else if (mainTab === 'hydrologie') {
+          if (filters.type !== 'all') {
+            apiFilters.type = filters.type;
+          } else {
+            apiFilters.type = HYDROLOGY_TYPES.join(',');
+          }
+        } else if (mainTab === 'tous') {
+          if (filters.type !== 'all') {
+            apiFilters.type = filters.type;
+          } else {
+            // If 'tous' tab and no specific filter, send all types
+            apiFilters.type = [...VEGETATION_TYPES, ...HYDROLOGY_TYPES].join(',');
+          }
         }
 
         // Site filter
         if (filters.site !== 'all') {
-          apiFilters.site = parseInt(filters.site);
+          apiFilters.site = parseInt(filters.site as string);
+        }
+
+        // State filter
+        if (filters.state !== 'all') {
+          apiFilters.state = filters.state;
+        }
+
+        // Maintenance filters
+        if (filters.intervention !== 'all') {
+          if (filters.intervention === 'urgent') {
+            apiFilters.urgent_maintenance = 'true';
+          } else if (filters.intervention === 'never') {
+            apiFilters.never_intervened = 'true';
+          } else if (filters.intervention === 'recent_30') {
+            const d = new Date();
+            d.setDate(d.getDate() - 30);
+            apiFilters.last_intervention_start = d.toISOString().split('T')[0];
+          }
+        }
+
+        // Family filter
+        if (filters.family !== 'all') {
+          apiFilters.famille = filters.family;
         }
 
         // Search filter
@@ -279,29 +335,29 @@ const Inventory: React.FC = () => {
 
     return apiInventory.results.map((feature) => {
       const props = feature.properties;
-      const coords = feature.geometry.type === 'Point'
+      const coords = (feature.geometry.type === 'Point'
         ? feature.geometry.coordinates as number[]
         : feature.geometry.type === 'Polygon'
-        ? (feature.geometry.coordinates as number[][][])[0][0]
-        : [0, 0];
+          ? (feature.geometry.coordinates as number[][][])[0]?.[0]
+          : [0, 0]) ?? [0, 0];
 
       // Map object_type to InventoryItem type
       const typeMapping: Record<string, InventoryItem['type']> = {
         'Arbre': 'arbre',
-        'Palmier': 'arbre',
+        'Palmier': 'palmier',
         'Gazon': 'gazon',
-        'Arbuste': 'gazon',
-        'Vivace': 'gazon',
-        'Cactus': 'gazon',
-        'Graminée': 'gazon',
-        'Puit': 'equipement',
-        'Pompe': 'equipement',
-        'Vanne': 'equipement',
-        'Clapet': 'equipement',
-        'Canalisation': 'reseau',
-        'Aspersion': 'reseau',
-        'Goutte': 'reseau',
-        'Ballon': 'equipement',
+        'Arbuste': 'arbuste',
+        'Vivace': 'vivace',
+        'Cactus': 'cactus',
+        'Graminée': 'graminee',
+        'Puit': 'puit',
+        'Pompe': 'pompe',
+        'Vanne': 'vanne',
+        'Clapet': 'clapet',
+        'Canalisation': 'canalisation',
+        'Aspersion': 'aspersion',
+        'Goutte': 'goutte',
+        'Ballon': 'ballon',
       };
 
       const featureId = feature.id ?? props.id ?? 0;
@@ -313,14 +369,14 @@ const Inventory: React.FC = () => {
         id: featureId.toString(),
         type: typeMapping[props.object_type] || 'equipement',
         code: props.code || `${props.object_type}-${featureId}`,
-        name: props.nom || `${props.object_type} ${featureId}`,
+        name: props.nom || props.marque || `${props.object_type} ${featureId}`,
         siteId: matchedSite ? matchedSite.id : (props.site_nom || 'unknown'),
         zone: props.sous_site_nom || props.site_nom || 'Non définie',
-        state: 'bon' as const,
+        state: (props.etat || 'bon') as 'bon' | 'moyen' | 'mauvais' | 'critique',
         species: props.famille || undefined,
-        height: props.hauteur || undefined,
-        diameter: props.diametre || undefined,
-        surface: props.surface || undefined,
+        height: props.hauteur || props.taille || props.profondeur || undefined,
+        diameter: props.diametre || props.densite || undefined,
+        surface: props.area_sqm || undefined,
         coordinates: {
           lat: coords[1] || 0,
           lng: coords[0] || 0,
@@ -332,18 +388,12 @@ const Inventory: React.FC = () => {
   }, [apiInventory, sites]);
 
 
-  // Table columns
-  const columns: Column<InventoryItem>[] = [
-    {
-      key: 'type',
-      label: 'Type',
-      render: (item) => <span className="capitalize">{item.type}</span>
-    },
-    {
-      key: 'code',
-      label: 'Code',
-      render: (item) => <span className="font-mono text-sm">{item.code}</span>
-    },
+  // ============================================================================
+  // COLONNES DYNAMIQUES (Polymorphisme)
+  // ============================================================================
+
+  // Colonnes communes à tous les objets (vue "Tous")
+  const commonColumns: Column<InventoryItem>[] = [
     {
       key: 'name',
       label: 'Nom'
@@ -357,46 +407,208 @@ const Inventory: React.FC = () => {
       }
     },
     {
-      key: 'zone',
-      label: 'Zone'
+      key: 'type',
+      label: 'Type',
+      render: (item) => <span className="capitalize">{item.type}</span>
     },
     {
       key: 'state',
       label: 'État',
       render: (item) => <StatusBadge status={item.state} type="state" />,
       sortable: false
-    },
-    {
-      key: 'surface',
-      label: 'Surface',
-      render: (item) => item.surface ? `${item.surface} m²` : '-'
-    },
-    {
-      key: 'lastIntervention',
-      label: 'Dernière intervention',
-      render: (item) =>
-        item.lastIntervention
-          ? new Date(item.lastIntervention).toLocaleDateString('fr-FR')
-          : '-'
     }
   ];
 
-  // Export function
+  // Colonnes spécifiques par type (basées sur le modèle de données réel)
+  const typeSpecificColumns: Record<string, Column<InventoryItem>[]> = {
+    // Végétation - Arbres et Palmiers (ont: nom, famille, taille, observation, last_intervention_date)
+    'Arbre': [
+      { key: 'name', label: 'Nom' },
+      { key: 'siteId', label: 'Site', render: (item) => sites.find(s => s.id === item.siteId)?.name || item.siteId || '-' },
+      { key: 'type', label: 'Type', render: (item) => <span className="capitalize">{item.type}</span> },
+      { key: 'state', label: 'État', render: (item) => <StatusBadge status={item.state} type="state" />, sortable: false },
+      { key: 'species', label: 'Famille', render: (item) => item.species || '-' },
+      { key: 'height', label: 'Taille', render: (item) => item.height || '-' },
+      { key: 'lastIntervention', label: 'Dernière intervention', render: (item) => item.lastIntervention ? new Date(item.lastIntervention).toLocaleDateString('fr-FR') : '-' }
+    ],
+    'Palmier': [
+      { key: 'name', label: 'Nom' },
+      { key: 'siteId', label: 'Site', render: (item) => sites.find(s => s.id === item.siteId)?.name || item.siteId || '-' },
+      { key: 'type', label: 'Type', render: (item) => <span className="capitalize">{item.type}</span> },
+      { key: 'state', label: 'État', render: (item) => <StatusBadge status={item.state} type="state" />, sortable: false },
+      { key: 'species', label: 'Famille', render: (item) => item.species || '-' },
+      { key: 'height', label: 'Taille', render: (item) => item.height || '-' },
+      { key: 'lastIntervention', label: 'Dernière intervention', render: (item) => item.lastIntervention ? new Date(item.lastIntervention).toLocaleDateString('fr-FR') : '-' }
+    ],
+
+    // Végétation - Gazon (a: nom, famille, area_sqm, observation, last_intervention_date)
+    'Gazon': [
+      { key: 'name', label: 'Nom' },
+      { key: 'siteId', label: 'Site', render: (item) => sites.find(s => s.id === item.siteId)?.name || item.siteId || '-' },
+      { key: 'type', label: 'Type', render: (item) => <span className="capitalize">{item.type}</span> },
+      { key: 'state', label: 'État', render: (item) => <StatusBadge status={item.state} type="state" />, sortable: false },
+      { key: 'species', label: 'Famille', render: (item) => item.species || '-' },
+      { key: 'surface', label: 'Surface (m²)', render: (item) => item.surface ? `${item.surface}` : '-' },
+      { key: 'lastIntervention', label: 'Dernière intervention', render: (item) => item.lastIntervention ? new Date(item.lastIntervention).toLocaleDateString('fr-FR') : '-' }
+    ],
+
+    // Végétation - Arbuste, Vivace, Cactus (ont: nom, famille, densite, observation, last_intervention_date)
+    'Arbuste': [
+      { key: 'name', label: 'Nom' },
+      { key: 'siteId', label: 'Site', render: (item) => sites.find(s => s.id === item.siteId)?.name || item.siteId || '-' },
+      { key: 'type', label: 'Type', render: (item) => <span className="capitalize">{item.type}</span> },
+      { key: 'state', label: 'État', render: (item) => <StatusBadge status={item.state} type="state" />, sortable: false },
+      { key: 'species', label: 'Famille', render: (item) => item.species || '-' },
+      { key: 'diameter', label: 'Densité', render: (item) => item.diameter || '-' },
+      { key: 'lastIntervention', label: 'Dernière intervention', render: (item) => item.lastIntervention ? new Date(item.lastIntervention).toLocaleDateString('fr-FR') : '-' }
+    ],
+    'Vivace': [
+      { key: 'name', label: 'Nom' },
+      { key: 'siteId', label: 'Site', render: (item) => sites.find(s => s.id === item.siteId)?.name || item.siteId || '-' },
+      { key: 'type', label: 'Type', render: (item) => <span className="capitalize">{item.type}</span> },
+      { key: 'state', label: 'État', render: (item) => <StatusBadge status={item.state} type="state" />, sortable: false },
+      { key: 'species', label: 'Famille', render: (item) => item.species || '-' },
+      { key: 'diameter', label: 'Densité', render: (item) => item.diameter || '-' },
+      { key: 'lastIntervention', label: 'Dernière intervention', render: (item) => item.lastIntervention ? new Date(item.lastIntervention).toLocaleDateString('fr-FR') : '-' }
+    ],
+    'Cactus': [
+      { key: 'name', label: 'Nom' },
+      { key: 'siteId', label: 'Site', render: (item) => sites.find(s => s.id === item.siteId)?.name || item.siteId || '-' },
+      { key: 'type', label: 'Type', render: (item) => <span className="capitalize">{item.type}</span> },
+      { key: 'state', label: 'État', render: (item) => <StatusBadge status={item.state} type="state" />, sortable: false },
+      { key: 'species', label: 'Famille', render: (item) => item.species || '-' },
+      { key: 'diameter', label: 'Densité', render: (item) => item.diameter || '-' },
+      { key: 'lastIntervention', label: 'Dernière intervention', render: (item) => item.lastIntervention ? new Date(item.lastIntervention).toLocaleDateString('fr-FR') : '-' }
+    ],
+
+    // Végétation - Graminee (a: nom, famille, densite, symbole, observation, last_intervention_date)
+    'Graminee': [
+      { key: 'name', label: 'Nom' },
+      { key: 'siteId', label: 'Site', render: (item) => sites.find(s => s.id === item.siteId)?.name || item.siteId || '-' },
+      { key: 'type', label: 'Type', render: (item) => <span className="capitalize">{item.type}</span> },
+      { key: 'state', label: 'État', render: (item) => <StatusBadge status={item.state} type="state" />, sortable: false },
+      { key: 'species', label: 'Famille', render: (item) => item.species || '-' },
+      { key: 'diameter', label: 'Densité', render: (item) => item.diameter || '-' },
+      { key: 'lastIntervention', label: 'Dernière intervention', render: (item) => item.lastIntervention ? new Date(item.lastIntervention).toLocaleDateString('fr-FR') : '-' }
+    ],
+
+    // Hydrologie - Puit (a: nom, profondeur, diametre, niveau_statique, niveau_dynamique, observation, last_intervention_date)
+    'Puit': [
+      { key: 'name', label: 'Nom' },
+      { key: 'siteId', label: 'Site', render: (item) => sites.find(s => s.id === item.siteId)?.name || item.siteId || '-' },
+      { key: 'type', label: 'Type', render: (item) => <span className="capitalize">{item.type}</span> },
+      { key: 'state', label: 'État', render: (item) => <StatusBadge status={item.state} type="state" />, sortable: false },
+      { key: 'height', label: 'Profondeur (m)', render: (item) => item.height || '-' },
+      { key: 'diameter', label: 'Diamètre (cm)', render: (item) => item.diameter || '-' },
+      { key: 'lastIntervention', label: 'Dernière intervention', render: (item) => item.lastIntervention ? new Date(item.lastIntervention).toLocaleDateString('fr-FR') : '-' }
+    ],
+
+    // Hydrologie - Pompe (a: nom, type, diametre, puissance, debit, observation, last_intervention_date)
+    'Pompe': [
+      { key: 'name', label: 'Nom' },
+      { key: 'siteId', label: 'Site', render: (item) => sites.find(s => s.id === item.siteId)?.name || item.siteId || '-' },
+      { key: 'type', label: 'Type', render: (item) => <span className="capitalize">{item.type}</span> },
+      { key: 'state', label: 'État', render: (item) => <StatusBadge status={item.state} type="state" />, sortable: false },
+      { key: 'diameter', label: 'Diamètre (cm)', render: (item) => item.diameter || '-' },
+      { key: 'lastIntervention', label: 'Dernière intervention', render: (item) => item.lastIntervention ? new Date(item.lastIntervention).toLocaleDateString('fr-FR') : '-' }
+    ],
+
+    // Hydrologie - Vanne, Clapet (ont: marque, type, diametre, materiau, pression, observation)
+    'Vanne': [
+      { key: 'name', label: 'Marque' },
+      { key: 'siteId', label: 'Site', render: (item) => sites.find(s => s.id === item.siteId)?.name || item.siteId || '-' },
+      { key: 'type', label: 'Type', render: (item) => <span className="capitalize">{item.type}</span> },
+      { key: 'state', label: 'État', render: (item) => <StatusBadge status={item.state} type="state" />, sortable: false },
+      { key: 'diameter', label: 'Diamètre (cm)', render: (item) => item.diameter || '-' }
+    ],
+    'Clapet': [
+      { key: 'name', label: 'Marque' },
+      { key: 'siteId', label: 'Site', render: (item) => sites.find(s => s.id === item.siteId)?.name || item.siteId || '-' },
+      { key: 'type', label: 'Type', render: (item) => <span className="capitalize">{item.type}</span> },
+      { key: 'state', label: 'État', render: (item) => <StatusBadge status={item.state} type="state" />, sortable: false },
+      { key: 'diameter', label: 'Diamètre (cm)', render: (item) => item.diameter || '-' }
+    ],
+
+    // Hydrologie - Ballon (a: marque, pression, volume, materiau, observation)
+    'Ballon': [
+      { key: 'name', label: 'Marque' },
+      { key: 'siteId', label: 'Site', render: (item) => sites.find(s => s.id === item.siteId)?.name || item.siteId || '-' },
+      { key: 'type', label: 'Type', render: (item) => <span className="capitalize">{item.type}</span> },
+      { key: 'state', label: 'État', render: (item) => <StatusBadge status={item.state} type="state" />, sortable: false }
+    ],
+
+    // Hydrologie - Canalisation, Aspersion (ont: marque, type, diametre, materiau, pression, observation)
+    'Canalisation': [
+      { key: 'name', label: 'Marque' },
+      { key: 'siteId', label: 'Site', render: (item) => sites.find(s => s.id === item.siteId)?.name || item.siteId || '-' },
+      { key: 'type', label: 'Type', render: (item) => <span className="capitalize">{item.type}</span> },
+      { key: 'state', label: 'État', render: (item) => <StatusBadge status={item.state} type="state" />, sortable: false },
+      { key: 'diameter', label: 'Diamètre (cm)', render: (item) => item.diameter || '-' }
+    ],
+    'Aspersion': [
+      { key: 'name', label: 'Marque' },
+      { key: 'siteId', label: 'Site', render: (item) => sites.find(s => s.id === item.siteId)?.name || item.siteId || '-' },
+      { key: 'type', label: 'Type', render: (item) => <span className="capitalize">{item.type}</span> },
+      { key: 'state', label: 'État', render: (item) => <StatusBadge status={item.state} type="state" />, sortable: false },
+      { key: 'diameter', label: 'Diamètre (cm)', render: (item) => item.diameter || '-' }
+    ],
+
+    // Hydrologie - Goutte (a: type, diametre, materiau, pression, observation - PAS de marque ni nom)
+    'Goutte': [
+      { key: 'name', label: 'Type' },
+      { key: 'siteId', label: 'Site', render: (item) => sites.find(s => s.id === item.siteId)?.name || item.siteId || '-' },
+      { key: 'type', label: 'Catégorie', render: (item) => <span className="capitalize">{item.type}</span> },
+      { key: 'state', label: 'État', render: (item) => <StatusBadge status={item.state} type="state" />, sortable: false },
+      { key: 'diameter', label: 'Diamètre (cm)', render: (item) => item.diameter || '-' }
+    ]
+  };
+
+  // Fonction pour obtenir les colonnes appropriées selon le filtre actif
+  const getColumns = (): Column<InventoryItem>[] => {
+    // Si un type spécifique est sélectionné, retourner ses colonnes
+    if (filters.type !== 'all' && typeSpecificColumns[filters.type]) {
+      return typeSpecificColumns[filters.type];
+    }
+    // Sinon, retourner les colonnes communes
+    return commonColumns;
+  };
+
+  const columns = getColumns();
+
+  // Export function (adapté aux colonnes dynamiques)
   const handleExport = () => {
-    const filename = `inventaire_${new Date().toISOString().split('T')[0]}.csv`;
-    const headers = ['Type', 'Code', 'Nom', 'Site', 'Zone', 'État', 'Surface (m²)', 'Dernière Intervention'];
+    const filename = `inventaire_${filters.type !== 'all' ? filters.type + '_' : ''}${new Date().toISOString().split('T')[0]}.csv`;
+
+    // Générer les en-têtes basés sur les colonnes actuelles
+    const headers = columns.map(col => col.label);
+
+    // Générer les données basées sur les colonnes actuelles
     const dataToExport = inventoryData.map(item => {
-      const site = sites.find(s => s.id === item.siteId);
-      return [
-        item.type,
-        item.code,
-        item.name,
-        site?.name || item.siteId || '-',
-        item.zone,
-        item.state,
-        item.surface || '',
-        item.lastIntervention ? new Date(item.lastIntervention).toLocaleDateString('fr-FR') : ''
-      ];
+      return columns.map(col => {
+        if (col.render) {
+          // Pour les colonnes avec render personnalisé, extraire la valeur
+          if (col.key === 'siteId') {
+            const site = sites.find(s => s.id === item.siteId);
+            return site?.name || item.siteId || '-';
+          } else if (col.key === 'type') {
+            return item.type;
+          } else if (col.key === 'state') {
+            return item.state;
+          } else if (col.key === 'species') {
+            return item.species || '-';
+          } else if (col.key === 'height') {
+            return item.height ? `${item.height} m` : '-';
+          } else if (col.key === 'diameter') {
+            return item.diameter ? `${item.diameter} cm` : '-';
+          } else if (col.key === 'surface') {
+            return item.surface ? `${item.surface} m²` : '-';
+          } else if (col.key === 'lastIntervention') {
+            return item.lastIntervention ? new Date(item.lastIntervention).toLocaleDateString('fr-FR') : '-';
+          }
+        }
+        // Pour les colonnes simples, retourner la valeur directement
+        return (item as any)[col.key] || '-';
+      });
     });
 
     if (dataToExport.length === 0) {
@@ -428,7 +640,9 @@ const Inventory: React.FC = () => {
     setFilters({
       type: 'all',
       state: 'all',
-      site: 'all'
+      site: 'all',
+      intervention: 'all',
+      family: 'all'
     });
     setCurrentPage(1);
   };
@@ -436,9 +650,9 @@ const Inventory: React.FC = () => {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [filters.type, filters.state, filters.site]);
+  }, [filters.type, filters.state, filters.site, filters.intervention, filters.family]);
 
-  const hasActiveFilters = filters.type !== 'all' || filters.state !== 'all' || filters.site !== 'all';
+  const hasActiveFilters = filters.type !== 'all' || filters.state !== 'all' || filters.site !== 'all' || filters.intervention !== 'all' || filters.family !== 'all';
 
   // Get types for current tab
   const getTypesForTab = () => {
@@ -524,11 +738,30 @@ const Inventory: React.FC = () => {
             <span>Filtres</span>
             {hasActiveFilters && (
               <span className="bg-emerald-600 text-white text-xs px-2 py-0.5 rounded-full">
-                {[filters.type, filters.state, filters.site].filter(v => v !== 'all').length}
+                {[filters.type, filters.state, filters.site, filters.intervention, filters.family].filter(v => v !== 'all').length}
               </span>
             )}
           </button>
+
+          {/* Export Button */}
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+          >
+            <FileText className="w-4 h-4" />
+            <span>Exporter</span>
+          </button>
         </div>
+
+        {/* Indicateur de vue polymorphe */}
+        {filters.type !== 'all' && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+            <FileText className="w-4 h-4" />
+            <span>
+              Vue détaillée : <strong>{filters.type}</strong> - Colonnes spécifiques affichées
+            </span>
+          </div>
+        )}
 
         {/* Type Filter Tabs */}
         <div className="flex gap-2 overflow-x-auto pb-2 border-b border-gray-200">
@@ -557,38 +790,94 @@ const Inventory: React.FC = () => {
       </div>
 
       {/* Filters Panel */}
+      {/* Filters Panel (Compact V2) */}
       {showFilters && (
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="mb-6 pb-4 border-b border-gray-200">
+          <div className="flex flex-wrap gap-3 items-center">
+            {/* Reset Button (Moved to start for better workflow) */}
+            {hasActiveFilters && (
+              <button
+                onClick={resetFilters}
+                className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                title="Réinitialiser les filtres"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
+
             {/* Site Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Site</label>
+            <div className="relative group">
               <select
                 value={filters.site}
                 onChange={(e) => setFilters({ ...filters, site: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                className="appearance-none bg-white min-w-[160px] pl-3 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 hover:border-emerald-400 outline-none transition-all cursor-pointer"
               >
-                <option value="all">Tous</option>
+                <option value="all">📍 Site: Tous</option>
                 {sites.map((site) => (
                   <option key={site.id} value={site.id}>
                     {site.name}
                   </option>
                 ))}
               </select>
+              <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 group-hover:text-emerald-500">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+              </div>
+            </div>
+
+            {/* State Filter */}
+            <div className="relative group">
+              <select
+                value={filters.state}
+                onChange={(e) => setFilters({ ...filters, state: e.target.value })}
+                className="appearance-none bg-white min-w-[160px] pl-3 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 hover:border-emerald-400 outline-none transition-all cursor-pointer"
+              >
+                <option value="all">❤️ État: Tous</option>
+                <option value="bon">✅ Bon</option>
+                <option value="moyen">⚠️ Moyen</option>
+                <option value="mauvais">🛑 Mauvais</option>
+                <option value="critique">💀 Critique</option>
+              </select>
+              <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 group-hover:text-emerald-500">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+              </div>
+            </div>
+
+            {/* Family Filter */}
+            <div className="relative group">
+              <select
+                value={filters.family}
+                onChange={(e) => setFilters({ ...filters, family: e.target.value })}
+                className="appearance-none bg-white min-w-[160px] pl-3 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 hover:border-emerald-400 outline-none transition-all cursor-pointer"
+              >
+                <option value="all">🌿 Famille: Toutes</option>
+                {families.map((fam) => (
+                  <option key={fam} value={fam}>
+                    {fam}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 group-hover:text-emerald-500">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+              </div>
+            </div>
+
+            {/* Maintenance Filter */}
+            <div className="relative group flex-grow sm:flex-grow-0">
+              <select
+                value={filters.intervention}
+                onChange={(e) => setFilters({ ...filters, intervention: e.target.value })}
+                className="appearance-none w-full sm:w-auto bg-white min-w-[200px] pl-3 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 hover:border-emerald-400 outline-none transition-all cursor-pointer"
+              >
+                <option value="all">🛠️ Maintenance: Tout</option>
+                <option value="urgent">⚠️ Urgente (&gt; 6 mois)</option>
+                <option value="never">🆕 Jamais intervenu</option>
+                <option value="recent_30">📅 Récente (&lt; 30j)</option>
+              </select>
+              <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 group-hover:text-emerald-500">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+              </div>
             </div>
           </div>
-
-          {/* Reset Filters */}
-          {hasActiveFilters && (
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={resetFilters}
-                className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
-              >
-                Réinitialiser les filtres
-              </button>
-            </div>
-          )}
         </div>
       )}
 
@@ -622,23 +911,18 @@ const Inventory: React.FC = () => {
             <DataTable
               data={inventoryData}
               columns={columns}
-              onRowClick={setSelectedItem}
-              itemsPerPage={10}
-              showExport
-              onExport={handleExport}
+              onRowClick={(item) => navigate(`/inventory/${item.type}/${item.id}`)}
+              itemsPerPage={20}
+              serverSide
+              totalItems={apiInventory?.count || 0}
+              currentPage={currentPage}
+              onPageChange={setCurrentPage}
             />
           </>
         )}
       </div>
 
-      {/* Detail Modal */}
-      {selectedItem && (
-        <InventoryDetailModal
-          item={selectedItem}
-          site={sites.find(s => s.id === selectedItem.siteId) || undefined}
-          onClose={() => setSelectedItem(null)}
-        />
-      )}
+      {/* Detail Modal is now removed */}
     </div>
   );
 };

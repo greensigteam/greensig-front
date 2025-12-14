@@ -6,7 +6,7 @@ interface LayerLegendProps {
   compact?: boolean;
 }
 
-const LayerLegend: React.FC<LayerLegendProps> = ({ compact = false }) => {
+const LayerLegend: React.FC<LayerLegendProps> = () => {
   const [isHydroOpen, setIsHydroOpen] = useState(false);
   const [isVegOpen, setIsVegOpen] = useState(false);
 

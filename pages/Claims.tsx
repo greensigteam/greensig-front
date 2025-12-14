@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Filter, AlertCircle } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
 import { PhotoUpload } from '../components/PhotoUpload';

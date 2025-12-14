@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import 'ol/ol.css';
 import Map from 'ol/Map';
@@ -11,1039 +10,921 @@ import Cluster from 'ol/source/Cluster';
 import { fromLonLat, toLonLat, transformExtent } from 'ol/proj';
 import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
 import GeoJSON from 'ol/format/GeoJSON';
-
 import Overlay from 'ol/Overlay';
 import { Feature } from 'ol';
-import { Point, LineString, Polygon } from 'ol/geom';
+import { Point } from 'ol/geom';
 import { defaults as defaultControls, ScaleLine } from 'ol/control';
+import { NorthArrow } from './map/NorthArrowControl';
 
-import { LayerConfig, Coordinates } from "../types";
+import { LayerConfig, Coordinates, MapSearchResult, UserLocation, MapObjectDetail, OverlayState, MapHandle, Measurement, MeasurementType } from "../types";
 import { INITIAL_POSITION, VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND } from "../constants";
-import { apiFetch } from "../services/apiFetch";
-// Note: Les sites sont maintenant chargés dynamiquement depuis l'API dans fetchData()
+import { createMarkerIcon, createSiteIcon, OBJECT_COLORS, TYPE_TO_API } from '../utils/mapHelpers';
+import { useSearchHighlight } from '../hooks/useSearchHighlight';
+import { useUserLocationDisplay } from '../hooks/useUserLocationDisplay';
+import { useMapHoverTooltip } from '../hooks/useMapHoverTooltip';
+import { useMapClickHandler } from '../hooks/useMapClickHandler';
+import { useMeasurementTools } from '../hooks/useMeasurementTools';
+import { useMapContext } from '../contexts/MapContext';
+import { useSelection } from '../contexts/SelectionContext';
+import logger from '../services/logger';
+import { apiFetch } from '../services/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
-// SVG Icons for site categories
-const createSiteIcon = (color: string, category: string, isHovered: boolean = false): string => {
-    const size = isHovered ? 48 : 40;
-    const iconSize = isHovered ? 24 : 20;
-
-    // Icon paths for each category
-    const iconPaths: Record<string, string> = {
-        'RECHERCHE': `<path d="M${size / 2 - iconSize / 4} ${size / 2 - iconSize / 4} l${iconSize / 2} 0 l0 ${iconSize / 2} l-${iconSize / 2} 0 z M${size / 2 - iconSize / 6} ${size / 2 + iconSize / 4} l${iconSize / 3} ${iconSize / 3}" stroke="white" stroke-width="2" fill="none"/>`, // Microscope/Lab
-        'INFRASTRUCTURE': `<path d="M${size / 2 - iconSize / 3} ${size / 2 + iconSize / 4} L${size / 2} ${size / 2 - iconSize / 3} L${size / 2 + iconSize / 3} ${size / 2 + iconSize / 4} Z" stroke="white" stroke-width="2" fill="none"/>`, // Building
-        'RESIDENCE': `<path d="M${size / 2 - iconSize / 3} ${size / 2 + iconSize / 5} L${size / 2} ${size / 2 - iconSize / 4} L${size / 2 + iconSize / 3} ${size / 2 + iconSize / 5} L${size / 2 + iconSize / 3} ${size / 2 + iconSize / 3} L${size / 2 - iconSize / 3} ${size / 2 + iconSize / 3} Z" stroke="white" stroke-width="2" fill="none"/>`, // House
-        'SANTE': `<path d="M${size / 2 - iconSize / 6} ${size / 2 - iconSize / 3} v${iconSize * 2 / 3} M${size / 2 - iconSize / 3} ${size / 2} h${iconSize * 2 / 3}" stroke="white" stroke-width="3" fill="none"/>`, // Cross
-        'HOTELLERIE': `<path d="M${size / 2 - iconSize / 3} ${size / 2 + iconSize / 4} v-${iconSize / 2} h${iconSize * 2 / 3} v${iconSize / 2} M${size / 2 - iconSize / 4} ${size / 2 - iconSize / 4} h${iconSize / 2}" stroke="white" stroke-width="2" fill="none"/>` // Bed
-    };
-
-    const shadowOffset = isHovered ? 4 : 2;
-    const glowRadius = isHovered ? 8 : 0;
-
-    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
-        <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size + 12}" viewBox="0 0 ${size} ${size + 12}">
-            <defs>
-                <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feDropShadow dx="0" dy="${shadowOffset}" stdDeviation="3" flood-color="rgba(0,0,0,0.4)"/>
-                </filter>
-                ${isHovered ? `<filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="${glowRadius}" result="coloredBlur"/>
-                    <feMerge>
-                        <feMergeNode in="coloredBlur"/>
-                        <feMergeNode in="SourceGraphic"/>
-                    </feMerge>
-                </filter>` : ''}
-            </defs>
-            <!-- Pin shape -->
-            <g filter="url(#shadow)" ${isHovered ? 'filter="url(#glow)"' : ''}>
-                <path d="M${size / 2} ${size + 8}
-                         C${size / 2} ${size + 8} ${size / 2 - 6} ${size / 2 + 12} ${size / 2 - size / 2 + 4} ${size / 2}
-                         A${size / 2 - 4} ${size / 2 - 4} 0 1 1 ${size - 4} ${size / 2}
-                         C${size - 4} ${size / 2 + 8} ${size / 2 + 6} ${size + 8} ${size / 2} ${size + 8} Z"
-                      fill="${color}" stroke="white" stroke-width="2"/>
-                <!-- Category icon -->
-                <circle cx="${size / 2}" cy="${size / 2}" r="${iconSize / 2 + 2}" fill="rgba(255,255,255,0.2)"/>
-                ${iconPaths[category] || iconPaths['INFRASTRUCTURE']}
-            </g>
-        </svg>
-    `)}`;
-};
-
-// Simpler marker icon
-const createMarkerIcon = (color: string, isHovered: boolean = false): string => {
-    const size = isHovered ? 44 : 36;
-    const pinHeight = isHovered ? 56 : 48;
-
-    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
-        <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${pinHeight}" viewBox="0 0 ${size} ${pinHeight}">
-            <defs>
-                <linearGradient id="grad" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style="stop-color:${color};stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:${color};stop-opacity:0.8" />
-                </linearGradient>
-                <filter id="shadow">
-                    <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.3)"/>
-                </filter>
-            </defs>
-            <g filter="url(#shadow)">
-                <!-- Pin body -->
-                <path d="M${size / 2} ${pinHeight - 4}
-                         L${size / 2 - 8} ${size / 2 + 4}
-                         A${size / 2 - 4} ${size / 2 - 4} 0 1 1 ${size / 2 + 8} ${size / 2 + 4}
-                         Z"
-                      fill="url(#grad)" stroke="white" stroke-width="${isHovered ? 3 : 2}"/>
-                <!-- Inner circle -->
-                <circle cx="${size / 2}" cy="${size / 2 - 2}" r="${isHovered ? 10 : 8}" fill="white" opacity="0.9"/>
-                <circle cx="${size / 2}" cy="${size / 2 - 2}" r="${isHovered ? 6 : 4}" fill="${color}"/>
-            </g>
-        </svg>
-    `)}`;
-};
-
-// Create mapping of colors
-const OBJECT_COLORS: Record<string, string> = {
-    ...Object.fromEntries(VEG_LEGEND.map(item => [item.type, item.color])),
-    ...Object.fromEntries(HYDRO_LEGEND.map(item => [item.type, item.color])),
-    ...Object.fromEntries(SITE_LEGEND.map(item => [item.type, item.color]))
-};
-
-// Mapping frontend types to API types
-const TYPE_TO_API: Record<string, string> = {
-    'Site': 'sites',
-    'Arbre': 'arbres',
-    'Gazon': 'gazons',
-    'Palmier': 'palmiers',
-    'Arbuste': 'arbustes',
-    'Vivace': 'vivaces',
-    'Cactus': 'cactus',
-    'Graminee': 'graminees',
-    'Puit': 'puits',
-    'Pompe': 'pompes',
-    'Vanne': 'vannes',
-    'Clapet': 'clapets',
-    'Canalisation': 'canalisations',
-    'Aspersion': 'aspersions',
-    'Goutte': 'gouttes',
-    'Ballon': 'ballons'
-};
+// ✅ SELECTION VISUAL STYLE (Yellow Highlight)
+const SELECTION_STYLE = new Style({
+  stroke: new Stroke({
+    color: '#FFD700', // Gold/Yellow
+    width: 4, // Thicker border
+  }),
+  fill: new Fill({
+    color: 'rgba(255, 215, 0, 0.2)', // Transparent Gold
+  }),
+  image: new CircleStyle({
+    radius: 8,
+    fill: new Fill({ color: 'rgba(255, 215, 0, 0.4)' }),
+    stroke: new Stroke({ color: '#FFD700', width: 3 }),
+  }),
+  zIndex: 1000 // Always on top
+});
 
 interface OLMapProps {
-    activeLayer: LayerConfig;
-    targetLocation: { coordinates: Coordinates; zoom?: number } | null;
-    userLocation?: Coordinates | null;
-    onMoveEnd?: (center: Coordinates, zoom: number) => void;
-    onObjectClick?: (object: any) => void;
-    isSidebarCollapsed?: boolean;
-    mapRef?: any;
-    overlays?: any;
-    isMeasuring?: boolean;
-    measurePoints?: any;
-    onMeasureClick?: any;
-    isRouting?: boolean;
-    clusteringEnabled?: boolean;
-    onToggleLayer?: (layerId: string, visible: boolean) => void;
+  activeLayer: LayerConfig;
+  targetLocation: { coordinates: Coordinates; zoom?: number } | null;
+  userLocation?: UserLocation | null;
+  searchResult?: MapSearchResult | null;
+  onMoveEnd?: (center: Coordinates, zoom: number) => void;
+  onObjectClick?: (object: MapObjectDetail | null) => void;
+  onToggleLayer?: (layerId: string, visible: boolean) => void;
+  overlays?: OverlayState;
+  clusteringEnabled?: boolean;
+  isRouting?: boolean;
+  isSidebarCollapsed?: boolean;
+  isMeasuring?: boolean;
+  measurementType?: MeasurementType;
+  currentMeasurement?: Measurement | null;
+  onMeasurementComplete?: (measurement: Measurement) => void;
+  onMeasurementUpdate?: (measurement: Measurement | null) => void;
+  isMiniMap?: boolean; // New prop for mini-map mode
+  highlightedGeometry?: any; // New prop for detailed object highlight (GeoJSON/Geometry)
 }
 
-export const OLMap = React.forwardRef<any, OLMapProps>(({
+const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) => {
+  const {
     activeLayer,
     targetLocation,
     userLocation,
+    searchResult,
     onMoveEnd,
     onObjectClick,
-    isSidebarCollapsed = true,
-    // Props kept for compatibility but might need implementation
-    overlays,
-    isMeasuring,
-    measurePoints,
-    onMeasureClick,
-    isRouting,
     clusteringEnabled,
-    onToggleLayer
-}, ref) => {
-    const innerMapRef = useRef<HTMLDivElement>(null);
-    const mapInstance = useRef<Map | null>(null);
+    isMeasuring = false,
+    measurementType = 'distance',
+    onMeasurementComplete,
+    onMeasurementUpdate,
+    isRouting,
+    isSidebarCollapsed,
+    isMiniMap = false,
+    highlightedGeometry
+  } = props;
 
-    const dataLayerRef = useRef<VectorLayer<VectorSource> | null>(null); // For clusters/markers (objects)
-    const sitesLayerRef = useRef<VectorLayer<VectorSource> | null>(null); // For site boundaries (containers)
-    const sitesSourceRef = useRef<VectorSource | null>(null); // Source for sites polygons
-    const vectorSourceRef = useRef<VectorSource | null>(null); // Raw vector source for objects
-    const clusterSourceRef = useRef<Cluster | null>(null); // Cluster source wrapper for objects
-    const popupRef = useRef<HTMLDivElement>(null);
-    const popupOverlay = useRef<Overlay | null>(null);
+  // ✅ USE MAP CONTEXT - Replaces window communication
+  const mapContext = useMapContext();
+  const { selectedObjects } = useSelection();
 
-    React.useImperativeHandle(ref, () => ({
-        zoomIn: () => {
-            if (mapInstance.current) {
-                const view = mapInstance.current.getView();
-                view.animate({ zoom: (view.getZoom() || 0) + 1, duration: 250 });
-            }
-        },
-        zoomOut: () => {
-            if (mapInstance.current) {
-                const view = mapInstance.current.getView();
-                view.animate({ zoom: (view.getZoom() || 0) - 1, duration: 250 });
-            }
-        },
-        getZoom: () => {
-            return mapInstance.current?.getView().getZoom() || 0;
-        },
-        getCenter: (): Coordinates | null => {
-            if (!mapInstance.current) return null;
-            const center = mapInstance.current.getView().getCenter();
-            if (!center) return null;
-            const [lng, lat] = toLonLat(center);
-            return { lat, lng };
-        },
-        getMapElement: () => {
-            return innerMapRef.current;
-        },
-        exportCanvas: (): Promise<string> => {
-            return new Promise((resolve, reject) => {
-                if (!mapInstance.current) {
-                    reject(new Error('Map not initialized'));
-                    return;
-                }
+  // Map and layer refs
+  const innerMapRef = useRef<HTMLDivElement>(null);
+  const mapInstance = useRef<Map | null>(null);
+  const selectionLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const dataLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const sitesLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const sitesSourceRef = useRef<VectorSource | null>(null);
+  const vectorSourceRef = useRef<VectorSource | null>(null);
+  const clusterSourcesRef = useRef<Record<string, Cluster>>({}); // ✅ Clusters by type
+  const clusterLayersRef = useRef<Record<string, VectorLayer<VectorSource>>>({});
 
-                const map = mapInstance.current;
+  // ✅ Refs for state accessed in event listeners (prevent stale closures)
+  const clusteringEnabledRef = useRef(clusteringEnabled);
+  const visibleLayersRef = useRef<string[]>([]);
 
-                // Force a render and wait for completion
-                map.once('rendercomplete', () => {
-                    try {
-                        const mapCanvas = document.createElement('canvas');
-                        const size = map.getSize();
-                        if (!size) {
-                            reject(new Error('Map size not available'));
-                            return;
-                        }
+  // Update refs when props change
+  useEffect(() => {
+    clusteringEnabledRef.current = clusteringEnabled;
+  }, [clusteringEnabled]);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const popupOverlay = useRef<Overlay | null>(null);
+  const fetchDataTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const northArrowRef = useRef<NorthArrow | null>(null);
+  const scaleLineRef = useRef<ScaleLine | null>(null);
 
-                        mapCanvas.width = size[0];
-                        mapCanvas.height = size[1];
-                        const mapContext = mapCanvas.getContext('2d');
+  // State
+  const [mapReady, setMapReady] = useState(false); // ✅ Flag to trigger hooks after map creation
+  const [visibleLayers, setVisibleLayers] = useState<string[]>(() =>
+    [...SITE_LEGEND, ...VEG_LEGEND, ...HYDRO_LEGEND].map(item => item.type)
+  );
 
-                        if (!mapContext) {
-                            reject(new Error('Could not get canvas context'));
-                            return;
-                        }
+  // ✅ CUSTOM HOOKS - Extracted logic
+  const measurementTools = useMeasurementTools({
+    mapInstance,
+    isMeasuring,
+    measurementType,
+    onMeasurementComplete,
+    onMeasurementUpdate
+  });
 
-                        // Get all canvas elements from the map viewport
-                        const mapViewport = map.getViewport();
-                        const canvases = mapViewport.querySelectorAll('canvas');
+  const searchHighlight = useSearchHighlight({
+    mapInstance,
+    vectorSourceRef,
+    sitesSourceRef,
+    searchResult
+  });
 
-                        canvases.forEach((canvas) => {
-                            if (canvas.width > 0) {
-                                const opacity = (canvas.parentNode as HTMLElement)?.style?.opacity || '1';
-                                mapContext.globalAlpha = parseFloat(opacity);
+  const userLocationDisplay = useUserLocationDisplay({
+    mapInstance,
+    userLocation
+  });
 
-                                // Get the transform from the canvas style
-                                const transform = canvas.style.transform;
-                                const matrix = transform
-                                    .match(/matrix\(([^)]+)\)/)?.[1]
-                                    ?.split(',')
-                                    .map(Number) || [1, 0, 0, 1, 0, 0];
+  useMapHoverTooltip({
+    mapInstance,
+    sitesLayerRef,
+    dataLayerRef,
+    mapReady, // ✅ Trigger hook when map is ready
+    isMeasuring // ✅ Disable hover when measuring
+  });
 
-                                mapContext.setTransform(
-                                    matrix[0], matrix[1], matrix[2],
-                                    matrix[3], matrix[4], matrix[5]
-                                );
+  useMapClickHandler({
+    mapInstance,
+    dataLayerRef,
+    sitesLayerRef,
+    popupOverlayRef: popupOverlay,
+    onObjectClick,
+    mapReady, // ✅ Trigger hook when map is ready
+    isMeasuring // ✅ Disable clicks when measuring
+  });
 
-                                mapContext.drawImage(canvas, 0, 0);
-                            }
-                        });
-
-                        mapContext.globalAlpha = 1;
-                        mapContext.setTransform(1, 0, 0, 1, 0, 0);
-
-                        resolve(mapCanvas.toDataURL('image/png'));
-                    } catch (err) {
-                        reject(err);
-                    }
-                });
-
-                // Trigger render
-                map.renderSync();
-            });
-        },
-        invalidateSize: () => {
-            mapInstance.current?.updateSize();
-        },
-        flyTo: (lat: number, lng: number, zoom: number) => {
-            mapInstance.current?.getView().animate({
-                center: fromLonLat([lng, lat]),
-                zoom: zoom,
-                duration: 1500
-            });
+  // Expose ref methods
+  React.useImperativeHandle(ref, () => ({
+    zoomIn: () => {
+      if (mapInstance.current) {
+        const view = mapInstance.current.getView();
+        view.animate({ zoom: (view.getZoom() || 0) + 1, duration: 250 });
+      }
+    },
+    zoomOut: () => {
+      if (mapInstance.current) {
+        const view = mapInstance.current.getView();
+        view.animate({ zoom: (view.getZoom() || 0) - 1, duration: 250 });
+      }
+    },
+    getZoom: () => {
+      return mapInstance.current?.getView().getZoom() || 0;
+    },
+    getCenter: (): Coordinates | null => {
+      if (!mapInstance.current) return null;
+      const center = mapInstance.current.getView().getCenter();
+      if (!center) return null;
+      const [lng, lat] = toLonLat(center);
+      return { lat, lng };
+    },
+    getMapElement: () => {
+      return innerMapRef.current;
+    },
+    exportCanvas: (): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        if (!mapInstance.current) {
+          reject(new Error('Map not initialized'));
+          return;
         }
-    }));
 
+        const map = mapInstance.current;
 
-    // Drawing interactions
-
-
-    // State - Initialize with all layer types visible
-    const [visibleLayers, setVisibleLayers] = useState<string[]>(() =>
-        [...SITE_LEGEND, ...VEG_LEGEND, ...HYDRO_LEGEND].map(item => item.type)
-    );
-    const [symbologyConfig, setSymbologyConfig] = useState<any>({});
-    const [hoveredSiteId, setHoveredSiteId] = useState<string | null>(null);
-    const hoverOverlayRef = useRef<Overlay | null>(null);
-
-    // Initialize Map
-    useEffect(() => {
-        if (!innerMapRef.current) return;
-
-        const baseLayer = new TileLayer({
-            source: new XYZ({
-                url: activeLayer.url,
-                maxZoom: activeLayer.maxNativeZoom || 19,
-                attributions: activeLayer.attribution,
-                crossOrigin: 'anonymous'
-            })
-        });
-
-
-
-        // Create hover tooltip overlay
-        const hoverTooltip = document.createElement('div');
-        hoverTooltip.id = 'site-hover-tooltip';
-        hoverTooltip.className = 'site-tooltip';
-        hoverTooltip.style.cssText = `
-            background: white;
-            border-radius: 12px;
-            padding: 12px 16px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2), 0 2px 10px rgba(0,0,0,0.1);
-            pointer-events: none;
-            min-width: 180px;
-            max-width: 280px;
-            border: 1px solid rgba(0,0,0,0.05);
-            transform: translateY(-10px);
-            opacity: 0;
-            transition: opacity 0.2s, transform 0.2s;
-            z-index: 9999 !important;
-            font-family: system-ui, -apple-system, sans-serif;
-        `;
-        document.body.appendChild(hoverTooltip);
-
-        const hoverOverlay = new Overlay({
-            element: hoverTooltip,
-            positioning: 'bottom-center',
-            offset: [0, -60],
-            stopEvent: false
-        });
-        hoverOverlayRef.current = hoverOverlay;
-
-        // ================================================================
-        // SITES LAYER - Separate layer for site boundaries (containers)
-        // ================================================================
-        const sitesSource = new VectorSource();
-        sitesSourceRef.current = sitesSource;
-
-        const sitesLayer = new VectorLayer({
-            source: sitesSource,
-            zIndex: 10, // Below objects layer
-            style: (feature) => {
-                const isVisible = (window as any).getVisibleLayers?.()?.includes('Site') ?? true;
-                if (!isVisible) {
-                    return new Style({});
-                }
-
-                const isHovered = feature.get('hovered') === true;
-                const isSelected = feature.get('selected') === true;
-                const siteId = feature.get('site_id');
-
-                // Generate a consistent color based on site ID
-                const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
-                const colorIndex = siteId ? Math.abs(String(siteId).split('').reduce((a, b) => a + b.charCodeAt(0), 0)) % colors.length : 0;
-                const baseColor = colors[colorIndex];
-
-                return new Style({
-                    fill: new Fill({
-                        color: isSelected ? baseColor + '40' : baseColor + '20' // 25% or 12% opacity
-                    }),
-                    stroke: new Stroke({
-                        color: baseColor,
-                        width: isHovered ? 4 : isSelected ? 3 : 2,
-                        lineDash: isSelected ? [] : [8, 4] // Dashed when not selected
-                    }),
-                    text: new Text({
-                        text: feature.get('nom_site') || '',
-                        font: isHovered ? 'bold 14px sans-serif' : '12px sans-serif',
-                        fill: new Fill({ color: '#1f2937' }),
-                        stroke: new Stroke({ color: '#ffffff', width: 3 }),
-                        overflow: true,
-                        placement: 'point'
-                    })
-                });
-            }
-        });
-        sitesLayerRef.current = sitesLayer;
-
-        // ================================================================
-        // OBJECTS LAYER - For vegetation and hydraulic objects
-        // ================================================================
-        const vectorSource = new VectorSource();
-        vectorSourceRef.current = vectorSource;
-
-        // Cluster source wrapping the vector source (for objects only, not sites)
-        // Only used when clustering is enabled
-        const clusterSource = new Cluster({
-            distance: clusteringEnabled ? 50 : 0,
-            source: vectorSource,
-            geometryFunction: (feature) => {
-                const geometry = feature.getGeometry();
-                if (!geometry) return null;
-
-                const geomType = geometry.getType();
-
-                if (geomType === 'Point') {
-                    return geometry as Point;
-                } else if (geomType === 'Polygon') {
-                    const polygon = geometry as Polygon;
-                    const extent = polygon.getExtent();
-                    const centerX = (extent[0] + extent[2]) / 2;
-                    const centerY = (extent[1] + extent[3]) / 2;
-                    return new Point([centerX, centerY]);
-                } else if (geomType === 'LineString') {
-                    const line = geometry as LineString;
-                    const coords = line.getCoordinates();
-                    if (coords.length > 0) {
-                        const midIndex = Math.floor(coords.length / 2);
-                        return new Point(coords[midIndex]);
-                    }
-                    return null;
-                } else if (geomType === 'MultiPolygon' || geomType === 'MultiLineString' || geomType === 'MultiPoint') {
-                    const extent = geometry.getExtent();
-                    const centerX = (extent[0] + extent[2]) / 2;
-                    const centerY = (extent[1] + extent[3]) / 2;
-                    return new Point([centerX, centerY]);
-                }
-
-                return null;
-            }
-        });
-        clusterSourceRef.current = clusterSource;
-
-        // Use cluster source only if clustering is enabled, otherwise use raw vector source
-        const dataLayer = new VectorLayer({
-            source: clusteringEnabled ? clusterSource : vectorSource,
-            zIndex: 50, // Above sites layer (zIndex: 10)
-            style: (feature) => {
-                const visibleLayersList = (window as any).getVisibleLayers?.() || [];
-
-                // Check if this is a clustered feature or a raw feature
-                const clusterFeatures = feature.get('features');
-
-                if (clusterFeatures && clusterFeatures.length > 0) {
-                    // ============================================
-                    // CLUSTERED MODE: Feature comes from ClusterSource
-                    // ============================================
-
-                    // Filter features based on visibility
-                    const visibleFeatures = clusterFeatures.filter((f: Feature) => {
-                        const type = f.get('object_type');
-                        return type !== 'Site' && visibleLayersList.includes(type);
-                    });
-
-                    // If no visible features, return empty style (hidden)
-                    if (visibleFeatures.length === 0) {
-                        return new Style({});
-                    }
-
-                    const size = visibleFeatures.length;
-
-                    if (size > 1) {
-                        // CLUSTER: Multiple objects grouped together
-                        let dominantColor = '#22c55e'; // Default green for vegetation
-                        let vegCount = 0;
-                        let hydroCount = 0;
-
-                        visibleFeatures.forEach((f: Feature) => {
-                            const type = f.get('object_type');
-                            if (['Arbre', 'Palmier', 'Gazon', 'Arbuste', 'Vivace', 'Cactus', 'Graminee'].includes(type)) {
-                                vegCount++;
-                            } else {
-                                hydroCount++;
-                            }
-                            if (type && OBJECT_COLORS[type]) dominantColor = OBJECT_COLORS[type];
-                        });
-
-                        // Use vegetation or hydraulic color based on majority
-                        if (hydroCount > vegCount) {
-                            dominantColor = '#0ea5e9'; // Blue for hydraulic
-                        } else {
-                            dominantColor = '#22c55e'; // Green for vegetation
-                        }
-
-                        return new Style({
-                            image: new CircleStyle({
-                                radius: 18 + Math.min(size * 2, 20),
-                                stroke: new Stroke({ color: '#fff', width: 3 }),
-                                fill: new Fill({ color: dominantColor })
-                            }),
-                            text: new Text({
-                                text: size.toString(),
-                                fill: new Fill({ color: '#fff' }),
-                                font: 'bold 14px sans-serif'
-                            })
-                        });
-                    } else {
-                        // SINGLE FEATURE in cluster: Show individual object marker
-                        const originalFeature = visibleFeatures[0];
-                        const type = originalFeature.get('object_type');
-                        const color = OBJECT_COLORS[type] || '#6b7280';
-                        const symbolConfig = (window as any).getSymbologyConfig?.()?.[type];
-
-                        if (originalFeature.getGeometry()?.getType() === 'Point') {
-                            return new Style({
-                                image: new CircleStyle({
-                                    radius: 8,
-                                    fill: new Fill({ color: symbolConfig?.fillColor || color }),
-                                    stroke: new Stroke({ color: '#fff', width: 2 })
-                                })
-                            });
-                        } else {
-                            return new Style({
-                                fill: new Fill({
-                                    color: symbolConfig?.fillColor
-                                        ? symbolConfig.fillColor + Math.round((symbolConfig.fillOpacity || 0.5) * 255).toString(16).padStart(2, '0')
-                                        : color + '4d'
-                                }),
-                                stroke: new Stroke({
-                                    color: symbolConfig?.strokeColor || color,
-                                    width: symbolConfig?.strokeWidth || 2
-                                })
-                            });
-                        }
-                    }
-                } else {
-                    // ============================================
-                    // NON-CLUSTERED MODE: Raw feature from VectorSource
-                    // ============================================
-                    const type = feature.get('object_type');
-
-                    // Check visibility
-                    if (!type || type === 'Site' || !visibleLayersList.includes(type)) {
-                        return new Style({});
-                    }
-
-                    const color = OBJECT_COLORS[type] || '#6b7280';
-                    const symbolConfig = (window as any).getSymbologyConfig?.()?.[type];
-                    const geomType = feature.getGeometry()?.getType();
-
-                    if (geomType === 'Point') {
-                        return new Style({
-                            image: new CircleStyle({
-                                radius: 8,
-                                fill: new Fill({ color: symbolConfig?.fillColor || color }),
-                                stroke: new Stroke({ color: '#fff', width: 2 })
-                            })
-                        });
-                    } else if (geomType === 'LineString' || geomType === 'MultiLineString') {
-                        return new Style({
-                            stroke: new Stroke({
-                                color: symbolConfig?.strokeColor || color,
-                                width: symbolConfig?.strokeWidth || 3
-                            })
-                        });
-                    } else {
-                        // Polygon
-                        return new Style({
-                            fill: new Fill({
-                                color: symbolConfig?.fillColor
-                                    ? symbolConfig.fillColor + Math.round((symbolConfig.fillOpacity || 0.5) * 255).toString(16).padStart(2, '0')
-                                    : color + '4d'
-                            }),
-                            stroke: new Stroke({
-                                color: symbolConfig?.strokeColor || color,
-                                width: symbolConfig?.strokeWidth || 2
-                            })
-                        });
-                    }
-                }
-            }
-        });
-        dataLayerRef.current = dataLayer;
-
-        // Overlay for popups
-        const overlay = new Overlay({
-            element: popupRef.current!,
-            autoPan: {
-                animation: {
-                    duration: 250,
-                },
-            },
-        });
-        popupOverlay.current = overlay;
-
-        const map = new Map({
-            target: innerMapRef.current,
-            layers: [baseLayer, sitesLayer, dataLayer], // Sites below objects
-            view: new View({
-                center: fromLonLat([
-                    INITIAL_POSITION?.lng ?? -6.8498,
-                    INITIAL_POSITION?.lat ?? 33.9716
-                ]),
-                zoom: INITIAL_POSITION?.zoom ?? 6
-            }),
-            controls: defaultControls().extend([new ScaleLine()])
-        });
-
-        map.addOverlay(overlay);
-        map.addOverlay(hoverOverlay);
-
-        mapInstance.current = map;
-
-        // Initial data fetch after map is ready
-        // Use setTimeout to ensure map is fully rendered
-        setTimeout(() => {
-            fetchData();
-        }, 500);
-
-        // Track last hovered feature for cleanup
-        let lastHoveredFeature: Feature | null = null;
-
-        // Pointer move event for hover effect on sites and objects
-        map.on('pointermove', (evt) => {
-            if (evt.dragging) {
+        map.once('rendercomplete', () => {
+          try {
+            const mapCanvas = document.createElement('canvas');
+            const size = map.getSize();
+            if (!size) {
+              reject(new Error('Map size not available'));
               return;
             }
-            const pixel = map.getEventPixel(evt.originalEvent);
 
-            // Check both sites and objects layers
-            const hitSites = map.hasFeatureAtPixel(pixel, {
-                layerFilter: (l) => l === sitesLayerRef.current
-            });
-            const hitObjects = map.hasFeatureAtPixel(pixel, {
-                layerFilter: (l) => l === dataLayerRef.current
-            });
-            map.getTargetElement().style.cursor = (hitSites || hitObjects) ? 'pointer' : '';
+            mapCanvas.width = size[0] || 0;
+            mapCanvas.height = size[1] || 0;
+            const mapContext = mapCanvas.getContext('2d');
 
-            // Check for site feature first (priority to sites layer)
-            let currentHoveredFeature: Feature | null = null;
-
-            const siteFeature = map.forEachFeatureAtPixel(pixel, (feat) => feat as Feature, {
-                layerFilter: (l) => l === sitesLayerRef.current
-            });
-
-            if (siteFeature && siteFeature.get('object_type') === 'Site') {
-                currentHoveredFeature = siteFeature;
+            if (!mapContext) {
+              reject(new Error('Could not get canvas context'));
+              return;
             }
 
-            if (lastHoveredFeature && lastHoveredFeature !== currentHoveredFeature) {
-                lastHoveredFeature.set('hovered', false);
-            }
+            const mapViewport = map.getViewport();
+            const canvases = mapViewport.querySelectorAll('canvas');
 
-            if (currentHoveredFeature) {
-                currentHoveredFeature.set('hovered', true);
-                const name = currentHoveredFeature.get('nom_site');
-                const code = currentHoveredFeature.get('code_site');
-                const superficie = currentHoveredFeature.get('superficie_totale');
-                const siteId = currentHoveredFeature.get('site_id');
+            canvases.forEach((canvas) => {
+              if (canvas.width > 0) {
+                const opacity = (canvas.parentNode as HTMLElement)?.style?.opacity || '1';
+                mapContext.globalAlpha = parseFloat(opacity);
 
-                // Generate color based on site ID
-                const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
-                const colorIndex = siteId ? Math.abs(String(siteId).split('').reduce((a: number, b: string) => a + b.charCodeAt(0), 0)) % colors.length : 0;
-                const color = colors[colorIndex];
+                const transform = canvas.style.transform;
+                const matrix = transform
+                  .match(/matrix\(([^)]+)\)/)?.[1]
+                  ?.split(',')
+                  .map(Number) || [1, 0, 0, 1, 0, 0];
 
-                // Update tooltip content
-                hoverTooltip.innerHTML = `
-                    <div style="display: flex; align-items: flex-start; gap: 10px;">
-                        <div style="
-                            width: 10px;
-                            height: 10px;
-                            border-radius: 50%;
-                            background: ${color};
-                            margin-top: 5px;
-                            flex-shrink: 0;
-                            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                        "></div>
-                        <div style="flex: 1; min-width: 0;">
-                            <div style="font-weight: 700; font-size: 14px; color: #1f2937; margin-bottom: 2px; line-height: 1.3;">
-                                ${name || 'Site'}
-                            </div>
-                            <div style="font-size: 11px; color: ${color}; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
-                                ${code || ''}
-                            </div>
-                            ${superficie ? `<div style="font-size: 12px; color: #6b7280; line-height: 1.4;">
-                                Surface: ${Number(superficie).toLocaleString('fr-FR')} m²
-                            </div>` : ''}
-                        </div>
-                    </div>
-                `;
+                mapContext.setTransform(
+                  matrix[0] || 1, matrix[1] || 0, matrix[2] || 0,
+                  matrix[3] || 1, matrix[4] || 0, matrix[5] || 0
+                );
 
-                // Position tooltip at event coordinate
-                hoverOverlay.setPosition(evt.coordinate);
-                hoverTooltip.style.opacity = '1';
-                hoverTooltip.style.transform = 'translateY(0)';
-                setHoveredSiteId(siteId);
-
-                // Force redraw of sites layer
-                sitesLayerRef.current?.changed();
-            } else {
-                hoverTooltip.style.opacity = '0';
-                hoverTooltip.style.transform = 'translateY(-10px)';
-                hoverOverlay.setPosition(undefined);
-                setHoveredSiteId(null);
-
-                // Force redraw if we un-hovered a site
-                if (lastHoveredFeature) {
-                    sitesLayerRef.current?.changed();
-                }
-            }
-
-            lastHoveredFeature = currentHoveredFeature;
-        });
-
-        // Hide tooltip when mouse leaves map
-        map.getTargetElement().addEventListener('mouseleave', () => {
-            if (lastHoveredFeature) {
-                lastHoveredFeature.set('hovered', false);
-                lastHoveredFeature = null;
-                sitesLayerRef.current?.changed();
-            }
-            hoverTooltip.style.opacity = '0';
-            hoverTooltip.style.transform = 'translateY(-10px)';
-            hoverOverlay.setPosition(undefined);
-            setHoveredSiteId(null);
-        });
-
-        // Event listeners
-        map.on('moveend', () => {
-            if (onMoveEnd) {
-                const view = map.getView();
-                const center = toLonLat(view.getCenter()!);
-                onMoveEnd({ lat: center[1], lng: center[0] }, view.getZoom()!);
-            }
-            fetchData();
-        });
-
-        map.on('click', (evt) => {
-            popupOverlay.current?.setPosition(undefined); // Close popup on any click first
-
-            // FIRST: Check for object click (data layer) - priority over sites
-            const feature = map.forEachFeatureAtPixel(evt.pixel, (feat) => feat as Feature, {
-                layerFilter: (l) => l === dataLayerRef.current
+                mapContext.drawImage(canvas, 0, 0);
+              }
             });
 
-            if (feature) {
-                // Check if this is a clustered feature or a raw feature
-                const featuresInCluster = feature.get('features');
+            mapContext.globalAlpha = 1;
+            mapContext.setTransform(1, 0, 0, 1, 0, 0);
 
-                if (featuresInCluster && featuresInCluster.length > 0) {
-                    // CLUSTERED MODE
-                    if (featuresInCluster.length > 1) {
-                        // Click on a cluster: zoom in
-                        const view = map.getView();
-                        if (view.getZoom()! < 19) {
-                            view.animate({
-                                center: (feature.getGeometry() as Point).getCoordinates(),
-                                zoom: view.getZoom()! + 2,
-                                duration: 500
-                            });
-                        }
-                    } else {
-                        // Click on a single object feature in cluster
-                        const singleFeature = featuresInCluster[0];
-                        const props = singleFeature.getProperties();
-
-                        if (onObjectClick) {
-                            const name = props.nom || props.marque || `${props.object_type} #${props.id}`;
-                            onObjectClick({
-                                id: props.id,
-                                type: props.object_type,
-                                title: name,
-                                subtitle: props.site_nom || '',
-                                attributes: props
-                            });
-                        }
-                    }
-                    return; // Object found, don't check sites
-                } else {
-                    // NON-CLUSTERED MODE: Raw feature
-                    const props = feature.getProperties();
-                    const type = props.object_type;
-
-                    // Only handle non-Site objects here
-                    if (type && type !== 'Site') {
-                        if (onObjectClick) {
-                            const name = props.nom || props.marque || `${type} #${props.id}`;
-                            onObjectClick({
-                                id: props.id,
-                                type: type,
-                                title: name,
-                                subtitle: props.site_nom || '',
-                                attributes: props
-                            });
-                        }
-                        return; // Object found, don't check sites
-                    }
-                }
-            }
-
-            // THEN: Check for site click (sites layer) - only if no object was clicked
-            const siteFeature = map.forEachFeatureAtPixel(evt.pixel, (feat) => feat as Feature, {
-                layerFilter: (l) => l === sitesLayerRef.current
-            });
-
-            if (siteFeature && siteFeature.get('object_type') === 'Site') {
-                const props = siteFeature.getProperties();
-                if (onObjectClick) {
-                    onObjectClick({
-                        id: props.id || props.site_id,
-                        type: 'Site',
-                        title: props.nom_site || 'Site',
-                        subtitle: props.code_site || '',
-                        attributes: {
-                            'Code': props.code_site,
-                            'Adresse': props.adresse || '-',
-                            'Surface totale': props.superficie_totale ? `${Number(props.superficie_totale).toLocaleString('fr-FR')} m²` : '-',
-                            'Date début contrat': props.date_debut_contrat || '-',
-                            'Date fin contrat': props.date_fin_contrat || '-',
-                            'Actif': props.actif ? 'Oui' : 'Non'
-                        }
-                    });
-                }
-            }
+            resolve(mapCanvas.toDataURL('image/png'));
+          } catch (err) {
+            reject(err);
+          }
         });
 
-        return () => {
-            map.setTarget(null);
-            // Clean up hover tooltip
-            const tooltip = document.getElementById('site-hover-tooltip');
-            if (tooltip) {
-                tooltip.remove();
-            }
-        };
-    }, []);
+        map.renderSync();
+      });
+    },
+    invalidateSize: () => {
+      mapInstance.current?.updateSize();
+    },
+    flyTo: (lat: number, lng: number, zoom: number) => {
+      mapInstance.current?.getView().animate({
+        center: fromLonLat([lng, lat]),
+        zoom: zoom,
+        duration: 1500
+      });
+    },
+    clearMeasurements: measurementTools.clearMeasurements
+  }));
 
-    // Update Base Layer if changed
-    useEffect(() => {
-        if (mapInstance.current) {
-            const layers = mapInstance.current.getLayers();
-            const baseLayer = layers.item(0) as TileLayer<XYZ>;
-            baseLayer.setSource(new XYZ({
-                url: activeLayer.url,
-                maxZoom: activeLayer.maxNativeZoom || 19,
-                attributions: activeLayer.attribution,
-                crossOrigin: 'anonymous'
-            }));
-        }
-    }, [activeLayer]);
+  // Initialize Map
+  useEffect(() => {
+    if (!innerMapRef.current) return;
 
-    // Handle Target Location (flyTo)
-    useEffect(() => {
-        if (mapInstance.current && targetLocation?.coordinates) {
-            const view = mapInstance.current.getView();
-            const { lat, lng } = targetLocation.coordinates;
-            if (!isNaN(lat) && !isNaN(lng)) {
-                view.animate({
-                    center: fromLonLat([lng, lat]),
-                    zoom: targetLocation.zoom || 16,
-                    duration: 1500
-                });
-            }
-        }
-    }, [targetLocation]);
+    // ✅ Prevent re-creating map in React 19 Strict Mode (double render)
+    if (mapInstance.current) {
+      console.log('Map already exists, skipping recreation');
+      return;
+    }
 
-    // Fetch Data Function - Fetches sites and objects separately
-    const fetchData = async () => {
-        console.log('=== fetchData START ===');
+    const baseLayer = new TileLayer({
+      source: new XYZ({
+        url: activeLayer.url,
+        maxZoom: activeLayer.maxNativeZoom || 19,
+        attributions: activeLayer.attribution,
+        crossOrigin: 'anonymous'
+      })
+    });
 
-        if (!mapInstance.current || !dataLayerRef.current || !sitesLayerRef.current) {
-            console.log('Early return - refs not ready');
-            return;
-        }
+    // Create popup overlay
+    const overlay = new Overlay({
+      element: popupRef.current!,
+      autoPan: {
+        animation: { duration: 250 }
+      }
+    });
+    popupOverlay.current = overlay;
 
-        const geojsonFormat = new GeoJSON();
-        const objectFeatures: Feature[] = [];
-        const siteFeatures: Feature[] = [];
+    // Sites Layer (polygons)
+    const sitesSource = new VectorSource();
+    sitesSourceRef.current = sitesSource;
 
-        // Helper function to fetch and process a single endpoint
-        const fetchEndpoint = async (endpoint: string, objectType: string): Promise<Feature[]> => {
-            try {
-                const url = `${API_BASE_URL}/${endpoint}/`;
-                const response = await apiFetch(url);
+    const sitesLayer = new VectorLayer({
+      source: sitesSource,
+      zIndex: 1,
+      style: (feature) => {
+        const type = feature.get('object_type');
+        if (type !== 'Site') return undefined;
 
-                if (response.ok) {
-                    const data = await response.json();
+        const siteId = feature.get('site_id');
+        const isHovered = feature.get('hovered') === true;
 
-                    // DRF GeoFeatureModelSerializer with pagination returns:
-                    // { count, next, previous, results: { type: 'FeatureCollection', features: [...] } }
-                    let featureCollection = null;
+        const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+        const colorIndex = siteId ? Math.abs(String(siteId).split('').reduce((a: number, b: string) => a + b.charCodeAt(0), 0)) % colors.length : 0;
+        const color = colors[colorIndex];
 
-                    if (data.results && data.results.type === 'FeatureCollection') {
-                        featureCollection = data.results;
-                    } else if (data.type === 'FeatureCollection') {
-                        featureCollection = data;
-                    }
-
-                    if (featureCollection && featureCollection.features) {
-                        console.log(`${endpoint}: ${featureCollection.features.length} features`);
-
-                        const features = geojsonFormat.readFeatures(featureCollection, {
-                            dataProjection: 'EPSG:4326',
-                            featureProjection: 'EPSG:3857'
-                        });
-
-                        features.forEach((feature, index) => {
-                            feature.set('object_type', objectType);
-                            const objId = feature.get('id') || index;
-                            feature.setId(`${objectType}-${objId}`);
-
-                            // For sites, also set site_id for color generation
-                            if (objectType === 'Site') {
-                                feature.set('site_id', objId);
-                            }
-                        });
-
-                        return features;
-                    }
-                } else {
-                    console.warn(`API ${endpoint} error:`, response.status);
-                }
-            } catch (err) {
-                console.warn(`Error fetching ${endpoint}:`, err);
-            }
-            return [];
-        };
-
-        // ================================================================
-        // FETCH SITES (separate layer - always fetch if Site is visible)
-        // ================================================================
-        if (visibleLayers.includes('Site')) {
-            const sites = await fetchEndpoint('sites', 'Site');
-            siteFeatures.push(...sites);
-        }
-
-        // Update sites source
-        if (sitesSourceRef.current) {
-            sitesSourceRef.current.clear();
-            sitesSourceRef.current.addFeatures(siteFeatures);
-            console.log('Sites in source:', sitesSourceRef.current.getFeatures().length);
-        }
-
-        // ================================================================
-        // FETCH OBJECTS (clustered layer - all types except Site)
-        // ================================================================
-        const objectTypes = visibleLayers.filter(t => t !== 'Site');
-        const fetchPromises = objectTypes.map(layerType => {
-            const endpoint = TYPE_TO_API[layerType];
-            if (endpoint) {
-                return fetchEndpoint(endpoint, layerType);
-            }
-            return Promise.resolve([]);
+        return new Style({
+          fill: new Fill({
+            color: isHovered ? `${color}33` : `${color}1A`
+          }),
+          stroke: new Stroke({
+            color: color,
+            width: isHovered ? 3 : 2
+          })
         });
+      }
+    });
+    sitesLayerRef.current = sitesLayer;
 
-        const results = await Promise.all(fetchPromises);
-        results.forEach(features => objectFeatures.push(...features));
+    // Selection Layer (highlighting selected objects)
+    const selectionLayer = new VectorLayer({
+      source: new VectorSource(),
+      style: SELECTION_STYLE,
+      zIndex: 1000,
+      visible: true
+    });
+    selectionLayerRef.current = selectionLayer;
 
-        console.log('Total objects fetched:', objectFeatures.length);
+    // Objects Layer - NO CLUSTERING INITIALLY (will be set up dynamically)
+    const vectorSource = new VectorSource();
+    vectorSourceRef.current = vectorSource;
 
-        // Update objects source
-        if (vectorSourceRef.current) {
-            vectorSourceRef.current.clear();
-            vectorSourceRef.current.addFeatures(objectFeatures);
-            console.log('Objects in source:', vectorSourceRef.current.getFeatures().length);
-        }
+    // Helper function to create cluster style for a specific type
+    const createClusterStyleForType = (feature: Feature, objectType: string): Style => {
+      const features = feature.get('features');
+      const size = features ? features.length : 1;
+      const color = OBJECT_COLORS[objectType] || '#10b981';
+
+      if (size > 1) {
+        // Cluster bubble with type-specific color
+        return new Style({
+          image: new CircleStyle({
+            radius: Math.min(15 + size * 2, 30),
+            fill: new Fill({ color: `${color}CC` }), // Type color with opacity
+            stroke: new Stroke({ color: '#fff', width: 3 })
+          }),
+          text: new Text({
+            text: size.toString(),
+            fill: new Fill({ color: '#fff' }),
+            font: 'bold 14px sans-serif'
+          })
+        });
+      }
+
+      // Single feature - normal styled marker
+      const singleFeature = features ? features[0] : feature;
+      const geom = singleFeature.getGeometry();
+
+      if (geom instanceof Point) {
+        return new Style({
+          image: new CircleStyle({
+            radius: 6,
+            fill: new Fill({ color: color }),
+            stroke: new Stroke({ color: '#fff', width: 2 })
+          })
+        });
+      } else {
+        return new Style({
+          fill: new Fill({ color: `${color}66` }),
+          stroke: new Stroke({ color: color, width: 2 })
+        });
+      }
     };
 
-    // Expose visibleLayers to window for style function to access AND fetch data
-    useEffect(() => {
-        // IMPORTANT: Set getVisibleLayers BEFORE fetching data
-        // The style function uses this to filter visible features
-        (window as any).getVisibleLayers = () => visibleLayers;
+    // Single non-clustered data layer (will be used when clustering disabled)
+    const dataLayer = new VectorLayer({
+      source: vectorSource,
+      zIndex: 50,
+      style: (feature) => {
+        const props = feature.getProperties();
+        const type = props.object_type;
+        return createClusterStyleForType(feature, type);
+      }
+    });
+    dataLayerRef.current = dataLayer;
 
-        // Now fetch data (style function will have access to visibleLayers)
+    // Create map (without hook layers to avoid "Duplicate item" error)
+    const map = new Map({
+      target: innerMapRef.current,
+      layers: [baseLayer, sitesLayer, dataLayer, selectionLayer], // ✅ Only our own layers
+      overlays: [overlay], // ✅ Only our own overlay
+      view: new View({
+        center: fromLonLat([INITIAL_POSITION.lng, INITIAL_POSITION.lat]),
+        zoom: INITIAL_POSITION.zoom,
+        maxZoom: 22,
+        minZoom: 2
+      }),
+      controls: defaultControls({ attribution: false, zoom: false }).extend([
+        scaleLineRef.current = new ScaleLine({ units: 'metric' }),
+        northArrowRef.current = new NorthArrow(isMiniMap ? { top: '10px', right: '10px' } : undefined)
+      ])
+    });
+
+    mapInstance.current = map;
+
+    // ✅ Add hook layers AFTER map creation to prevent duplication
+    if (measurementTools.measureLayerRef.current) {
+      map.addLayer(measurementTools.measureLayerRef.current);
+    }
+    if (searchHighlight.highlightLayerRef.current) {
+      map.addLayer(searchHighlight.highlightLayerRef.current);
+    }
+    if (userLocationDisplay.userLocationLayerRef.current) {
+      map.addLayer(userLocationDisplay.userLocationLayerRef.current);
+    }
+
+    // ✅ Trigger hooks to initialize event handlers
+    setMapReady(true);
+
+    // Initial data fetch
+    fetchData();
+
+    // MoveEnd event with debouncing
+    map.on('moveend', () => {
+      if (onMoveEnd) {
+        const view = map.getView();
+        const center = toLonLat(view.getCenter()!);
+        onMoveEnd({ lat: center[1], lng: center[0] }, view.getZoom()!);
+      }
+
+      if (fetchDataTimeoutRef.current) {
+        clearTimeout(fetchDataTimeoutRef.current);
+      }
+
+      fetchDataTimeoutRef.current = setTimeout(() => {
         fetchData();
+      }, 300);
+    });
 
-        // Force re-render of both layers when visibility changes
-        if (dataLayerRef.current) {
-            dataLayerRef.current.changed();
-        }
-        if (sitesLayerRef.current) {
-            sitesLayerRef.current.changed();
-        }
+    return () => {
+      // ✅ Complete cleanup to prevent "Duplicate item" error in React 19 Strict Mode
+      if (fetchDataTimeoutRef.current) {
+        clearTimeout(fetchDataTimeoutRef.current);
+      }
 
-        return () => { delete (window as any).getVisibleLayers; };
-    }, [visibleLayers]);
+      // Remove all layers from map before disposing
+      map.getLayers().clear();
 
-    // Handle clustering toggle - switch between cluster source and raw vector source
-    useEffect(() => {
-        if (!dataLayerRef.current || !vectorSourceRef.current || !clusterSourceRef.current) return;
+      // Remove all overlays
+      map.getOverlays().clear();
 
-        if (clusteringEnabled) {
-            // Enable clustering - use cluster source with distance
-            clusterSourceRef.current.setDistance(50);
-            dataLayerRef.current.setSource(clusterSourceRef.current);
+      // Dispose of the map completely
+      map.setTarget(undefined);
+      map.dispose();
+
+      // Reset refs and state to allow recreation
+      mapInstance.current = null;
+      setMapReady(false); // ✅ Reset flag for cleanup
+    };
+  }, [isMiniMap]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch Data Function - Unified endpoint with bbox
+  const fetchData = async () => {
+    console.log('=== fetchData START (UNIFIED ENDPOINT) ===');
+
+    if (!mapInstance.current || !dataLayerRef.current || !sitesLayerRef.current) {
+      return;
+    }
+
+    try {
+      const view = mapInstance.current.getView();
+      const extent = view.calculateExtent(mapInstance.current.getSize());
+      const [west, south, east, north] = transformExtent(extent, 'EPSG:3857', 'EPSG:4326');
+      const zoom = Math.round(view.getZoom() || 10);
+
+      // ✅ Use ref to get current value (avoids stale closure)
+      const currentVisibleLayers = visibleLayersRef.current;
+
+      // ✅ Short-circuit: If no layers are visible, clear map and return
+      if (currentVisibleLayers.length === 0) {
+        console.log('⚠️ No visible layers - clearing map data');
+        sitesSourceRef.current?.clear();
+        vectorSourceRef.current?.clear();
+        // Clear all cluster sources
+        Object.values(clusterSourcesRef.current).forEach(cluster => cluster.getSource()?.clear());
+        return;
+      }
+
+      const typesParam = currentVisibleLayers
+        .map(layerType => TYPE_TO_API[layerType] || layerType.toLowerCase())
+        .filter(Boolean)
+        .join(',');
+
+      const url = `${API_BASE_URL}/map/?bbox=${west},${south},${east},${north}&types=${typesParam}&zoom=${zoom}`;
+
+      const response = await apiFetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const data = await response.json();
+      if (data.type !== 'FeatureCollection') throw new Error('Invalid GeoJSON');
+
+      const siteFeatures: Feature[] = [];
+      const featuresByType: Record<string, Feature[]> = {};
+
+      const geojsonFormat = new GeoJSON();
+
+      data.features.forEach((feat: any) => {
+        const feature = geojsonFormat.readFeature(feat, {
+          dataProjection: 'EPSG:4326',
+          featureProjection: 'EPSG:3857'
+        }) as Feature;
+
+        const objectType = feature.get('object_type');
+        if (objectType === 'Site') {
+          siteFeatures.push(feature);
         } else {
-            // Disable clustering - use raw vector source directly (no clustering at all)
-            dataLayerRef.current.setSource(vectorSourceRef.current);
+          // ✅ Group features by type for type-based clustering
+          if (!featuresByType[objectType]) {
+            featuresByType[objectType] = [];
+          }
+          featuresByType[objectType].push(feature);
         }
+      });
 
-        // Force layer refresh
-        dataLayerRef.current.changed();
-    }, [clusteringEnabled]);
+      // Update sites
+      sitesSourceRef.current?.clear();
+      sitesSourceRef.current?.addFeatures(siteFeatures);
 
-    // Expose API to Window for MapPage
-    useEffect(() => {
-        (window as any).updateLayerSymbology = (type: string, config: any) => {
-            setSymbologyConfig(prev => ({ ...prev, [type]: config }));
-            // Force redraw by toggling layer visibility or triggering render
-            if (dataLayerRef.current) {
-                dataLayerRef.current.changed();
+      // ✅ Update type-based clusters
+      if (clusteringEnabledRef.current) {
+        // Separate Point features (for clustering) from non-Point features (polygons, lines)
+        const pointFeaturesByType: Record<string, Feature[]> = {};
+        const nonPointFeatures: Feature[] = [];
+
+        Object.entries(featuresByType).forEach(([type, features]) => {
+          features.forEach(feature => {
+            const geom = feature.getGeometry();
+            if (geom?.getType() === 'Point') {
+              if (!pointFeaturesByType[type]) {
+                pointFeaturesByType[type] = [];
+              }
+              pointFeaturesByType[type].push(feature);
+            } else {
+              // Polygons, LineStrings, etc. - keep in dataLayer
+              nonPointFeatures.push(feature);
             }
-        };
+          });
+        });
 
-        return () => {
-            delete (window as any).updateLayerSymbology;
+        // Update vectorSource with non-Point features (always visible)
+        vectorSourceRef.current?.clear();
+        vectorSourceRef.current?.addFeatures(nonPointFeatures);
+
+        // Create/update cluster layers for Point features only
+        Object.entries(pointFeaturesByType).forEach(([type, features]) => {
+          // Get or create cluster source for this type
+          if (!clusterSourcesRef.current[type]) {
+            const typeSource = new VectorSource();
+            const typeCluster = new Cluster({
+              distance: 50,
+              // minDistance: 20, // REMOVED: Potentially causing instability
+              source: typeSource,
+              geometryFunction: (feature) => {
+                const geom = feature.getGeometry();
+                return geom?.getType() === 'Point' ? geom : null;
+              }
+            });
+            clusterSourcesRef.current[type] = typeCluster;
+
+            // Create cluster layer for this type
+            const typeColor = OBJECT_COLORS[type] || '#10b981';
+            const clusterLayer = new VectorLayer({
+              source: typeCluster,
+              zIndex: 50 + Object.keys(clusterSourcesRef.current).indexOf(type),
+              style: (feature) => {
+                const features = feature.get('features');
+                const size = features ? features.length : 1;
+
+                if (size > 1) {
+                  return new Style({
+                    image: new CircleStyle({
+                      radius: Math.min(15 + size * 2, 30),
+                      fill: new Fill({ color: `${typeColor}CC` }),
+                      stroke: new Stroke({ color: '#fff', width: 3 })
+                    }),
+                    text: new Text({
+                      text: size.toString(),
+                      fill: new Fill({ color: '#fff' }),
+                      font: 'bold 14px sans-serif'
+                    })
+                  });
+                }
+
+                const singleFeature = features ? features[0] : feature;
+                const geom = singleFeature.getGeometry();
+                if (geom instanceof Point) {
+                  return new Style({
+                    image: new CircleStyle({
+                      radius: 6,
+                      fill: new Fill({ color: typeColor }),
+                      stroke: new Stroke({ color: '#fff', width: 2 })
+                    })
+                  });
+                } else {
+                  return new Style({
+                    fill: new Fill({ color: `${typeColor}66` }),
+                    stroke: new Stroke({ color: typeColor, width: 2 })
+                  });
+                }
+              }
+            });
+
+            clusterLayersRef.current[type] = clusterLayer;
+            mapInstance.current?.addLayer(clusterLayer);
+          }
+
+          // Update features for this type's cluster
+          const typeSource = clusterSourcesRef.current[type].getSource();
+          if (typeSource) {
+            typeSource.clear();
+            if (features.length > 0) {
+              typeSource.addFeatures(features);
+            }
+          }
+          // Force redraw of the layer to ensure cluster calculation updates
+          clusterLayersRef.current[type]?.changed();
+        });
+
+        // Remove clusters for types that no longer have Point features
+        Object.keys(clusterSourcesRef.current).forEach(type => {
+          if (!pointFeaturesByType[type]) {
+            const clusterLayer = clusterLayersRef.current[type];
+            if (clusterLayer) {
+              mapInstance.current?.removeLayer(clusterLayer);
+              delete clusterLayersRef.current[type];
+            }
+            delete clusterSourcesRef.current[type];
+          }
+        });
+
+        // Keep dataLayer visible for non-Point features
+        dataLayerRef.current?.setVisible(true);
+      } else {
+        // Non-clustered mode - use single layer
+        const allObjects = Object.values(featuresByType).flat();
+        vectorSourceRef.current?.clear();
+        vectorSourceRef.current?.addFeatures(allObjects);
+
+        // Hide all cluster layers - Force REMOVE to ensure they are gone
+        Object.keys(clusterLayersRef.current).forEach(type => {
+          const layer = clusterLayersRef.current[type];
+          if (layer) {
+            mapInstance.current?.removeLayer(layer);
+          }
+        });
+        clusterLayersRef.current = {}; // Reset tracking
+        clusterSourcesRef.current = {};
+
+        dataLayerRef.current?.setVisible(true);
+      }
+
+      const totalObjects = Object.values(featuresByType).reduce((sum, arr) => sum + arr.length, 0);
+      console.log(`✅ Loaded ${siteFeatures.length} sites, ${totalObjects} objects (${Object.keys(featuresByType).length} types)`);
+    } catch (err) {
+      logger.error('Error in fetchData:', err);
+    }
+  };
+
+  // Base layer update
+  useEffect(() => {
+    if (!mapInstance.current) return;
+
+    const layers = mapInstance.current.getLayers().getArray();
+    const baseLayer = layers[0] as TileLayer<XYZ>;
+
+    if (baseLayer) {
+      const source = baseLayer.getSource();
+      if (source) {
+        source.setUrl(activeLayer.url);
+        source.refresh();
+      }
+    }
+  }, [activeLayer]);
+
+  // Target location (fly to)
+  useEffect(() => {
+    if (!targetLocation || !mapInstance.current) return;
+
+    const view = mapInstance.current.getView();
+    view.animate({
+      center: fromLonLat([targetLocation.coordinates.lng || 0, targetLocation.coordinates.lat || 0]),
+      zoom: targetLocation.zoom || 18,
+      duration: 1500
+    });
+  }, [targetLocation]);
+
+  // ✅ Update Selection Layer based on selectedObjects
+  useEffect(() => {
+    if (!selectionLayerRef.current || !mapInstance.current) return;
+
+    const source = selectionLayerRef.current.getSource();
+    if (!source) return;
+
+    source.clear();
+
+    if (selectedObjects.length === 0) return;
+
+    // Helper to find feature by ID
+    const findFeatureById = (id: string): Feature | undefined => {
+      // 1. Check Data Layer (non-clustered)
+      if (dataLayerRef.current) {
+        const dSource = dataLayerRef.current.getSource();
+        if (dSource) {
+          const feat = dSource.getFeatureById(id);
+          if (feat) return feat as Feature;
+
+          const features = dSource.getFeatures();
+          const found = features.find(f => f.get('id') === id || f.getId() === id);
+          if (found) return found as Feature;
         }
-    }, []);
+      }
 
-    // Popup logic
-    const showPopup = (coordinate: any, properties: any) => {
-        if (!popupRef.current) return;
+      // 2. Check Vector Source (original points)
+      if (vectorSourceRef.current) {
+        const feat = vectorSourceRef.current.getFeatureById(id);
+        if (feat) return feat as Feature;
 
-        const content = document.getElementById('popup-content');
-        if (content) {
-            content.innerHTML = `
-            <div style="padding: 5px;">
-               <strong>${properties.nom || properties.object_type || 'Objet'}</strong><br/>
-               <small>${properties.object_type}</small>
-            </div>
-          `;
-        }
-        popupOverlay.current?.setPosition(coordinate);
+        const features = vectorSourceRef.current.getFeatures();
+        const found = features.find(f => f.get('id') === id || f.getId() === id);
+        if (found) return found as Feature;
+      }
+
+      // 3. Check Sites Source
+      if (sitesSourceRef.current) {
+        const feat = sitesSourceRef.current.getFeatureById(id);
+        if (feat) return feat as Feature;
+
+        const features = sitesSourceRef.current.getFeatures();
+        const found = features.find(f => f.get('id') === id || f.getId() === id || (f.get('object_type') === 'Site' && f.get('site_id') === id));
+        if (found) return found as Feature;
+      }
+
+      return undefined;
     };
 
-    // Handle layer toggle from parent (MapPage)
-    const handleToggleLayer = React.useCallback((id: string, visible: boolean) => {
-        setVisibleLayers(prev => {
-            if (visible) return prev.includes(id) ? prev : [...prev, id];
-            return prev.filter(l => l !== id);
-        });
-        // Also call parent callback if provided
-        if (onToggleLayer) onToggleLayer(id, visible);
-    }, [onToggleLayer]);
+    selectedObjects.forEach(obj => {
+      const originalFeature = findFeatureById(obj.id);
 
-    // Expose handleToggleLayer to window for MapPage to use
-    useEffect(() => {
-        (window as any).toggleMapLayer = handleToggleLayer;
-        return () => { delete (window as any).toggleMapLayer; };
-    }, [handleToggleLayer]);
+      if (originalFeature) {
+        const clonedFeature = originalFeature.clone();
+        clonedFeature.setId(obj.id);
 
-    return (
-        <div className="h-full w-full relative">
-            <div ref={innerMapRef} className="h-full w-full bg-slate-100" />
+        const geom = clonedFeature.getGeometry();
 
-            <div ref={popupRef} className="ol-popup bg-white p-2 rounded shadow-lg border border-gray-200 min-w-[150px]">
-                <a href="#" className="ol-popup-closer absolute top-1 right-2 text-gray-500 font-bold" onClick={(e) => {
-                    e.preventDefault();
-                    popupOverlay.current?.setPosition(undefined);
-                }}>✖</a>
-                <div id="popup-content"></div>
-            </div>
-        </div>
-    );
-});
+        // Handling Points (Sites, Trees, Furniture) differently to keep icon visible
+        if (geom && geom instanceof Point) {
+          const type = obj.type as string;
+          const color = OBJECT_COLORS[type] || '#10b981';
 
+          // 1. Highlight Halo (Yellow Circle)
+          const highlightStyle = new Style({
+            image: new CircleStyle({
+              radius: 28,
+              fill: new Fill({ color: 'rgba(255, 215, 0, 0.5)' }),
+              stroke: new Stroke({ color: '#FFD700', width: 4 })
+            }),
+            zIndex: 999
+          });
+
+          // 2. Original Icon (Recreated)
+          let iconSrc;
+          if (type === 'Site') {
+            const category = originalFeature.get('site_categorie') || 'INFRASTRUCTURE';
+            iconSrc = createSiteIcon(color, category, true);
+          } else {
+            iconSrc = createMarkerIcon(color, true);
+          }
+
+          const iconStyle = new Style({
+            image: new Icon({
+              src: iconSrc,
+              anchor: [0.5, 1],
+              anchorXUnits: 'fraction',
+              anchorYUnits: 'fraction'
+            }),
+            zIndex: 1000
+          });
+
+          clonedFeature.setStyle([highlightStyle, iconStyle]);
+
+        } else {
+          // Polygons / Lines
+          clonedFeature.setStyle(SELECTION_STYLE);
+        }
+
+        source.addFeature(clonedFeature);
+      }
+    });
+
+  }, [selectedObjects, mapReady, clusteringEnabled]);
+
+  // ✅ Sync visibleLayers to ref (for moveend callback to access current value)
+  useEffect(() => {
+    visibleLayersRef.current = visibleLayers;
+  }, [visibleLayers]);
+
+  // Visible layers effect
+  // Refetch when clustering is toggled
+  useEffect(() => {
+    if (mapReady && mapInstance.current) {
+      fetchData();
+    }
+  }, [clusteringEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ✅ New Effect: Handle specific highlightedGeometry (from Detail Page)
+  useEffect(() => {
+    if (!mapReady || !selectionLayerRef.current) return;
+
+    // Clear previous selection if new highlight is provided or emptied
+    const source = selectionLayerRef.current.getSource();
+    if (!source) return;
+
+    // We only clear if we are in "detail mode" (highlightedGeometry is present)
+    // to avoid conflicting with global selection context
+    if (highlightedGeometry) {
+      source.clear();
+
+      try {
+        const geojsonFormat = new GeoJSON();
+        // If it's a raw geometry object (coordinates, type), wrap in Feature
+        // If it's already a Feature, read it directly
+        let feature;
+
+        if (highlightedGeometry.type === 'Feature') {
+          feature = geojsonFormat.readFeature(highlightedGeometry, {
+            dataProjection: 'EPSG:4326',
+            featureProjection: 'EPSG:3857'
+          });
+        } else {
+          // Assume it's a raw geometry or property object mimicking a feature
+          feature = new Feature({
+            geometry: new GeoJSON().readGeometry(highlightedGeometry, {
+              dataProjection: 'EPSG:4326',
+              featureProjection: 'EPSG:3857'
+            })
+          });
+        }
+
+        if (feature) {
+          // Create a STRONG highlight style
+          const highlightStyle = new Style({
+            stroke: new Stroke({
+              color: '#00ffff', // Cyan for high visibility
+              width: 5,
+            }),
+            fill: new Fill({
+              color: 'rgba(0, 255, 255, 0.2)',
+            }),
+            image: new CircleStyle({
+              radius: 12,
+              fill: new Fill({ color: '#00ffff' }),
+              stroke: new Stroke({ color: '#fff', width: 3 }),
+            }),
+            zIndex: 10000
+          });
+
+          if (!Array.isArray(feature)) { // Ensure it's a single feature
+            feature.setStyle(highlightStyle);
+            source.addFeature(feature);
+          }
+
+          // Centre map if not already handled by targetLocation
+          // optional: mapInstance.current?.getView().fit(source.getExtent(), { padding: [50, 50, 50, 50], maxZoom: 20 });
+        }
+      } catch (e) {
+        console.error("Error adding highlighted geometry:", e);
+      }
+    }
+  }, [highlightedGeometry, mapReady]);
+
+  // Clustering is now handled in fetchData function with type-based clusters
+
+
+  // ✅ Sync local layer visibility with MapContext when changed externally
+  useEffect(() => {
+    const contextVisibleLayers = mapContext.getVisibleLayers();
+    // Convert context format to local format
+    const layersList: string[] = Object.entries(contextVisibleLayers)
+      .filter(([_, visible]) => visible)
+      .map(([layerId, _]) => layerId);
+    setVisibleLayers(layersList);
+  }, [mapContext.visibleLayers]);
+
+  // ✅ Update map controls position based on sidebar state
+  useEffect(() => {
+    const leftPosition = isSidebarCollapsed ? '88px' : '276px'; // Match MapZoomControls
+    // if (northArrowRef.current) northArrowRef.current.updatePosition(leftPosition); // REMOVED: Keep North Arrow on Right
+    const scaleEl = document.querySelector('.ol-scale-line') as HTMLElement;
+    if (scaleEl) {
+      scaleEl.style.left = 'auto'; // Remove left positioning
+      scaleEl.style.right = '24px'; // Align to Right
+      scaleEl.style.bottom = '8px';
+      scaleEl.style.top = 'auto';
+      // scaleEl.style.transition = 'left 0.3s ease'; // No transition needed for fixed right pos
+    }
+  }, [isSidebarCollapsed]);
+
+  return (
+    <div className="h-full w-full relative">
+      <div ref={innerMapRef} className="h-full w-full bg-slate-100" />
+
+      <div ref={popupRef} className="ol-popup bg-white p-2 rounded shadow-lg border border-gray-200 min-w-[150px]">
+        <a href="#" className="ol-popup-closer absolute top-1 right-2 text-gray-500 font-bold" onClick={(e) => {
+          e.preventDefault();
+          popupOverlay.current?.setPosition(undefined);
+        }}>✖</a>
+        <div id="popup-content"></div>
+      </div>
+    </div>
+  );
+};
+
+export const OLMap = React.forwardRef<any, OLMapProps>(OLMapInternal);
 export default OLMap;
