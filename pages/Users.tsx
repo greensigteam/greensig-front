@@ -1229,68 +1229,8 @@ const Users: React.FC = () => {
     return true;
   });
 
-  // Columns
-  const columns = activeTab === 'clients' ? [
-    {
-      key: 'structure',
-      label: 'Structure',
-      render: (u: Utilisateur) => {
-        const client = clients.find(c => c.utilisateur === u.id);
-        return (
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600">
-              <Building2 className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="font-medium text-gray-900">{client?.nomStructure || 'N/A'}</p>
-              <p className="text-xs text-gray-500">{u.email}</p>
-            </div>
-          </div>
-        );
-      }
-    },
-    {
-      key: 'contact',
-      label: 'Contact',
-      render: (u: Utilisateur) => {
-        const client = clients.find(c => c.utilisateur === u.id);
-        return (
-          <div>
-            <p className="text-sm text-gray-900">{client?.contactPrincipal || u.fullName}</p>
-            <p className="text-xs text-gray-500">{client?.emailFacturation || '-'}</p>
-          </div>
-        );
-      }
-    },
-    {
-      key: 'telephone',
-      label: 'Téléphone',
-      render: (u: Utilisateur) => {
-        const client = clients.find(c => c.utilisateur === u.id);
-        return <span className="text-sm text-gray-700">{client?.telephone || '-'}</span>;
-      }
-    },
-    {
-      key: 'adresse',
-      label: 'Adresse',
-      render: (u: Utilisateur) => {
-        const client = clients.find(c => c.utilisateur === u.id);
-        return <span className="text-sm text-gray-700 truncate max-w-[200px] block" title={client?.adresse}>{client?.adresse || '-'}</span>;
-      }
-    },
-    {
-      key: 'actif',
-      label: 'Statut',
-      render: (u: Utilisateur) => (
-        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${u.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-          }`}>
-          {u.actif ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-          {u.actif ? 'Actif' : 'Inactif'}
-        </span>
-      ),
-      sortable: false
-    }
-  ] : [
+  // Columns - Mêmes colonnes pour tous les onglets (affichage des infos utilisateur)
+  const columns = [
     {
       key: 'fullName',
       label: 'Nom',
