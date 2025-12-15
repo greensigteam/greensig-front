@@ -12,8 +12,11 @@ import {
   NOM_ROLE_LABELS,
   Competence,
   NiveauCompetence,
-  NIVEAU_COMPETENCE_LABELS
-  , STATUT_OPERATEUR_LABELS, STATUT_OPERATEUR_COLORS, getBadgeColors
+  NIVEAU_COMPETENCE_LABELS,
+  STATUT_OPERATEUR_LABELS,
+  STATUT_OPERATEUR_COLORS,
+  getBadgeColors,
+  ClientCreate
 } from '../types/users';
 import React, { useState, useEffect } from 'react';
 import {
@@ -114,6 +117,8 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated })
   const [competences, setCompetences] = useState<Competence[]>([]);
   const [selectedCompetences, setSelectedCompetences] = useState<{ competenceId: number; niveau: NiveauCompetence }[]>([]);
 
+
+
   // Fetch competences when OPERATEUR or CHEF_EQUIPE is selected
   useEffect(() => {
     if (selectedRole === 'OPERATEUR' || selectedRole === 'CHEF_EQUIPE') {
@@ -160,15 +165,15 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated })
       return;
     }
 
-    // If OPERATEUR or CHEF_EQUIPE is selected, require matricule
+    // Validation spécifique
     if ((selectedRole === 'OPERATEUR' || selectedRole === 'CHEF_EQUIPE') && !matricule.trim()) {
       setError("Le matricule est requis pour un opérateur/chef d'équipe");
       return;
     }
 
+
     setLoading(true);
     try {
-      // Nouvelle logique : comportement par rôle (single-role forms)
       if (selectedRole === 'OPERATEUR' || selectedRole === 'CHEF_EQUIPE') {
         const operateurData: OperateurCreate = {
           email: formData.email,
@@ -181,11 +186,8 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated })
         };
 
         const operateurResponse = await createOperateur(operateurData);
-        // L'ID de l'opérateur est l'ID de l'utilisateur (primary_key)
         const operateurId = operateurResponse.utilisateur;
 
-        // Si le rôle sélectionné est CHEF_EQUIPE, l'ajouter
-        // (createOperateur attribue déjà OPERATEUR par défaut via le backend, ou on peut le forcer)
         if (selectedRole === 'CHEF_EQUIPE') {
           const chefRole = roleObjects.find(r => r.nomRole === 'CHEF_EQUIPE');
           if (chefRole) {
@@ -193,7 +195,6 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated })
           }
         }
 
-        // Ajouter les compétences
         if (selectedCompetences.length > 0) {
           for (const comp of selectedCompetences) {
             await affecterCompetence(operateurId, {
@@ -203,16 +204,15 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated })
           }
         }
       } else {
-        // Cas classique : création utilisateur puis attribution des rôles
+        // ADMIN
         const user = await createUtilisateur({
           email: formData.email,
           nom: formData.nom,
           prenom: formData.prenom,
           password: formData.password,
-          passwordConfirm: formData.password, // Ajouté pour respecter UtilisateurCreate
+          passwordConfirm: formData.password,
           actif: true
         });
-        // Attribuer le rôle sélectionné
         if (selectedRole) {
           const roleObj = roleObjects.find(r => r.nomRole === selectedRole);
           if (roleObj) await attribuerRole(user.id.toString(), roleObj.id.toString());
@@ -221,14 +221,11 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated })
       onCreated();
       onClose();
     } catch (err: any) {
-      // Gestion explicite des erreurs 400 lors de la création d'utilisateur
       if (err?.response?.status === 400) {
         setError('Erreur de validation : vérifiez les champs du formulaire.');
       } else {
-        setError('Erreur inconnue lors de la création de l’utilisateur.');
+        setError('Erreur lors de la création de l’utilisateur.');
       }
-      setLoading(false);
-      return;
     } finally {
       setLoading(false);
     }
@@ -374,6 +371,8 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated })
                       />
                     </div>
                   )}
+
+
                 </Tab.Panel>
                 {(selectedRole === 'OPERATEUR' || selectedRole === 'CHEF_EQUIPE') && (
                   <Tab.Panel>
@@ -1231,7 +1230,67 @@ const Users: React.FC = () => {
   });
 
   // Columns
-  const columns = [
+  const columns = activeTab === 'clients' ? [
+    {
+      key: 'structure',
+      label: 'Structure',
+      render: (u: Utilisateur) => {
+        const client = clients.find(c => c.utilisateur === u.id);
+        return (
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+              <Building2 className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">{client?.nomStructure || 'N/A'}</p>
+              <p className="text-xs text-gray-500">{u.email}</p>
+            </div>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'contact',
+      label: 'Contact',
+      render: (u: Utilisateur) => {
+        const client = clients.find(c => c.utilisateur === u.id);
+        return (
+          <div>
+            <p className="text-sm text-gray-900">{client?.contactPrincipal || u.fullName}</p>
+            <p className="text-xs text-gray-500">{client?.emailFacturation || '-'}</p>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'telephone',
+      label: 'Téléphone',
+      render: (u: Utilisateur) => {
+        const client = clients.find(c => c.utilisateur === u.id);
+        return <span className="text-sm text-gray-700">{client?.telephone || '-'}</span>;
+      }
+    },
+    {
+      key: 'adresse',
+      label: 'Adresse',
+      render: (u: Utilisateur) => {
+        const client = clients.find(c => c.utilisateur === u.id);
+        return <span className="text-sm text-gray-700 truncate max-w-[200px] block" title={client?.adresse}>{client?.adresse || '-'}</span>;
+      }
+    },
+    {
+      key: 'actif',
+      label: 'Statut',
+      render: (u: Utilisateur) => (
+        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${u.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          }`}>
+          {u.actif ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+          {u.actif ? 'Actif' : 'Inactif'}
+        </span>
+      ),
+      sortable: false
+    }
+  ] : [
     {
       key: 'fullName',
       label: 'Nom',
@@ -1259,7 +1318,6 @@ const Users: React.FC = () => {
         </div>
       )
     },
-    // Colonne 'Type' supprimée : affichage des rôles uniquement dans la colonne 'Roles'
     {
       key: 'roles',
       label: 'Roles',

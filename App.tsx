@@ -15,7 +15,7 @@ import Reporting from './pages/Reporting';
 import ClientPortal from './pages/ClientPortal';
 import Users from './pages/Users';
 import LoadingScreen from './components/LoadingScreen';
-import { User, ViewState, MapLayerType, Coordinates, OverlayState, MapObjectDetail, UserLocation, Measurement, MeasurementType } from './types';
+import { User, MapLayerType, Coordinates, OverlayState, MapObjectDetail, UserLocation, Measurement, MeasurementType } from './types';
 import { MAP_LAYERS } from './constants';
 import { MapSearchResult } from './types';
 import { hasExistingToken, fetchCurrentUser } from './services/api';
@@ -350,6 +350,7 @@ function App() {
                           onRemoveMeasurement={handleRemoveMeasurement}
                         />
                       }
+                      children={null}
                     >
                       {/* The Outlet from Layout will render these nested routes */}
                     </Layout>

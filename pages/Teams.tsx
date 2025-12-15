@@ -13,7 +13,8 @@ import {
   Clock,
   Edit2,
   Trash2,
-  Eye
+  Eye,
+  Building2
 } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 
@@ -718,7 +719,7 @@ const StatCard: React.FC<StatCardProps> = ({ icon, label, value, color }) => (
 // COMPOSANT PRINCIPAL - Teams
 // ============================================================================
 
-type TabType = 'equipes' | 'operateurs' | 'absences' | 'competences' | 'historique';
+type TabType = 'equipes' | 'operateurs' | 'absences' | 'competences' | 'historique' | 'clients';
 
 const Teams: React.FC = () => {
   // State
@@ -946,6 +947,12 @@ const Teams: React.FC = () => {
     }
     return true;
   }).sort((a, b) => (a.ordreAffichage || 0) - (b.ordreAffichage || 0));
+
+  const filteredClients = clients.filter(c =>
+    (c.nomStructure || (c as any).nom_structure || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (c.contactPrincipal || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (c.email || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   // Columns
   const [editEquipe, setEditEquipe] = useState<EquipeList | null>(null);
@@ -1184,6 +1191,34 @@ const Teams: React.FC = () => {
     }
   ];
 
+  const clientsColumns: Column<Client>[] = [
+    { key: 'nomStructure', label: 'Structure', render: (c) => c.nomStructure || (c as any).nom_structure || '-' },
+    { key: 'contactPrincipal', label: 'Contact', render: (c) => c.contactPrincipal || '-' },
+    { key: 'email', label: 'Email', render: (c) => c.email || '-' },
+    { key: 'telephone', label: 'Téléphone', render: (c) => c.telephone || '-' },
+    { key: 'adresse', label: 'Adresse', render: (c) => c.adresse || '-' },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (c) => (
+        <div className="flex gap-1">
+          <button
+            className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+            title="Modifier"
+            onClick={(ev) => {
+              ev.stopPropagation();
+              const u = utilisateurs.find(us => us.id === c.utilisateur);
+              if (u) setEditingUser(u);
+            }}
+          >
+            <Edit2 className="w-4 h-4" />
+          </button>
+        </div>
+      ),
+      sortable: false
+    }
+  ];
+
   if (loading) {
     return (
       <div className="p-6 h-full flex items-center justify-center">
@@ -1304,6 +1339,18 @@ const Teams: React.FC = () => {
                 {absencesAValider.length}
               </span>
             )}
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveTab('clients')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'clients'
+            ? 'border-emerald-500 text-emerald-600'
+            : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+        >
+          <span className="flex items-center gap-2">
+            <Building2 className="w-4 h-4" />
+            Clients ({clients.length})
           </span>
         </button>
         <button
@@ -1536,6 +1583,16 @@ const Teams: React.FC = () => {
                 />
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'clients' && (
+          <div className="h-full overflow-auto">
+            <DataTable
+              data={filteredClients}
+              columns={clientsColumns}
+              itemsPerPage={10}
+            />
           </div>
         )}
 
