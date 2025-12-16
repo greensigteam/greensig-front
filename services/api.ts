@@ -734,3 +734,482 @@ export async function fetchFilterOptions(type?: string): Promise<FilterOptions> 
     }
   }
 }
+
+// ==============================================================================
+// CRÉATION D'OBJETS (DESSIN)
+// ==============================================================================
+
+export interface CreateInventoryItemData {
+  geometry: {
+    type: 'Point' | 'LineString' | 'Polygon' | 'MultiPoint' | 'MultiLineString' | 'MultiPolygon';
+    coordinates: number[] | number[][] | number[][][] | number[][][][];
+  };
+  site_id: number;
+  sous_site_id?: number;
+  properties: Record<string, any>;
+}
+
+/**
+ * Create a new inventory item
+ * @param objectType - Type of object (Arbre, Gazon, Puit, etc.)
+ * @param data - Object data including geometry and properties
+ * @returns Created object in GeoJSON format
+ */
+export async function createInventoryItem(
+  objectType: string,
+  data: CreateInventoryItemData
+): Promise<any> {
+  const endpoint = typeToPathMap[objectType.toLowerCase()];
+
+  if (!endpoint) {
+    throw new ApiError(`Type d'objet non supporté: ${objectType}`);
+  }
+
+  try {
+    // Build the request body in GeoJSON format expected by DRF-GIS
+    const requestBody = {
+      type: 'Feature',
+      geometry: data.geometry,
+      properties: {
+        site: data.site_id,
+        sous_site: data.sous_site_id || null,
+        ...data.properties,
+      },
+    };
+
+    const response = await apiFetch(`${API_BASE_URL}/${endpoint}/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    return await handleResponse<any>(response);
+  } catch (error) {
+    logger.error(`Error creating ${objectType}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Delete an inventory item
+ * @param objectType - Type of object (arbre, gazon, puit, etc.)
+ * @param objectId - ID of the object
+ */
+export async function deleteInventoryItem(
+  objectType: string,
+  objectId: string
+): Promise<void> {
+  const endpoint = typeToPathMap[objectType.toLowerCase()];
+
+  if (!endpoint) {
+    throw new ApiError(`Type d'objet non supporté: ${objectType}`);
+  }
+
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/${endpoint}/${objectId}/`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok && response.status !== 204) {
+      throw new ApiError(`Erreur lors de la suppression: ${response.status}`, response.status);
+    }
+  } catch (error) {
+    logger.error(`Error deleting ${objectType} #${objectId}:`, error);
+    throw error;
+  }
+}
+
+// ==============================================================================
+// OPÉRATIONS GÉOMÉTRIQUES
+// ==============================================================================
+
+export interface GeometryOperationResult {
+  geometry?: any;
+  geometries?: any[];
+  stats?: Record<string, any>;
+  metrics?: Record<string, any>;
+  error?: string;
+}
+
+/**
+ * Simplify a geometry
+ */
+export async function simplifyGeometry(
+  geometry: any,
+  tolerance: number = 0.0001,
+  preserveTopology: boolean = true
+): Promise<GeometryOperationResult> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/geometry/simplify/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        geometry,
+        tolerance,
+        preserve_topology: preserveTopology,
+      }),
+    });
+    return handleResponse<GeometryOperationResult>(response);
+  } catch (error) {
+    logger.error('Error simplifying geometry:', error);
+    throw error;
+  }
+}
+
+/**
+ * Calculate geometry metrics (area, length, perimeter)
+ */
+export async function calculateGeometryMetrics(
+  geometry: any
+): Promise<GeometryOperationResult> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/geometry/calculate/`, {
+      method: 'POST',
+      body: JSON.stringify({ geometry }),
+    });
+    return handleResponse<GeometryOperationResult>(response);
+  } catch (error) {
+    logger.error('Error calculating geometry metrics:', error);
+    throw error;
+  }
+}
+
+/**
+ * Validate a geometry
+ */
+export async function validateGeometry(
+  geometry: any,
+  options?: {
+    targetType?: string;
+    siteId?: number;
+    checkDuplicates?: boolean;
+    checkWithinSite?: boolean;
+  }
+): Promise<any> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/geometry/validate/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        geometry,
+        target_type: options?.targetType,
+        site_id: options?.siteId,
+        check_duplicates: options?.checkDuplicates,
+        check_within_site: options?.checkWithinSite,
+      }),
+    });
+    return handleResponse<any>(response);
+  } catch (error) {
+    logger.error('Error validating geometry:', error);
+    throw error;
+  }
+}
+
+/**
+ * Create a buffer around a geometry
+ */
+export async function bufferGeometry(
+  geometry: any,
+  distanceMeters: number
+): Promise<GeometryOperationResult> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/geometry/buffer/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        geometry,
+        distance: distanceMeters,
+      }),
+    });
+    return handleResponse<GeometryOperationResult>(response);
+  } catch (error) {
+    logger.error('Error creating buffer:', error);
+    throw error;
+  }
+}
+
+/**
+ * Merge multiple polygons
+ */
+export async function mergePolygons(
+  polygons: any[]
+): Promise<GeometryOperationResult> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/geometry/merge/`, {
+      method: 'POST',
+      body: JSON.stringify({ polygons }),
+    });
+    return handleResponse<GeometryOperationResult>(response);
+  } catch (error) {
+    logger.error('Error merging polygons:', error);
+    throw error;
+  }
+}
+
+/**
+ * Split a polygon with a line
+ */
+export async function splitPolygon(
+  polygon: any,
+  splitLine: any
+): Promise<GeometryOperationResult> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/geometry/split/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        polygon,
+        split_line: splitLine,
+      }),
+    });
+    return handleResponse<GeometryOperationResult>(response);
+  } catch (error) {
+    logger.error('Error splitting polygon:', error);
+    throw error;
+  }
+}
+
+// ==============================================================================
+// IMPORT GÉOGRAPHIQUE
+// ==============================================================================
+
+export type ImportFormat = 'geojson' | 'kml' | 'shapefile' | 'auto';
+
+export interface ImportFeature {
+  index: number;
+  geometry: {
+    type: string;
+    coordinates: any;
+  };
+  properties: Record<string, any>;
+  original_properties?: Record<string, any>;
+}
+
+export interface ImportPreviewResponse {
+  format: string;
+  feature_count: number;
+  geometry_types: string[];
+  sample_properties: string[];
+  features: ImportFeature[];
+  suggested_mapping?: Record<string, string>;
+  bbox?: [number, number, number, number];
+}
+
+export interface ImportValidationResponse {
+  valid_count: number;
+  invalid_count: number;
+  warnings: Array<{
+    index: number;
+    message: string;
+    code: string;
+  }>;
+  errors: Array<{
+    index: number;
+    message: string;
+    code: string;
+  }>;
+  features: Array<{
+    index: number;
+    is_valid: boolean;
+    geometry_type: string;
+    mapped_properties: Record<string, any>;
+  }>;
+}
+
+export interface ImportExecuteResponse {
+  created: number[];
+  errors: Array<{
+    index: number;
+    error: string;
+  }>;
+  summary: {
+    total: number;
+    created: number;
+    failed: number;
+  };
+}
+
+export interface AttributeMapping {
+  [targetField: string]: string | null; // source field name or null
+}
+
+/**
+ * Preview an import file - upload and get features preview
+ * @param file - File to import (GeoJSON, KML, or Shapefile ZIP)
+ * @param format - Format hint ('auto' for auto-detection)
+ */
+export async function importPreview(
+  file: File,
+  format: ImportFormat = 'auto'
+): Promise<ImportPreviewResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('format', format);
+
+  try {
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    // Don't set Content-Type for FormData - browser will set it with boundary
+
+    const response = await fetch(`${API_BASE_URL}/import/preview/`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    return handleResponse<ImportPreviewResponse>(response);
+  } catch (error) {
+    logger.error('Error previewing import:', error);
+    throw error;
+  }
+}
+
+/**
+ * Validate import features with attribute mapping
+ * @param features - Features from preview
+ * @param targetType - Target object type (Arbre, Gazon, etc.)
+ * @param mapping - Attribute mapping configuration
+ * @param siteId - Target site ID
+ */
+export async function importValidate(
+  features: ImportFeature[],
+  targetType: string,
+  mapping: AttributeMapping,
+  siteId: number
+): Promise<ImportValidationResponse> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/import/validate/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        features,
+        target_type: targetType,
+        mapping,
+        site_id: siteId,
+      }),
+    });
+
+    return handleResponse<ImportValidationResponse>(response);
+  } catch (error) {
+    logger.error('Error validating import:', error);
+    throw error;
+  }
+}
+
+/**
+ * Execute import - create objects in database
+ * @param features - Validated features
+ * @param targetType - Target object type
+ * @param mapping - Attribute mapping
+ * @param siteId - Target site ID
+ * @param sousSiteId - Optional sous-site ID
+ */
+export async function importExecute(
+  features: ImportFeature[],
+  targetType: string,
+  mapping: AttributeMapping,
+  siteId: number,
+  sousSiteId?: number
+): Promise<ImportExecuteResponse> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/import/execute/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        features,
+        target_type: targetType,
+        mapping,
+        site_id: siteId,
+        sous_site_id: sousSiteId,
+      }),
+    });
+
+    return handleResponse<ImportExecuteResponse>(response);
+  } catch (error) {
+    logger.error('Error executing import:', error);
+    throw error;
+  }
+}
+
+// ==============================================================================
+// EXPORT GÉOGRAPHIQUE
+// ==============================================================================
+
+export type ExportFormat = 'csv' | 'xlsx' | 'geojson' | 'kml' | 'shapefile';
+
+/**
+ * Export data in various formats
+ * @param modelName - Model to export (arbres, gazons, etc.)
+ * @param format - Export format
+ * @param ids - Optional list of IDs to export (if not provided, exports all)
+ */
+export async function exportGeoData(
+  modelName: string,
+  format: ExportFormat,
+  ids?: number[]
+): Promise<Blob> {
+  try {
+    const params = new URLSearchParams();
+    params.append('format', format);
+    if (ids && ids.length > 0) {
+      params.append('ids', ids.join(','));
+    }
+
+    const response = await apiFetch(`${API_BASE_URL}/export/${modelName}/?${params}`);
+
+    if (!response.ok) {
+      throw new ApiError(`Erreur export ${format.toUpperCase()}: ${response.status}`, response.status);
+    }
+
+    return response.blob();
+  } catch (error) {
+    logger.error(`Error exporting ${modelName} as ${format}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Export selected inventory items
+ * @param objectType - Type of objects
+ * @param ids - List of object IDs
+ * @param format - Export format
+ */
+export async function exportSelection(
+  objectType: string,
+  ids: number[],
+  format: ExportFormat
+): Promise<Blob> {
+  const endpoint = typeToPathMap[objectType.toLowerCase()];
+  if (!endpoint) {
+    throw new ApiError(`Type d'objet non supporté: ${objectType}`);
+  }
+
+  return exportGeoData(endpoint, format, ids);
+}
+
+/**
+ * Get file extension for export format
+ */
+export function getExportFileExtension(format: ExportFormat): string {
+  switch (format) {
+    case 'csv': return '.csv';
+    case 'xlsx': return '.xlsx';
+    case 'geojson': return '.geojson';
+    case 'kml': return '.kml';
+    case 'shapefile': return '.zip';
+    default: return '.dat';
+  }
+}
+
+/**
+ * Get MIME type for export format
+ */
+export function getExportMimeType(format: ExportFormat): string {
+  switch (format) {
+    case 'csv': return 'text/csv';
+    case 'xlsx': return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    case 'geojson': return 'application/geo+json';
+    case 'kml': return 'application/vnd.google-earth.kml+xml';
+    case 'shapefile': return 'application/zip';
+    default: return 'application/octet-stream';
+  }
+}

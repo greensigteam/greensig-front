@@ -9,6 +9,7 @@ import { useGeolocation } from '../hooks/useGeolocation';
 import { useMapContext } from '../contexts/MapContext';
 import { useToast } from '../contexts/ToastContext';
 import { useSelection } from '../contexts/SelectionContext';
+import { useDrawing } from '../contexts/DrawingContext';
 import logger from '../services/logger';
 
 // ✅ IMPORT SUB-COMPONENTS
@@ -18,6 +19,10 @@ import { MapObjectDetailCard } from '../components/map/MapObjectDetailCard';
 import { MapLayersPanel } from '../components/map/MapLayersPanel';
 import { MapZoomControls } from '../components/map/MapZoomControls';
 import { SelectionPanel } from '../components/map/SelectionPanel';
+import ObjectTypeSelector from '../components/map/ObjectTypeSelector';
+import CreateObjectModal from '../components/CreateObjectModal';
+import ImportWizard from '../components/import/ImportWizard';
+import ExportPanel from '../components/export/ExportPanel';
 
 // Types pour la symbologie
 interface SymbologyConfig {
@@ -126,11 +131,31 @@ export const MapPage: React.FC<MapPageProps> = ({
   const { showToast } = useToast();
 
   // ✅ USE SELECTION - For multi-object selection
-  const { toggleSelectionMode, isSelectionMode, selectedObjects } = useSelection();
+  const { toggleSelectionMode, isSelectionMode, selectedObjects, getSelectedIds } = useSelection();
+
+  // ✅ USE DRAWING - For drawing/editing tools
+  const {
+    drawingMode,
+    setDrawingMode,
+    editingMode,
+    setEditingMode,
+    isDrawing,
+    drawnGeometry,
+    clearDrawnGeometry,
+    pendingObjectType,
+    setPendingObjectType,
+    calculatedMetrics,
+  } = useDrawing();
 
   // ========== STATE MANAGEMENT ==========
   const [showLayers, setShowLayers] = useState(false);
   const [showZoomWarning, setShowZoomWarning] = useState(false);
+
+  // ✅ Import/Export modals state
+  const [showImportWizard, setShowImportWizard] = useState(false);
+  const [showExportPanel, setShowExportPanel] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showTypeSelector, setShowTypeSelector] = useState(false);
 
   // Sites dynamiques chargés depuis l'API
   const [sites, setSites] = useState<SiteFrontend[]>([]);
@@ -429,6 +454,50 @@ export const MapPage: React.FC<MapPageProps> = ({
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ✅ Show type selector when a geometry is drawn
+  useEffect(() => {
+    if (drawnGeometry && !pendingObjectType) {
+      setShowTypeSelector(true);
+    }
+  }, [drawnGeometry, pendingObjectType]);
+
+  // ✅ Show create modal when type is selected
+  useEffect(() => {
+    if (pendingObjectType && drawnGeometry) {
+      setShowTypeSelector(false);
+      setShowCreateModal(true);
+    }
+  }, [pendingObjectType, drawnGeometry]);
+
+  // ✅ Handle object type selection
+  const handleTypeSelected = (typeId: string) => {
+    setPendingObjectType(typeId);
+    setShowTypeSelector(false);
+  };
+
+  // ✅ Handle create modal close
+  const handleCreateModalClose = () => {
+    setShowCreateModal(false);
+    clearDrawnGeometry();
+  };
+
+  // ✅ Handle object created successfully
+  const handleObjectCreated = (objectData: any) => {
+    showToast(`${pendingObjectType} créé avec succès!`, 'success');
+    setShowCreateModal(false);
+    clearDrawnGeometry();
+    // Trigger a refresh of map data
+    window.dispatchEvent(new CustomEvent('refresh-map-data'));
+  };
+
+  // ✅ Handle import success
+  const handleImportSuccess = (count: number, type: string) => {
+    showToast(`${count} ${type}(s) importé(s) avec succès!`, 'success');
+    setShowImportWizard(false);
+    // Trigger a refresh of map data
+    window.dispatchEvent(new CustomEvent('refresh-map-data'));
+  };
+
   // ========== RENDER ==========
   return (
     <>
@@ -449,7 +518,7 @@ export const MapPage: React.FC<MapPageProps> = ({
         isSidebarCollapsed={isSidebarCollapsed}
       />
 
-      {/* 2. Floating Tools Component */}
+      {/* 2. Floating Tools Component (includes drawing tools) */}
       <MapFloatingTools
         isPanelOpen={isPanelOpen}
         onToggleMap={onToggleMap}
@@ -467,6 +536,8 @@ export const MapPage: React.FC<MapPageProps> = ({
         isSelectionMode={isSelectionMode}
         onToggleSelection={toggleSelectionMode}
         selectionCount={selectedObjects.length}
+        onImport={() => setShowImportWizard(true)}
+        onExport={() => setShowExportPanel(true)}
       />
 
       {/* 3. Selection Panel */}
@@ -503,6 +574,46 @@ export const MapPage: React.FC<MapPageProps> = ({
         onZoomIn={onZoomIn}
         onZoomOut={handleZoomOutClick}
         isSidebarCollapsed={isSidebarCollapsed}
+      />
+
+      {/* 6. Object Type Selector Modal */}
+      {showTypeSelector && drawnGeometry && (
+        <ObjectTypeSelector
+          isOpen={showTypeSelector}
+          onClose={() => {
+            setShowTypeSelector(false);
+            clearDrawnGeometry();
+          }}
+          onSelect={handleTypeSelected}
+          geometryType={drawnGeometry.type as 'Point' | 'LineString' | 'Polygon'}
+        />
+      )}
+
+      {/* 7. Create Object Modal */}
+      {showCreateModal && pendingObjectType && drawnGeometry && (
+        <CreateObjectModal
+          isOpen={showCreateModal}
+          onClose={handleCreateModalClose}
+          objectType={pendingObjectType}
+          geometry={drawnGeometry}
+          metrics={calculatedMetrics}
+          onSuccess={handleObjectCreated}
+        />
+      )}
+
+      {/* 8. Import Wizard Modal */}
+      <ImportWizard
+        isOpen={showImportWizard}
+        onClose={() => setShowImportWizard(false)}
+        onSuccess={handleImportSuccess}
+      />
+
+      {/* 9. Export Panel Modal */}
+      <ExportPanel
+        isOpen={showExportPanel}
+        onClose={() => setShowExportPanel(false)}
+        selectedType={selectedObjects.length > 0 ? selectedObjects[0]?.type : undefined}
+        selectedIds={getSelectedIds()}
       />
 
       {/* Zoom Warning Modal */}

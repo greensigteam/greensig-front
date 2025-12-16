@@ -118,6 +118,8 @@ export interface Tache {
     notifiee: boolean;
     confirmee: boolean;
     deleted_at: string | null;
+    reclamation?: number | null;
+    reclamation_numero?: string;
 }
 
 export interface TacheCreate {
@@ -135,6 +137,9 @@ export interface TacheCreate {
 
     // Pour l'inventaire (ManyToMany IDs)
     objets?: number[];
+
+    // Lien Réclamation
+    reclamation?: number | null;
 }
 
 export interface TacheUpdate {

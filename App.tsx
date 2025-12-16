@@ -7,10 +7,12 @@ import { MapPage } from './pages/MapPage';
 import { OLMap } from './components/OLMap';
 import Inventory from './pages/Inventory';
 import InventoryDetailPage from './pages/InventoryDetailPage';
-import Interventions from './pages/Interventions';
+import Reclamations from './pages/Reclamations';
+import ReclamationsDashboard from './pages/ReclamationsDashboard';
 import Teams from './pages/Teams';
 import Planning from './pages/Planning';
-import Claims from './pages/Claims';
+import SuiviTaches from './pages/SuiviTaches';
+import Produits from './pages/Produits';
 import Reporting from './pages/Reporting';
 import ClientPortal from './pages/ClientPortal';
 import Users from './pages/Users';
@@ -25,6 +27,7 @@ import { useGeolocation } from './hooks/useGeolocation';
 import { MapProvider } from './contexts/MapContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { SelectionProvider } from './contexts/SelectionContext';
+import { DrawingProvider } from './contexts/DrawingContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import logger from './services/logger';
 
@@ -281,97 +284,102 @@ function App() {
       <ErrorBoundary>
         <ToastProvider>
           <SelectionProvider maxSelections={100}>
-            <MapProvider>
-              <Routes>
-                <Route
-                  path="/"
-                  element={
-                    <Layout
-                      user={user}
-                      onLogout={() => setUser(null)}
-                      isSidebarCollapsed={isSidebarCollapsed}
-                      onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                      searchQuery={searchQuery}
-                      setSearchQuery={setSearchQuery}
-                      onSearch={handleSearch}
-                      isSearching={isSearching}
-                      searchResult={searchResult}
-                      searchSuggestions={searchSuggestions}
-                      onGeolocation={handleGeolocation}
-                      setSearchResult={setSearchResult}
-                      setTargetLocation={setTargetLocation}
-                      mapComponent={
-                        <OLMap
-                          activeLayer={MAP_LAYERS[activeLayerId]}
-                          targetLocation={targetLocation}
-                          userLocation={userLocation}
-                          searchResult={searchResult}
-                          ref={mapRef}
-                          overlays={overlays}
-                          onObjectClick={setSelectedMapObject}
-                          isRouting={isRouting}
-                          isSidebarCollapsed={isSidebarCollapsed}
-                          clusteringEnabled={clusteringEnabled}
-                          isMeasuring={isMeasuring}
-                          measurementType={measurementType}
-                          onMeasurementComplete={handleMeasurementComplete}
-                          onMeasurementUpdate={handleMeasurementUpdate}
-                        />
-                      }
-                      mapControls={
-                        <MapPage
-                          activeLayerId={activeLayerId}
-                          setActiveLayerId={setActiveLayerId}
-                          setTargetLocation={setTargetLocation}
-                          setUserLocation={setUserLocation}
-                          onZoomIn={handleZoomIn}
-                          onZoomOut={handleZoomOut}
-                          getCurrentZoom={getCurrentZoom}
-                          getMapCenter={getMapCenter}
-                          getMapElement={getMapElement}
-                          exportMapCanvas={exportMapCanvas}
-                          isPanelOpen={true} // Simplified, can be derived from location
-                          onToggleMap={() => { }} // Will be handled by routing
-                          overlays={overlays}
-                          onToggleOverlay={toggleOverlay}
-                          selectedObject={selectedMapObject}
-                          onCloseObjectDetail={() => setSelectedMapObject(null)}
-                          isSidebarCollapsed={isSidebarCollapsed}
-                          isRouting={isRouting}
-                          setIsRouting={setIsRouting}
-                          clusteringEnabled={clusteringEnabled}
-                          setClusteringEnabled={setClusteringEnabled}
-                          isMeasuring={isMeasuring}
-                          measurementType={measurementType}
-                          onToggleMeasure={handleToggleMeasure}
-                          measurements={measurements}
-                          currentMeasurement={currentMeasurement}
-                          onClearMeasurements={handleClearMeasurements}
-                          onRemoveMeasurement={handleRemoveMeasurement}
-                        />
-                      }
-                      children={null}
-                    >
-                      {/* The Outlet from Layout will render these nested routes */}
-                    </Layout>
-                  }
-                >
-                  <Route index element={<Navigate to={user.role === 'CLIENT' ? '/client' : '/dashboard'} replace />} />
-                  <Route path="dashboard" element={<Dashboard />} />
-                  <Route path="inventory" element={<Inventory />} />
-                  <Route path="inventory/:objectType/:objectId" element={<InventoryDetailPage />} />
-                  <Route path="interventions" element={<Interventions />} />
-                  <Route path="teams" element={<Teams />} />
-                  <Route path="users" element={<Users />} />
-                  <Route path="planning" element={<Planning />} />
-                  <Route path="claims" element={<Claims />} />
-                  <Route path="reporting" element={<Reporting />} />
-                  <Route path="client" element={<ClientPortal user={user} />} />
-                  {/* Add a /map route if you want a dedicated map view without the panel */}
-                  <Route path="map" element={null} />
-                </Route>
-              </Routes>
-            </MapProvider>
+            <DrawingProvider>
+              <MapProvider>
+                <Routes>
+                  <Route
+                    path="/"
+                    element={
+                      <Layout
+                        user={user}
+                        onLogout={() => setUser(null)}
+                        isSidebarCollapsed={isSidebarCollapsed}
+                        onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                        searchQuery={searchQuery}
+                        setSearchQuery={setSearchQuery}
+                        onSearch={handleSearch}
+                        isSearching={isSearching}
+                        searchResult={searchResult}
+                        searchSuggestions={searchSuggestions}
+                        onGeolocation={handleGeolocation}
+                        setSearchResult={setSearchResult}
+                        setTargetLocation={setTargetLocation}
+                        mapComponent={
+                          <OLMap
+                            activeLayer={MAP_LAYERS[activeLayerId]}
+                            targetLocation={targetLocation}
+                            userLocation={userLocation}
+                            searchResult={searchResult}
+                            ref={mapRef}
+                            overlays={overlays}
+                            onObjectClick={setSelectedMapObject}
+                            isRouting={isRouting}
+                            isSidebarCollapsed={isSidebarCollapsed}
+                            clusteringEnabled={clusteringEnabled}
+                            isMeasuring={isMeasuring}
+                            measurementType={measurementType}
+                            onMeasurementComplete={handleMeasurementComplete}
+                            onMeasurementUpdate={handleMeasurementUpdate}
+                          />
+                        }
+                        mapControls={
+                          <MapPage
+                            activeLayerId={activeLayerId}
+                            setActiveLayerId={setActiveLayerId}
+                            setTargetLocation={setTargetLocation}
+                            setUserLocation={setUserLocation}
+                            onZoomIn={handleZoomIn}
+                            onZoomOut={handleZoomOut}
+                            getCurrentZoom={getCurrentZoom}
+                            getMapCenter={getMapCenter}
+                            getMapElement={getMapElement}
+                            exportMapCanvas={exportMapCanvas}
+                            isPanelOpen={true} // Simplified, can be derived from location
+                            onToggleMap={() => { }} // Will be handled by routing
+                            overlays={overlays}
+                            onToggleOverlay={toggleOverlay}
+                            selectedObject={selectedMapObject}
+                            onCloseObjectDetail={() => setSelectedMapObject(null)}
+                            isSidebarCollapsed={isSidebarCollapsed}
+                            isRouting={isRouting}
+                            setIsRouting={setIsRouting}
+                            clusteringEnabled={clusteringEnabled}
+                            setClusteringEnabled={setClusteringEnabled}
+                            isMeasuring={isMeasuring}
+                            measurementType={measurementType}
+                            onToggleMeasure={handleToggleMeasure}
+                            measurements={measurements}
+                            currentMeasurement={currentMeasurement}
+                            onClearMeasurements={handleClearMeasurements}
+                            onRemoveMeasurement={handleRemoveMeasurement}
+                          />
+                        }
+                        children={null}
+                      >
+                        {/* The Outlet from Layout will render these nested routes */}
+                      </Layout>
+                    }
+                  >
+                    <Route index element={<Navigate to={user.role === 'CLIENT' ? '/client' : '/dashboard'} replace />} />
+                    <Route path="dashboard" element={<Dashboard />} />
+                    <Route path="inventory" element={<Inventory />} />
+                    <Route path="inventory/:objectType/:objectId" element={<InventoryDetailPage />} />
+                    <Route path="interventions" element={<Navigate to="/reclamations" replace />} />
+                    <Route path="reclamations" element={<Reclamations />} />
+                    <Route path="reclamations/stats" element={<ReclamationsDashboard />} />
+                    <Route path="teams" element={<Teams />} />
+                    <Route path="users" element={<Users />} />
+                    <Route path="planning" element={<Planning />} />
+                    <Route path="claims" element={<SuiviTaches />} />
+                    <Route path="products" element={<Produits />} />
+                    <Route path="reporting" element={<Reporting />} />
+                    <Route path="client" element={<ClientPortal user={user} />} />
+                    {/* Add a /map route if you want a dedicated map view without the panel */}
+                    <Route path="map" element={null} />
+                  </Route>
+                </Routes>
+              </MapProvider>
+            </DrawingProvider>
           </SelectionProvider>
         </ToastProvider>
       </ErrorBoundary>

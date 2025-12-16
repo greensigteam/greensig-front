@@ -24,8 +24,10 @@ import { useUserLocationDisplay } from '../hooks/useUserLocationDisplay';
 import { useMapHoverTooltip } from '../hooks/useMapHoverTooltip';
 import { useMapClickHandler } from '../hooks/useMapClickHandler';
 import { useMeasurementTools } from '../hooks/useMeasurementTools';
+import { useDrawingTools } from '../hooks/useDrawingTools';
 import { useMapContext } from '../contexts/MapContext';
 import { useSelection } from '../contexts/SelectionContext';
+import { useDrawing } from '../contexts/DrawingContext';
 import logger from '../services/logger';
 import { apiFetch } from '../services/api';
 
@@ -91,6 +93,7 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
   // ✅ USE MAP CONTEXT - Replaces window communication
   const mapContext = useMapContext();
   const { selectedObjects } = useSelection();
+  const { drawingMode, editingMode, isDrawing, setCurrentGeometry, setCalculatedMetrics, finishDrawing } = useDrawing();
 
   // Map and layer refs
   const innerMapRef = useRef<HTMLDivElement>(null);
@@ -144,12 +147,15 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     userLocation
   });
 
+  // ✅ Disable interactions when in any tool mode (measuring, drawing, editing)
+  const isToolActive = isMeasuring || isDrawing || drawingMode !== 'none' || editingMode !== 'none';
+
   useMapHoverTooltip({
     mapInstance,
     sitesLayerRef,
     dataLayerRef,
     mapReady, // ✅ Trigger hook when map is ready
-    isMeasuring // ✅ Disable hover when measuring
+    isMeasuring: isToolActive // ✅ Disable hover when any tool is active
   });
 
   useMapClickHandler({
@@ -159,7 +165,29 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     popupOverlayRef: popupOverlay,
     onObjectClick,
     mapReady, // ✅ Trigger hook when map is ready
-    isMeasuring // ✅ Disable clicks when measuring
+    isMeasuring: isToolActive // ✅ Disable clicks when any tool is active
+  });
+
+  // ✅ DRAWING TOOLS HOOK
+  const drawingTools = useDrawingTools({
+    mapInstance,
+    drawingMode,
+    isDrawing,
+    onDrawEnd: (geometry, metrics) => {
+      console.log('Draw completed:', geometry, metrics);
+      // Update context with the drawn geometry - this triggers the form modal in MapPage
+      setCurrentGeometry(geometry);
+      setCalculatedMetrics(metrics);
+      finishDrawing();
+    },
+    onDrawUpdate: (metrics) => {
+      // Live update metrics while drawing
+      setCalculatedMetrics(metrics);
+    },
+    onModifyEnd: (geometry, featureId) => {
+      console.log('Modify completed:', featureId, geometry);
+      setCurrentGeometry(geometry);
+    },
   });
 
   // Expose ref methods
@@ -418,6 +446,10 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     }
     if (userLocationDisplay.userLocationLayerRef.current) {
       map.addLayer(userLocationDisplay.userLocationLayerRef.current);
+    }
+    // ✅ Add drawing layer
+    if (drawingTools.drawingLayerRef.current) {
+      map.addLayer(drawingTools.drawingLayerRef.current);
     }
 
     // ✅ Trigger hooks to initialize event handlers
@@ -905,7 +937,7 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     if (scaleEl) {
       scaleEl.style.left = 'auto'; // Remove left positioning
       scaleEl.style.right = '24px'; // Align to Right
-      scaleEl.style.bottom = '8px';
+      scaleEl.style.bottom = '24px'; // Position plus bas pour éviter l'alignement avec les boutons de zoom
       scaleEl.style.top = 'auto';
       // scaleEl.style.transition = 'left 0.3s ease'; // No transition needed for fixed right pos
     }

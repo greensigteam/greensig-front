@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
-import { MapObjectDetail } from '../types';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import { MapObjectDetail, GeoJSONGeometry } from '../types';
 
 interface SelectionContextType {
     selectedObjects: MapObjectDetail[];
@@ -11,6 +11,12 @@ interface SelectionContextType {
     toggleObjectSelection: (object: MapObjectDetail) => void;
     clearSelection: () => void;
     isSelected: (objectId: string) => boolean;
+    // New helper methods
+    getSelectedByType: (objectType: string) => MapObjectDetail[];
+    getSelectedIds: () => number[];
+    getSelectedGeometries: () => GeoJSONGeometry[];
+    selectionCount: number;
+    hasSelection: boolean;
 }
 
 const SelectionContext = createContext<SelectionContextType | undefined>(undefined);
@@ -89,6 +95,31 @@ export const SelectionProvider: React.FC<SelectionProviderProps> = ({
         return selectedObjects.some(obj => obj.id === objectId);
     }, [selectedObjects]);
 
+    // Get selected objects filtered by type
+    const getSelectedByType = useCallback((objectType: string): MapObjectDetail[] => {
+        return selectedObjects.filter(obj => obj.type === objectType);
+    }, [selectedObjects]);
+
+    // Get array of selected object IDs (numeric)
+    const getSelectedIds = useCallback((): number[] => {
+        return selectedObjects.map(obj => {
+            // Handle both string and numeric IDs
+            const numId = parseInt(obj.id, 10);
+            return isNaN(numId) ? 0 : numId;
+        }).filter(id => id > 0);
+    }, [selectedObjects]);
+
+    // Get geometries of all selected objects
+    const getSelectedGeometries = useCallback((): GeoJSONGeometry[] => {
+        return selectedObjects
+            .filter(obj => obj.geometry)
+            .map(obj => obj.geometry as GeoJSONGeometry);
+    }, [selectedObjects]);
+
+    // Computed values
+    const selectionCount = useMemo(() => selectedObjects.length, [selectedObjects]);
+    const hasSelection = useMemo(() => selectedObjects.length > 0, [selectedObjects]);
+
     const value: SelectionContextType = {
         selectedObjects,
         isSelectionMode,
@@ -99,6 +130,11 @@ export const SelectionProvider: React.FC<SelectionProviderProps> = ({
         toggleObjectSelection,
         clearSelection,
         isSelected,
+        getSelectedByType,
+        getSelectedIds,
+        getSelectedGeometries,
+        selectionCount,
+        hasSelection,
     };
 
     return (

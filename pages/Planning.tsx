@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Calendar as BigCalendar, dateFnsLocalizer } from 'react-big-calendar';
+import { useLocation } from 'react-router-dom';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
@@ -46,21 +47,23 @@ interface CalendarEvent {
 
 const TaskFormModal: React.FC<{
     tache?: Tache;
+    initialValues?: Partial<TacheCreate>;
     clients: Client[];
     equipes: EquipeList[];
     typesTaches: TypeTache[];
     onClose: () => void;
     onSubmit: (data: TacheCreate) => void;
-}> = ({ tache, clients, equipes, typesTaches, onClose, onSubmit }) => {
+}> = ({ tache, initialValues, clients, equipes, typesTaches, onClose, onSubmit }) => {
     const [formData, setFormData] = useState<TacheCreate>({
-        id_client: (tache?.client_detail && ((tache?.client_detail as any).utilisateur || tache?.client_detail?.utilisateur)) || null,
-        id_type_tache: tache?.type_tache_detail.id || 0,
-        id_equipe: tache?.equipe_detail?.id || null,
-        date_debut_planifiee: tache?.date_debut_planifiee.slice(0, 16) || '',
-        date_fin_planifiee: tache?.date_fin_planifiee.slice(0, 16) || '',
-        priorite: tache?.priorite || 3,
-        commentaires: tache?.commentaires || '',
-        parametres_recurrence: tache?.parametres_recurrence || null
+        id_client: (tache?.client_detail && ((tache?.client_detail as any).utilisateur || tache?.client_detail?.utilisateur)) || initialValues?.id_client || null,
+        id_type_tache: tache?.type_tache_detail.id || initialValues?.id_type_tache || 0,
+        id_equipe: tache?.equipe_detail?.id || initialValues?.id_equipe || null,
+        date_debut_planifiee: tache?.date_debut_planifiee.slice(0, 16) || initialValues?.date_debut_planifiee || '',
+        date_fin_planifiee: tache?.date_fin_planifiee.slice(0, 16) || initialValues?.date_fin_planifiee || '',
+        priorite: tache?.priorite || initialValues?.priorite || 3,
+        commentaires: tache?.commentaires || initialValues?.commentaires || '',
+        parametres_recurrence: tache?.parametres_recurrence || null,
+        reclamation: tache?.reclamation || initialValues?.reclamation || null
     });
 
     const [showRecurrence, setShowRecurrence] = useState(!!tache?.parametres_recurrence);
@@ -84,6 +87,10 @@ const TaskFormModal: React.FC<{
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (!formData.id_type_tache || formData.id_type_tache === 0) {
+            alert('Veuillez sélectionner un type de tâche');
+            return;
+        }
         onSubmit(formData);
     };
 
@@ -122,11 +129,11 @@ const TaskFormModal: React.FC<{
                             </label>
                             <select
                                 required
-                                value={formData.id_type_tache}
+                                value={formData.id_type_tache || ""}
                                 onChange={(e) => setFormData({ ...formData, id_type_tache: Number(e.target.value) })}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                             >
-                                <option value={0}>Sélectionner un type</option>
+                                <option value="">Sélectionner un type</option>
                                 {typesTaches.map((type) => (
                                     <option key={type.id} value={type.id}>
                                         {type.nom_tache}
@@ -452,6 +459,32 @@ const Planning: React.FC = () => {
     const [filterType, setFilterType] = useState<number | 'all'>('all');
     const [tacheToDelete, setTacheToDelete] = useState<number | null>(null);
 
+    const location = useLocation();
+    const [initialTaskValues, setInitialTaskValues] = useState<Partial<TacheCreate> | undefined>(undefined);
+
+    // Handle navigation from Reclamations
+    useEffect(() => {
+        if (location.state?.createTaskFromReclamation && location.state.reclamation) {
+            const rec = location.state.reclamation;
+            // Set defaults suitable for form
+            const now = new Date();
+            const end = new Date(now.getTime() + 3600000); // +1 hour
+
+            setInitialTaskValues({
+                id_client: rec.client,
+                id_equipe: rec.equipe_affectee || null,
+                priorite: Math.min(Math.max(rec.urgence || 3, 1), 5) as any,
+                commentaires: `[Réclamation #${rec.numero_reclamation}] ${rec.description}`,
+                reclamation: rec.id,
+                date_debut_planifiee: now.toISOString().slice(0, 16),
+                date_fin_planifiee: end.toISOString().slice(0, 16),
+            });
+            setShowCreateForm(true);
+            // Clear state so refresh doesn't trigger it again? 
+            // Optional: window.history.replaceState({}, document.title);
+        }
+    }, [location]);
+
     // Load initial data
     useEffect(() => {
         loadData();
@@ -625,7 +658,7 @@ const Planning: React.FC = () => {
                     <p className="text-gray-500 mt-1">Gestion des tâches planifiées</p>
                 </div>
                 <button
-                    onClick={() => { setSelectedTache(null); setShowCreateForm(true); }}
+                    onClick={() => { setSelectedTache(null); setInitialTaskValues(undefined); setShowCreateForm(true); }}
                     className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
                 >
                     <Plus className="w-4 h-4" />
@@ -834,10 +867,11 @@ const Planning: React.FC = () => {
                 showCreateForm && (
                     <TaskFormModal
                         tache={selectedTache || undefined}
+                        initialValues={initialTaskValues}
                         clients={clients}
                         equipes={equipes}
                         typesTaches={typesTaches}
-                        onClose={() => setShowCreateForm(false)}
+                        onClose={() => { setShowCreateForm(false); setSelectedTache(null); setInitialTaskValues(undefined); }}
                         onSubmit={selectedTache ? handleUpdateTache : handleCreateTache}
                     />
                 )

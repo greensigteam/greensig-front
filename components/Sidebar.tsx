@@ -2,8 +2,8 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Map as MapIcon, Package, Calendar,
-  Wrench, AlertTriangle, Users, UserCog, BarChart3,
-  LogOut, ChevronLeft, ChevronRight
+  ClipboardList, Users, UserCog, BarChart3,
+  LogOut, ChevronLeft, ChevronRight, AlertCircle
 } from 'lucide-react';
 import { ViewState, Role } from '../types';
 
@@ -15,11 +15,13 @@ interface SidebarProps {
 }
 
 const viewToPath: Record<ViewState, string> = {
+  LOGIN: '/login',
   DASHBOARD: '/dashboard',
   MAP: '/map',
   INVENTORY: '/inventory',
+  PRODUCTS: '/products',
   PLANNING: '/planning',
-  INTERVENTIONS: '/interventions',
+  INTERVENTIONS: '/reclamations',
   CLAIMS: '/claims',
   TEAMS: '/teams',
   REPORTING: '/reporting',
@@ -39,9 +41,10 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'DASHBOARD', label: 'Tableau de bord', icon: LayoutDashboard, roles: ['ADMIN', 'OPERATOR'] },
     { id: 'MAP', label: 'Cartographie', icon: MapIcon, roles: ['ADMIN', 'OPERATOR'] },
     { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['ADMIN', 'OPERATOR'] },
+    { id: 'PRODUCTS', label: 'Gestion de produits', icon: Package, roles: ['ADMIN', 'OPERATOR'] },
     { id: 'PLANNING', label: 'Planification', icon: Calendar, roles: ['ADMIN'] },
-    { id: 'INTERVENTIONS', label: 'Interventions', icon: Wrench, roles: ['ADMIN', 'OPERATOR'] },
-    { id: 'CLAIMS', label: 'Réclamations', icon: AlertTriangle, roles: ['ADMIN', 'OPERATOR'] },
+    { id: 'INTERVENTIONS', label: 'Réclamations', icon: AlertCircle, roles: ['ADMIN', 'OPERATOR'] },
+    { id: 'CLAIMS', label: 'Suivi des Tâches', icon: ClipboardList, roles: ['ADMIN', 'OPERATOR'] },
     { id: 'TEAMS', label: 'Équipes', icon: Users, roles: ['ADMIN'] },
     { id: 'USERS', label: 'Utilisateurs', icon: UserCog, roles: ['ADMIN'] },
     { id: 'REPORTING', label: 'Rapports', icon: BarChart3, roles: ['ADMIN'] },

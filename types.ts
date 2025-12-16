@@ -1,6 +1,6 @@
 
 export type Role = 'ADMIN' | 'OPERATEUR' | 'CLIENT' | 'CHEF_EQUIPE';
-export type ViewState = 'LOGIN' | 'DASHBOARD' | 'MAP' | 'INVENTORY' | 'PLANNING' | 'INTERVENTIONS' | 'CLAIMS' | 'TEAMS' | 'USERS' | 'REPORTING' | 'CLIENT_PORTAL';
+export type ViewState = 'LOGIN' | 'DASHBOARD' | 'MAP' | 'INVENTORY' | 'PLANNING' | 'INTERVENTIONS' | 'CLAIMS' | 'TEAMS' | 'USERS' | 'REPORTING' | 'CLIENT_PORTAL' | 'PRODUCTS';
 
 export interface User {
   id: string;
@@ -119,12 +119,13 @@ export interface OverlayState {
 // User 1.1.5 - Detailed Object Interface
 export interface MapObjectDetail {
   id: string;
-  type: 'PARCELLE' | 'RESEAU' | 'ESPACE_VERT' | 'CHANTIER' | 'Site';
+  type: string;
   title: string;
   subtitle: string;
   attributes: Record<string, string>;
   lastIntervention?: string;
   nextIntervention?: string;
+  geometry?: GeoJSONGeometry;
 }
 
 // ========================
@@ -190,7 +191,7 @@ import type { EventsKey as OLEventsKey } from 'ol/events';
 import type { Feature as OLFeature } from 'ol';
 import type { Geometry as OLGeometry } from 'ol/geom';
 
-export type MapBrowserEvent<T = UIEvent> = OLMapBrowserEvent<T>;
+export type MapBrowserEvent = OLMapBrowserEvent<any>;
 export type EventsKey = OLEventsKey;
 export type Feature<G extends OLGeometry = OLGeometry> = OLFeature<G>;
 export type Geometry = OLGeometry;
@@ -202,6 +203,69 @@ export interface Measurement {
   type: MeasurementType;
   value: string;
   timestamp: number;
+}
+
+// ==============================================================================
+// DRAWING & EDITING TYPES
+// ==============================================================================
+
+export type DrawingMode = 'none' | 'point' | 'line' | 'polygon';
+export type EditingMode = 'none' | 'modify' | 'move' | 'delete';
+
+export type ObjectCategory = 'vegetation' | 'hydraulique';
+
+export interface ObjectTypeInfo {
+  id: string;
+  name: string;
+  namePlural: string;
+  category: ObjectCategory;
+  geometryType: 'Point' | 'LineString' | 'Polygon';
+  color: string;
+  icon: string;
+  fields: ObjectFieldConfig[];
+}
+
+export interface ObjectFieldConfig {
+  name: string;
+  label: string;
+  type: 'text' | 'number' | 'select' | 'textarea';
+  required?: boolean;
+  options?: string[];
+  placeholder?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+}
+
+export interface DrawingState {
+  isDrawing: boolean;
+  drawingMode: DrawingMode;
+  editingMode: EditingMode;
+  selectedObjectType: string | null;
+  currentGeometry: GeoJSONGeometry | null;
+  calculatedMetrics: GeometryMetrics | null;
+}
+
+export interface GeoJSONGeometry {
+  type: 'Point' | 'LineString' | 'Polygon' | 'MultiPoint' | 'MultiLineString' | 'MultiPolygon';
+  coordinates: number[] | number[][] | number[][][] | number[][][][];
+}
+
+export interface GeometryMetrics {
+  area_m2?: number;
+  area_hectares?: number;
+  length_m?: number;
+  length_km?: number;
+  perimeter_m?: number;
+  centroid?: { lng: number; lat: number };
+}
+
+export interface CreateObjectData {
+  type: string;
+  geometry: GeoJSONGeometry;
+  site_id: number;
+  sous_site_id?: number;
+  properties: Record<string, any>;
 }
 
 // ==============================================================================
