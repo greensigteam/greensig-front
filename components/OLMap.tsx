@@ -29,9 +29,9 @@ import { useMapContext } from '../contexts/MapContext';
 import { useSelection } from '../contexts/SelectionContext';
 import { useDrawing } from '../contexts/DrawingContext';
 import logger from '../services/logger';
-import { apiFetch } from '../services/api';
+import { fetchMapData } from '../services/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+
 
 // ✅ SELECTION VISUAL STYLE (Yellow Highlight)
 const SELECTION_STYLE = new Style({
@@ -129,6 +129,18 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
   const [visibleLayers, setVisibleLayers] = useState<string[]>(() =>
     [...SITE_LEGEND, ...VEG_LEGEND, ...HYDRO_LEGEND].map(item => item.type)
   );
+
+  // ✅ WEB WORKER REF
+  const workerRef = useRef<Worker | null>(null);
+
+  useEffect(() => {
+    // Initialiser le worker
+    workerRef.current = new Worker('/workers/geojsonWorker.js');
+
+    return () => {
+      workerRef.current?.terminate();
+    };
+  }, []);
 
   // ✅ CUSTOM HOOKS - Extracted logic
   const measurementTools = useMeasurementTools({
@@ -566,20 +578,33 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
         .filter(Boolean)
         .join(',');
 
-      const url = `${API_BASE_URL}/map/?bbox=${west},${south},${east},${north}&types=${typesParam}&zoom=${zoom}`;
+      const data = await fetchMapData(
+        `${west},${south},${east},${north}`,
+        typesParam,
+        zoom
+      );
 
-      const response = await apiFetch(url);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-      const data = await response.json();
       if (data.type !== 'FeatureCollection') throw new Error('Invalid GeoJSON');
+
+      // ✅ UTILISER LE WEB WORKER pour le traitement lourd
+      const processedData = await new Promise<any>((resolve, reject) => {
+        if (!workerRef.current) return reject('Worker not initialized');
+
+        workerRef.current.onmessage = (e) => {
+          if (e.data.success) resolve(e.data);
+          else reject(e.data.error);
+        };
+
+        workerRef.current.postMessage({ task: 'parse_geojson', data: data });
+      });
 
       const siteFeatures: Feature[] = [];
       const featuresByType: Record<string, Feature[]> = {};
-
       const geojsonFormat = new GeoJSON();
 
-      data.features.forEach((feat: any) => {
+      // Traitement des features pré-groupées par le worker
+      const allFeatures = processedData.features;
+      allFeatures.forEach((feat: any) => {
         const feature = geojsonFormat.readFeature(feat, {
           dataProjection: 'EPSG:4326',
           featureProjection: 'EPSG:3857'
@@ -589,7 +614,6 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
         if (objectType === 'Site') {
           siteFeatures.push(feature);
         } else {
-          // ✅ Group features by type for type-based clustering
           if (!featuresByType[objectType]) {
             featuresByType[objectType] = [];
           }
