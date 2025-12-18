@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { X, AlertTriangle } from 'lucide-react';
 import { VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND } from '../constants';
 import { MapLayerType, Coordinates, OverlayState, MapObjectDetail, Measurement, MeasurementType } from '../types';
@@ -141,9 +141,10 @@ export const MapPage: React.FC<MapPageProps> = ({
 
   // ✅ USE NAVIGATE - For page navigation
   const navigate = useNavigate();
+  const location = useLocation();
 
   // ✅ USE SELECTION - For multi-object selection
-  const { toggleSelectionMode, isSelectionMode, selectedObjects, getSelectedIds } = useSelection();
+  const { toggleSelectionMode, isSelectionMode, selectedObjects, getSelectedIds, addMultipleToSelection, setSelectionMode } = useSelection();
 
   // ✅ USE DRAWING - For drawing/editing tools
   const {
@@ -189,6 +190,55 @@ export const MapPage: React.FC<MapPageProps> = ({
   const [taskPreSelectedObjects, setTaskPreSelectedObjects] = useState<InventoryObjectOption[]>([]);
   const [typesTaches, setTypesTaches] = useState<TypeTache[]>([]);
   const [equipes, setEquipes] = useState<EquipeList[]>([]);
+
+  // ========== HANDLE NAVIGATION FROM INVENTORY ==========
+  useEffect(() => {
+    const state = location.state as { highlightFromInventory?: boolean; selectedObjects?: any[] } | null;
+
+    if (state?.highlightFromInventory && state?.selectedObjects?.length) {
+      // Convert inventory objects to MapObjectDetail format
+      const mapObjects: MapObjectDetail[] = state.selectedObjects.map((obj: any) => ({
+        id: obj.id,
+        type: obj.type,
+        title: obj.title,
+        subtitle: obj.subtitle || '',
+        attributes: obj.attributes || {},
+        geometry: obj.coordinates ? {
+          type: 'Point' as const,
+          coordinates: [obj.coordinates.lng, obj.coordinates.lat]
+        } : undefined
+      }));
+
+      // Activate selection mode and add objects
+      setSelectionMode(true);
+      addMultipleToSelection(mapObjects);
+
+      // Calculate bounding box and zoom to fit all objects
+      if (state.selectedObjects.length > 0) {
+        const coords = state.selectedObjects
+          .filter((obj: any) => obj.coordinates?.lat && obj.coordinates?.lng)
+          .map((obj: any) => obj.coordinates);
+
+        if (coords.length > 0) {
+          // Calculate center of all objects
+          const avgLat = coords.reduce((sum: number, c: any) => sum + c.lat, 0) / coords.length;
+          const avgLng = coords.reduce((sum: number, c: any) => sum + c.lng, 0) / coords.length;
+
+          // Zoom to center with appropriate zoom level
+          setTargetLocation({
+            coordinates: { lat: avgLat, lng: avgLng },
+            zoom: coords.length === 1 ? 18 : 16
+          });
+        }
+      }
+
+      // Show notification
+      showToast(`${mapObjects.length} objet(s) affiché(s) sur la carte`, 'success');
+
+      // Clear the navigation state to prevent re-processing on refresh
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state]);
 
   // ========== LOAD SITES FROM API ==========
   useEffect(() => {

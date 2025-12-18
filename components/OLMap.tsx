@@ -37,15 +37,15 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000
 const SELECTION_STYLE = new Style({
   stroke: new Stroke({
     color: '#FFD700', // Gold/Yellow
-    width: 4, // Thicker border
+    width: 2, // Thicker border
   }),
   fill: new Fill({
     color: 'rgba(255, 215, 0, 0.2)', // Transparent Gold
   }),
   image: new CircleStyle({
-    radius: 8,
-    fill: new Fill({ color: 'rgba(255, 215, 0, 0.4)' }),
-    stroke: new Stroke({ color: '#FFD700', width: 3 }),
+    radius: 2,
+    fill: new Fill({ color: 'rgba(255, 215, 0, 0.5)' }),
+    stroke: new Stroke({ color: '#FFD700', width: 2 }),
   }),
   zIndex: 1000 // Always on top
 });
@@ -869,6 +869,71 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
         }
 
         source.addFeature(clonedFeature);
+      } else if (obj.geometry) {
+        // Feature not found in existing layers, but object has geometry
+        // Create a new feature from the geometry (for objects coming from inventory)
+        try {
+          const type = obj.type as string;
+          // Normalize type for color lookup (inventory sends lowercase, OBJECT_COLORS uses PascalCase)
+          const normalizedType = type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+          const color = OBJECT_COLORS[normalizedType] || OBJECT_COLORS[type] || '#10b981';
+
+          let newFeature: Feature;
+
+          if (obj.geometry.type === 'Point') {
+            const coords = obj.geometry.coordinates as [number, number];
+            newFeature = new Feature({
+              geometry: new Point(fromLonLat(coords)),
+              id: obj.id,
+              object_type: type,
+              title: obj.title
+            });
+            newFeature.setId(obj.id);
+
+            // Create highlight style for point
+            const highlightStyle = new Style({
+              image: new CircleStyle({
+                radius: 28,
+                fill: new Fill({ color: 'rgba(255, 215, 0, 0.5)' }),
+                stroke: new Stroke({ color: '#FFD700', width: 4 })
+              }),
+              zIndex: 999
+            });
+
+            // Create marker icon
+            const iconSrc = createMarkerIcon(color, true);
+            const iconStyle = new Style({
+              image: new Icon({
+                src: iconSrc,
+                anchor: [0.5, 1],
+                anchorXUnits: 'fraction',
+                anchorYUnits: 'fraction'
+              }),
+              zIndex: 1000
+            });
+
+            newFeature.setStyle([highlightStyle, iconStyle]);
+            source.addFeature(newFeature);
+          } else {
+            // For Polygon/LineString geometries from inventory
+            const geoJsonFormat = new GeoJSON();
+            const geojsonFeature = {
+              type: 'Feature',
+              geometry: obj.geometry,
+              properties: { id: obj.id, object_type: type }
+            };
+            newFeature = geoJsonFormat.readFeature(geojsonFeature, {
+              featureProjection: 'EPSG:3857'
+            }) as Feature;
+            newFeature.setId(obj.id);
+            newFeature.setStyle(SELECTION_STYLE);
+            source.addFeature(newFeature);
+          }
+
+          logger.debug(`Created selection feature from geometry for object ${obj.id} (${type})`);
+        } catch (error) {
+          logger.error(`Failed to create selection feature from geometry for object ${obj.id}:`, error);
+        }
       }
     });
 
