@@ -11,6 +11,7 @@ export const hasExistingToken = () => {
 import logger from './logger';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+import { db } from './db';
 
 // Wrapper fetch pour ajouter automatiquement le token
 export async function apiFetch(url: string, options: RequestInit = {}) {
@@ -160,9 +161,9 @@ function calculatePolygonCentroid(coordinates: number[][][]): { lat: number; lng
 
   for (let i = 0; i < n; i++) {
     const coord = ring[i];
-    if (coord) {
-      sumLng += coord[0];
-      sumLat += coord[1];
+    if (coord && coord.length >= 2) {
+      sumLng += coord[0] || 0;
+      sumLat += coord[1] || 0;
     }
   }
 
@@ -222,7 +223,7 @@ function transformSiteToFrontend(site: SiteGeoJSON, index: number): SiteFrontend
     coordinates,
     description: site.properties.adresse || `Site ${site.properties.code_site}`,
     category,
-    color,
+    color: color || '#22c55e',
     code_site: site.properties.code_site,
     adresse: site.properties.adresse,
     superficie_totale: site.properties.superficie_totale,
@@ -243,23 +244,39 @@ const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
  * Utilise un cache de 5 minutes pour éviter les requêtes répétées
  */
 export async function fetchAllSites(forceRefresh = false): Promise<SiteFrontend[]> {
-  // Vérifier le cache
   const now = Date.now()
+
+  // 1. Vérifier le cache mémoire (très rapide)
   if (!forceRefresh && sitesCache && (now - sitesCacheTimestamp) < CACHE_DURATION) {
     return sitesCache
   }
 
   try {
+    // 2. Vérifier Dexie (Persistant) si on n'a pas de cache mémoire
+    if (!forceRefresh) {
+      const localSites = await db.sites.toArray();
+      if (localSites.length > 0) {
+        // Optionnel : ne pas utiliser le cache s'il est trop vieux (ex: > 1 jour)
+        const oldestEntry = Math.min(...localSites.map(s => s.lastUpdated));
+        if ((now - oldestEntry) < (24 * 60 * 60 * 1000)) {
+          const transformed = localSites.map(ls => ls.data as SiteFrontend);
+          sitesCache = transformed;
+          sitesCacheTimestamp = now;
+          logger.info(`Sites chargés depuis Dexie: ${transformed.length}`);
+          return transformed;
+        }
+      }
+    }
+
+    // 3. Sinon, charger depuis l'API
     const allSites: SiteGeoJSON[] = []
     let page = 1
     let hasMore = true
 
-    // Charger toutes les pages
     while (hasMore) {
       const response = await apiFetch(`${API_BASE_URL}/sites/?page=${page}`)
       const data = await handleResponse<SiteResponse>(response)
 
-      // Gérer les deux formats possibles (avec ou sans FeatureCollection)
       let features: SiteGeoJSON[]
       if (data.results && 'type' in data.results && data.results.type === 'FeatureCollection') {
         features = data.results.features
@@ -270,31 +287,36 @@ export async function fetchAllSites(forceRefresh = false): Promise<SiteFrontend[
       }
 
       allSites.push(...features)
-
       hasMore = data.next !== null
       page++
-
-      // Sécurité : max 10 pages
       if (page > 10) break
     }
 
-    // Transformer en format frontend
     const transformedSites = allSites.map((site, index) => transformSiteToFrontend(site, index))
 
-    // Mettre en cache
+    // 4. Sauvegarder dans Dexie pour la prochaine fois
+    await db.sites.clear(); // On remplace tout pour la liste complète
+    await db.sites.bulkAdd(transformedSites.map(s => ({
+      id: s.id,
+      name: s.name,
+      lastUpdated: now,
+      data: s
+    })));
+
     sitesCache = transformedSites
     sitesCacheTimestamp = now
 
-    logger.info(`Sites chargés: ${transformedSites.length} sites depuis l'API`)
+    logger.info(`Sites chargés depuis API et sauvés dans Dexie: ${transformedSites.length}`);
     return transformedSites
 
   } catch (error) {
     logger.error('Erreur fetchAllSites:', error)
+    if (sitesCache) return sitesCache
 
-    // Retourner le cache même expiré en cas d'erreur
-    if (sitesCache) {
-      logger.warn('Utilisation du cache expiré suite à une erreur')
-      return sitesCache
+    // Tentative ultime : même si forceRefresh=true, si l'API échoue, on prend Dexie
+    const fallbackSites = await db.sites.toArray();
+    if (fallbackSites.length > 0) {
+      return fallbackSites.map(ls => ls.data);
     }
 
     throw error
@@ -339,6 +361,7 @@ export async function searchSites(query: string): Promise<SiteFrontend[]> {
 export function clearSitesCache() {
   sitesCache = null
   sitesCacheTimestamp = 0
+  db.sites.clear(); // Vide aussi Dexie
 }
 
 // Anciennes fonctions conservées pour compatibilité
@@ -446,7 +469,7 @@ export async function createSite(data: CreateSiteData): Promise<SiteFrontend> {
       body: JSON.stringify(geoJsonPayload),
     })
 
-    const result = await handleResponse(response)
+    const result = await handleResponse<any>(response)
 
     // Transform to SiteFrontend format
     const coords = result.geometry?.coordinates?.[0]?.[0] || [0, 0]
@@ -494,7 +517,7 @@ export async function updateSite(id: number, data: UpdateSiteData): Promise<Site
       }),
     })
 
-    const result = await handleResponse(response)
+    const result = await handleResponse<any>(response)
 
     // Invalidate sites cache
     sitesCache = null
@@ -573,6 +596,35 @@ export interface InventoryResponse {
   }>
 }
 
+/**
+ * Récupère les données d'objets pour la carte avec filtrage BBOX et cache local.
+ */
+export async function fetchMapData(bbox: string, types: string, zoom: number): Promise<any> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/map/?bbox=${bbox}&types=${types}&zoom=${zoom}`);
+    const data = await handleResponse<any>(response);
+
+    if (data.features && data.features.length > 0) {
+      // Sauvegarder les objets en arrière-plan
+      const localObjects = data.features.map((f: any) => ({
+        id: `${f.properties.object_type}-${f.id}`,
+        objectId: f.id,
+        objectType: f.properties.object_type,
+        siteId: f.properties.site_id || null,
+        data: f,
+        lastUpdated: Date.now()
+      }));
+
+      db.inventory.bulkPut(localObjects).catch(err => logger.error('Dexie bulkPut error:', err));
+    }
+
+    return data;
+  } catch (error) {
+    logger.error('Erreur fetchMapData:', error);
+    throw error;
+  }
+}
+
 export async function fetchInventory(filters?: Record<string, string | number>): Promise<InventoryResponse> {
   try {
     const params = new URLSearchParams();
@@ -610,6 +662,18 @@ const typeToPathMap: Record<string, string> = {
 };
 
 export async function fetchInventoryItem(objectType: string, objectId: string): Promise<any> {
+  // 1. Tenter de récupérer depuis Dexie d'abord (ultra rapide)
+  try {
+    const localId = `${objectType}-${objectId}`;
+    const cached = await db.inventory.get(localId);
+    if (cached) {
+      logger.info(`Objet chargé depuis Dexie: ${localId}`);
+      return cached.data;
+    }
+  } catch (err) {
+    logger.warn('Erreur lecture Dexie:', err);
+  }
+
   const pathSegment = typeToPathMap[objectType.toLowerCase()];
 
   // If type is not in the mapping (e.g., 'equipement'), use the unified inventory endpoint
