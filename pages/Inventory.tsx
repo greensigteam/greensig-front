@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, X, MapPin, Calendar, FileText, Leaf, Droplet, AlertCircle, ClipboardList, Trash2 } from 'lucide-react';
+import { Search, Filter, X, MapPin, Calendar, FileText, Leaf, Droplet, AlertCircle, ClipboardList, Trash2, Map } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
 import { MOCK_INVENTORY, InventoryItem } from '../services/mockData';
@@ -958,6 +958,38 @@ const Inventory: React.FC = () => {
               >
                 <X className="w-4 h-4" />
                 Effacer
+              </button>
+
+              {/* Show on map */}
+              <button
+                onClick={() => {
+                  // Get selected items data with coordinates
+                  const selectedItems = inventoryData.filter(item => selectedIds.has(item.id));
+                  const objectsForMap = selectedItems.map(item => ({
+                    id: item.id,
+                    type: item.type,
+                    title: item.name,
+                    subtitle: typeof item.siteId === 'string' ? item.siteId : sites.find(s => s.id === item.siteId)?.name || '',
+                    coordinates: item.coordinates,
+                    attributes: {
+                      code: item.code,
+                      state: item.state,
+                      zone: item.zone
+                    }
+                  }));
+
+                  // Navigate to Map page with selected objects
+                  navigate('/map', {
+                    state: {
+                      highlightFromInventory: true,
+                      selectedObjects: objectsForMap
+                    }
+                  });
+                }}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium shadow-sm"
+              >
+                <Map className="w-4 h-4" />
+                Afficher sur la carte
               </button>
 
               {/* Create task */}

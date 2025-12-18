@@ -25,10 +25,11 @@ import {
 import {
     BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
+import { VEG_LEGEND, HYDRO_LEGEND } from '../constants';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
-// Couleurs pour les graphiques
+// Couleurs pour les graphiques - basées sur les légendes des filtres de la carte
 const STATE_COLORS: Record<string, string> = {
     bon: '#22c55e',      // green-500
     moyen: '#eab308',    // yellow-500
@@ -36,8 +37,27 @@ const STATE_COLORS: Record<string, string> = {
     critique: '#ef4444'  // red-500
 };
 
-const VEGETATION_COLORS = ['#16a34a', '#22c55e', '#4ade80', '#86efac', '#bbf7d0', '#dcfce7', '#f0fdf4'];
-const HYDRAULIC_COLORS = ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe', '#dbeafe', '#eff6ff', '#1d4ed8'];
+// Mapping des couleurs par type d'objet (harmonisé avec les filtres de la carte)
+// L'API renvoie les types en minuscule/pluriel, les filtres utilisent PascalCase/singulier
+const TYPE_COLORS: Record<string, string> = {
+    // Végétation - clés API -> couleurs des filtres
+    'arbres': VEG_LEGEND.find(l => l.type === 'Arbre')?.color || '#22c55e',
+    'gazons': VEG_LEGEND.find(l => l.type === 'Gazon')?.color || '#84cc16',
+    'palmiers': VEG_LEGEND.find(l => l.type === 'Palmier')?.color || '#16a34a',
+    'arbustes': VEG_LEGEND.find(l => l.type === 'Arbuste')?.color || '#65a30d',
+    'vivaces': VEG_LEGEND.find(l => l.type === 'Vivace')?.color || '#a3e635',
+    'cactus': VEG_LEGEND.find(l => l.type === 'Cactus')?.color || '#4d7c0f',
+    'graminees': VEG_LEGEND.find(l => l.type === 'Graminee')?.color || '#bef264',
+    // Hydraulique - clés API -> couleurs des filtres
+    'puits': HYDRO_LEGEND.find(l => l.type === 'Puit')?.color || '#0ea5e9',
+    'pompes': HYDRO_LEGEND.find(l => l.type === 'Pompe')?.color || '#06b6d4',
+    'vannes': HYDRO_LEGEND.find(l => l.type === 'Vanne')?.color || '#14b8a6',
+    'clapets': HYDRO_LEGEND.find(l => l.type === 'Clapet')?.color || '#0891b2',
+    'canalisations': HYDRO_LEGEND.find(l => l.type === 'Canalisation')?.color || '#0284c7',
+    'aspersions': HYDRO_LEGEND.find(l => l.type === 'Aspersion')?.color || '#38bdf8',
+    'gouttes': HYDRO_LEGEND.find(l => l.type === 'Goutte')?.color || '#7dd3fc',
+    'ballons': HYDRO_LEGEND.find(l => l.type === 'Ballon')?.color || '#0369a1',
+};
 
 const LoadingSpinner: React.FC = () => (
     <div className="flex items-center justify-center h-full">
@@ -426,8 +446,8 @@ const SiteDetailPage: React.FC = () => {
                                                     <Bar dataKey="value" name="Quantité" radius={[0, 4, 4, 0]}>
                                                         {Object.entries(statistics.vegetation.by_type)
                                                             .filter(([, count]) => (count as number) > 0)
-                                                            .map((_, index) => (
-                                                                <Cell key={`cell-${index}`} fill={VEGETATION_COLORS[index % VEGETATION_COLORS.length]} />
+                                                            .map(([typeName], index) => (
+                                                                <Cell key={`cell-${index}`} fill={TYPE_COLORS[typeName] || '#22c55e'} />
                                                             ))}
                                                     </Bar>
                                                 </BarChart>
@@ -457,8 +477,8 @@ const SiteDetailPage: React.FC = () => {
                                                     <Bar dataKey="value" name="Quantité" radius={[0, 4, 4, 0]}>
                                                         {Object.entries(statistics.hydraulique.by_type)
                                                             .filter(([, count]) => (count as number) > 0)
-                                                            .map((_, index) => (
-                                                                <Cell key={`cell-${index}`} fill={HYDRAULIC_COLORS[index % HYDRAULIC_COLORS.length]} />
+                                                            .map(([typeName], index) => (
+                                                                <Cell key={`cell-${index}`} fill={TYPE_COLORS[typeName] || '#3b82f6'} />
                                                             ))}
                                                     </Bar>
                                                 </BarChart>

@@ -47,7 +47,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'MAP', label: 'Cartographie', icon: MapIcon, roles: ['ADMIN', 'OPERATEUR', 'CHEF_EQUIPE'] },
     { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['ADMIN', 'OPERATEUR', 'CHEF_EQUIPE'] },
     { id: 'SITES', label: 'Gestion des sites', icon: MapPin, roles: ['ADMIN'] },
-    { id: 'PRODUCTS', label: 'Gestion de produits', icon: Package, roles: ['ADMIN', 'OPERATEUR', 'CHEF_EQUIPE'] },
+    { id: 'PRODUCTS', label: 'Gestion de produits', icon: Package, roles: ['ADMIN'] },
     { id: 'PLANNING', label: 'Planification', icon: Calendar, roles: ['ADMIN', 'CHEF_EQUIPE'] },
     { id: 'RATIOS', label: 'Ratios productivité', icon: Gauge, roles: ['ADMIN'] },
     { id: 'INTERVENTIONS', label: 'Réclamations', icon: AlertCircle, roles: ['ADMIN', 'OPERATEUR', 'CHEF_EQUIPE'] },
