@@ -1247,13 +1247,15 @@ export async function importPreview(
  * @param features - Features from preview
  * @param targetType - Target object type (Arbre, Gazon, etc.)
  * @param mapping - Attribute mapping configuration
- * @param siteId - Target site ID
+ * @param siteId - Target site ID (null if auto-detect)
+ * @param autoDetectSite - If true, detect site from geometry
  */
 export async function importValidate(
   features: ImportFeature[],
   targetType: string,
   mapping: AttributeMapping,
-  siteId: number | null
+  siteId: number | null,
+  autoDetectSite: boolean = false
 ): Promise<ImportValidationResponse> {
   try {
     const response = await apiFetch(`${API_BASE_URL}/import/validate/`, {
@@ -1263,6 +1265,7 @@ export async function importValidate(
         target_type: targetType,
         mapping,
         site_id: siteId,
+        auto_detect_site: autoDetectSite,
       }),
     });
 
@@ -1278,15 +1281,17 @@ export async function importValidate(
  * @param features - Validated features
  * @param targetType - Target object type
  * @param mapping - Attribute mapping
- * @param siteId - Target site ID
+ * @param siteId - Target site ID (null if auto-detect)
  * @param sousSiteId - Optional sous-site ID
+ * @param autoDetectSite - If true, detect site from geometry
  */
 export async function importExecute(
   features: ImportFeature[],
   targetType: string,
   mapping: AttributeMapping,
   siteId: number | null,
-  sousSiteId?: number
+  sousSiteId?: number,
+  autoDetectSite: boolean = false
 ): Promise<ImportExecuteResponse> {
   try {
     const response = await apiFetch(`${API_BASE_URL}/import/execute/`, {
@@ -1297,6 +1302,7 @@ export async function importExecute(
         mapping,
         site_id: siteId,
         sous_site_id: sousSiteId,
+        auto_detect_site: autoDetectSite,
       }),
     });
 
