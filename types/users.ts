@@ -267,7 +267,6 @@ export interface EquipeList {
   nomEquipe: string;
   chefEquipe: number | null;
   chefEquipeNom: string | null;
-  specialite: string;
   actif: boolean;
   dateCreation: string;
   nombreMembres: number;
@@ -282,7 +281,6 @@ export interface EquipeDetail extends EquipeList {
 export interface EquipeCreate {
   nomEquipe: string;
   chefEquipe?: number | null;
-  specialite?: string;
   actif?: boolean;
   membres?: number[];
 }
@@ -290,7 +288,6 @@ export interface EquipeCreate {
 export interface EquipeUpdate {
   nomEquipe?: string;
   chefEquipe?: number | null;
-  specialite?: string;
   actif?: boolean;
 }
 
@@ -453,7 +450,6 @@ export interface OperateurFilters {
 export interface EquipeFilters {
   search?: string;
   actif?: boolean;
-  specialite?: string;
   chefEquipe?: number;
   statutOperationnel?: StatutEquipe;
   membresMin?: number;

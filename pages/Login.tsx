@@ -55,7 +55,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         }
         // Si l'utilisateur sélectionne OPÉRATEUR (CHEF ÉQUIPE), il doit avoir le rôle CHEF_EQUIPE
         if (selectedRole === 'CHEF_EQUIPE' && !roles.includes('CHEF_EQUIPE')) {
-          setError("Seuls les chefs d'équipe peuvent accéder à la partie opérateurs.");
+          setError("Seuls les chefs d'équipe peuvent acceder.");
           setIsLoading(false);
           return;
         }

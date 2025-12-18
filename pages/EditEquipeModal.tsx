@@ -20,7 +20,6 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
   const [form, setForm] = useState<EquipeUpdate>({
     nomEquipe: equipe.nomEquipe,
     chefEquipe: equipe.chefEquipe,
-    specialite: equipe.specialite,
     actif: equipe.actif,
   });
   const [loading, setLoading] = useState(false);
@@ -150,8 +149,8 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
             type="button"
             onClick={() => setActiveTab('info')}
             className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 -mb-px ${activeTab === 'info'
-                ? 'border-emerald-500 text-emerald-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-emerald-500 text-emerald-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
           >
             Informations
@@ -160,8 +159,8 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
             type="button"
             onClick={() => setActiveTab('membres')}
             className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 -mb-px ${activeTab === 'membres'
-                ? 'border-emerald-500 text-emerald-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-emerald-500 text-emerald-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
           >
             Membres ({membres.length})
@@ -192,18 +191,7 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Specialite
-                </label>
-                <input
-                  name="specialite"
-                  value={form.specialite || ''}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                  placeholder="Ex: Entretien general"
-                />
-              </div>
+
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -301,8 +289,8 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
                           >
                             <div className="flex items-center gap-3">
                               <div className={`w-8 h-8 rounded-full flex items-center justify-center ${membre.utilisateur === equipe.chefEquipe
-                                  ? 'bg-emerald-200'
-                                  : 'bg-gray-200'
+                                ? 'bg-emerald-200'
+                                : 'bg-gray-200'
                                 }`}>
                                 {membre.utilisateur === equipe.chefEquipe ? (
                                   <UserCheck className="w-4 h-4 text-emerald-700" />

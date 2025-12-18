@@ -1,12 +1,13 @@
 import React from 'react';
 import { X, TreeDeciduous, Droplet, Sprout, Flower2 } from 'lucide-react';
 import { ObjectTypeInfo } from '../../types';
-import { getObjectTypesByGeometry, getObjectTypesByCategory } from '../../contexts/DrawingContext';
+import { getObjectTypesByGeometry } from '../../contexts/DrawingContext';
 
 interface ObjectTypeSelectorProps {
     geometryType: 'Point' | 'LineString' | 'Polygon';
     onSelect: (typeId: string) => void;
     onClose: () => void;
+    isOpen?: boolean;
 }
 
 // Icon mapping for object types
@@ -67,7 +68,7 @@ export default function ObjectTypeSelector({
                 <div className="font-medium text-sm">{type.name}</div>
                 <div className="text-xs text-gray-500">
                     {type.geometryType === 'Point' ? 'Point' :
-                     type.geometryType === 'LineString' ? 'Ligne' : 'Surface'}
+                        type.geometryType === 'LineString' ? 'Ligne' : 'Surface'}
                 </div>
             </div>
         </button>

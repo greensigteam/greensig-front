@@ -9,11 +9,9 @@ import { MAP_LAYERS } from '../constants';
 import {
   ChevronLeft,
   MapPin,
-  Image as ImageIcon,
   Info,
   Wrench,
-  Edit,
-  Calendar
+  Edit
 } from 'lucide-react';
 
 const LoadingSpinner: React.FC = () => (
@@ -141,10 +139,7 @@ const InventoryDetailPage: React.FC = () => {
             <Edit className="w-4 h-4" />
             Modifier
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">
-            <Calendar className="w-4 h-4" />
-            Planifier
-          </button>
+
         </div>
       </header>
 
@@ -154,7 +149,7 @@ const InventoryDetailPage: React.FC = () => {
         <div className="md:col-span-2 bg-gray-50 p-6 rounded-lg border">
           <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"><Info className="w-5 h-5 text-emerald-600" />Informations Générales</h2>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-6">
-            {getRelevantFields(item, objectType).map((field) => (
+            {getRelevantFields(item, objectType || '').map((field) => (
               <div key={field.label} className="col-span-1">
                 <dt className="text-sm font-medium text-gray-500">{field.label}</dt>
                 <dd className="mt-1 text-gray-900">{field.value || 'N/A'}</dd>
@@ -162,7 +157,7 @@ const InventoryDetailPage: React.FC = () => {
             ))}
           </dl>
 
-          <h2 className="text-lg font-semibold text-gray-800 mt-8 mb-4 flex items-center gap-2"><Wrench className="w-5 h-5 text-emerald-600" />Historique des Interventions</h2>
+          <h2 className="text-lg font-semibold text-gray-800 mt-8 mb-4 flex items-center gap-2"><Wrench className="w-5 h-5 text-emerald-600" />Historique de taches</h2>
           <div className="text-center py-8 text-gray-500 bg-white rounded-lg border">
             <p>L'historique des interventions sera affiché ici.</p>
           </div>
@@ -198,18 +193,7 @@ const InventoryDetailPage: React.FC = () => {
               />
             </div>
           </div>
-          <div className="bg-gray-50 p-4 rounded-lg border">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"><ImageIcon className="w-5 h-5 text-emerald-600" />Photos</h2>
-            {item.photos && item.photos.length > 0 ? (
-              <div className="grid grid-cols-2 gap-2">
-                {item.photos.map((photo, index) => (
-                  <img key={index} src={photo} alt={`${item.name} ${index + 1}`} className="w-full h-32 object-cover rounded-md" />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">Aucune photo</div>
-            )}
-          </div>
+
         </div>
       </main>
 
@@ -217,8 +201,8 @@ const InventoryDetailPage: React.FC = () => {
       <EditObjectModal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
-        objectType={objectType}
-        objectId={objectId}
+        objectType={objectType || ''}
+        objectId={objectId || ''}
         currentData={item}
         onSuccess={() => {
           // Trigger reload by incrementing refreshKey

@@ -53,6 +53,46 @@ export interface TypeTache {
     productivite_theorique: number | null;
 }
 
+// ============================================================================
+// RATIOS DE PRODUCTIVITE
+// ============================================================================
+
+export type UniteMesure = 'm2' | 'ml' | 'unite';
+
+export const UNITE_MESURE_LABELS: Record<UniteMesure, string> = {
+    'm2': 'Mètres carrés (m²)',
+    'ml': 'Mètres linéaires (ml)',
+    'unite': 'Unités'
+};
+
+export const TYPES_OBJETS = [
+    'Arbre', 'Palmier', 'Gazon', 'Arbuste', 'Vivace', 'Cactus', 'Graminee',
+    'Puit', 'Pompe', 'Vanne', 'Clapet', 'Ballon',
+    'Canalisation', 'Aspersion', 'Goutte'
+] as const;
+
+export type TypeObjet = typeof TYPES_OBJETS[number];
+
+export interface RatioProductivite {
+    id: number;
+    id_type_tache: number;
+    type_tache_nom: string;
+    type_objet: string;
+    unite_mesure: UniteMesure;
+    ratio: number;
+    description: string;
+    actif: boolean;
+}
+
+export interface RatioProductiviteCreate {
+    id_type_tache: number;
+    type_objet: string;
+    unite_mesure: UniteMesure;
+    ratio: number;
+    description?: string;
+    actif?: boolean;
+}
+
 export interface ObjetSimple {
     id: number;
     site: string;
@@ -90,7 +130,8 @@ export interface Tache {
     // Relations détaillées
     client_detail: Client | null;
     type_tache_detail: TypeTache;
-    equipe_detail: EquipeList | null;
+    equipe_detail: EquipeList | null; // Legacy single team (backwards compatibility)
+    equipes_detail: EquipeList[]; // Multi-teams (US-PLAN-013)
     participations_detail: ParticipationTache[];
     objets_detail: ObjetSimple[];
 
@@ -106,6 +147,8 @@ export interface Tache {
     date_debut_reelle: string | null;
     date_fin_reelle: string | null;
     duree_reelle_minutes: number | null;
+    charge_estimee_heures: number | null;
+    charge_manuelle: boolean;
 
     description_travaux: string;
 
@@ -125,7 +168,8 @@ export interface Tache {
 export interface TacheCreate {
     id_client: number | null;
     id_type_tache: number;
-    id_equipe?: number | null;
+    id_equipe?: number | null; // Legacy single team (backwards compatibility)
+    equipes_ids?: number[]; // Multi-teams (US-PLAN-013)
 
     date_debut_planifiee: string;
     date_fin_planifiee: string;
@@ -138,12 +182,20 @@ export interface TacheCreate {
     // Pour l'inventaire (ManyToMany IDs)
     objets?: number[];
 
+    // Nombre d'opérateurs requis
+    nombre_operateurs?: number;
+
     // Lien Réclamation
     reclamation?: number | null;
+
+    // Surcharge manuelle de la charge estimée
+    charge_estimee_heures?: number | null;
 }
 
 export interface TacheUpdate {
-    id_equipe?: number | null;
+    id_equipe?: number | null; // Legacy single team
+    equipes_ids?: number[]; // Multi-teams (US-PLAN-013)
+    nombre_operateurs?: number;
     date_debut_planifiee?: string;
     date_fin_planifiee?: string;
     priorite?: PrioriteTache;
@@ -151,6 +203,8 @@ export interface TacheUpdate {
     commentaires?: string;
     parametres_recurrence?: RecurrenceParams | null;
     objets?: number[];
+    // Surcharge manuelle de la charge estimée
+    charge_estimee_heures?: number | null;
 }
 
 export interface ParticipationCreate {

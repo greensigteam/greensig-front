@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Map as MapIcon, Package, Calendar,
   ClipboardList, Users, UserCog, BarChart3,
-  LogOut, ChevronLeft, ChevronRight, AlertCircle
+  LogOut, ChevronLeft, ChevronRight, AlertCircle, MapPin, Gauge, FileText, MessageSquare
 } from 'lucide-react';
 import { ViewState, Role } from '../types';
 
@@ -14,19 +14,24 @@ interface SidebarProps {
   onToggle: () => void;
 }
 
-const viewToPath: Record<ViewState, string> = {
+const viewToPath: Record<string, string> = {
   LOGIN: '/login',
   DASHBOARD: '/dashboard',
   MAP: '/map',
   INVENTORY: '/inventory',
+  SITES: '/sites',
   PRODUCTS: '/products',
   PLANNING: '/planning',
+  RATIOS: '/ratios',
   INTERVENTIONS: '/reclamations',
   CLAIMS: '/claims',
   TEAMS: '/teams',
   REPORTING: '/reporting',
   CLIENT_PORTAL: '/client',
   USERS: '/users',
+  // Client specific routes
+  CLIENT_MAP: '/client/map',
+  CLIENT_CLAIMS: '/client/claims',
 };
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -38,16 +43,21 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   // User Roles Configuration
   const menuItems = [
-    { id: 'DASHBOARD', label: 'Tableau de bord', icon: LayoutDashboard, roles: ['ADMIN', 'OPERATOR'] },
-    { id: 'MAP', label: 'Cartographie', icon: MapIcon, roles: ['ADMIN', 'OPERATOR'] },
-    { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['ADMIN', 'OPERATOR'] },
-    { id: 'PRODUCTS', label: 'Gestion de produits', icon: Package, roles: ['ADMIN', 'OPERATOR'] },
-    { id: 'PLANNING', label: 'Planification', icon: Calendar, roles: ['ADMIN'] },
-    { id: 'INTERVENTIONS', label: 'Réclamations', icon: AlertCircle, roles: ['ADMIN', 'OPERATOR'] },
-    { id: 'CLAIMS', label: 'Suivi des Tâches', icon: ClipboardList, roles: ['ADMIN', 'OPERATOR'] },
-    { id: 'TEAMS', label: 'Équipes', icon: Users, roles: ['ADMIN'] },
+    { id: 'DASHBOARD', label: 'Tableau de bord', icon: LayoutDashboard, roles: ['ADMIN', 'OPERATEUR', 'CHEF_EQUIPE'] },
+    { id: 'MAP', label: 'Cartographie', icon: MapIcon, roles: ['ADMIN', 'OPERATEUR', 'CHEF_EQUIPE'] },
+    { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['ADMIN', 'OPERATEUR', 'CHEF_EQUIPE'] },
+    { id: 'SITES', label: 'Gestion des sites', icon: MapPin, roles: ['ADMIN'] },
+    { id: 'PRODUCTS', label: 'Gestion de produits', icon: Package, roles: ['ADMIN', 'OPERATEUR', 'CHEF_EQUIPE'] },
+    { id: 'PLANNING', label: 'Planification', icon: Calendar, roles: ['ADMIN', 'CHEF_EQUIPE'] },
+    { id: 'RATIOS', label: 'Ratios productivité', icon: Gauge, roles: ['ADMIN'] },
+    { id: 'INTERVENTIONS', label: 'Réclamations', icon: AlertCircle, roles: ['ADMIN', 'OPERATEUR', 'CHEF_EQUIPE'] },
+    { id: 'CLAIMS', label: 'Suivi des Tâches', icon: ClipboardList, roles: ['ADMIN', 'OPERATEUR', 'CHEF_EQUIPE'] },
+    { id: 'TEAMS', label: 'Équipes', icon: Users, roles: ['ADMIN', 'CHEF_EQUIPE'] },
     { id: 'USERS', label: 'Utilisateurs', icon: UserCog, roles: ['ADMIN'] },
     { id: 'REPORTING', label: 'Rapports', icon: BarChart3, roles: ['ADMIN'] },
+    // Client specific menu items
+    { id: 'CLIENT_MAP', label: 'Carte', icon: MapIcon, roles: ['CLIENT'] },
+    { id: 'CLIENT_CLAIMS', label: 'Réclamations', icon: MessageSquare, roles: ['CLIENT'] },
   ];
 
   const filteredItems = menuItems.filter(item => item.roles.includes(userRole));
@@ -93,7 +103,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           {filteredItems.map((item) => (
             <li key={item.id}>
               <NavLink
-                to={viewToPath[item.id as ViewState]}
+                to={viewToPath[item.id]}
                 className={({ isActive }) =>
                   `w-full flex items-center rounded-lg transition-all duration-200 group relative
                   ${collapsed ? 'justify-center p-2.5' : 'px-3 py-2.5 gap-3'}

@@ -1,32 +1,38 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { Map, Feature } from 'ol';
+import { Map as OLMap, Feature, Collection } from 'ol';
 import { Vector as VectorSource } from 'ol/source';
 import { Vector as VectorLayer } from 'ol/layer';
-import { Style, Fill, Stroke, Circle as CircleStyle, Icon } from 'ol/style';
-import { Draw, Modify, Snap, Translate } from 'ol/interaction';
+import { Style, Fill, Stroke, Circle as CircleStyle } from 'ol/style';
+import { Draw, Modify, Snap, Translate, Select } from 'ol/interaction';
 import { Overlay } from 'ol';
-import { Point, LineString, Polygon } from 'ol/geom';
+import { Point, LineString, Polygon, Geometry } from 'ol/geom';
 import { getLength, getArea } from 'ol/sphere';
 import { unByKey } from 'ol/Observable';
 import { GeoJSON } from 'ol/format';
-import { DrawingMode, GeoJSONGeometry, GeometryMetrics } from '../types';
+import { DrawingMode, EditingMode, GeoJSONGeometry, GeometryMetrics, MapObjectDetail } from '../types';
 
 interface UseDrawingToolsProps {
-    mapInstance: React.MutableRefObject<Map | null>;
+    mapInstance: React.MutableRefObject<OLMap | null>;
     drawingMode: DrawingMode;
+    editingMode: EditingMode;
     isDrawing: boolean;
+    selectedObjects?: MapObjectDetail[];
     onDrawStart?: () => void;
     onDrawEnd?: (geometry: GeoJSONGeometry, metrics: GeometryMetrics) => void;
     onDrawUpdate?: (metrics: GeometryMetrics) => void;
-    onModifyEnd?: (geometry: GeoJSONGeometry, featureId: string) => void;
+    onModifyEnd?: (geometry: GeoJSONGeometry, featureId: string, objectType: string) => void;
+    onMoveEnd?: (geometry: GeoJSONGeometry, featureId: string, objectType: string) => void;
+    onDeleteClick?: (featureId: string, objectType: string) => void;
 }
 
 interface UseDrawingToolsReturn {
     drawingLayerRef: React.MutableRefObject<VectorLayer<VectorSource> | null>;
     drawingSourceRef: React.MutableRefObject<VectorSource | null>;
+    editingLayerRef: React.MutableRefObject<VectorLayer<VectorSource> | null>;
     clearDrawing: () => void;
     setFeatureForEditing: (geojson: GeoJSONGeometry, featureId: string) => void;
     removeEditingFeature: () => void;
+    loadFeaturesForEditing: (objects: MapObjectDetail[]) => void;
 }
 
 // Style for drawing
@@ -86,21 +92,70 @@ const modifyStyle = new Style({
     }),
 });
 
+// Style for features being edited (highlight)
+const editingStyle = new Style({
+    fill: new Fill({
+        color: 'rgba(59, 130, 246, 0.3)',
+    }),
+    stroke: new Stroke({
+        color: '#3b82f6',
+        width: 3,
+    }),
+    image: new CircleStyle({
+        radius: 8,
+        fill: new Fill({
+            color: '#3b82f6',
+        }),
+        stroke: new Stroke({
+            color: '#ffffff',
+            width: 2,
+        }),
+    }),
+});
+
+// Style for delete mode (red highlight on hover)
+const deleteStyle = new Style({
+    fill: new Fill({
+        color: 'rgba(239, 68, 68, 0.3)',
+    }),
+    stroke: new Stroke({
+        color: '#ef4444',
+        width: 3,
+    }),
+    image: new CircleStyle({
+        radius: 8,
+        fill: new Fill({
+            color: '#ef4444',
+        }),
+        stroke: new Stroke({
+            color: '#ffffff',
+            width: 2,
+        }),
+    }),
+});
+
 export const useDrawingTools = ({
     mapInstance,
     drawingMode,
+    editingMode,
     isDrawing,
+    selectedObjects = [],
     onDrawStart,
     onDrawEnd,
     onDrawUpdate,
     onModifyEnd,
+    onMoveEnd,
+    onDeleteClick,
 }: UseDrawingToolsProps): UseDrawingToolsReturn => {
     const drawingSourceRef = useRef<VectorSource | null>(null);
     const drawingLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+    const editingSourceRef = useRef<VectorSource | null>(null);
+    const editingLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
     const drawInteractionRef = useRef<Draw | null>(null);
     const modifyInteractionRef = useRef<Modify | null>(null);
     const snapInteractionRef = useRef<Snap | null>(null);
     const translateInteractionRef = useRef<Translate | null>(null);
+    const selectInteractionRef = useRef<Select | null>(null);
     const helpTooltipRef = useRef<Overlay | null>(null);
     const helpTooltipElementRef = useRef<HTMLDivElement | null>(null);
     const measureTooltipRef = useRef<Overlay | null>(null);
@@ -108,9 +163,29 @@ export const useDrawingTools = ({
     const sketchFeatureRef = useRef<Feature | null>(null);
     const geoJSONFormat = useRef(new GeoJSON());
     const editingFeatureIdRef = useRef<string | null>(null);
+    const editingFeaturesRef = useRef<Map<string, Feature>>(new Map());
+
+    // Store callbacks in refs to prevent effect re-triggering on every render
+    const onDrawStartRef = useRef(onDrawStart);
+    const onDrawEndRef = useRef(onDrawEnd);
+    const onDrawUpdateRef = useRef(onDrawUpdate);
+    const onModifyEndRef = useRef(onModifyEnd);
+    const onMoveEndRef = useRef(onMoveEnd);
+    const onDeleteClickRef = useRef(onDeleteClick);
+
+    // Update refs when callbacks change
+    useEffect(() => {
+        onDrawStartRef.current = onDrawStart;
+        onDrawEndRef.current = onDrawEnd;
+        onDrawUpdateRef.current = onDrawUpdate;
+        onModifyEndRef.current = onModifyEnd;
+        onMoveEndRef.current = onMoveEnd;
+        onDeleteClickRef.current = onDeleteClick;
+    }, [onDrawStart, onDrawEnd, onDrawUpdate, onModifyEnd, onMoveEnd, onDeleteClick]);
 
     // Initialize source and layer
     useEffect(() => {
+        // Drawing layer (for new features)
         const source = new VectorSource();
         const layer = new VectorLayer({
             source: source,
@@ -121,8 +196,20 @@ export const useDrawingTools = ({
         drawingSourceRef.current = source;
         drawingLayerRef.current = layer;
 
+        // Editing layer (for existing features being modified)
+        const editingSource = new VectorSource();
+        const editingLayer = new VectorLayer({
+            source: editingSource,
+            style: editingStyle,
+            zIndex: 250,
+        });
+
+        editingSourceRef.current = editingSource;
+        editingLayerRef.current = editingLayer;
+
         return () => {
             // Cleanup
+            editingFeaturesRef.current.clear();
         };
     }, []);
 
@@ -174,7 +261,7 @@ export const useDrawingTools = ({
     };
 
     // Create help tooltip
-    const createHelpTooltip = useCallback((map: Map) => {
+    const createHelpTooltip = useCallback((map: OLMap) => {
         if (helpTooltipElementRef.current) {
             helpTooltipElementRef.current.parentNode?.removeChild(helpTooltipElementRef.current);
         }
@@ -192,7 +279,7 @@ export const useDrawingTools = ({
     }, []);
 
     // Create measure tooltip
-    const createMeasureTooltip = useCallback((map: Map) => {
+    const createMeasureTooltip = useCallback((map: OLMap) => {
         measureTooltipElementRef.current = document.createElement('div');
         measureTooltipElementRef.current.className = 'ol-tooltip ol-tooltip-measure';
 
@@ -265,7 +352,7 @@ export const useDrawingTools = ({
 
         draw.on('drawstart', (evt) => {
             sketchFeatureRef.current = evt.feature;
-            onDrawStart?.();
+            onDrawStartRef.current?.();
 
             // For lines and polygons, show live measurements
             if (drawType !== 'Point') {
@@ -280,14 +367,14 @@ export const useDrawingTools = ({
                         tooltipPosition = geom.getInteriorPoint().getCoordinates();
 
                         const metrics = calculateMetrics(geom);
-                        onDrawUpdate?.(metrics);
+                        onDrawUpdateRef.current?.(metrics);
                     } else if (geom instanceof LineString) {
                         const length = getLength(geom);
                         output = formatLength(length);
                         tooltipPosition = geom.getLastCoordinate();
 
                         const metrics = calculateMetrics(geom);
-                        onDrawUpdate?.(metrics);
+                        onDrawUpdateRef.current?.(metrics);
                     }
 
                     if (measureTooltipElementRef.current) {
@@ -318,7 +405,7 @@ export const useDrawingTools = ({
                 feature.setStyle(completedStyle);
 
                 // Notify parent
-                onDrawEnd?.(geoJSONGeom, metrics);
+                onDrawEndRef.current?.(geoJSONGeom, metrics);
             }
 
             // Cleanup
@@ -388,7 +475,7 @@ export const useDrawingTools = ({
                 map.removeOverlay(measureTooltipRef.current);
             }
         };
-    }, [mapInstance, drawingMode, isDrawing, onDrawStart, onDrawEnd, onDrawUpdate, calculateMetrics, createHelpTooltip, createMeasureTooltip]);
+    }, [mapInstance, drawingMode, isDrawing, calculateMetrics, createHelpTooltip, createMeasureTooltip]);
 
     // Clear drawing
     const clearDrawing = useCallback(() => {
@@ -417,7 +504,7 @@ export const useDrawingTools = ({
                 featureProjection: 'EPSG:3857',
                 dataProjection: 'EPSG:4326',
             }
-        );
+        ) as Feature<Geometry>;
 
         feature.setId(featureId);
         feature.setStyle(completedStyle);
@@ -440,13 +527,14 @@ export const useDrawingTools = ({
                 const modifiedFeature = evt.features.getArray()[0];
                 if (modifiedFeature) {
                     const geom = modifiedFeature.getGeometry();
+                    const objectType = modifiedFeature.get('objectType') || 'Arbre';
                     if (geom) {
                         const updatedGeoJSON = geoJSONFormat.current.writeGeometryObject(geom, {
                             featureProjection: 'EPSG:3857',
                             dataProjection: 'EPSG:4326',
                         }) as GeoJSONGeometry;
 
-                        onModifyEnd?.(updatedGeoJSON, editingFeatureIdRef.current || '');
+                        onModifyEndRef.current?.(updatedGeoJSON, editingFeatureIdRef.current || '', objectType);
                     }
                 }
             });
@@ -454,7 +542,7 @@ export const useDrawingTools = ({
             map.addInteraction(modify);
             modifyInteractionRef.current = modify;
         }
-    }, [mapInstance, onModifyEnd]);
+    }, [mapInstance]);
 
     // Remove editing feature
     const removeEditingFeature = useCallback(() => {
@@ -468,11 +556,200 @@ export const useDrawingTools = ({
         }
     }, [mapInstance]);
 
+    // Load multiple features for editing (from selected objects)
+    const loadFeaturesForEditing = useCallback((objects: MapObjectDetail[]) => {
+        console.log('[useDrawingTools] loadFeaturesForEditing called with:', objects.length, 'objects');
+
+        if (!editingSourceRef.current) {
+            console.warn('[useDrawingTools] No editing source available');
+            return;
+        }
+
+        // Clear existing editing features
+        editingSourceRef.current.clear();
+        editingFeaturesRef.current.clear();
+
+        let loadedCount = 0;
+        objects.forEach(obj => {
+            console.log('[useDrawingTools] Processing object:', obj.id, obj.type, 'has geometry:', !!obj.geometry);
+            if (obj.geometry) {
+                try {
+                    const feature = geoJSONFormat.current.readFeature(
+                        { type: 'Feature', geometry: obj.geometry, properties: { objectType: obj.type } },
+                        {
+                            featureProjection: 'EPSG:3857',
+                            dataProjection: 'EPSG:4326',
+                        }
+                    ) as Feature<Geometry>;
+                    feature.setId(obj.id);
+                    feature.set('objectType', obj.type);
+                    feature.set('objectId', obj.id);
+                    editingSourceRef.current?.addFeature(feature);
+                    editingFeaturesRef.current.set(obj.id, feature as Feature);
+                    loadedCount++;
+                } catch (e) {
+                    console.error('Error loading feature for editing:', obj.id, e);
+                }
+            }
+        });
+
+        console.log('[useDrawingTools] Loaded', loadedCount, 'features for editing');
+    }, []);
+
+    // Handle editing mode interactions (modify, move, delete)
+    useEffect(() => {
+        const map = mapInstance.current;
+        console.log('[useDrawingTools] Editing effect triggered:', {
+            editingMode,
+            selectedObjectsCount: selectedObjects.length,
+            hasMap: !!map,
+            hasEditingSource: !!editingSourceRef.current
+        });
+
+        if (!map || !editingSourceRef.current) return;
+
+        // Clean up previous editing interactions
+        const cleanupInteractions = () => {
+            if (modifyInteractionRef.current) {
+                map.removeInteraction(modifyInteractionRef.current);
+                modifyInteractionRef.current = null;
+            }
+            if (translateInteractionRef.current) {
+                map.removeInteraction(translateInteractionRef.current);
+                translateInteractionRef.current = null;
+            }
+            if (selectInteractionRef.current) {
+                map.removeInteraction(selectInteractionRef.current);
+                selectInteractionRef.current = null;
+            }
+        };
+
+        // If no editing mode or no selected objects, cleanup and return
+        if (editingMode === 'none' || selectedObjects.length === 0) {
+            cleanupInteractions();
+            editingSourceRef.current.clear();
+            editingFeaturesRef.current.clear();
+            return;
+        }
+
+        // Load selected objects into editing layer
+        loadFeaturesForEditing(selectedObjects);
+
+        // Make sure editing layer is on the map
+        const layers = map.getLayers().getArray();
+        if (editingLayerRef.current && !layers.includes(editingLayerRef.current)) {
+            map.addLayer(editingLayerRef.current);
+        }
+
+        // Setup interactions based on editing mode
+        if (editingMode === 'modify') {
+            // MODIFY MODE - Edit vertices
+            const modify = new Modify({
+                source: editingSourceRef.current,
+                style: modifyStyle,
+            });
+
+            modify.on('modifyend', (evt) => {
+                evt.features.forEach((feature) => {
+                    const geom = feature.getGeometry();
+                    const featureId = feature.getId() as string || feature.get('objectId');
+                    const objectType = feature.get('objectType') || 'Arbre';
+                    if (geom && featureId) {
+                        const updatedGeoJSON = geoJSONFormat.current.writeGeometryObject(geom, {
+                            featureProjection: 'EPSG:3857',
+                            dataProjection: 'EPSG:4326',
+                        }) as GeoJSONGeometry;
+                        onModifyEndRef.current?.(updatedGeoJSON, featureId, objectType);
+                    }
+                });
+            });
+
+            map.addInteraction(modify);
+            modifyInteractionRef.current = modify;
+
+            // Add snap for better precision
+            const snap = new Snap({ source: editingSourceRef.current });
+            map.addInteraction(snap);
+            snapInteractionRef.current = snap;
+
+        } else if (editingMode === 'move') {
+            // MOVE MODE - Translate entire features
+            const features = editingSourceRef.current.getFeatures();
+            const featuresCollection = new Collection<Feature<Geometry>>();
+            features.forEach(f => featuresCollection.push(f));
+
+            const translate = new Translate({
+                features: featuresCollection,
+            });
+
+            translate.on('translateend', (evt) => {
+                evt.features.forEach((feature) => {
+                    const geom = feature.getGeometry();
+                    const featureId = feature.getId() as string || feature.get('objectId');
+                    const objectType = feature.get('objectType') || 'Arbre';
+                    if (geom && featureId) {
+                        const updatedGeoJSON = geoJSONFormat.current.writeGeometryObject(geom, {
+                            featureProjection: 'EPSG:3857',
+                            dataProjection: 'EPSG:4326',
+                        }) as GeoJSONGeometry;
+                        onMoveEndRef.current?.(updatedGeoJSON, featureId, objectType);
+                    }
+                });
+            });
+
+            map.addInteraction(translate);
+            translateInteractionRef.current = translate;
+
+        } else if (editingMode === 'delete') {
+            // DELETE MODE - Click to select and delete
+            // Style features in red to indicate delete mode
+            editingLayerRef.current?.setStyle(deleteStyle);
+
+            // Click handler for delete
+            const deleteClickHandler = (evt: any) => {
+                map.forEachFeatureAtPixel(evt.pixel, (feature) => {
+                    const featureId = feature.getId() as string || feature.get('objectId');
+                    const objectType = feature.get('objectType');
+                    if (featureId && onDeleteClickRef.current) {
+                        onDeleteClickRef.current(featureId, objectType);
+                    }
+                    return true; // Stop at first feature
+                }, {
+                    layerFilter: (layer) => layer === editingLayerRef.current
+                });
+            };
+
+            map.on('click', deleteClickHandler);
+
+            // Store handler reference for cleanup
+            (map as any)._deleteClickHandler = deleteClickHandler;
+        }
+
+        return () => {
+            cleanupInteractions();
+            // Cleanup delete click handler
+            if ((map as any)._deleteClickHandler) {
+                map.un('click', (map as any)._deleteClickHandler);
+                delete (map as any)._deleteClickHandler;
+            }
+            // Reset style
+            if (editingLayerRef.current) {
+                editingLayerRef.current.setStyle(editingStyle);
+            }
+            if (snapInteractionRef.current) {
+                map.removeInteraction(snapInteractionRef.current);
+                snapInteractionRef.current = null;
+            }
+        };
+    }, [mapInstance, editingMode, selectedObjects, loadFeaturesForEditing]);
+
     return {
         drawingLayerRef,
         drawingSourceRef,
+        editingLayerRef,
         clearDrawing,
         setFeatureForEditing,
         removeEditingFeature,
+        loadFeaturesForEditing,
     };
 };

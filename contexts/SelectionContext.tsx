@@ -4,9 +4,12 @@ import { MapObjectDetail, GeoJSONGeometry } from '../types';
 interface SelectionContextType {
     selectedObjects: MapObjectDetail[];
     isSelectionMode: boolean;
+    isBoxSelectionMode: boolean;
     setSelectionMode: (active: boolean) => void;
+    setBoxSelectionMode: (active: boolean) => void;
     toggleSelectionMode: () => void;
     addToSelection: (object: MapObjectDetail) => void;
+    addMultipleToSelection: (objects: MapObjectDetail[]) => void;
     removeFromSelection: (objectId: string) => void;
     toggleObjectSelection: (object: MapObjectDetail) => void;
     clearSelection: () => void;
@@ -40,13 +43,19 @@ export const SelectionProvider: React.FC<SelectionProviderProps> = ({
 }) => {
     const [selectedObjects, setSelectedObjects] = useState<MapObjectDetail[]>([]);
     const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [isBoxSelectionMode, setIsBoxSelectionMode] = useState(false);
 
     const setSelectionMode = useCallback((active: boolean) => {
         setIsSelectionMode(active);
         // Clear selection when exiting selection mode
         if (!active) {
             setSelectedObjects([]);
+            setIsBoxSelectionMode(false);
         }
+    }, []);
+
+    const setBoxSelectionMode = useCallback((active: boolean) => {
+        setIsBoxSelectionMode(active);
     }, []);
 
     const toggleSelectionMode = useCallback(() => {
@@ -65,6 +74,20 @@ export const SelectionProvider: React.FC<SelectionProviderProps> = ({
                 return prev;
             }
             return [...prev, object];
+        });
+    }, [maxSelections]);
+
+    const addMultipleToSelection = useCallback((objects: MapObjectDetail[]) => {
+        setSelectedObjects(prev => {
+            const newObjects = objects.filter(
+                obj => !prev.some(existing => existing.id === obj.id)
+            );
+            const combined = [...prev, ...newObjects];
+            if (combined.length > maxSelections) {
+                console.warn(`Selection limited to ${maxSelections} objects`);
+                return combined.slice(0, maxSelections);
+            }
+            return combined;
         });
     }, [maxSelections]);
 
@@ -123,9 +146,12 @@ export const SelectionProvider: React.FC<SelectionProviderProps> = ({
     const value: SelectionContextType = {
         selectedObjects,
         isSelectionMode,
+        isBoxSelectionMode,
         setSelectionMode,
+        setBoxSelectionMode,
         toggleSelectionMode,
         addToSelection,
+        addMultipleToSelection,
         removeFromSelection,
         toggleObjectSelection,
         clearSelection,

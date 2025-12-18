@@ -25,6 +25,23 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
+      },
+      build: {
+        rollupOptions: {
+          output: {
+            manualChunks: {
+              // Split vendor chunks for better caching
+              'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+              'vendor-calendar': ['react-big-calendar', 'date-fns'],
+              'vendor-map': ['ol'],
+              'vendor-charts': ['recharts'],
+              'vendor-ui': ['lucide-react', '@headlessui/react'],
+              'vendor-pdf': ['jspdf', 'html2canvas'],
+            }
+          }
+        },
+        // Increase chunk size warning limit since we're intentionally creating larger vendor chunks
+        chunkSizeWarningLimit: 600,
       }
     };
 });

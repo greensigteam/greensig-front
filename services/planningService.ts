@@ -2,7 +2,8 @@ import { apiFetch } from './apiFetch';
 import { PaginatedResponse } from '../types/users';
 import {
     Tache, TacheCreate, TacheUpdate,
-    TypeTache, ParticipationCreate, ParticipationTache
+    TypeTache, ParticipationCreate, ParticipationTache,
+    RatioProductivite, RatioProductiviteCreate
 } from '../types/planning';
 
 const BASE_URL = '/api/planification';
@@ -82,6 +83,19 @@ export const planningService = {
         return data.results || [];
     },
 
+    async createTypeTache(data: { nom_tache: string; description?: string }): Promise<TypeTache> {
+        const response = await apiFetch(`${BASE_URL}/types-taches/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.nom_tache?.[0] || error.detail || 'Erreur lors de la création du type de tâche');
+        }
+        return response.json();
+    },
+
     // --- PARTICIPATION ---
 
     async addParticipation(tacheId: number, data: ParticipationCreate): Promise<ParticipationTache> {
@@ -92,5 +106,67 @@ export const planningService = {
         });
         if (!response.ok) throw new Error('Erreur ajout participation');
         return response.json();
+    },
+
+    // --- CHARGE ESTIMEE ---
+
+    async resetCharge(tacheId: number): Promise<{ charge_estimee_heures: number | null; charge_manuelle: boolean }> {
+        const response = await apiFetch(`${BASE_URL}/taches/${tacheId}/reset_charge/`, {
+            method: 'POST'
+        });
+        if (!response.ok) throw new Error('Erreur lors du recalcul de la charge');
+        return response.json();
+    },
+
+    // --- RATIOS DE PRODUCTIVITE ---
+
+    async getRatios(params: { type_tache_id?: number; type_objet?: string; actif?: boolean } = {}): Promise<RatioProductivite[]> {
+        const query = new URLSearchParams();
+        if (params.type_tache_id) query.append('type_tache_id', params.type_tache_id.toString());
+        if (params.type_objet) query.append('type_objet', params.type_objet);
+        if (params.actif !== undefined) query.append('actif', params.actif.toString());
+
+        const response = await apiFetch(`${BASE_URL}/ratios-productivite/?${query.toString()}`);
+        if (!response.ok) throw new Error('Erreur chargement ratios');
+
+        const data = await response.json();
+        if (Array.isArray(data)) return data;
+        return data.results || [];
+    },
+
+    async getRatio(id: number): Promise<RatioProductivite> {
+        const response = await apiFetch(`${BASE_URL}/ratios-productivite/${id}/`);
+        if (!response.ok) throw new Error('Ratio non trouvé');
+        return response.json();
+    },
+
+    async createRatio(data: RatioProductiviteCreate): Promise<RatioProductivite> {
+        const response = await apiFetch(`${BASE_URL}/ratios-productivite/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || error.non_field_errors?.[0] || 'Erreur lors de la création du ratio');
+        }
+        return response.json();
+    },
+
+    async updateRatio(id: number, data: Partial<RatioProductiviteCreate>): Promise<RatioProductivite> {
+        const response = await apiFetch(`${BASE_URL}/ratios-productivite/${id}/`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) throw new Error('Erreur modification ratio');
+        return response.json();
+    },
+
+    async deleteRatio(id: number): Promise<void> {
+        const response = await apiFetch(`${BASE_URL}/ratios-productivite/${id}/`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) throw new Error('Erreur suppression ratio');
     }
 };

@@ -14,6 +14,20 @@ import {
 // ==============================================================================
 
 export const OBJECT_TYPES: ObjectTypeInfo[] = [
+    // Site - Special category for spatial hierarchy
+    {
+        id: 'Site',
+        name: 'Site',
+        namePlural: 'Sites',
+        category: 'site',
+        geometryType: 'Polygon',
+        color: '#3b82f6',
+        icon: 'map-pin',
+        fields: [
+            { name: 'nom_site', label: 'Nom du site', type: 'text', required: true, placeholder: 'Ex: Parc Central' },
+            { name: 'adresse', label: 'Adresse', type: 'textarea', placeholder: 'Adresse complète du site' },
+        ]
+    },
     // Vegetation - Points
     {
         id: 'Arbre',
@@ -24,9 +38,9 @@ export const OBJECT_TYPES: ObjectTypeInfo[] = [
         color: '#22c55e',
         icon: 'tree-deciduous',
         fields: [
-            { name: 'nom', label: 'Nom', type: 'text', placeholder: 'Ex: Olivier 001' },
+            { name: 'nom', label: 'Nom', type: 'text', required: true, placeholder: 'Ex: Olivier 001' },
             { name: 'famille', label: 'Famille', type: 'text', placeholder: 'Ex: Oleaceae' },
-            { name: 'taille', label: 'Taille', type: 'select', options: ['petit', 'moyen', 'grand'] },
+            { name: 'taille', label: 'Taille', type: 'select', options: ['Petit', 'Moyen', 'Grand'] },
             { name: 'etat', label: 'État', type: 'select', options: ['bon', 'moyen', 'mauvais'] },
         ]
     },
@@ -39,9 +53,9 @@ export const OBJECT_TYPES: ObjectTypeInfo[] = [
         color: '#84cc16',
         icon: 'tree-palm',
         fields: [
-            { name: 'nom', label: 'Nom', type: 'text' },
+            { name: 'nom', label: 'Nom', type: 'text', required: true },
             { name: 'famille', label: 'Famille', type: 'text' },
-            { name: 'taille', label: 'Taille', type: 'select', options: ['petit', 'moyen', 'grand'] },
+            { name: 'taille', label: 'Taille', type: 'select', options: ['Petit', 'Moyen', 'Grand'] },
             { name: 'etat', label: 'État', type: 'select', options: ['bon', 'moyen', 'mauvais'] },
         ]
     },
@@ -55,8 +69,8 @@ export const OBJECT_TYPES: ObjectTypeInfo[] = [
         color: '#4ade80',
         icon: 'grass',
         fields: [
-            { name: 'nom', label: 'Nom', type: 'text' },
-            { name: 'type_gazon', label: 'Type', type: 'select', options: ['anglais', 'rustique', 'sport'] },
+            { name: 'nom', label: 'Nom', type: 'text', required: true },
+            { name: 'famille', label: 'Famille/Type', type: 'text', placeholder: 'Ex: Anglais, Rustique' },
             { name: 'etat', label: 'État', type: 'select', options: ['bon', 'moyen', 'mauvais'] },
         ]
     },
@@ -69,8 +83,9 @@ export const OBJECT_TYPES: ObjectTypeInfo[] = [
         color: '#16a34a',
         icon: 'shrub',
         fields: [
-            { name: 'nom', label: 'Nom', type: 'text' },
+            { name: 'nom', label: 'Nom', type: 'text', required: true },
             { name: 'famille', label: 'Famille', type: 'text' },
+            { name: 'densite', label: 'Densité', type: 'number', min: 0, step: 0.1 },
             { name: 'etat', label: 'État', type: 'select', options: ['bon', 'moyen', 'mauvais'] },
         ]
     },
@@ -83,8 +98,9 @@ export const OBJECT_TYPES: ObjectTypeInfo[] = [
         color: '#a855f7',
         icon: 'flower',
         fields: [
-            { name: 'nom', label: 'Nom', type: 'text' },
+            { name: 'nom', label: 'Nom', type: 'text', required: true },
             { name: 'famille', label: 'Famille', type: 'text' },
+            { name: 'densite', label: 'Densité', type: 'number', min: 0, step: 0.1 },
         ]
     },
     {
@@ -96,8 +112,9 @@ export const OBJECT_TYPES: ObjectTypeInfo[] = [
         color: '#65a30d',
         icon: 'cactus',
         fields: [
-            { name: 'nom', label: 'Nom', type: 'text' },
-            { name: 'espece', label: 'Espèce', type: 'text' },
+            { name: 'nom', label: 'Nom', type: 'text', required: true },
+            { name: 'famille', label: 'Famille/Espèce', type: 'text', placeholder: 'Ex: Cactaceae' },
+            { name: 'densite', label: 'Densité', type: 'number', min: 0, step: 0.1 },
         ]
     },
     {
@@ -109,8 +126,9 @@ export const OBJECT_TYPES: ObjectTypeInfo[] = [
         color: '#ca8a04',
         icon: 'wheat',
         fields: [
-            { name: 'nom', label: 'Nom', type: 'text' },
+            { name: 'nom', label: 'Nom', type: 'text', required: true },
             { name: 'famille', label: 'Famille', type: 'text' },
+            { name: 'densite', label: 'Densité', type: 'number', min: 0, step: 0.1 },
         ]
     },
     // Hydraulique - Points
@@ -123,9 +141,10 @@ export const OBJECT_TYPES: ObjectTypeInfo[] = [
         color: '#3b82f6',
         icon: 'droplet',
         fields: [
-            { name: 'nom', label: 'Nom', type: 'text' },
+            { name: 'nom', label: 'Nom', type: 'text', required: true },
             { name: 'profondeur', label: 'Profondeur (m)', type: 'number', min: 0, step: 0.1 },
-            { name: 'debit', label: 'Débit (m³/h)', type: 'number', min: 0, step: 0.1 },
+            { name: 'diametre', label: 'Diamètre (m)', type: 'number', min: 0, step: 0.1 },
+            { name: 'niveau_statique', label: 'Niveau statique (m)', type: 'number', step: 0.1 },
         ]
     },
     {
@@ -137,7 +156,7 @@ export const OBJECT_TYPES: ObjectTypeInfo[] = [
         color: '#0ea5e9',
         icon: 'pump',
         fields: [
-            { name: 'nom', label: 'Nom', type: 'text' },
+            { name: 'nom', label: 'Nom', type: 'text', required: true },
             { name: 'puissance', label: 'Puissance (kW)', type: 'number', min: 0, step: 0.1 },
             { name: 'debit', label: 'Débit (m³/h)', type: 'number', min: 0, step: 0.1 },
             { name: 'marque', label: 'Marque', type: 'text' },
@@ -152,9 +171,10 @@ export const OBJECT_TYPES: ObjectTypeInfo[] = [
         color: '#6366f1',
         icon: 'valve',
         fields: [
-            { name: 'nom', label: 'Nom', type: 'text' },
+            { name: 'marque', label: 'Marque', type: 'text', placeholder: 'Ex: Pentair' },
+            { name: 'type', label: 'Type', type: 'text', placeholder: 'Ex: Vanne papillon' },
             { name: 'diametre', label: 'Diamètre (mm)', type: 'number', min: 0 },
-            { name: 'type_vanne', label: 'Type', type: 'select', options: ['manuelle', 'electrique', 'pneumatique'] },
+            { name: 'materiau', label: 'Matériau', type: 'text', placeholder: 'Ex: PVC' },
         ]
     },
     {
@@ -166,8 +186,10 @@ export const OBJECT_TYPES: ObjectTypeInfo[] = [
         color: '#8b5cf6',
         icon: 'check-valve',
         fields: [
-            { name: 'nom', label: 'Nom', type: 'text' },
+            { name: 'marque', label: 'Marque', type: 'text', placeholder: 'Ex: Pentair' },
+            { name: 'type', label: 'Type', type: 'text', placeholder: 'Ex: Clapet anti-retour' },
             { name: 'diametre', label: 'Diamètre (mm)', type: 'number', min: 0 },
+            { name: 'materiau', label: 'Matériau', type: 'text', placeholder: 'Ex: Laiton' },
         ]
     },
     {
@@ -179,9 +201,10 @@ export const OBJECT_TYPES: ObjectTypeInfo[] = [
         color: '#14b8a6',
         icon: 'tank',
         fields: [
-            { name: 'nom', label: 'Nom', type: 'text' },
-            { name: 'capacite', label: 'Capacité (L)', type: 'number', min: 0 },
-            { name: 'materiau', label: 'Matériau', type: 'select', options: ['acier', 'plastique', 'beton'] },
+            { name: 'marque', label: 'Marque', type: 'text', placeholder: 'Ex: Calpeda' },
+            { name: 'volume', label: 'Volume (L)', type: 'number', min: 0 },
+            { name: 'pression', label: 'Pression (bar)', type: 'number', min: 0, step: 0.1 },
+            { name: 'materiau', label: 'Matériau', type: 'text', placeholder: 'Ex: Acier' },
         ]
     },
     // Hydraulique - Lines
@@ -194,7 +217,8 @@ export const OBJECT_TYPES: ObjectTypeInfo[] = [
         color: '#2563eb',
         icon: 'pipe',
         fields: [
-            { name: 'nom', label: 'Nom', type: 'text' },
+            { name: 'marque', label: 'Marque', type: 'text', placeholder: 'Ex: Wavin' },
+            { name: 'type', label: 'Type', type: 'text', placeholder: 'Ex: Distribution' },
             { name: 'diametre', label: 'Diamètre (mm)', type: 'number', min: 0 },
             { name: 'materiau', label: 'Matériau', type: 'select', options: ['PVC', 'PEHD', 'acier', 'fonte'] },
         ]
@@ -208,8 +232,9 @@ export const OBJECT_TYPES: ObjectTypeInfo[] = [
         color: '#06b6d4',
         icon: 'sprinkler',
         fields: [
-            { name: 'nom', label: 'Nom', type: 'text' },
-            { name: 'debit', label: 'Débit (L/h)', type: 'number', min: 0 },
+            { name: 'marque', label: 'Marque', type: 'text', placeholder: 'Ex: Rain Bird' },
+            { name: 'type', label: 'Type', type: 'text', placeholder: 'Ex: Asperseur rotatif' },
+            { name: 'diametre', label: 'Diamètre (mm)', type: 'number', min: 0 },
             { name: 'pression', label: 'Pression (bar)', type: 'number', min: 0, step: 0.1 },
         ]
     },
@@ -222,9 +247,10 @@ export const OBJECT_TYPES: ObjectTypeInfo[] = [
         color: '#0891b2',
         icon: 'droplets',
         fields: [
-            { name: 'nom', label: 'Nom', type: 'text' },
-            { name: 'debit_goutteur', label: 'Débit/goutteur (L/h)', type: 'number', min: 0, step: 0.1 },
-            { name: 'espacement', label: 'Espacement (cm)', type: 'number', min: 0 },
+            { name: 'type', label: 'Type', type: 'text', placeholder: 'Ex: Goutteur intégré' },
+            { name: 'diametre', label: 'Diamètre (mm)', type: 'number', min: 0 },
+            { name: 'pression', label: 'Pression (bar)', type: 'number', min: 0, step: 0.1 },
+            { name: 'materiau', label: 'Matériau', type: 'text', placeholder: 'Ex: PEHD' },
         ]
     },
 ];

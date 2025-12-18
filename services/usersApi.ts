@@ -78,6 +78,42 @@ const USERS_API_URL = `${API_BASE_URL}/users`;
 const API_MODE: 'mock' | 'api' = 'api';
 
 // ============================================================================
+// CACHE SYSTEM - Pour éviter les re-fetch constants
+// ============================================================================
+
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+const cache = new Map<string, CacheEntry<unknown>>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+function getCached<T>(key: string): T | null {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_DURATION) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.data as T;
+}
+
+function setCache<T>(key: string, data: T): void {
+  cache.set(key, { data, timestamp: Date.now() });
+}
+
+export function invalidateCache(keyPrefix?: string): void {
+  if (keyPrefix) {
+    for (const key of cache.keys()) {
+      if (key.startsWith(keyPrefix)) cache.delete(key);
+    }
+  } else {
+    cache.clear();
+  }
+}
+
+// ============================================================================
 // UTILITAIRES
 // ============================================================================
 
@@ -324,18 +360,29 @@ export async function fetchRoles(): Promise<Role[]> {
 // CLIENTS
 // ============================================================================
 
-export async function fetchClients(): Promise<PaginatedResponse<Client>> {
+export async function fetchClients(forceRefresh = false): Promise<PaginatedResponse<Client>> {
+  const cacheKey = 'clients';
+
+  if (!forceRefresh) {
+    const cached = getCached<PaginatedResponse<Client>>(cacheKey);
+    if (cached) return cached;
+  }
+
   if (API_MODE === 'mock') {
     await delay(200);
-    return {
+    const result = {
       count: MOCK_CLIENTS.length,
       next: null,
       previous: null,
       results: MOCK_CLIENTS
     };
+    setCache(cacheKey, result);
+    return result;
   }
 
-  return fetchApi<PaginatedResponse<Client>>(`${USERS_API_URL}/clients/`);
+  const result = await fetchApi<PaginatedResponse<Client>>(`${USERS_API_URL}/clients/`);
+  setCache(cacheKey, result);
+  return result;
 }
 
 export async function createClient(data: ClientCreate): Promise<Client> {
@@ -732,8 +779,18 @@ export async function affecterCompetence(
 // ============================================================================
 
 export async function fetchEquipes(
-  filters: EquipeFilters = {}
+  filters: EquipeFilters = {},
+  forceRefresh = false
 ): Promise<PaginatedResponse<EquipeList>> {
+  // Cache uniquement quand pas de filtres (cas le plus courant)
+  const hasFilters = Object.keys(filters).length > 0;
+  const cacheKey = 'equipes';
+
+  if (!hasFilters && !forceRefresh) {
+    const cached = getCached<PaginatedResponse<EquipeList>>(cacheKey);
+    if (cached) return cached;
+  }
+
   if (API_MODE === 'mock') {
     await delay(200);
     let results = [...MOCK_EQUIPES];
@@ -753,18 +810,22 @@ export async function fetchEquipes(
       results = results.filter(e => e.statutOperationnel === filters.statutOperationnel);
     }
 
-    return {
+    const result = {
       count: results.length,
       next: null,
       previous: null,
       results
     };
+    if (!hasFilters) setCache(cacheKey, result);
+    return result;
   }
 
   const queryString = buildQueryParams(filters as Record<string, unknown>);
-  return fetchApi<PaginatedResponse<EquipeList>>(
+  const result = await fetchApi<PaginatedResponse<EquipeList>>(
     `${USERS_API_URL}/equipes/?${queryString}`
   );
+  if (!hasFilters) setCache(cacheKey, result);
+  return result;
 }
 
 export async function fetchEquipeById(id: number): Promise<EquipeDetail> {

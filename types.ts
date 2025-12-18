@@ -212,7 +212,7 @@ export interface Measurement {
 export type DrawingMode = 'none' | 'point' | 'line' | 'polygon';
 export type EditingMode = 'none' | 'modify' | 'move' | 'delete';
 
-export type ObjectCategory = 'vegetation' | 'hydraulique';
+export type ObjectCategory = 'vegetation' | 'hydraulique' | 'site';
 
 export interface ObjectTypeInfo {
   id: string;

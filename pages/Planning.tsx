@@ -1,20 +1,26 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar as BigCalendar, dateFnsLocalizer } from 'react-big-calendar';
+import { useState, useEffect, useMemo, useCallback, memo, useRef, type FC } from 'react';
+import { Calendar as BigCalendar, dateFnsLocalizer, View } from 'react-big-calendar';
+import withDragAndDrop, { EventInteractionArgs } from 'react-big-calendar/lib/addons/dragAndDrop';
 import { useLocation } from 'react-router-dom';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
+import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 
-import { Plus, Users, Clock, X, Trash2, Edit, Search, Filter, UserPlus } from 'lucide-react';
+import {
+    Users, Clock, X, Trash2, Edit, Search, Filter, UserPlus, Timer, AlertTriangle, Download
+} from 'lucide-react';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import { planningService } from '../services/planningService';
 import { fetchClients, fetchEquipes } from '../services/usersApi';
 import {
     Tache, TacheCreate, TacheUpdate, TypeTache,
     STATUT_TACHE_LABELS, STATUT_TACHE_COLORS,
-    PRIORITE_LABELS, PRIORITE_COLORS,
-    PrioriteTache, FrequenceRecurrence
+    PRIORITE_LABELS, PRIORITE_COLORS
 } from '../types/planning';
 import { Client, EquipeList } from '../types/users';
+import TaskFormModal, { InventoryObjectOption } from '../components/planning/TaskFormModal';
 
 // ============================================================================
 // CONFIGURATION CALENDRIER
@@ -32,6 +38,9 @@ const localizer = dateFnsLocalizer({
     locales,
 });
 
+// Create Drag and Drop Calendar
+const DnDCalendar = withDragAndDrop<CalendarEvent>(BigCalendar);
+
 // Custom Event Interface for RBC
 interface CalendarEvent {
     id: number;
@@ -41,380 +50,35 @@ interface CalendarEvent {
     resource: Tache;
 }
 
-// ============================================================================
-// CREATE/EDIT TASK MODAL
-// ============================================================================
-
-const TaskFormModal: React.FC<{
-    tache?: Tache;
-    initialValues?: Partial<TacheCreate>;
-    clients: Client[];
-    equipes: EquipeList[];
-    typesTaches: TypeTache[];
-    onClose: () => void;
-    onSubmit: (data: TacheCreate) => void;
-}> = ({ tache, initialValues, clients, equipes, typesTaches, onClose, onSubmit }) => {
-    const [formData, setFormData] = useState<TacheCreate>({
-        id_client: (tache?.client_detail && ((tache?.client_detail as any).utilisateur || tache?.client_detail?.utilisateur)) || initialValues?.id_client || null,
-        id_type_tache: tache?.type_tache_detail.id || initialValues?.id_type_tache || 0,
-        id_equipe: tache?.equipe_detail?.id || initialValues?.id_equipe || null,
-        date_debut_planifiee: tache?.date_debut_planifiee.slice(0, 16) || initialValues?.date_debut_planifiee || '',
-        date_fin_planifiee: tache?.date_fin_planifiee.slice(0, 16) || initialValues?.date_fin_planifiee || '',
-        priorite: tache?.priorite || initialValues?.priorite || 3,
-        commentaires: tache?.commentaires || initialValues?.commentaires || '',
-        parametres_recurrence: tache?.parametres_recurrence || null,
-        reclamation: tache?.reclamation || initialValues?.reclamation || null
-    });
-
-    const [showRecurrence, setShowRecurrence] = useState(!!tache?.parametres_recurrence);
-
-    // Synchroniser le formulaire quand la tâche change (édition)
-    useEffect(() => {
-        if (tache) {
-            setFormData({
-                id_client: tache.client_detail ? ((tache.client_detail as any).utilisateur || tache.client_detail.utilisateur) : null,
-                id_type_tache: tache.type_tache_detail ? tache.type_tache_detail.id : 0,
-                id_equipe: tache.equipe_detail?.id || null,
-                date_debut_planifiee: tache.date_debut_planifiee.slice(0, 16),
-                date_fin_planifiee: tache.date_fin_planifiee.slice(0, 16),
-                priorite: tache.priorite,
-                commentaires: tache.commentaires || '',
-                parametres_recurrence: tache.parametres_recurrence || null
-            });
-            setShowRecurrence(!!tache.parametres_recurrence);
-        }
-    }, [tache]);
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!formData.id_type_tache || formData.id_type_tache === 0) {
-            alert('Veuillez sélectionner un type de tâche');
-            return;
-        }
-        onSubmit(formData);
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-                <form onSubmit={handleSubmit}>
-                    <div className="p-6 border-b border-gray-200">
-                        <h2 className="text-2xl font-bold text-gray-900">
-                            {tache ? 'Modifier la tâche' : 'Nouvelle tâche'}
-                        </h2>
-                    </div>
-
-                    <div className="p-6 space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Structure (Client)
-                            </label>
-                            <select
-                                value={formData.id_client || 0}
-                                onChange={(e) => setFormData({ ...formData, id_client: Number(e.target.value) || null })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                            >
-                                <option value={0}>Sélectionner un client</option>
-                                {clients.map((client) => (
-                                    <option key={client.utilisateur} value={client.utilisateur}>
-                                        {(client as any).nom_structure || client.nomStructure || 'Client sans nom'}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Type de tâche <span className="text-red-500">*</span>
-                            </label>
-                            <select
-                                required
-                                value={formData.id_type_tache || ""}
-                                onChange={(e) => setFormData({ ...formData, id_type_tache: Number(e.target.value) })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                            >
-                                <option value="">Sélectionner un type</option>
-                                {typesTaches.map((type) => (
-                                    <option key={type.id} value={type.id}>
-                                        {type.nom_tache}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Équipe
-                            </label>
-                            <select
-                                value={formData.id_equipe || ''}
-                                onChange={(e) => setFormData({ ...formData, id_equipe: e.target.value ? Number(e.target.value) : null })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                            >
-                                <option value="">Aucune équipe</option>
-                                {equipes.map((equipe) => (
-                                    <option key={equipe.id} value={equipe.id}>
-                                        {equipe.nomEquipe}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Date début <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    required
-                                    type="datetime-local"
-                                    value={formData.date_debut_planifiee}
-                                    onChange={(e) => setFormData({ ...formData, date_debut_planifiee: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Date fin <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    required
-                                    type="datetime-local"
-                                    value={formData.date_fin_planifiee}
-                                    onChange={(e) => setFormData({ ...formData, date_fin_planifiee: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Priorité
-                            </label>
-                            <select
-                                value={formData.priorite}
-                                onChange={(e) => setFormData({ ...formData, priorite: Number(e.target.value) as PrioriteTache })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                            >
-                                {Object.entries(PRIORITE_LABELS).map(([value, label]) => (
-                                    <option key={value} value={value}>
-                                        {label}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Commentaires
-                            </label>
-                            <textarea
-                                value={formData.commentaires}
-                                onChange={(e) => setFormData({ ...formData, commentaires: e.target.value })}
-                                rows={3}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                placeholder="Détails de la tâche..."
-                            />
-                        </div>
-
-                        <div className="border-t pt-4">
-                            <div className="flex items-center justify-between mb-3">
-                                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                                    <Clock className="w-4 h-4" />
-                                    Récurrence personnalisée
-                                </label>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setShowRecurrence(!showRecurrence);
-                                        if (showRecurrence) {
-                                            setFormData({ ...formData, parametres_recurrence: null });
-                                        } else {
-                                            // Default init
-                                            setFormData({
-                                                ...formData,
-                                                parametres_recurrence: {
-                                                    frequence: 'weekly',
-                                                    interval: 1,
-                                                    nombre_occurrences: 4,
-                                                    jours: []
-                                                }
-                                            });
-                                        }
-                                    }}
-                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${showRecurrence ? 'bg-emerald-600' : 'bg-gray-200'}`}
-                                >
-                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${showRecurrence ? 'translate-x-6' : 'translate-x-1'}`} />
-                                </button>
-                            </div>
-
-                            {showRecurrence && formData.parametres_recurrence && (
-                                <div className="space-y-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                    {/* Intervalle et Fréquence */}
-                                    <div className="flex items-end gap-3">
-                                        <div className="flex-1">
-                                            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase">Répéter tous les</label>
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="number"
-                                                    min="1"
-                                                    value={formData.parametres_recurrence.interval || 1}
-                                                    onChange={(e) => setFormData({
-                                                        ...formData,
-                                                        parametres_recurrence: {
-                                                            ...formData.parametres_recurrence!,
-                                                            interval: Number(e.target.value)
-                                                        }
-                                                    })}
-                                                    className="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                                />
-                                                <select
-                                                    value={formData.parametres_recurrence.frequence}
-                                                    onChange={(e) => setFormData({
-                                                        ...formData,
-                                                        parametres_recurrence: {
-                                                            ...formData.parametres_recurrence!,
-                                                            frequence: e.target.value as FrequenceRecurrence
-                                                        }
-                                                    })}
-                                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                                >
-                                                    <option value="daily">Jours</option>
-                                                    <option value="weekly">Semaines</option>
-                                                    <option value="monthly">Mois</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Jours de la semaine (si Hebdo) */}
-                                    {formData.parametres_recurrence.frequence === 'weekly' && (
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-500 mb-2 uppercase">Jours concernés</label>
-                                            <div className="flex justify-between gap-1">
-                                                {[
-                                                    { id: 'MO', label: 'L' },
-                                                    { id: 'TU', label: 'M' },
-                                                    { id: 'WE', label: 'M' },
-                                                    { id: 'TH', label: 'J' },
-                                                    { id: 'FR', label: 'V' },
-                                                    { id: 'SA', label: 'S' },
-                                                    { id: 'SU', label: 'D' }
-                                                ].map((d) => {
-                                                    const isSelected = formData.parametres_recurrence?.jours?.includes(d.id);
-                                                    return (
-                                                        <button
-                                                            key={d.id}
-                                                            type="button"
-                                                            onClick={() => {
-                                                                const currentDays = formData.parametres_recurrence?.jours || [];
-                                                                const newDays = isSelected
-                                                                    ? currentDays.filter(day => day !== d.id)
-                                                                    : [...currentDays, d.id];
-                                                                setFormData({
-                                                                    ...formData,
-                                                                    parametres_recurrence: {
-                                                                        ...formData.parametres_recurrence!,
-                                                                        jours: newDays
-                                                                    }
-                                                                });
-                                                            }}
-                                                            className={`w-8 h-8 rounded-full text-xs font-bold transition-colors ${isSelected
-                                                                ? 'bg-emerald-600 text-white'
-                                                                : 'bg-white border border-gray-300 text-gray-500 hover:bg-gray-100'
-                                                                }`}
-                                                        >
-                                                            {d.label}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Fin de récurrence */}
-                                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-200/50">
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase">Se termine après</label>
-                                            <div className="relative">
-                                                <input
-                                                    type="number"
-                                                    min="1"
-                                                    placeholder="Nb fois"
-                                                    value={formData.parametres_recurrence.nombre_occurrences || ''}
-                                                    onChange={(e) => setFormData({
-                                                        ...formData,
-                                                        parametres_recurrence: {
-                                                            ...formData.parametres_recurrence!,
-                                                            nombre_occurrences: e.target.value ? Number(e.target.value) : undefined,
-                                                            date_fin: undefined
-                                                        }
-                                                    })}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none pr-12"
-                                                />
-                                                <span className="absolute right-3 top-2.5 text-xs text-gray-400">fois</span>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase">Ou jusqu'au</label>
-                                            <input
-                                                type="date"
-                                                value={formData.parametres_recurrence.date_fin?.split('T')[0] || ''}
-                                                onChange={(e) => setFormData({
-                                                    ...formData,
-                                                    parametres_recurrence: {
-                                                        ...formData.parametres_recurrence!,
-                                                        date_fin: e.target.value ? e.target.value : undefined,
-                                                        nombre_occurrences: undefined
-                                                    }
-                                                })}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                            />
-                                        </div>
-                                    </div>
-                                    <p className="text-[10px] text-gray-400 italic text-center">
-                                        (Remplissez soit le nombre de fois, soit la date de fin)
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="p-6 border-t border-gray-200 flex gap-3">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                        >
-                            Annuler
-                        </button>
-                        <button
-                            type="submit"
-                            className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-                        >
-                            {tache ? 'Modifier' : 'Créer'}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
-};
+// TaskFormModal is imported from '../components/planning/TaskFormModal'
 
 // ============================================================================
-// CUSTOM EVENT COMPONENT
+// CUSTOM EVENT COMPONENT (memoized for performance)
 // ============================================================================
 
-const TaskEvent = ({ event }: { event: CalendarEvent }) => {
+const TaskEvent = memo(function TaskEvent({ event }: { event: CalendarEvent }) {
     const tache = event.resource;
-    // Gestion robuste du nom structure (snake_case vs camelCase)
     const clientName = (tache.client_detail as any)?.nom_structure || tache.client_detail?.nomStructure || 'Aucun client';
+    const isUrgent = tache.priorite === 5;
+    const equipesCount = tache.equipes_detail?.length || (tache.equipe_detail ? 1 : 0);
+    const equipesNames = tache.equipes_detail?.length > 0
+        ? tache.equipes_detail.map(e => e.nomEquipe).join(', ')
+        : tache.equipe_detail?.nomEquipe || '';
 
     return (
-        <div className="flex flex-col h-full justify-start leading-tight min-h-[24px]">
-            <div className="font-semibold text-xs truncate">
+        <div
+            className="flex flex-col h-full justify-start leading-tight min-h-[24px] group relative"
+            title={`${tache.type_tache_detail.nom_tache}\nClient: ${clientName}\nPriorité: ${PRIORITE_LABELS[tache.priorite]}\n${equipesNames ? `Équipes: ${equipesNames}` : 'Aucune équipe'}\n${tache.charge_estimee_heures ? `Charge: ${tache.charge_estimee_heures}h` : ''}`}
+        >
+            {/* Priority indicator + Task name */}
+            <div className="font-semibold text-xs truncate flex items-center gap-1">
+                {isUrgent && (
+                    <AlertTriangle className="w-3 h-3 text-red-500 shrink-0 animate-pulse" />
+                )}
                 {tache.type_tache_detail.nom_tache}
             </div>
+
+            {/* Client info */}
             <div className="text-[10px] truncate opacity-90 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-black/20 shrink-0" />
                 {!tache.client_detail ? (
@@ -426,20 +90,31 @@ const TaskEvent = ({ event }: { event: CalendarEvent }) => {
                     clientName
                 )}
             </div>
-            {tache.equipe_detail && (
-                <div className="text-[9px] opacity-75 mt-0.5 truncate">
-                    👥 {tache.equipe_detail.nomEquipe}
-                </div>
-            )}
+
+            {/* Teams and charge info */}
+            <div className="flex items-center gap-2 text-[9px] opacity-75 mt-0.5">
+                {equipesCount > 0 && (
+                    <span className="truncate flex items-center gap-0.5">
+                        <Users className="w-2.5 h-2.5" />
+                        {equipesCount > 1 ? `${equipesCount} équipes` : equipesNames}
+                    </span>
+                )}
+                {tache.charge_estimee_heures && (
+                    <span className="flex items-center gap-0.5 text-emerald-700/80">
+                        <Timer className="w-2.5 h-2.5" />
+                        {tache.charge_estimee_heures}h
+                    </span>
+                )}
+            </div>
         </div>
     );
-};
+});
 
 // ============================================================================
 // MAIN PLANNING COMPONENT
 // ============================================================================
 
-const Planning: React.FC = () => {
+const Planning: FC = () => {
     const [taches, setTaches] = useState<Tache[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
     const [equipes, setEquipes] = useState<EquipeList[]>([]);
@@ -459,8 +134,13 @@ const Planning: React.FC = () => {
     const [filterType, setFilterType] = useState<number | 'all'>('all');
     const [tacheToDelete, setTacheToDelete] = useState<number | null>(null);
 
+    // Export PDF
+    const [isExporting, setIsExporting] = useState(false);
+    const calendarRef = useRef<HTMLDivElement>(null);
+
     const location = useLocation();
     const [initialTaskValues, setInitialTaskValues] = useState<Partial<TacheCreate> | undefined>(undefined);
+    const [preSelectedObjects, setPreSelectedObjects] = useState<InventoryObjectOption[] | undefined>(undefined);
 
     // Handle navigation from Reclamations
     useEffect(() => {
@@ -480,8 +160,31 @@ const Planning: React.FC = () => {
                 date_fin_planifiee: end.toISOString().slice(0, 16),
             });
             setShowCreateForm(true);
-            // Clear state so refresh doesn't trigger it again? 
-            // Optional: window.history.replaceState({}, document.title);
+        }
+    }, [location]);
+
+    // Handle navigation from Map (selection → task creation)
+    useEffect(() => {
+        if (location.state?.createTaskFromSelection && location.state.preSelectedObjects) {
+            const objects = location.state.preSelectedObjects as InventoryObjectOption[];
+            const now = new Date();
+            const end = new Date(now.getTime() + 3600000); // +1 hour
+
+            // Determine common site from selected objects
+            const sites = [...new Set(objects.map(o => o.site))];
+            const siteInfo = sites.length === 1 ? sites[0] : `${sites.length} sites`;
+
+            setPreSelectedObjects(objects);
+            setInitialTaskValues({
+                objets: objects.map(o => o.id),
+                commentaires: `Intervention sur ${objects.length} objet(s) - ${siteInfo}`,
+                date_debut_planifiee: now.toISOString().slice(0, 16),
+                date_fin_planifiee: end.toISOString().slice(0, 16),
+            });
+            setShowCreateForm(true);
+
+            // Clear location state to prevent re-triggering on refresh
+            window.history.replaceState({}, document.title);
         }
     }, [location]);
 
@@ -509,6 +212,94 @@ const Planning: React.FC = () => {
             console.error(err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleExportPDF = async () => {
+        if (!calendarRef.current) return;
+        setIsExporting(true);
+
+        try {
+            const canvas = await html2canvas(calendarRef.current, {
+                scale: 2, // Meilleure qualité
+                useCORS: true,
+                logging: false,
+                windowWidth: calendarRef.current.scrollWidth,
+                windowHeight: calendarRef.current.scrollHeight
+            });
+
+            const imgData = canvas.toDataURL('image/png');
+            // jsPDF setup (A4 landscape)
+            const pdf = new jsPDF({
+                orientation: 'landscape',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+
+            // En-tête professionnel
+            // Fond gris clair pour l'en-tête
+            pdf.setFillColor(245, 247, 250);
+            pdf.rect(0, 0, pageWidth, 25, 'F');
+
+            // Titre
+            pdf.setFontSize(22);
+            pdf.setTextColor(16, 185, 129); // Emerald 500
+            pdf.text('GreenSIG', 14, 16);
+
+            pdf.setFontSize(14);
+            pdf.setTextColor(55, 65, 81); // Gray 700
+            pdf.text('Planning des interventions', pageWidth - 14, 16, { align: 'right' });
+
+            // Sous-titre avec date
+            pdf.setFontSize(10);
+            pdf.setTextColor(107, 114, 128); // Gray 500
+            const dateStr = new Date().toLocaleDateString('fr-FR', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            pdf.text(`Exporté le ${dateStr}`, pageWidth - 14, 22, { align: 'right' });
+
+            // Ajout de l'image du calendrier
+            const imgWidth = pageWidth - 20; // Marge 10mm
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+            // Gestion de la hauteur (si ça dépasse, on compresse ou coupe, ici on ajuste)
+            // On laisse 30mm de marge en haut pour l'en-tête
+            const maxHeight = pageHeight - 35;
+            let finalHeight = imgHeight;
+            let finalWidth = imgWidth;
+
+            if (imgHeight > maxHeight) {
+                // Si trop haut, on scale down pour faire tenir sur une page
+                const ratio = maxHeight / imgHeight;
+                finalHeight = maxHeight;
+                finalWidth = imgWidth * ratio;
+            }
+
+            // Centrage horizontal si redimensionné
+            const xPos = (pageWidth - finalWidth) / 2;
+
+            pdf.addImage(imgData, 'PNG', xPos, 30, finalWidth, finalHeight);
+
+            // Pied de page
+            pdf.setFontSize(8);
+            pdf.setTextColor(156, 163, 175);
+            pdf.text('Document généré automatiquement par GreenSIG', pageWidth / 2, pageHeight - 5, { align: 'center' });
+
+            pdf.save(`planning_greensig_${new Date().toISOString().split('T')[0]}.pdf`);
+
+        } catch (error) {
+            console.error('Erreur export PDF:', error);
+            alert('Une erreur est survenue lors de l\'exportation (voir console).');
+        } finally {
+            setIsExporting(false);
         }
     };
 
@@ -564,10 +355,24 @@ const Planning: React.FC = () => {
         }
     };
 
+    const handleResetCharge = async (tacheId: number) => {
+        try {
+            await planningService.resetCharge(tacheId);
+            await loadData();
+        } catch (err) {
+            alert('Erreur lors du recalcul de la charge');
+            console.error(err);
+        }
+    };
+
     const filteredTaches = useMemo(() => {
         return taches.filter(t => {
-            // 1. Filtre Equipe
-            if (filterEquipe !== 'all' && t.equipe_detail?.id !== filterEquipe) return false;
+            // 1. Filtre Equipe (check M2M equipes or legacy equipe)
+            if (filterEquipe !== 'all') {
+                const hasEquipe = t.equipes_detail?.some(e => e.id === filterEquipe) ||
+                    t.equipe_detail?.id === filterEquipe;
+                if (!hasEquipe) return false;
+            }
 
             // 2. Filtre Client
             if (filterClient !== 'all' && (t.client_detail as any)?.utilisateur !== filterClient) return false;
@@ -603,9 +408,19 @@ const Planning: React.FC = () => {
         }));
     }, [filteredTaches]);
 
-    // Custom coloring for events
+    // Custom coloring for events based on status and priority
     const eventPropGetter = (event: CalendarEvent) => {
         const tache = event.resource;
+
+        // Priority-based top border colors (green→yellow→orange→red)
+        const priorityBorderColors: Record<number, string> = {
+            1: '#22C55E', // green-500
+            2: '#84CC16', // lime-500
+            3: '#EAB308', // yellow-500
+            4: '#F97316', // orange-500
+            5: '#EF4444', // red-500
+        };
+        const priorityBorder = priorityBorderColors[tache.priorite] || '#9CA3AF';
 
         // Si pas de client, style d'alerte (orange/rouge) comme dans la liste
         if (!tache.client_detail) {
@@ -614,24 +429,95 @@ const Planning: React.FC = () => {
                     backgroundColor: '#FFF7ED', // orange-50
                     color: '#7C2D12',           // orange-900
                     borderLeft: '4px solid #F97316', // orange-500
-                    borderColor: 'transparent transparent transparent #F97316'
+                    borderTop: `3px solid ${priorityBorder}`,
                 },
                 className: `text-xs rounded shadow-sm opacity-95 hover:opacity-100 hover:shadow-md transition-all`
             };
         }
 
-        const colors = STATUT_TACHE_COLORS[tache.statut] || { bg: 'bg-gray-100', text: 'text-gray-800' };
+        // Status-based left border colors
+        const statusBorderColors: Record<string, string> = {
+            'PLANIFIEE': '#3B82F6',  // blue-500
+            'NON_DEBUTEE': '#9CA3AF', // gray-400
+            'EN_COURS': '#F97316',    // orange-500
+            'TERMINEE': '#22C55E',    // green-500
+            'ANNULEE': '#EF4444',     // red-500
+        };
+        const statusBorder = statusBorderColors[tache.statut] || '#9CA3AF';
 
-        let borderClass = 'border-l-4 border-gray-400';
-        if (tache.statut === 'PLANIFIEE') borderClass = 'border-l-4 border-blue-500';
-        if (tache.statut === 'EN_COURS') borderClass = 'border-l-4 border-orange-500';
-        if (tache.statut === 'TERMINEE') borderClass = 'border-l-4 border-green-500';
-        if (tache.statut === 'ANNULEE') borderClass = 'border-l-4 border-red-500';
+        // Status-based background colors
+        const statusBgColors: Record<string, string> = {
+            'PLANIFIEE': '#EFF6FF',   // blue-50
+            'NON_DEBUTEE': '#F9FAFB', // gray-50
+            'EN_COURS': '#FFF7ED',    // orange-50
+            'TERMINEE': '#F0FDF4',    // green-50
+            'ANNULEE': '#FEF2F2',     // red-50
+        };
+        const statusBg = statusBgColors[tache.statut] || '#F9FAFB';
+
+        // Status-based text colors
+        const statusTextColors: Record<string, string> = {
+            'PLANIFIEE': '#1E40AF',   // blue-800
+            'NON_DEBUTEE': '#374151', // gray-700
+            'EN_COURS': '#9A3412',    // orange-800
+            'TERMINEE': '#166534',    // green-800
+            'ANNULEE': '#991B1B',     // red-800
+        };
+        const statusText = statusTextColors[tache.statut] || '#374151';
 
         return {
-            className: `${colors.bg} ${colors.text} text-xs ${borderClass} rounded shadow-sm opacity-95 hover:opacity-100 hover:shadow-md transition-all`
+            style: {
+                backgroundColor: statusBg,
+                color: statusText,
+                borderLeft: `4px solid ${statusBorder}`,
+                borderTop: `3px solid ${priorityBorder}`,
+            },
+            className: `text-xs rounded shadow-sm opacity-95 hover:opacity-100 hover:shadow-md transition-all cursor-pointer`
         };
     };
+
+    // Drag & Drop handlers
+    const handleEventDrop = useCallback(async ({ event, start, end }: EventInteractionArgs<CalendarEvent>) => {
+        try {
+            const tache = event.resource;
+            await planningService.updateTache(tache.id, {
+                date_debut_planifiee: (start as Date).toISOString(),
+                date_fin_planifiee: (end as Date).toISOString()
+            });
+            // Update local state optimistically
+            setTaches(prev => prev.map(t =>
+                t.id === tache.id
+                    ? { ...t, date_debut_planifiee: (start as Date).toISOString(), date_fin_planifiee: (end as Date).toISOString() }
+                    : t
+            ));
+        } catch (err) {
+            console.error('Erreur lors du déplacement de la tâche:', err);
+            alert('Erreur lors du déplacement de la tâche');
+            // Reload data to restore correct state
+            loadData();
+        }
+    }, []);
+
+    const handleEventResize = useCallback(async ({ event, start, end }: EventInteractionArgs<CalendarEvent>) => {
+        try {
+            const tache = event.resource;
+            await planningService.updateTache(tache.id, {
+                date_debut_planifiee: (start as Date).toISOString(),
+                date_fin_planifiee: (end as Date).toISOString()
+            });
+            // Update local state optimistically
+            setTaches(prev => prev.map(t =>
+                t.id === tache.id
+                    ? { ...t, date_debut_planifiee: (start as Date).toISOString(), date_fin_planifiee: (end as Date).toISOString() }
+                    : t
+            ));
+        } catch (err) {
+            console.error('Erreur lors du redimensionnement de la tâche:', err);
+            alert('Erreur lors du redimensionnement de la tâche');
+            // Reload data to restore correct state
+            loadData();
+        }
+    }, []);
 
     if (loading) {
         return (
@@ -657,13 +543,7 @@ const Planning: React.FC = () => {
                     <h1 className="text-2xl font-bold text-gray-900">Planning</h1>
                     <p className="text-gray-500 mt-1">Gestion des tâches planifiées</p>
                 </div>
-                <button
-                    onClick={() => { setSelectedTache(null); setInitialTaskValues(undefined); setShowCreateForm(true); }}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
-                >
-                    <Plus className="w-4 h-4" />
-                    Nouvelle tâche
-                </button>
+
             </div>
 
             {/* Filters & View Toggle */}
@@ -701,6 +581,16 @@ const Planning: React.FC = () => {
                             Liste
                         </button>
                     </div>
+                    {viewMode === 'calendar' && (
+                        <button
+                            onClick={handleExportPDF}
+                            disabled={isExporting}
+                            className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm shadow-sm disabled:opacity-50"
+                        >
+                            {isExporting ? '...' : <Download className="w-4 h-4" />}
+                            <span className="hidden sm:inline">Exporter PDF</span>
+                        </button>
+                    )}
                 </div>
 
                 {/* Ligne du bas : Filtres déroulants */}
@@ -764,8 +654,8 @@ const Planning: React.FC = () => {
             {/* Content */}
             <div className="flex-1 overflow-hidden bg-white rounded-lg border border-gray-200">
                 {viewMode === 'calendar' ? (
-                    <div className="h-full p-4">
-                        <BigCalendar
+                    <div className="h-full p-4" ref={calendarRef}>
+                        <DnDCalendar
                             components={{
                                 event: TaskEvent
                             }}
@@ -787,10 +677,28 @@ const Planning: React.FC = () => {
                                 event: "Événement",
                                 noEventsInRange: "Aucune tâche dans cette période.",
                             }}
+                            formats={{
+                                timeGutterFormat: 'HH:mm',
+                                eventTimeRangeFormat: ({ start, end }, culture, localizer) =>
+                                    `${localizer?.format(start, 'HH:mm', culture)} - ${localizer?.format(end, 'HH:mm', culture)}`,
+                                agendaTimeRangeFormat: ({ start, end }, culture, localizer) =>
+                                    `${localizer?.format(start, 'HH:mm', culture)} - ${localizer?.format(end, 'HH:mm', culture)}`,
+                                dayHeaderFormat: 'dddd d MMMM',
+                                dayRangeHeaderFormat: ({ start, end }, culture, localizer) =>
+                                    `${localizer?.format(start, 'd MMM', culture)} - ${localizer?.format(end, 'd MMM', culture)}`,
+                            }}
                             culture='fr'
+                            min={new Date(2024, 0, 1, 7, 0, 0)}
+                            max={new Date(2024, 0, 1, 19, 0, 0)}
+                            step={30}
+                            timeslots={2}
                             onSelectEvent={(event) => setSelectedTache(event.resource)}
                             eventPropGetter={eventPropGetter}
                             views={['month', 'week', 'day', 'agenda']}
+                            onEventDrop={handleEventDrop}
+                            onEventResize={handleEventResize}
+                            resizable
+                            draggableAccessor={() => true}
                         />
                     </div>
                 ) : (
@@ -848,10 +756,15 @@ const Planning: React.FC = () => {
                                             <Clock className="w-4 h-4" />
                                             {new Date(tache.date_debut_planifiee).toLocaleString('fr-FR')}
                                         </div>
-                                        {tache.equipe_detail && (
+                                        {/* Display multiple equipes or single legacy equipe */}
+                                        {(tache.equipes_detail?.length > 0 || tache.equipe_detail) && (
                                             <div className="flex items-center gap-2">
                                                 <Users className="w-4 h-4" />
-                                                {tache.equipe_detail.nomEquipe}
+                                                <span className="truncate">
+                                                    {tache.equipes_detail?.length > 0
+                                                        ? tache.equipes_detail.map(e => e.nomEquipe).join(', ')
+                                                        : tache.equipe_detail?.nomEquipe}
+                                                </span>
                                             </div>
                                         )}
                                     </div>
@@ -868,11 +781,12 @@ const Planning: React.FC = () => {
                     <TaskFormModal
                         tache={selectedTache || undefined}
                         initialValues={initialTaskValues}
-                        clients={clients}
+                        preSelectedObjects={preSelectedObjects}
                         equipes={equipes}
                         typesTaches={typesTaches}
-                        onClose={() => { setShowCreateForm(false); setSelectedTache(null); setInitialTaskValues(undefined); }}
+                        onClose={() => { setShowCreateForm(false); setSelectedTache(null); setInitialTaskValues(undefined); setPreSelectedObjects(undefined); }}
                         onSubmit={selectedTache ? handleUpdateTache : handleCreateTache}
+                        onResetCharge={handleResetCharge}
                     />
                 )
             }
@@ -915,6 +829,24 @@ const Planning: React.FC = () => {
                                 <div>
                                     <span className="text-sm font-medium text-gray-500">Priorité</span>
                                     <p className="text-gray-900">{PRIORITE_LABELS[selectedTache.priorite]}</p>
+                                </div>
+                                <div>
+                                    <span className="text-sm font-medium text-gray-500">Charge estimée</span>
+                                    <p className="text-gray-900 flex items-center gap-2">
+                                        {selectedTache.charge_estimee_heures !== null ? (
+                                            <>
+                                                <Timer className="w-4 h-4 text-emerald-600" />
+                                                {selectedTache.charge_estimee_heures} heures
+                                                {selectedTache.charge_manuelle && (
+                                                    <span className="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full">
+                                                        Manuelle
+                                                    </span>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <span className="text-gray-400 italic">Non calculée</span>
+                                        )}
+                                    </p>
                                 </div>
                                 {selectedTache.commentaires && (
                                     <div>

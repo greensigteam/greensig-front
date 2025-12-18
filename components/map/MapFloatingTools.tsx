@@ -13,14 +13,12 @@ import {
   Circle,
   Minus,
   Pentagon,
-  MousePointer2,
-  Move,
   Undo2,
   Redo2,
   FolderInput,
   FileOutput,
 } from 'lucide-react';
-import { Measurement, MeasurementType, DrawingMode, EditingMode } from '../../types';
+import { Measurement, MeasurementType, DrawingMode } from '../../types';
 import { useDrawing, getObjectTypesByGeometry } from '../../contexts/DrawingContext';
 import ObjectTypeSelector from './ObjectTypeSelector';
 
@@ -86,11 +84,9 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
   const {
     isDrawing,
     drawingMode,
-    editingMode,
     currentGeometry,
     calculatedMetrics,
     setDrawingMode,
-    setEditingMode,
     startDrawing,
     cancelDrawing,
     canUndo,
@@ -181,15 +177,6 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
     }
   };
 
-  // Handle editing mode button click
-  const handleEditingModeClick = (mode: EditingMode) => {
-    if (mode === editingMode) {
-      setEditingMode('none');
-    } else {
-      setEditingMode(mode);
-    }
-  };
-
   // Handle cancel drawing
   const handleCancelDrawing = () => {
     cancelDrawing();
@@ -198,7 +185,7 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
   };
 
   const hasMeasurements = measurements.length > 0;
-  const isDrawingActive = isDrawing || drawingMode !== 'none' || editingMode !== 'none';
+  const isDrawingActive = isDrawing || drawingMode !== 'none';
 
   return (
     <div className="absolute top-24 right-4 pointer-events-auto flex flex-col gap-2 z-50 items-end">
@@ -345,49 +332,6 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
               >
                 <Pentagon className="w-4 h-4" />
                 <span className="text-[9px] font-medium">Surface</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Editing Buttons */}
-          <div className="mb-3">
-            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Modifier</div>
-            <div className="flex gap-1 bg-slate-50 rounded-lg p-1">
-              <button
-                onClick={() => handleEditingModeClick('modify')}
-                className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${
-                  editingMode === 'modify'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'hover:bg-white text-slate-600 hover:shadow-sm'
-                }`}
-                title="Modifier les sommets"
-              >
-                <MousePointer2 className="w-4 h-4" />
-                <span className="text-[9px] font-medium">Sommets</span>
-              </button>
-              <button
-                onClick={() => handleEditingModeClick('move')}
-                className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${
-                  editingMode === 'move'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'hover:bg-white text-slate-600 hover:shadow-sm'
-                }`}
-                title="Déplacer"
-              >
-                <Move className="w-4 h-4" />
-                <span className="text-[9px] font-medium">Déplacer</span>
-              </button>
-              <button
-                onClick={() => handleEditingModeClick('delete')}
-                className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${
-                  editingMode === 'delete'
-                    ? 'bg-red-600 text-white shadow-md'
-                    : 'hover:bg-white text-slate-600 hover:shadow-sm'
-                }`}
-                title="Supprimer"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span className="text-[9px] font-medium">Supprimer</span>
               </button>
             </div>
           </div>

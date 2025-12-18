@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     X,
     Upload,
@@ -182,8 +182,10 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
 
     // Validation step
     const handleValidationStep = async () => {
-        if (!siteId || !targetType) {
-            showToast('Veuillez sélectionner un site et un type d\'objet', 'error');
+        // Site is not required for Site objects
+        const requiresSite = targetType !== 'Site';
+        if (!targetType || (requiresSite && !siteId)) {
+            showToast(requiresSite ? 'Veuillez sélectionner un site et un type d\'objet' : 'Veuillez sélectionner un type d\'objet', 'error');
             return;
         }
 
@@ -193,7 +195,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                 selectedFeatures,
                 targetType,
                 attributeMapping,
-                siteId
+                requiresSite ? siteId! : null
             );
             setValidationResult(result);
             setCurrentStep('validation');
@@ -206,7 +208,8 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
 
     // Execute step - import data
     const handleExecuteStep = async () => {
-        if (!siteId || !targetType) return;
+        const requiresSite = targetType !== 'Site';
+        if (!targetType || (requiresSite && !siteId)) return;
 
         setIsLoading(true);
         try {
@@ -214,7 +217,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                 selectedFeatures,
                 targetType,
                 attributeMapping,
-                siteId
+                requiresSite ? siteId! : null
             );
             setExecuteResult(result);
             setCurrentStep('complete');
@@ -246,7 +249,9 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
             case 'preview':
                 return selectedFeatures.length > 0;
             case 'mapping':
-                return !!targetType && !!siteId;
+                // Site is not required for Site objects
+                const requiresSite = targetType !== 'Site';
+                return !!targetType && (!requiresSite || !!siteId);
             case 'validation':
                 return validationResult !== null && validationResult.valid_count > 0;
             default:

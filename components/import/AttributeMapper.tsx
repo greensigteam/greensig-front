@@ -113,35 +113,12 @@ export default function AttributeMapper({
         onMappingChange(newMapping);
     };
 
+    // Check if target type requires a site (Site objects don't need a parent site)
+    const requiresSite = targetType !== 'Site';
+
     return (
         <div className="space-y-6">
-            {/* Site Selection */}
-            <div className="bg-gray-50 rounded-lg p-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Site de destination <span className="text-red-500">*</span>
-                </label>
-                {isLoadingSites ? (
-                    <div className="flex items-center gap-2 text-gray-500">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Chargement des sites...
-                    </div>
-                ) : (
-                    <select
-                        value={siteId || ''}
-                        onChange={(e) => onSiteIdChange(e.target.value ? parseInt(e.target.value) : null)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                        <option value="">Sélectionner un site...</option>
-                        {sites.map(site => (
-                            <option key={site.id} value={site.id}>
-                                {site.name}
-                            </option>
-                        ))}
-                    </select>
-                )}
-            </div>
-
-            {/* Object Type Selection */}
+            {/* Object Type Selection - First, so we know if we need site */}
             <div className="bg-gray-50 rounded-lg p-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                     Type d'objet à créer <span className="text-red-500">*</span>
@@ -180,6 +157,47 @@ export default function AttributeMapper({
                     </div>
                 )}
             </div>
+
+            {/* Site Selection - Only show if target type requires a site */}
+            {requiresSite && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Site de destination <span className="text-red-500">*</span>
+                    </label>
+                    {isLoadingSites ? (
+                        <div className="flex items-center gap-2 text-gray-500">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Chargement des sites...
+                        </div>
+                    ) : sites.length === 0 ? (
+                        <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 p-3 rounded-lg">
+                            <AlertCircle className="w-5 h-5" />
+                            <span>Aucun site disponible. Importez d'abord un fichier de Sites.</span>
+                        </div>
+                    ) : (
+                        <select
+                            value={siteId || ''}
+                            onChange={(e) => onSiteIdChange(e.target.value ? parseInt(e.target.value) : null)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="">Sélectionner un site...</option>
+                            {sites.map(site => (
+                                <option key={site.id} value={site.id}>
+                                    {site.name}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+                </div>
+            )}
+
+            {/* Info message for Site import */}
+            {targetType === 'Site' && (
+                <div className="flex items-center gap-2 p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-800">
+                    <HelpCircle className="w-5 h-5 flex-shrink-0" />
+                    <span>Les Sites sont des objets racines et n'ont pas besoin de site parent.</span>
+                </div>
+            )}
 
             {/* Attribute Mapping */}
             {selectedTypeInfo && (

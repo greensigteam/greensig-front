@@ -148,7 +148,6 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
   const [formData, setFormData] = useState({
     nomEquipe: '',
     chefEquipe: 0,
-    specialite: '',
     membres: [] as number[]
   });
   const [loading, setLoading] = useState(false);
@@ -169,7 +168,6 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
       const equipe = await createEquipe({
         nomEquipe: formData.nomEquipe,
         chefEquipe: formData.chefEquipe && formData.chefEquipe !== 0 ? formData.chefEquipe : undefined,
-        specialite: formData.specialite || undefined,
         membres: formData.membres.length > 0 ? formData.membres : undefined
       });
 
@@ -232,19 +230,6 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
                 onChange={(e) => setFormData({ ...formData, nomEquipe: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                 placeholder="Ex: Equipe C - Irrigation"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Specialite
-              </label>
-              <input
-                type="text"
-                value={formData.specialite}
-                onChange={(e) => setFormData({ ...formData, specialite: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                placeholder="Ex: Entretien general"
               />
             </div>
 
@@ -455,9 +440,22 @@ const OperateurDetailModal: React.FC<OperateurDetailModalProps> = ({ operateur, 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">{operateur.fullName}</h2>
-            <p className="text-sm text-gray-500">{operateur.numeroImmatriculation}</p>
+          <div className="flex items-center gap-4">
+            {operateur.photo ? (
+              <img
+                src={operateur.photo}
+                alt={operateur.fullName}
+                className="w-16 h-16 rounded-full object-cover border-2 border-emerald-200"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center">
+                <Users className="w-8 h-8 text-emerald-600" />
+              </div>
+            )}
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">{operateur.fullName}</h2>
+              <p className="text-sm text-gray-500">{operateur.numeroImmatriculation}</p>
+            </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
             <X className="w-5 h-5" />
@@ -468,11 +466,19 @@ const OperateurDetailModal: React.FC<OperateurDetailModalProps> = ({ operateur, 
           {/* Informations generales */}
           <div className="grid grid-cols-2 gap-4">
             <div>
+              <label className="text-sm font-medium text-gray-500">Nom</label>
+              <p className="text-gray-900">{operateur.nom}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-500">Prénom</label>
+              <p className="text-gray-900">{operateur.prenom}</p>
+            </div>
+            <div>
               <label className="text-sm font-medium text-gray-500">Email</label>
               <p className="text-gray-900">{operateur.email}</p>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-500">Telephone</label>
+              <label className="text-sm font-medium text-gray-500">Téléphone</label>
               <p className="text-gray-900">{operateur.telephone || '-'}</p>
             </div>
             <div>
@@ -482,31 +488,42 @@ const OperateurDetailModal: React.FC<OperateurDetailModalProps> = ({ operateur, 
               </p>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-500">Statut</label>
+              <label className="text-sm font-medium text-gray-500">Statut compte</label>
+              <div className="mt-1">
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${operateur.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  }`}>
+                  {operateur.actif ? 'Actif' : 'Inactif'}
+                </span>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-500">Statut opérateur</label>
               <div className="mt-1">
                 <StatutOperateurBadge statut={operateur.statut} />
               </div>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-500">Equipe</label>
-              <p className="text-gray-900">{operateur.equipeNom || 'Non affecte'}</p>
+              <p className="text-gray-900">{operateur.equipeNom || 'Non affecté'}</p>
             </div>
-            <div>
-              <label className="text-sm font-medium text-gray-500">Role</label>
-              <div className="flex items-center gap-2">
+            <div className="col-span-2">
+              <label className="text-sm font-medium text-gray-500">Rôle(s)</label>
+              <div className="flex items-center gap-2 mt-1">
                 {operateur.utilisateurDetail?.roles && operateur.utilisateurDetail.roles.length > 0 ? (
                   operateur.utilisateurDetail.roles.map((r) => (
-                    <span key={r} className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                    <span key={r} className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                       {NOM_ROLE_LABELS[r as keyof typeof NOM_ROLE_LABELS] || r}
                     </span>
                   ))
                 ) : (
-                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{operateur.estChefEquipe ? "Chef d'equipe" : 'Operateur'}</span>
+                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                    {operateur.estChefEquipe ? "Chef d'équipe" : 'Opérateur'}
+                  </span>
                 )}
 
                 {operateur.estChefEquipe && (
                   <span className="text-sm text-gray-500 ml-1">
-                    ({operateur.equipesDirigeesCount} equipe{operateur.equipesDirigeesCount > 1 ? 's' : ''})
+                    ({operateur.equipesDirigeesCount} équipe{operateur.equipesDirigeesCount > 1 ? 's' : ''})
                   </span>
                 )}
               </div>
@@ -591,7 +608,6 @@ const EquipeDetailModal: React.FC<EquipeDetailModalProps> = ({ equipe, onClose }
         <div className="p-6 border-b border-gray-200 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">{equipe.nomEquipe}</h2>
-            <p className="text-sm text-gray-500">{equipe.specialite || 'Pas de specialite'}</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
             <X className="w-5 h-5" />
@@ -719,7 +735,7 @@ const StatCard: React.FC<StatCardProps> = ({ icon, label, value, color }) => (
 // COMPOSANT PRINCIPAL - Teams
 // ============================================================================
 
-type TabType = 'equipes' | 'operateurs' | 'absences' | 'competences' | 'historique' | 'clients';
+type TabType = 'equipes' | 'operateurs' | 'absences' | 'competences' | 'historique';
 
 const Teams: React.FC = () => {
   // State
@@ -948,11 +964,7 @@ const Teams: React.FC = () => {
     return true;
   }).sort((a, b) => (a.ordreAffichage || 0) - (b.ordreAffichage || 0));
 
-  const filteredClients = clients.filter(c =>
-    (c.nomStructure || (c as any).nom_structure || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (c.contactPrincipal || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (c.email || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+
 
   // Columns
   const [editEquipe, setEditEquipe] = useState<EquipeList | null>(null);
@@ -963,7 +975,7 @@ const Teams: React.FC = () => {
   const equipesColumns: Column<EquipeList>[] = [
     { key: 'nomEquipe', label: 'Nom' },
     { key: 'chefEquipeNom', label: "Chef d'equipe" },
-    { key: 'specialite', label: 'Specialite', render: (e) => e.specialite || '-' },
+
     {
       key: 'nombreMembres',
       label: 'Membres',
@@ -1191,33 +1203,7 @@ const Teams: React.FC = () => {
     }
   ];
 
-  const clientsColumns: Column<Client>[] = [
-    { key: 'nomStructure', label: 'Structure', render: (c) => c.nomStructure || (c as any).nom_structure || '-' },
-    { key: 'contactPrincipal', label: 'Contact', render: (c) => c.contactPrincipal || '-' },
-    { key: 'email', label: 'Email', render: (c) => c.email || '-' },
-    { key: 'telephone', label: 'Téléphone', render: (c) => c.telephone || '-' },
-    { key: 'adresse', label: 'Adresse', render: (c) => c.adresse || '-' },
-    {
-      key: 'actions',
-      label: 'Actions',
-      render: (c) => (
-        <div className="flex gap-1">
-          <button
-            className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-            title="Modifier"
-            onClick={(ev) => {
-              ev.stopPropagation();
-              const u = utilisateurs.find(us => us.id === c.utilisateur);
-              if (u) setEditingUser(u);
-            }}
-          >
-            <Edit2 className="w-4 h-4" />
-          </button>
-        </div>
-      ),
-      sortable: false
-    }
-  ];
+
 
   if (loading) {
     return (
@@ -1341,18 +1327,7 @@ const Teams: React.FC = () => {
             )}
           </span>
         </button>
-        <button
-          onClick={() => setActiveTab('clients')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'clients'
-            ? 'border-emerald-500 text-emerald-600'
-            : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-        >
-          <span className="flex items-center gap-2">
-            <Building2 className="w-4 h-4" />
-            Clients ({clients.length})
-          </span>
-        </button>
+
         <button
           onClick={() => setActiveTab('historique')}
           className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'historique'
@@ -1586,15 +1561,7 @@ const Teams: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'clients' && (
-          <div className="h-full overflow-auto">
-            <DataTable
-              data={filteredClients}
-              columns={clientsColumns}
-              itemsPerPage={10}
-            />
-          </div>
-        )}
+
 
         {activeTab === 'historique' && (
           <HistoriqueRHPanel
