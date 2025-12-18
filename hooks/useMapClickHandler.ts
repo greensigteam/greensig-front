@@ -1,12 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import { Point } from 'ol/geom';
 import Overlay from 'ol/Overlay';
+import { GeoJSON } from 'ol/format';
 import type Map from 'ol/Map';
 import type { Feature } from 'ol';
-import type { MapObjectDetail, MapBrowserEvent } from '../types';
-import { useSelection } from '../contexts/SelectionContext'; // Added this import
+import type { MapObjectDetail, MapBrowserEvent, GeoJSONGeometry } from '../types';
+import { useSelection } from '../contexts/SelectionContext';
+import { useDrawing } from '../contexts/DrawingContext';
 
 export interface UseMapClickHandlerOptions {
   mapInstance: React.RefObject<Map | null>;
@@ -48,6 +50,27 @@ export function useMapClickHandler(options: UseMapClickHandlerOptions): void {
   // ✅ Call useSelection at hook level, NOT inside useEffect
   const { isSelectionMode, toggleObjectSelection } = useSelection();
 
+  // Get editing mode from DrawingContext
+  const { editingMode } = useDrawing();
+
+  // GeoJSON format for extracting geometry
+  const geoJSONFormat = useRef(new GeoJSON());
+
+  // Helper to extract geometry from feature
+  const extractGeometry = (feature: Feature): GeoJSONGeometry | undefined => {
+    const geom = feature.getGeometry();
+    if (!geom) return undefined;
+    try {
+      return geoJSONFormat.current.writeGeometryObject(geom, {
+        featureProjection: 'EPSG:3857',
+        dataProjection: 'EPSG:4326',
+      }) as GeoJSONGeometry;
+    } catch (e) {
+      console.error('Error extracting geometry:', e);
+      return undefined;
+    }
+  };
+
   useEffect(() => {
     const map = mapInstance.current;
 
@@ -55,6 +78,11 @@ export function useMapClickHandler(options: UseMapClickHandlerOptions): void {
 
     if (isMeasuring) {
       // Don't register click handler if measuring
+      return;
+    }
+
+    // Don't register click handler if editing geometry
+    if (editingMode !== 'none') {
       return;
     }
 
@@ -107,7 +135,8 @@ export function useMapClickHandler(options: UseMapClickHandlerOptions): void {
                 type: props.object_type,
                 title: name,
                 subtitle: props.site_nom || '',
-                attributes: props
+                attributes: props,
+                geometry: extractGeometry(singleFeature)
               });
               return; // Don't show modal
             }
@@ -140,7 +169,8 @@ export function useMapClickHandler(options: UseMapClickHandlerOptions): void {
                 type: type,
                 title: name,
                 subtitle: props.site_nom || '',
-                attributes: props
+                attributes: props,
+                geometry: extractGeometry(feature)
               });
               return; // Don't show modal
             }
@@ -169,9 +199,12 @@ export function useMapClickHandler(options: UseMapClickHandlerOptions): void {
 
       if (siteFeature) {
         const props = siteFeature.getProperties();
+        // Extract ID robustly: try feature ID first, then properties
+        const featureId = siteFeature.getId() || siteFeature.get('id') || props.id || props.site_id;
+
         if (onObjectClick) {
           onObjectClick({
-            id: props.id || props.site_id,
+            id: String(featureId),
             type: 'Site',
             title: props.nom_site || 'Site',
             subtitle: props.code_site || '',
@@ -185,6 +218,12 @@ export function useMapClickHandler(options: UseMapClickHandlerOptions): void {
             }
           });
         }
+        return;
+      }
+
+      // If we reach here, we clicked on empty space -> Deselect
+      if (onObjectClick) {
+        onObjectClick(null);
       }
     };
 

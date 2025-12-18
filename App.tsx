@@ -1,34 +1,53 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import { MapPage } from './pages/MapPage';
 import { OLMap } from './components/OLMap';
-import Inventory from './pages/Inventory';
-import InventoryDetailPage from './pages/InventoryDetailPage';
-import Interventions from './pages/Interventions';
-import Teams from './pages/Teams';
-import Planning from './pages/Planning';
-import Claims from './pages/Claims';
-import Reporting from './pages/Reporting';
-import ClientPortal from './pages/ClientPortal';
-import Users from './pages/Users';
 import LoadingScreen from './components/LoadingScreen';
-import { User, ViewState, MapLayerType, Coordinates, OverlayState, MapObjectDetail, UserLocation, Measurement, MeasurementType } from './types';
+
+// Lazy load heavy pages for better initial bundle size
+const Inventory = lazy(() => import('./pages/Inventory'));
+const InventoryDetailPage = lazy(() => import('./pages/InventoryDetailPage'));
+const Reclamations = lazy(() => import('./pages/Reclamations'));
+const ReclamationsDashboard = lazy(() => import('./pages/ReclamationsDashboard'));
+const Teams = lazy(() => import('./pages/Teams'));
+const Planning = lazy(() => import('./pages/Planning'));
+const RatiosProductivite = lazy(() => import('./pages/RatiosProductivite'));
+const SuiviTaches = lazy(() => import('./pages/SuiviTaches'));
+const Produits = lazy(() => import('./pages/Produits'));
+const Reporting = lazy(() => import('./pages/Reporting'));
+const ClientPortal = lazy(() => import('./pages/ClientPortal'));
+const Users = lazy(() => import('./pages/Users'));
+const Sites = lazy(() => import('./pages/Sites'));
+const SiteDetailPage = lazy(() => import('./pages/SiteDetailPage'));
+import { User, MapLayerType, Coordinates, OverlayState, MapObjectDetail, UserLocation, Measurement, MeasurementType } from './types';
 import { MAP_LAYERS } from './constants';
 import { MapSearchResult } from './types';
-import { hasExistingToken, fetchCurrentUser } from './services/api';
+import { hasExistingToken, fetchCurrentUser, updateInventoryItem, deleteInventoryItem } from './services/api';
 import { searchObjects } from './services/api';
+import { GeoJSONGeometry } from './types';
 import { useSearch, Site } from './hooks/useSearch';
 import { useGeolocation } from './hooks/useGeolocation';
 import { MapProvider } from './contexts/MapContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { SelectionProvider } from './contexts/SelectionContext';
+import { DrawingProvider } from './contexts/DrawingContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import logger from './services/logger';
 
 const EMPTY_SITES: Site[] = [];
+
+// Simple loading fallback for lazy-loaded pages
+const PageLoadingFallback = () => (
+  <div className="flex items-center justify-center h-full min-h-[400px]">
+    <div className="flex flex-col items-center gap-3">
+      <div className="animate-spin rounded-full h-10 w-10 border-4 border-emerald-500 border-t-transparent"></div>
+      <p className="text-slate-500 text-sm">Chargement...</p>
+    </div>
+  </div>
+);
 
 function App() {
   // Si un token existe, pas besoin du LoadingScreen avec video
@@ -248,6 +267,44 @@ function App() {
   };
   const handleRemoveMeasurement = (id: string) => { setMeasurements(prev => prev.filter(m => m.id !== id)); };
 
+  // ========== HANDLERS FOR OBJECT MODIFICATION/DELETION ==========
+  const handleObjectModify = async (objectId: string, newGeometry: GeoJSONGeometry, objectType: string) => {
+    try {
+      await updateInventoryItem(objectType, objectId, {
+        geometry: newGeometry
+      });
+
+      logger.info(`Object ${objectType} #${objectId} geometry updated successfully`);
+      // Trigger map data refresh
+      window.dispatchEvent(new CustomEvent('refresh-map-data'));
+    } catch (error) {
+      logger.error(`Failed to update object ${objectType} #${objectId}:`, error);
+      // TODO: Show error toast
+    }
+  };
+
+  const handleObjectDelete = async (objectId: string, objectType: string) => {
+    // Ask for confirmation
+    if (!window.confirm(`Êtes-vous sûr de vouloir supprimer cet objet (${objectType} #${objectId}) ?`)) {
+      return;
+    }
+
+    try {
+      await deleteInventoryItem(objectType, objectId);
+
+      logger.info(`Object ${objectType} #${objectId} deleted successfully`);
+      // Clear selection if this object was selected
+      if (selectedMapObject?.id === objectId) {
+        setSelectedMapObject(null);
+      }
+      // Trigger map data refresh
+      window.dispatchEvent(new CustomEvent('refresh-map-data'));
+    } catch (error) {
+      logger.error(`Failed to delete object ${objectId}:`, error);
+      // TODO: Show error toast
+    }
+  };
+
   // Gestion du chargement:
   // - Si pas de token (nouvelle visite): LoadingScreen avec video
   // - Si token existe (refresh/retour): Simple spinner rapide
@@ -281,96 +338,109 @@ function App() {
       <ErrorBoundary>
         <ToastProvider>
           <SelectionProvider maxSelections={100}>
-            <MapProvider>
-              <Routes>
-                <Route
-                  path="/"
-                  element={
-                    <Layout
-                      user={user}
-                      onLogout={() => setUser(null)}
-                      isSidebarCollapsed={isSidebarCollapsed}
-                      onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                      searchQuery={searchQuery}
-                      setSearchQuery={setSearchQuery}
-                      onSearch={handleSearch}
-                      isSearching={isSearching}
-                      searchResult={searchResult}
-                      searchSuggestions={searchSuggestions}
-                      onGeolocation={handleGeolocation}
-                      setSearchResult={setSearchResult}
-                      setTargetLocation={setTargetLocation}
-                      mapComponent={
-                        <OLMap
-                          activeLayer={MAP_LAYERS[activeLayerId]}
-                          targetLocation={targetLocation}
-                          userLocation={userLocation}
-                          searchResult={searchResult}
-                          ref={mapRef}
-                          overlays={overlays}
-                          onObjectClick={setSelectedMapObject}
-                          isRouting={isRouting}
-                          isSidebarCollapsed={isSidebarCollapsed}
-                          clusteringEnabled={clusteringEnabled}
-                          isMeasuring={isMeasuring}
-                          measurementType={measurementType}
-                          onMeasurementComplete={handleMeasurementComplete}
-                          onMeasurementUpdate={handleMeasurementUpdate}
-                        />
-                      }
-                      mapControls={
-                        <MapPage
-                          activeLayerId={activeLayerId}
-                          setActiveLayerId={setActiveLayerId}
-                          setTargetLocation={setTargetLocation}
-                          setUserLocation={setUserLocation}
-                          onZoomIn={handleZoomIn}
-                          onZoomOut={handleZoomOut}
-                          getCurrentZoom={getCurrentZoom}
-                          getMapCenter={getMapCenter}
-                          getMapElement={getMapElement}
-                          exportMapCanvas={exportMapCanvas}
-                          isPanelOpen={true} // Simplified, can be derived from location
-                          onToggleMap={() => { }} // Will be handled by routing
-                          overlays={overlays}
-                          onToggleOverlay={toggleOverlay}
-                          selectedObject={selectedMapObject}
-                          onCloseObjectDetail={() => setSelectedMapObject(null)}
-                          isSidebarCollapsed={isSidebarCollapsed}
-                          isRouting={isRouting}
-                          setIsRouting={setIsRouting}
-                          clusteringEnabled={clusteringEnabled}
-                          setClusteringEnabled={setClusteringEnabled}
-                          isMeasuring={isMeasuring}
-                          measurementType={measurementType}
-                          onToggleMeasure={handleToggleMeasure}
-                          measurements={measurements}
-                          currentMeasurement={currentMeasurement}
-                          onClearMeasurements={handleClearMeasurements}
-                          onRemoveMeasurement={handleRemoveMeasurement}
-                        />
-                      }
-                    >
-                      {/* The Outlet from Layout will render these nested routes */}
-                    </Layout>
-                  }
-                >
-                  <Route index element={<Navigate to={user.role === 'CLIENT' ? '/client' : '/dashboard'} replace />} />
-                  <Route path="dashboard" element={<Dashboard />} />
-                  <Route path="inventory" element={<Inventory />} />
-                  <Route path="inventory/:objectType/:objectId" element={<InventoryDetailPage />} />
-                  <Route path="interventions" element={<Interventions />} />
-                  <Route path="teams" element={<Teams />} />
-                  <Route path="users" element={<Users />} />
-                  <Route path="planning" element={<Planning />} />
-                  <Route path="claims" element={<Claims />} />
-                  <Route path="reporting" element={<Reporting />} />
-                  <Route path="client" element={<ClientPortal user={user} />} />
-                  {/* Add a /map route if you want a dedicated map view without the panel */}
-                  <Route path="map" element={null} />
-                </Route>
-              </Routes>
-            </MapProvider>
+            <DrawingProvider>
+              <MapProvider>
+                <Routes>
+                  <Route
+                    path="/"
+                    element={
+                      <Layout
+                        user={user}
+                        onLogout={() => setUser(null)}
+                        isSidebarCollapsed={isSidebarCollapsed}
+                        onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                        searchQuery={searchQuery}
+                        setSearchQuery={setSearchQuery}
+                        onSearch={handleSearch}
+                        isSearching={isSearching}
+                        searchResult={searchResult}
+                        searchSuggestions={searchSuggestions}
+                        onGeolocation={handleGeolocation}
+                        setSearchResult={setSearchResult}
+                        setTargetLocation={setTargetLocation}
+                        mapComponent={
+                          <OLMap
+                            activeLayer={MAP_LAYERS[activeLayerId]}
+                            targetLocation={targetLocation}
+                            userLocation={userLocation}
+                            searchResult={searchResult}
+                            ref={mapRef}
+                            overlays={overlays}
+                            onObjectClick={setSelectedMapObject}
+                            isRouting={isRouting}
+                            isSidebarCollapsed={isSidebarCollapsed}
+                            clusteringEnabled={clusteringEnabled}
+                            isMeasuring={isMeasuring}
+                            measurementType={measurementType}
+                            onMeasurementComplete={handleMeasurementComplete}
+                            onMeasurementUpdate={handleMeasurementUpdate}
+                            onObjectModify={handleObjectModify}
+                            onObjectDelete={handleObjectDelete}
+                          />
+                        }
+                        mapControls={
+                          <MapPage
+                            activeLayerId={activeLayerId}
+                            setActiveLayerId={setActiveLayerId}
+                            setTargetLocation={setTargetLocation}
+                            setUserLocation={setUserLocation}
+                            onZoomIn={handleZoomIn}
+                            onZoomOut={handleZoomOut}
+                            getCurrentZoom={getCurrentZoom}
+                            getMapCenter={getMapCenter}
+                            getMapElement={getMapElement}
+                            exportMapCanvas={exportMapCanvas}
+                            isPanelOpen={true} // Simplified, can be derived from location
+                            onToggleMap={() => { }} // Will be handled by routing
+                            overlays={overlays}
+                            onToggleOverlay={toggleOverlay}
+                            selectedObject={selectedMapObject}
+                            onCloseObjectDetail={() => setSelectedMapObject(null)}
+                            isSidebarCollapsed={isSidebarCollapsed}
+                            isRouting={isRouting}
+                            setIsRouting={setIsRouting}
+                            clusteringEnabled={clusteringEnabled}
+                            setClusteringEnabled={setClusteringEnabled}
+                            isMeasuring={isMeasuring}
+                            measurementType={measurementType}
+                            onToggleMeasure={handleToggleMeasure}
+                            measurements={measurements}
+                            currentMeasurement={currentMeasurement}
+                            onClearMeasurements={handleClearMeasurements}
+                            onRemoveMeasurement={handleRemoveMeasurement}
+                          />
+                        }
+                        children={null}
+                      >
+                        {/* The Outlet from Layout will render these nested routes */}
+                      </Layout>
+                    }
+                  >
+                    <Route index element={<Navigate to={user.role === 'CLIENT' ? '/client/map' : '/dashboard'} replace />} />
+                    <Route path="dashboard" element={<Dashboard />} />
+                    <Route path="inventory" element={<Suspense fallback={<PageLoadingFallback />}><Inventory /></Suspense>} />
+                    <Route path="inventory/:objectType/:objectId" element={<Suspense fallback={<PageLoadingFallback />}><InventoryDetailPage /></Suspense>} />
+                    <Route path="sites" element={<Suspense fallback={<PageLoadingFallback />}><Sites /></Suspense>} />
+                    <Route path="sites/:id" element={<Suspense fallback={<PageLoadingFallback />}><SiteDetailPage /></Suspense>} />
+                    <Route path="interventions" element={<Navigate to="/reclamations" replace />} />
+                    <Route path="reclamations" element={<Suspense fallback={<PageLoadingFallback />}><Reclamations /></Suspense>} />
+                    <Route path="reclamations/stats" element={<Suspense fallback={<PageLoadingFallback />}><ReclamationsDashboard /></Suspense>} />
+                    <Route path="teams" element={<Suspense fallback={<PageLoadingFallback />}><Teams /></Suspense>} />
+                    <Route path="users" element={<Suspense fallback={<PageLoadingFallback />}><Users /></Suspense>} />
+                    <Route path="planning" element={<Suspense fallback={<PageLoadingFallback />}><Planning /></Suspense>} />
+                    <Route path="ratios" element={<Suspense fallback={<PageLoadingFallback />}><RatiosProductivite /></Suspense>} />
+                    <Route path="claims" element={<Suspense fallback={<PageLoadingFallback />}><SuiviTaches /></Suspense>} />
+                    <Route path="products" element={<Suspense fallback={<PageLoadingFallback />}><Produits /></Suspense>} />
+                    <Route path="reporting" element={<Suspense fallback={<PageLoadingFallback />}><Reporting /></Suspense>} />
+                    <Route path="client" element={<Navigate to="/client/map" replace />} />
+                    <Route path="client/map" element={null} />
+                    <Route path="client/claims" element={<Suspense fallback={<PageLoadingFallback />}><ClientPortal user={user} /></Suspense>} />
+                    {/* Add a /map route if you want a dedicated map view without the panel */}
+                    <Route path="map" element={null} />
+                  </Route>
+                </Routes>
+              </MapProvider>
+            </DrawingProvider>
           </SelectionProvider>
         </ToastProvider>
       </ErrorBoundary>

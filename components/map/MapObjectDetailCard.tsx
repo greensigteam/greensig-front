@@ -1,11 +1,13 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Eye, Navigation, FileText, Calendar as CalendarIcon } from 'lucide-react';
+import { X, Eye, Navigation, FileText, Calendar as CalendarIcon, ClipboardList } from 'lucide-react';
 import type { MapObjectDetail } from '../../types';
 
 interface MapObjectDetailCardProps {
   selectedObject: MapObjectDetail | null;
   onClose?: () => void;
+  onViewCentreGest?: () => void;
+  onCreateTask?: () => void;
 }
 
 /**
@@ -19,7 +21,8 @@ interface MapObjectDetailCardProps {
  */
 export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
   selectedObject,
-  onClose
+  onClose,
+  onCreateTask
 }) => {
   const navigate = useNavigate();
 
@@ -28,7 +31,13 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
   const handleViewDetails = () => {
     if (!selectedObject) return;
 
-    // Convert type to lowercase for URL (e.g., "Arbre" -> "arbre", "Site" -> "site")
+    // Special handling for Site details
+    if (selectedObject.type === 'Site' || selectedObject.type === 'site') {
+      navigate(`/sites/${selectedObject.id}`);
+      return;
+    }
+
+    // Convert type to lowercase for URL (e.g., "Arbre" -> "arbre")
     const typeForUrl = selectedObject.type.toLowerCase();
     const objectId = selectedObject.id;
 
@@ -185,20 +194,9 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
             <>
               <button
                 onClick={handleViewDetails}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1"
               >
                 <Eye className="w-3 h-3" /> Voir détails
-              </button>
-              <button
-                onClick={() => {
-                  const googleMapsUrl = selectedObject.attributes?.['Google Maps'];
-                  if (googleMapsUrl && typeof googleMapsUrl === 'string') {
-                    window.open(googleMapsUrl, '_blank');
-                  }
-                }}
-                className="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1"
-              >
-                <Navigation className="w-3 h-3" /> Itinéraire
               </button>
             </>
           ) : (
@@ -209,8 +207,11 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
               >
                 <Eye className="w-3 h-3" /> Voir détails
               </button>
-              <button className="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1">
-                <FileText className="w-3 h-3" /> Créer Intervention
+              <button
+                onClick={onCreateTask}
+                className="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1"
+              >
+                <ClipboardList className="w-3 h-3" /> Créer une Tâche
               </button>
             </>
           )}

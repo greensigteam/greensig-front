@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, X, MapPin, Calendar, FileText, Leaf, Droplet, AlertCircle } from 'lucide-react';
+import { Search, Filter, X, MapPin, Calendar, FileText, Leaf, Droplet, AlertCircle, ClipboardList, Trash2, Map } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
 import { MOCK_INVENTORY, InventoryItem } from '../services/mockData';
@@ -182,6 +182,9 @@ const Inventory: React.FC = () => {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [mainTab, setMainTab] = useState<'tous' | 'vegetation' | 'hydrologie'>('tous');
 
+  // Selection state for creating tasks
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
   // Advanced Filters
   const [filters, setFilters] = useState({
     type: 'all',
@@ -290,7 +293,7 @@ const Inventory: React.FC = () => {
 
         // State filter
         if (filters.state !== 'all') {
-          apiFilters.state = filters.state;
+          apiFilters.etat = filters.state;
         }
 
         // Maintenance filters
@@ -302,7 +305,7 @@ const Inventory: React.FC = () => {
           } else if (filters.intervention === 'recent_30') {
             const d = new Date();
             d.setDate(d.getDate() - 30);
-            apiFilters.last_intervention_start = d.toISOString().split('T')[0];
+            apiFilters.last_intervention_start = d.toISOString().split('T')[0] || '';
           }
         }
 
@@ -566,8 +569,11 @@ const Inventory: React.FC = () => {
   // Fonction pour obtenir les colonnes appropriées selon le filtre actif
   const getColumns = (): Column<InventoryItem>[] => {
     // Si un type spécifique est sélectionné, retourner ses colonnes
-    if (filters.type !== 'all' && typeSpecificColumns[filters.type]) {
-      return typeSpecificColumns[filters.type];
+    if (filters.type !== 'all') {
+      const specificCols = typeSpecificColumns[filters.type];
+      if (specificCols) {
+        return specificCols;
+      }
     }
     // Sinon, retourner les colonnes communes
     return commonColumns;
@@ -917,12 +923,106 @@ const Inventory: React.FC = () => {
               totalItems={apiInventory?.count || 0}
               currentPage={currentPage}
               onPageChange={setCurrentPage}
+              selectable
+              selectedIds={selectedIds}
+              onSelectionChange={setSelectedIds}
+              getItemId={(item) => item.id}
             />
           </>
         )}
       </div>
 
-      {/* Detail Modal is now removed */}
+      {/* Floating Action Bar when items are selected */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 px-6 py-4 flex items-center gap-6">
+            {/* Selection count */}
+            <div className="flex items-center gap-2">
+              <span className="bg-emerald-100 text-emerald-700 font-bold px-3 py-1 rounded-full">
+                {selectedIds.size}
+              </span>
+              <span className="text-gray-600">
+                objet{selectedIds.size > 1 ? 's' : ''} sélectionné{selectedIds.size > 1 ? 's' : ''}
+              </span>
+            </div>
+
+            {/* Divider */}
+            <div className="h-8 w-px bg-gray-200"></div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-3">
+              {/* Clear selection */}
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex items-center gap-2"
+              >
+                <X className="w-4 h-4" />
+                Effacer
+              </button>
+
+              {/* Show on map */}
+              <button
+                onClick={() => {
+                  // Get selected items data with coordinates
+                  const selectedItems = inventoryData.filter(item => selectedIds.has(item.id));
+                  const objectsForMap = selectedItems.map(item => ({
+                    id: item.id,
+                    type: item.type,
+                    title: item.name,
+                    subtitle: typeof item.siteId === 'string' ? item.siteId : sites.find(s => s.id === item.siteId)?.name || '',
+                    coordinates: item.coordinates,
+                    attributes: {
+                      code: item.code,
+                      state: item.state,
+                      zone: item.zone
+                    }
+                  }));
+
+                  // Navigate to Map page with selected objects
+                  navigate('/map', {
+                    state: {
+                      highlightFromInventory: true,
+                      selectedObjects: objectsForMap
+                    }
+                  });
+                }}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium shadow-sm"
+              >
+                <Map className="w-4 h-4" />
+                Afficher sur la carte
+              </button>
+
+              {/* Create task */}
+              <button
+                onClick={() => {
+                  // Get selected items data
+                  const selectedItems = inventoryData.filter(item => selectedIds.has(item.id));
+                  const objectsForPlanning = selectedItems.map(item => ({
+                    id: parseInt(item.id, 10),
+                    type: item.type,
+                    nom: item.name,
+                    site: typeof item.siteId === 'string' ? item.siteId : sites.find(s => s.id === item.siteId)?.name || '',
+                    soussite: item.zone
+                  }));
+
+                  // Navigate to Planning page with pre-selected objects
+                  navigate('/planning', {
+                    state: {
+                      createTaskFromSelection: true,
+                      preSelectedObjects: objectsForPlanning,
+                      objectCount: selectedItems.length
+                    }
+                  });
+                }}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium shadow-sm"
+              >
+                <ClipboardList className="w-4 h-4" />
+                Créer une tâche
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

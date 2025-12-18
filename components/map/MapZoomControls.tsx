@@ -5,6 +5,7 @@ interface MapZoomControlsProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   isSidebarCollapsed: boolean;
+  isCarouselOpen?: boolean;
 }
 
 /**
@@ -14,16 +15,24 @@ interface MapZoomControlsProps {
  * - Zoom in/out buttons
  * - Fixed position (bottom-left)
  * - Responsive to sidebar state
+ * - Moves up when carousel is open
  */
 export const MapZoomControls: React.FC<MapZoomControlsProps> = ({
   onZoomIn,
   onZoomOut,
-  isSidebarCollapsed
+  isSidebarCollapsed,
+  isCarouselOpen = false
 }) => {
+  // Bottom offset: 32px normally, 220px when carousel is open (176px height + 44px padding)
+  const bottomOffset = isCarouselOpen ? '220px' : '32px';
+
   return (
     <div
-      className="absolute bottom-8 transition-all duration-300 pointer-events-auto flex flex-col gap-4 z-50"
-      style={{ left: isSidebarCollapsed ? '88px' : '276px' }}
+      className="absolute transition-all duration-300 pointer-events-auto flex flex-col gap-4 z-50"
+      style={{
+        left: isSidebarCollapsed ? '88px' : '276px',
+        bottom: bottomOffset
+      }}
     >
       <div className="flex flex-col gap-2">
         <button

@@ -14,7 +14,6 @@ import Overlay from 'ol/Overlay';
 import { Feature } from 'ol';
 import { Point } from 'ol/geom';
 import { defaults as defaultControls, ScaleLine } from 'ol/control';
-import { NorthArrow } from './map/NorthArrowControl';
 
 import { LayerConfig, Coordinates, MapSearchResult, UserLocation, MapObjectDetail, OverlayState, MapHandle, Measurement, MeasurementType } from "../types";
 import { INITIAL_POSITION, VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND } from "../constants";
@@ -24,26 +23,29 @@ import { useUserLocationDisplay } from '../hooks/useUserLocationDisplay';
 import { useMapHoverTooltip } from '../hooks/useMapHoverTooltip';
 import { useMapClickHandler } from '../hooks/useMapClickHandler';
 import { useMeasurementTools } from '../hooks/useMeasurementTools';
+import { useDrawingTools } from '../hooks/useDrawingTools';
+import { useBoxSelection } from '../hooks/useBoxSelection';
 import { useMapContext } from '../contexts/MapContext';
 import { useSelection } from '../contexts/SelectionContext';
+import { useDrawing } from '../contexts/DrawingContext';
 import logger from '../services/logger';
-import { apiFetch } from '../services/api';
+import { fetchMapData } from '../services/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+
 
 // ✅ SELECTION VISUAL STYLE (Yellow Highlight)
 const SELECTION_STYLE = new Style({
   stroke: new Stroke({
     color: '#FFD700', // Gold/Yellow
-    width: 4, // Thicker border
+    width: 2, // Thicker border
   }),
   fill: new Fill({
     color: 'rgba(255, 215, 0, 0.2)', // Transparent Gold
   }),
   image: new CircleStyle({
-    radius: 8,
-    fill: new Fill({ color: 'rgba(255, 215, 0, 0.4)' }),
-    stroke: new Stroke({ color: '#FFD700', width: 3 }),
+    radius: 2,
+    fill: new Fill({ color: 'rgba(255, 215, 0, 0.5)' }),
+    stroke: new Stroke({ color: '#FFD700', width: 2 }),
   }),
   zIndex: 1000 // Always on top
 });
@@ -67,6 +69,9 @@ interface OLMapProps {
   onMeasurementUpdate?: (measurement: Measurement | null) => void;
   isMiniMap?: boolean; // New prop for mini-map mode
   highlightedGeometry?: any; // New prop for detailed object highlight (GeoJSON/Geometry)
+  // Editing callbacks
+  onObjectModify?: (objectId: string, newGeometry: any, objectType: string) => void;
+  onObjectDelete?: (objectId: string, objectType: string) => void;
 }
 
 const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) => {
@@ -85,12 +90,15 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     isRouting,
     isSidebarCollapsed,
     isMiniMap = false,
-    highlightedGeometry
+    highlightedGeometry,
+    onObjectModify,
+    onObjectDelete,
   } = props;
 
   // ✅ USE MAP CONTEXT - Replaces window communication
   const mapContext = useMapContext();
-  const { selectedObjects } = useSelection();
+  const { selectedObjects, isBoxSelectionMode, addMultipleToSelection } = useSelection();
+  const { drawingMode, editingMode, isDrawing, setCurrentGeometry, setCalculatedMetrics, finishDrawing } = useDrawing();
 
   // Map and layer refs
   const innerMapRef = useRef<HTMLDivElement>(null);
@@ -114,7 +122,6 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
   const popupRef = useRef<HTMLDivElement>(null);
   const popupOverlay = useRef<Overlay | null>(null);
   const fetchDataTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const northArrowRef = useRef<NorthArrow | null>(null);
   const scaleLineRef = useRef<ScaleLine | null>(null);
 
   // State
@@ -122,6 +129,18 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
   const [visibleLayers, setVisibleLayers] = useState<string[]>(() =>
     [...SITE_LEGEND, ...VEG_LEGEND, ...HYDRO_LEGEND].map(item => item.type)
   );
+
+  // ✅ WEB WORKER REF
+  const workerRef = useRef<Worker | null>(null);
+
+  useEffect(() => {
+    // Initialiser le worker
+    workerRef.current = new Worker('/workers/geojsonWorker.js');
+
+    return () => {
+      workerRef.current?.terminate();
+    };
+  }, []);
 
   // ✅ CUSTOM HOOKS - Extracted logic
   const measurementTools = useMeasurementTools({
@@ -144,12 +163,15 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     userLocation
   });
 
+  // ✅ Disable interactions when in any tool mode (measuring, drawing, editing, box selection)
+  const isToolActive = isMeasuring || isDrawing || drawingMode !== 'none' || editingMode !== 'none' || isBoxSelectionMode;
+
   useMapHoverTooltip({
     mapInstance,
     sitesLayerRef,
     dataLayerRef,
     mapReady, // ✅ Trigger hook when map is ready
-    isMeasuring // ✅ Disable hover when measuring
+    isMeasuring: isToolActive // ✅ Disable hover when any tool is active
   });
 
   useMapClickHandler({
@@ -159,7 +181,59 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     popupOverlayRef: popupOverlay,
     onObjectClick,
     mapReady, // ✅ Trigger hook when map is ready
-    isMeasuring // ✅ Disable clicks when measuring
+    isMeasuring: isToolActive // ✅ Disable clicks when any tool is active
+  });
+
+  // ✅ DRAWING TOOLS HOOK
+  const drawingTools = useDrawingTools({
+    mapInstance,
+    drawingMode,
+    editingMode,
+    isDrawing,
+    selectedObjects,
+    onDrawEnd: (geometry, metrics) => {
+      console.log('Draw completed:', geometry, metrics);
+      // Update context with the drawn geometry - this triggers the form modal in MapPage
+      setCurrentGeometry(geometry);
+      setCalculatedMetrics(metrics);
+      finishDrawing();
+    },
+    onDrawUpdate: (metrics) => {
+      // Live update metrics while drawing
+      setCalculatedMetrics(metrics);
+    },
+    onModifyEnd: (geometry, featureId, objectType) => {
+      console.log('Modify completed:', featureId, objectType, geometry);
+      // Notify parent component about the modification (don't set currentGeometry - that's for new objects)
+      if (onObjectModify) {
+        onObjectModify(featureId, geometry, objectType);
+      }
+    },
+    onMoveEnd: (geometry, featureId, objectType) => {
+      console.log('Move completed:', featureId, objectType, geometry);
+      // Notify parent component about the move (don't set currentGeometry - that's for new objects)
+      if (onObjectModify) {
+        onObjectModify(featureId, geometry, objectType);
+      }
+    },
+    onDeleteClick: (featureId, objectType) => {
+      console.log('Delete requested:', featureId, objectType);
+      // Notify parent component about the delete request
+      if (onObjectDelete) {
+        onObjectDelete(featureId, objectType);
+      }
+    },
+  });
+
+  // ✅ BOX SELECTION HOOK
+  useBoxSelection({
+    mapInstance,
+    isBoxSelectionActive: isBoxSelectionMode,
+    onFeaturesSelected: (features) => {
+      console.log('[OLMap] Box selection completed:', features.length, 'features');
+      addMultipleToSelection(features);
+    },
+    mapReady,
   });
 
   // Expose ref methods
@@ -402,8 +476,7 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
         minZoom: 2
       }),
       controls: defaultControls({ attribution: false, zoom: false }).extend([
-        scaleLineRef.current = new ScaleLine({ units: 'metric' }),
-        northArrowRef.current = new NorthArrow(isMiniMap ? { top: '10px', right: '10px' } : undefined)
+        scaleLineRef.current = new ScaleLine({ units: 'metric' })
       ])
     });
 
@@ -418,6 +491,14 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     }
     if (userLocationDisplay.userLocationLayerRef.current) {
       map.addLayer(userLocationDisplay.userLocationLayerRef.current);
+    }
+    // ✅ Add drawing layer
+    if (drawingTools.drawingLayerRef.current) {
+      map.addLayer(drawingTools.drawingLayerRef.current);
+    }
+    // ✅ Add editing layer
+    if (drawingTools.editingLayerRef.current) {
+      map.addLayer(drawingTools.editingLayerRef.current);
     }
 
     // ✅ Trigger hooks to initialize event handlers
@@ -497,20 +578,33 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
         .filter(Boolean)
         .join(',');
 
-      const url = `${API_BASE_URL}/map/?bbox=${west},${south},${east},${north}&types=${typesParam}&zoom=${zoom}`;
+      const data = await fetchMapData(
+        `${west},${south},${east},${north}`,
+        typesParam,
+        zoom
+      );
 
-      const response = await apiFetch(url);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-      const data = await response.json();
       if (data.type !== 'FeatureCollection') throw new Error('Invalid GeoJSON');
+
+      // ✅ UTILISER LE WEB WORKER pour le traitement lourd
+      const processedData = await new Promise<any>((resolve, reject) => {
+        if (!workerRef.current) return reject('Worker not initialized');
+
+        workerRef.current.onmessage = (e) => {
+          if (e.data.success) resolve(e.data);
+          else reject(e.data.error);
+        };
+
+        workerRef.current.postMessage({ task: 'parse_geojson', data: data });
+      });
 
       const siteFeatures: Feature[] = [];
       const featuresByType: Record<string, Feature[]> = {};
-
       const geojsonFormat = new GeoJSON();
 
-      data.features.forEach((feat: any) => {
+      // Traitement des features pré-groupées par le worker
+      const allFeatures = processedData.features;
+      allFeatures.forEach((feat: any) => {
         const feature = geojsonFormat.readFeature(feat, {
           dataProjection: 'EPSG:4326',
           featureProjection: 'EPSG:3857'
@@ -520,7 +614,6 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
         if (objectType === 'Site') {
           siteFeatures.push(feature);
         } else {
-          // ✅ Group features by type for type-based clustering
           if (!featuresByType[objectType]) {
             featuresByType[objectType] = [];
           }
@@ -800,6 +893,71 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
         }
 
         source.addFeature(clonedFeature);
+      } else if (obj.geometry) {
+        // Feature not found in existing layers, but object has geometry
+        // Create a new feature from the geometry (for objects coming from inventory)
+        try {
+          const type = obj.type as string;
+          // Normalize type for color lookup (inventory sends lowercase, OBJECT_COLORS uses PascalCase)
+          const normalizedType = type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+          const color = OBJECT_COLORS[normalizedType] || OBJECT_COLORS[type] || '#10b981';
+
+          let newFeature: Feature;
+
+          if (obj.geometry.type === 'Point') {
+            const coords = obj.geometry.coordinates as [number, number];
+            newFeature = new Feature({
+              geometry: new Point(fromLonLat(coords)),
+              id: obj.id,
+              object_type: type,
+              title: obj.title
+            });
+            newFeature.setId(obj.id);
+
+            // Create highlight style for point
+            const highlightStyle = new Style({
+              image: new CircleStyle({
+                radius: 28,
+                fill: new Fill({ color: 'rgba(255, 215, 0, 0.5)' }),
+                stroke: new Stroke({ color: '#FFD700', width: 4 })
+              }),
+              zIndex: 999
+            });
+
+            // Create marker icon
+            const iconSrc = createMarkerIcon(color, true);
+            const iconStyle = new Style({
+              image: new Icon({
+                src: iconSrc,
+                anchor: [0.5, 1],
+                anchorXUnits: 'fraction',
+                anchorYUnits: 'fraction'
+              }),
+              zIndex: 1000
+            });
+
+            newFeature.setStyle([highlightStyle, iconStyle]);
+            source.addFeature(newFeature);
+          } else {
+            // For Polygon/LineString geometries from inventory
+            const geoJsonFormat = new GeoJSON();
+            const geojsonFeature = {
+              type: 'Feature',
+              geometry: obj.geometry,
+              properties: { id: obj.id, object_type: type }
+            };
+            newFeature = geoJsonFormat.readFeature(geojsonFeature, {
+              featureProjection: 'EPSG:3857'
+            }) as Feature;
+            newFeature.setId(obj.id);
+            newFeature.setStyle(SELECTION_STYLE);
+            source.addFeature(newFeature);
+          }
+
+          logger.debug(`Created selection feature from geometry for object ${obj.id} (${type})`);
+        } catch (error) {
+          logger.error(`Failed to create selection feature from geometry for object ${obj.id}:`, error);
+        }
       }
     });
 
@@ -817,6 +975,21 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
       fetchData();
     }
   }, [clusteringEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Listen for refresh-map-data event (triggered after object modification/deletion)
+  useEffect(() => {
+    const handleRefreshMapData = () => {
+      console.log('[OLMap] Received refresh-map-data event');
+      if (mapReady && mapInstance.current) {
+        fetchData();
+      }
+    };
+
+    window.addEventListener('refresh-map-data', handleRefreshMapData);
+    return () => {
+      window.removeEventListener('refresh-map-data', handleRefreshMapData);
+    };
+  }, [mapReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ✅ New Effect: Handle specific highlightedGeometry (from Detail Page)
   useEffect(() => {
@@ -886,6 +1059,38 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
 
   // Clustering is now handled in fetchData function with type-based clusters
 
+  // ✅ Ensure drawing layer is added to map when drawing mode is activated
+  useEffect(() => {
+    if (!mapReady || !mapInstance.current) return;
+
+    const map = mapInstance.current;
+    const drawingLayer = drawingTools.drawingLayerRef.current;
+
+    if (drawingLayer && isDrawing) {
+      // Check if layer is already on the map
+      const layers = map.getLayers().getArray();
+      if (!layers.includes(drawingLayer)) {
+        map.addLayer(drawingLayer);
+      }
+    }
+  }, [mapReady, isDrawing, drawingTools.drawingLayerRef]);
+
+  // ✅ Ensure editing layer is added to map when editing mode is activated
+  useEffect(() => {
+    if (!mapReady || !mapInstance.current) return;
+
+    const map = mapInstance.current;
+    const editingLayer = drawingTools.editingLayerRef.current;
+
+    if (editingLayer && editingMode !== 'none' && selectedObjects.length > 0) {
+      // Check if layer is already on the map
+      const layers = map.getLayers().getArray();
+      if (!layers.includes(editingLayer)) {
+        map.addLayer(editingLayer);
+      }
+    }
+  }, [mapReady, editingMode, selectedObjects.length, drawingTools.editingLayerRef]);
+
 
   // ✅ Sync local layer visibility with MapContext when changed externally
   useEffect(() => {
@@ -897,19 +1102,6 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     setVisibleLayers(layersList);
   }, [mapContext.visibleLayers]);
 
-  // ✅ Update map controls position based on sidebar state
-  useEffect(() => {
-    const leftPosition = isSidebarCollapsed ? '88px' : '276px'; // Match MapZoomControls
-    // if (northArrowRef.current) northArrowRef.current.updatePosition(leftPosition); // REMOVED: Keep North Arrow on Right
-    const scaleEl = document.querySelector('.ol-scale-line') as HTMLElement;
-    if (scaleEl) {
-      scaleEl.style.left = 'auto'; // Remove left positioning
-      scaleEl.style.right = '24px'; // Align to Right
-      scaleEl.style.bottom = '8px';
-      scaleEl.style.top = 'auto';
-      // scaleEl.style.transition = 'left 0.3s ease'; // No transition needed for fixed right pos
-    }
-  }, [isSidebarCollapsed]);
 
   return (
     <div className="h-full w-full relative">

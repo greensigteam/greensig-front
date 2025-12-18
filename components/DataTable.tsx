@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, Square, CheckSquare, MinusSquare } from 'lucide-react';
 
 export interface Column<T> {
     key: keyof T | string;
@@ -23,6 +23,12 @@ export interface DataTableProps<T> {
 
     // Custom key for rows (defaults to 'id')
     rowKey?: string | ((item: T) => string);
+
+    // Selection props
+    selectable?: boolean;
+    selectedIds?: Set<string>;
+    onSelectionChange?: (selectedIds: Set<string>) => void;
+    getItemId?: (item: T) => string;
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -36,11 +42,54 @@ export function DataTable<T extends Record<string, any>>({
     totalItems = 0,
     currentPage: externalCurrentPage = 1,
     onPageChange,
-    rowKey = 'id'
+    rowKey = 'id',
+    selectable = false,
+    selectedIds = new Set(),
+    onSelectionChange,
+    getItemId = (item) => String(item.id)
 }: DataTableProps<T>) {
     const [localCurrentPage, setLocalCurrentPage] = useState(1);
     const [sortColumn, setSortColumn] = useState<string | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+    // Selection helpers
+    const currentDataIds = useMemo(() => {
+        return new Set(data.map(item => getItemId(item)));
+    }, [data, getItemId]);
+
+    const selectedInCurrentPage = useMemo(() => {
+        return [...currentDataIds].filter(id => selectedIds.has(id)).length;
+    }, [currentDataIds, selectedIds]);
+
+    const isAllCurrentPageSelected = currentDataIds.size > 0 && selectedInCurrentPage === currentDataIds.size;
+    const isSomeCurrentPageSelected = selectedInCurrentPage > 0 && selectedInCurrentPage < currentDataIds.size;
+
+    const handleSelectAll = () => {
+        if (!onSelectionChange) return;
+
+        const newSelected = new Set(selectedIds);
+        if (isAllCurrentPageSelected) {
+            // Deselect all in current page
+            currentDataIds.forEach(id => newSelected.delete(id));
+        } else {
+            // Select all in current page
+            currentDataIds.forEach(id => newSelected.add(id));
+        }
+        onSelectionChange(newSelected);
+    };
+
+    const handleSelectItem = (itemId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!onSelectionChange) return;
+
+        const newSelected = new Set(selectedIds);
+        if (newSelected.has(itemId)) {
+            newSelected.delete(itemId);
+        } else {
+            newSelected.add(itemId);
+        }
+        onSelectionChange(newSelected);
+    };
 
     // Use external or local state
     const currentPage = serverSide ? externalCurrentPage : localCurrentPage;
@@ -121,6 +170,23 @@ export function DataTable<T extends Record<string, any>>({
                         <table className="w-full">
                             <thead className="bg-gray-50 border-b border-gray-200">
                                 <tr>
+                                    {selectable && (
+                                        <th className="px-4 py-3 w-12">
+                                            <button
+                                                onClick={handleSelectAll}
+                                                className="p-1 hover:bg-gray-200 rounded transition-colors"
+                                                title={isAllCurrentPageSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
+                                            >
+                                                {isAllCurrentPageSelected ? (
+                                                    <CheckSquare className="w-5 h-5 text-emerald-600" />
+                                                ) : isSomeCurrentPageSelected ? (
+                                                    <MinusSquare className="w-5 h-5 text-emerald-600" />
+                                                ) : (
+                                                    <Square className="w-5 h-5 text-gray-400" />
+                                                )}
+                                            </button>
+                                        </th>
+                                    )}
                                     {columns.map((column) => (
                                         <th
                                             key={String(column.key)}
@@ -143,7 +209,7 @@ export function DataTable<T extends Record<string, any>>({
                             <tbody className="bg-white divide-y divide-gray-200">
                                 {currentData.length === 0 ? (
                                     <tr>
-                                        <td colSpan={columns.length} className="px-6 py-8 text-center text-gray-500">
+                                        <td colSpan={columns.length + (selectable ? 1 : 0)} className="px-6 py-8 text-center text-gray-500">
                                             Aucune donnée disponible
                                         </td>
                                     </tr>
@@ -152,13 +218,29 @@ export function DataTable<T extends Record<string, any>>({
                                         const key = typeof rowKey === 'function'
                                             ? rowKey(item)
                                             : (item[rowKey] ? String(item[rowKey]) : `row-${index}`);
+                                        const itemId = getItemId(item);
+                                        const isSelected = selectedIds.has(itemId);
 
                                         return (
                                             <tr
                                                 key={key}
                                                 onClick={() => onRowClick?.(item)}
-                                                className={`${onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''} transition-colors`}
+                                                className={`${onRowClick ? 'cursor-pointer' : ''} ${isSelected ? 'bg-emerald-50' : 'hover:bg-gray-50'} transition-colors`}
                                             >
+                                                {selectable && (
+                                                    <td className="px-4 py-4 w-12">
+                                                        <button
+                                                            onClick={(e) => handleSelectItem(itemId, e)}
+                                                            className="p-1 hover:bg-gray-200 rounded transition-colors"
+                                                        >
+                                                            {isSelected ? (
+                                                                <CheckSquare className="w-5 h-5 text-emerald-600" />
+                                                            ) : (
+                                                                <Square className="w-5 h-5 text-gray-400" />
+                                                            )}
+                                                        </button>
+                                                    </td>
+                                                )}
                                                 {columns.map((column) => (
                                                     <td key={String(column.key)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                                         {column.render
@@ -167,7 +249,6 @@ export function DataTable<T extends Record<string, any>>({
                                                     </td>
                                                 ))}
                                             </tr>
-
                                         );
                                     })
                                 )}

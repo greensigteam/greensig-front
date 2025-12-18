@@ -52,6 +52,3 @@ coverage
 *.geojson
 
 # Exclude Geojson project folder
-Gejson/
-Gejson
-verificationdemodules

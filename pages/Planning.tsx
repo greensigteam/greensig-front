@@ -1,354 +1,539 @@
-import React, { useState } from 'react';
-import { Calendar, Plus, Users, Clock, MapPin } from 'lucide-react';
-import { StatusBadge } from '../components/StatusBadge';
+import { useState, useEffect, useMemo, useCallback, memo, useRef, type FC } from 'react';
+import { Calendar as BigCalendar, dateFnsLocalizer, View } from 'react-big-calendar';
+import withDragAndDrop, { EventInteractionArgs } from 'react-big-calendar/lib/addons/dragAndDrop';
+import { useLocation } from 'react-router-dom';
+import { format, parse, startOfWeek, getDay } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
+
 import {
-    MOCK_INTERVENTIONS,
-    MOCK_SITES,
-    MOCK_TEAMS,
-    Intervention,
-    getSiteById,
-    getTeamById
-} from '../services/mockData';
+    Users, Clock, X, Trash2, Edit, Search, Filter, UserPlus, Timer, AlertTriangle, Download
+} from 'lucide-react';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import { planningService } from '../services/planningService';
+import { fetchClients, fetchEquipes } from '../services/usersApi';
+import {
+    Tache, TacheCreate, TacheUpdate, TypeTache,
+    STATUT_TACHE_LABELS, STATUT_TACHE_COLORS,
+    PRIORITE_LABELS, PRIORITE_COLORS
+} from '../types/planning';
+import { Client, EquipeList } from '../types/users';
+import TaskFormModal, { InventoryObjectOption } from '../components/planning/TaskFormModal';
 
-// User 3.3.5: Calendar View Component
-const CalendarView: React.FC<{
-    interventions: Intervention[];
-    onInterventionClick: (intervention: Intervention) => void;
-}> = ({ interventions, onInterventionClick }) => {
-    const [currentDate, setCurrentDate] = useState(new Date());
+// ============================================================================
+// CONFIGURATION CALENDRIER
+// ============================================================================
 
-    // Get days in month
-    const getDaysInMonth = (date: Date) => {
-        const year = date.getFullYear();
-        const month = date.getMonth();
-        const firstDay = new Date(year, month, 1);
-        const lastDay = new Date(year, month + 1, 0);
-        const daysInMonth = lastDay.getDate();
-        const startingDayOfWeek = firstDay.getDay();
+const locales = {
+    'fr': fr,
+};
 
-        return { daysInMonth, startingDayOfWeek };
-    };
+const localizer = dateFnsLocalizer({
+    format,
+    parse,
+    startOfWeek,
+    getDay,
+    locales,
+});
 
-    const { daysInMonth, startingDayOfWeek } = getDaysInMonth(currentDate);
+// Create Drag and Drop Calendar
+const DnDCalendar = withDragAndDrop<CalendarEvent>(BigCalendar);
 
-    // Get interventions for a specific day
-    const getInterventionsForDay = (day: number) => {
-        const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        return interventions.filter(int => int.scheduledDate === dateStr);
-    };
+// Custom Event Interface for RBC
+interface CalendarEvent {
+    id: number;
+    title: string;
+    start: Date;
+    end: Date;
+    resource: Tache;
+}
+
+// TaskFormModal is imported from '../components/planning/TaskFormModal'
+
+// ============================================================================
+// CUSTOM EVENT COMPONENT (memoized for performance)
+// ============================================================================
+
+const TaskEvent = memo(function TaskEvent({ event }: { event: CalendarEvent }) {
+    const tache = event.resource;
+    const clientName = (tache.client_detail as any)?.nom_structure || tache.client_detail?.nomStructure || 'Aucun client';
+    const isUrgent = tache.priorite === 5;
+    const equipesCount = tache.equipes_detail?.length || (tache.equipe_detail ? 1 : 0);
+    const equipesNames = tache.equipes_detail?.length > 0
+        ? tache.equipes_detail.map(e => e.nomEquipe).join(', ')
+        : tache.equipe_detail?.nomEquipe || '';
 
     return (
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-            {/* Calendar Header */}
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">
-                    {currentDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
-                </h3>
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1))}
-                        className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
-                    >
-                        ←
-                    </button>
-                    <button
-                        onClick={() => setCurrentDate(new Date())}
-                        className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
-                    >
-                        Aujourd'hui
-                    </button>
-                    <button
-                        onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))}
-                        className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
-                    >
-                        →
-                    </button>
-                </div>
+        <div
+            className="flex flex-col h-full justify-start leading-tight min-h-[24px] group relative"
+            title={`${tache.type_tache_detail.nom_tache}\nClient: ${clientName}\nPriorité: ${PRIORITE_LABELS[tache.priorite]}\n${equipesNames ? `Équipes: ${equipesNames}` : 'Aucune équipe'}\n${tache.charge_estimee_heures ? `Charge: ${tache.charge_estimee_heures}h` : ''}`}
+        >
+            {/* Priority indicator + Task name */}
+            <div className="font-semibold text-xs truncate flex items-center gap-1">
+                {isUrgent && (
+                    <AlertTriangle className="w-3 h-3 text-red-500 shrink-0 animate-pulse" />
+                )}
+                {tache.type_tache_detail.nom_tache}
             </div>
 
-            {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-1">
-                {/* Day headers */}
-                {['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'].map((day) => (
-                    <div key={day} className="text-center text-xs font-medium text-gray-500 py-2">
-                        {day}
-                    </div>
-                ))}
+            {/* Client info */}
+            <div className="text-[10px] truncate opacity-90 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-black/20 shrink-0" />
+                {!tache.client_detail ? (
+                    <span className="text-red-700 font-bold flex items-center gap-1">
+                        <Users className="w-3 h-3" />
+                        Aucun client
+                    </span>
+                ) : (
+                    clientName
+                )}
+            </div>
 
-                {/* Empty cells before first day */}
-                {Array.from({ length: startingDayOfWeek }).map((_, index) => (
-                    <div key={`empty-${index}`} className="aspect-square border border-gray-100 bg-gray-50" />
-                ))}
-
-                {/* Days */}
-                {Array.from({ length: daysInMonth }).map((_, index) => {
-                    const day = index + 1;
-                    const dayInterventions = getInterventionsForDay(day);
-                    const isToday = new Date().getDate() === day &&
-                        new Date().getMonth() === currentDate.getMonth() &&
-                        new Date().getFullYear() === currentDate.getFullYear();
-
-                    return (
-                        <div
-                            key={day}
-                            className={`aspect-square border border-gray-200 p-1 hover:bg-gray-50 cursor-pointer ${isToday ? 'bg-emerald-50 border-emerald-600' : ''
-                                }`}
-                        >
-                            <div className={`text-xs font-medium ${isToday ? 'text-emerald-600' : 'text-gray-700'}`}>
-                                {day}
-                            </div>
-                            <div className="space-y-0.5 mt-1">
-                                {dayInterventions.slice(0, 2).map((int) => (
-                                    <div
-                                        key={int.id}
-                                        onClick={() => onInterventionClick(int)}
-                                        className={`text-[10px] px-1 py-0.5 rounded truncate ${int.status === 'planifiee' ? 'bg-blue-100 text-blue-700' :
-                                                int.status === 'en_cours' ? 'bg-orange-100 text-orange-700' :
-                                                    'bg-green-100 text-green-700'
-                                            }`}
-                                    >
-                                        {int.title.substring(0, 15)}...
-                                    </div>
-                                ))}
-                                {dayInterventions.length > 2 && (
-                                    <div className="text-[10px] text-gray-500">
-                                        +{dayInterventions.length - 2}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    );
-                })}
+            {/* Teams and charge info */}
+            <div className="flex items-center gap-2 text-[9px] opacity-75 mt-0.5">
+                {equipesCount > 0 && (
+                    <span className="truncate flex items-center gap-0.5">
+                        <Users className="w-2.5 h-2.5" />
+                        {equipesCount > 1 ? `${equipesCount} équipes` : equipesNames}
+                    </span>
+                )}
+                {tache.charge_estimee_heures && (
+                    <span className="flex items-center gap-0.5 text-emerald-700/80">
+                        <Timer className="w-2.5 h-2.5" />
+                        {tache.charge_estimee_heures}h
+                    </span>
+                )}
             </div>
         </div>
     );
-};
+});
 
-// User 3.3.1: Create Task Form
-const CreateTaskModal: React.FC<{
-    onClose: () => void;
-    onCreate: (task: Partial<Intervention>) => void;
-}> = ({ onClose, onCreate }) => {
-    const [formData, setFormData] = useState({
-        title: '',
-        type: 'tonte' as Intervention['type'],
-        siteId: '',
-        zone: '',
-        scheduledDate: '',
-        scheduledTime: '',
-        duration: 120,
-        teamId: '',
-        description: ''
-    });
+// ============================================================================
+// MAIN PLANNING COMPONENT
+// ============================================================================
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        onCreate(formData);
-        onClose();
-    };
+const Planning: FC = () => {
+    const [taches, setTaches] = useState<Tache[]>([]);
+    const [clients, setClients] = useState<Client[]>([]);
+    const [equipes, setEquipes] = useState<EquipeList[]>([]);
+    const [typesTaches, setTypesTaches] = useState<TypeTache[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                <form onSubmit={handleSubmit}>
-                    {/* Header */}
-                    <div className="p-6 border-b border-gray-200">
-                        <h2 className="text-2xl font-bold text-gray-900">Nouvelle tâche</h2>
-                        <p className="text-sm text-gray-500 mt-1">User 3.3.1: Créer une intervention</p>
-                    </div>
-
-                    {/* Form */}
-                    <div className="p-6 space-y-4">
-                        {/* Title */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Titre <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                required
-                                type="text"
-                                value={formData.title}
-                                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                placeholder="Ex: Tonte pelouse Villa Al Amal"
-                            />
-                        </div>
-
-                        {/* Type */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
-                            <select
-                                value={formData.type}
-                                onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                            >
-                                <option value="tonte">Tonte</option>
-                                <option value="taille">Taille</option>
-                                <option value="arrosage">Arrosage</option>
-                                <option value="traitement">Traitement</option>
-                                <option value="plantation">Plantation</option>
-                                <option value="entretien">Entretien</option>
-                            </select>
-                        </div>
-
-                        {/* Site & Zone */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Site <span className="text-red-500">*</span>
-                                </label>
-                                <select
-                                    required
-                                    value={formData.siteId}
-                                    onChange={(e) => setFormData({ ...formData, siteId: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                >
-                                    <option value="">Sélectionner</option>
-                                    {MOCK_SITES.map((site) => (
-                                        <option key={site.id} value={site.id}>{site.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Zone</label>
-                                <input
-                                    type="text"
-                                    value={formData.zone}
-                                    onChange={(e) => setFormData({ ...formData, zone: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                    placeholder="Ex: Jardin principal"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Date & Time */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Date <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    required
-                                    type="date"
-                                    value={formData.scheduledDate}
-                                    onChange={(e) => setFormData({ ...formData, scheduledDate: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Heure</label>
-                                <input
-                                    type="time"
-                                    value={formData.scheduledTime}
-                                    onChange={(e) => setFormData({ ...formData, scheduledTime: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Duration & Team */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Durée (minutes)
-                                </label>
-                                <input
-                                    type="number"
-                                    value={formData.duration}
-                                    onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                    min="15"
-                                    step="15"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Équipe <span className="text-red-500">*</span>
-                                </label>
-                                <select
-                                    required
-                                    value={formData.teamId}
-                                    onChange={(e) => setFormData({ ...formData, teamId: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                >
-                                    <option value="">Sélectionner</option>
-                                    {MOCK_TEAMS.map((team) => (
-                                        <option key={team.id} value={team.id}>{team.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-
-                        {/* Description */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                            <textarea
-                                value={formData.description}
-                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                rows={3}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                placeholder="Détails de l'intervention..."
-                            />
-                        </div>
-                    </div>
-
-                    {/* Footer */}
-                    <div className="p-6 border-t border-gray-200 flex gap-3">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                        >
-                            Annuler
-                        </button>
-                        <button
-                            type="submit"
-                            className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-                        >
-                            Créer la tâche
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
-};
-
-// Main Planning Component
-const Planning: React.FC = () => {
-    const [interventions, setInterventions] = useState(MOCK_INTERVENTIONS);
-    const [showCreateForm, setShowCreateForm] = useState(false);
-    const [selectedIntervention, setSelectedIntervention] = useState<Intervention | null>(null);
     const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
-    const [filterTeam, setFilterTeam] = useState<string>('all');
+    const [showCreateForm, setShowCreateForm] = useState(false);
+    const [selectedTache, setSelectedTache] = useState<Tache | null>(null);
+    const [filterEquipe, setFilterEquipe] = useState<number | 'all'>('all');
 
-    // User 3.3.7: Filter by team
-    const filteredInterventions = interventions.filter((int) =>
-        filterTeam === 'all' || int.teamId === filterTeam
-    );
+    // Nouveaux filtres
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterClient, setFilterClient] = useState<number | 'all'>('all');
+    const [filterStatut, setFilterStatut] = useState<string>('all');
+    const [filterType, setFilterType] = useState<number | 'all'>('all');
+    const [tacheToDelete, setTacheToDelete] = useState<number | null>(null);
 
-    // User 3.3.1: Create new task
-    const handleCreateTask = (data: Partial<Intervention>) => {
-        const newIntervention: Intervention = {
-            id: `int-${Date.now()}`,
-            title: data.title!,
-            type: data.type!,
-            siteId: data.siteId!,
-            zone: data.zone || '',
-            status: 'planifiee',
-            priority: 'moyenne',
-            scheduledDate: data.scheduledDate!,
-            scheduledTime: data.scheduledTime,
-            duration: data.duration || 120,
-            teamId: data.teamId!,
-            assignedTo: [],
-            description: data.description || '',
-            coordinates: { lat: 0, lng: 0 },
-            photosBefore: [],
-            photosAfter: []
-        };
-        setInterventions([...interventions, newIntervention]);
+    // Export PDF
+    const [isExporting, setIsExporting] = useState(false);
+    const calendarRef = useRef<HTMLDivElement>(null);
+
+    const location = useLocation();
+    const [initialTaskValues, setInitialTaskValues] = useState<Partial<TacheCreate> | undefined>(undefined);
+    const [preSelectedObjects, setPreSelectedObjects] = useState<InventoryObjectOption[] | undefined>(undefined);
+
+    // Handle navigation from Reclamations
+    useEffect(() => {
+        if (location.state?.createTaskFromReclamation && location.state.reclamation) {
+            const rec = location.state.reclamation;
+            // Set defaults suitable for form
+            const now = new Date();
+            const end = new Date(now.getTime() + 3600000); // +1 hour
+
+            setInitialTaskValues({
+                id_client: rec.client,
+                id_equipe: rec.equipe_affectee || null,
+                priorite: Math.min(Math.max(rec.urgence || 3, 1), 5) as any,
+                commentaires: `[Réclamation #${rec.numero_reclamation}] ${rec.description}`,
+                reclamation: rec.id,
+                date_debut_planifiee: now.toISOString().slice(0, 16),
+                date_fin_planifiee: end.toISOString().slice(0, 16),
+            });
+            setShowCreateForm(true);
+        }
+    }, [location]);
+
+    // Handle navigation from Map (selection → task creation)
+    useEffect(() => {
+        if (location.state?.createTaskFromSelection && location.state.preSelectedObjects) {
+            const objects = location.state.preSelectedObjects as InventoryObjectOption[];
+            const now = new Date();
+            const end = new Date(now.getTime() + 3600000); // +1 hour
+
+            // Determine common site from selected objects
+            const sites = [...new Set(objects.map(o => o.site))];
+            const siteInfo = sites.length === 1 ? sites[0] : `${sites.length} sites`;
+
+            setPreSelectedObjects(objects);
+            setInitialTaskValues({
+                objets: objects.map(o => o.id),
+                commentaires: `Intervention sur ${objects.length} objet(s) - ${siteInfo}`,
+                date_debut_planifiee: now.toISOString().slice(0, 16),
+                date_fin_planifiee: end.toISOString().slice(0, 16),
+            });
+            setShowCreateForm(true);
+
+            // Clear location state to prevent re-triggering on refresh
+            window.history.replaceState({}, document.title);
+        }
+    }, [location]);
+
+    // Load initial data
+    useEffect(() => {
+        loadData();
+    }, []);
+
+    const loadData = async () => {
+        try {
+            setLoading(true);
+            const [tachesData, clientsData, equipesData, typesData] = await Promise.all([
+                planningService.getTaches(),
+                fetchClients().then(data => data.results || data),
+                fetchEquipes().then(data => data.results || data),
+                planningService.getTypesTaches()
+            ]);
+
+            setTaches(tachesData.results || tachesData);
+            setClients(Array.isArray(clientsData) ? clientsData : []);
+            setEquipes(Array.isArray(equipesData) ? equipesData : []);
+            setTypesTaches(typesData);
+        } catch (err) {
+            setError('Erreur lors du chargement des données');
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
     };
+
+    const handleExportPDF = async () => {
+        if (!calendarRef.current) return;
+        setIsExporting(true);
+
+        try {
+            const canvas = await html2canvas(calendarRef.current, {
+                scale: 2, // Meilleure qualité
+                useCORS: true,
+                logging: false,
+                windowWidth: calendarRef.current.scrollWidth,
+                windowHeight: calendarRef.current.scrollHeight
+            });
+
+            const imgData = canvas.toDataURL('image/png');
+            // jsPDF setup (A4 landscape)
+            const pdf = new jsPDF({
+                orientation: 'landscape',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+
+            // En-tête professionnel
+            // Fond gris clair pour l'en-tête
+            pdf.setFillColor(245, 247, 250);
+            pdf.rect(0, 0, pageWidth, 25, 'F');
+
+            // Titre
+            pdf.setFontSize(22);
+            pdf.setTextColor(16, 185, 129); // Emerald 500
+            pdf.text('GreenSIG', 14, 16);
+
+            pdf.setFontSize(14);
+            pdf.setTextColor(55, 65, 81); // Gray 700
+            pdf.text('Planning des interventions', pageWidth - 14, 16, { align: 'right' });
+
+            // Sous-titre avec date
+            pdf.setFontSize(10);
+            pdf.setTextColor(107, 114, 128); // Gray 500
+            const dateStr = new Date().toLocaleDateString('fr-FR', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            pdf.text(`Exporté le ${dateStr}`, pageWidth - 14, 22, { align: 'right' });
+
+            // Ajout de l'image du calendrier
+            const imgWidth = pageWidth - 20; // Marge 10mm
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+            // Gestion de la hauteur (si ça dépasse, on compresse ou coupe, ici on ajuste)
+            // On laisse 30mm de marge en haut pour l'en-tête
+            const maxHeight = pageHeight - 35;
+            let finalHeight = imgHeight;
+            let finalWidth = imgWidth;
+
+            if (imgHeight > maxHeight) {
+                // Si trop haut, on scale down pour faire tenir sur une page
+                const ratio = maxHeight / imgHeight;
+                finalHeight = maxHeight;
+                finalWidth = imgWidth * ratio;
+            }
+
+            // Centrage horizontal si redimensionné
+            const xPos = (pageWidth - finalWidth) / 2;
+
+            pdf.addImage(imgData, 'PNG', xPos, 30, finalWidth, finalHeight);
+
+            // Pied de page
+            pdf.setFontSize(8);
+            pdf.setTextColor(156, 163, 175);
+            pdf.text('Document généré automatiquement par GreenSIG', pageWidth / 2, pageHeight - 5, { align: 'center' });
+
+            pdf.save(`planning_greensig_${new Date().toISOString().split('T')[0]}.pdf`);
+
+        } catch (error) {
+            console.error('Erreur export PDF:', error);
+            alert('Une erreur est survenue lors de l\'exportation (voir console).');
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    const handleUpdateTache = async (data: TacheCreate) => {
+        if (!selectedTache) return;
+        try {
+            const updateData: TacheUpdate = {
+                ...data,
+                date_debut_planifiee: new Date(data.date_debut_planifiee).toISOString(),
+                date_fin_planifiee: new Date(data.date_fin_planifiee).toISOString()
+            };
+            await planningService.updateTache(selectedTache.id, updateData);
+            await loadData();
+            setShowCreateForm(false);
+            setSelectedTache(null);
+        } catch (err) {
+            alert('Erreur lors de la modification');
+            console.error(err);
+        }
+    };
+
+    const handleCreateTache = async (data: TacheCreate) => {
+        try {
+            const createData = {
+                ...data,
+                date_debut_planifiee: new Date(data.date_debut_planifiee).toISOString(),
+                date_fin_planifiee: new Date(data.date_fin_planifiee).toISOString()
+            };
+
+            await planningService.createTache(createData);
+            await loadData();
+            setShowCreateForm(false);
+        } catch (err) {
+            alert('Erreur lors de la création de la tâche');
+            console.error(err);
+        }
+    };
+
+    const handleDeleteTache = (id: number) => {
+        setTacheToDelete(id);
+    };
+
+    const confirmDelete = async () => {
+        if (!tacheToDelete) return;
+        try {
+            await planningService.deleteTache(tacheToDelete);
+            await loadData();
+            setSelectedTache(null);
+            setTacheToDelete(null);
+        } catch (err) {
+            alert('Erreur lors de la suppression');
+            console.error(err);
+        }
+    };
+
+    const handleResetCharge = async (tacheId: number) => {
+        try {
+            await planningService.resetCharge(tacheId);
+            await loadData();
+        } catch (err) {
+            alert('Erreur lors du recalcul de la charge');
+            console.error(err);
+        }
+    };
+
+    const filteredTaches = useMemo(() => {
+        return taches.filter(t => {
+            // 1. Filtre Equipe (check M2M equipes or legacy equipe)
+            if (filterEquipe !== 'all') {
+                const hasEquipe = t.equipes_detail?.some(e => e.id === filterEquipe) ||
+                    t.equipe_detail?.id === filterEquipe;
+                if (!hasEquipe) return false;
+            }
+
+            // 2. Filtre Client
+            if (filterClient !== 'all' && (t.client_detail as any)?.utilisateur !== filterClient) return false;
+
+            // 3. Filtre Statut
+            if (filterStatut !== 'all' && t.statut !== filterStatut) return false;
+
+            // 4. Filtre Type
+            if (filterType !== 'all' && t.type_tache_detail.id !== filterType) return false;
+
+            // 5. Recherche textuelle (Tâche, Client, Description)
+            if (searchTerm) {
+                const term = searchTerm.toLowerCase();
+                const clientName = ((t.client_detail as any)?.nom_structure || t.client_detail?.nomStructure || '').toLowerCase();
+                const taskName = t.type_tache_detail.nom_tache.toLowerCase();
+                const desc = (t.description_travaux || '').toLowerCase();
+
+                return taskName.includes(term) || clientName.includes(term) || desc.includes(term);
+            }
+
+            return true;
+        });
+    }, [taches, filterEquipe, filterClient, filterStatut, filterType, searchTerm]);
+
+    // Map tasks to RBC events
+    const events: CalendarEvent[] = useMemo(() => {
+        return filteredTaches.map(tache => ({
+            id: tache.id,
+            title: `${tache.type_tache_detail.nom_tache} - ${(tache.client_detail as any)?.nom_structure || tache.client_detail?.nomStructure || ''}`,
+            start: new Date(tache.date_debut_planifiee),
+            end: new Date(tache.date_fin_planifiee),
+            resource: tache
+        }));
+    }, [filteredTaches]);
+
+    // Custom coloring for events based on status and priority
+    const eventPropGetter = (event: CalendarEvent) => {
+        const tache = event.resource;
+
+        // Priority-based top border colors (green→yellow→orange→red)
+        const priorityBorderColors: Record<number, string> = {
+            1: '#22C55E', // green-500
+            2: '#84CC16', // lime-500
+            3: '#EAB308', // yellow-500
+            4: '#F97316', // orange-500
+            5: '#EF4444', // red-500
+        };
+        const priorityBorder = priorityBorderColors[tache.priorite] || '#9CA3AF';
+
+        // Si pas de client, style d'alerte (orange/rouge) comme dans la liste
+        if (!tache.client_detail) {
+            return {
+                style: {
+                    backgroundColor: '#FFF7ED', // orange-50
+                    color: '#7C2D12',           // orange-900
+                    borderLeft: '4px solid #F97316', // orange-500
+                    borderTop: `3px solid ${priorityBorder}`,
+                },
+                className: `text-xs rounded shadow-sm opacity-95 hover:opacity-100 hover:shadow-md transition-all`
+            };
+        }
+
+        // Status-based left border colors
+        const statusBorderColors: Record<string, string> = {
+            'PLANIFIEE': '#3B82F6',  // blue-500
+            'NON_DEBUTEE': '#9CA3AF', // gray-400
+            'EN_COURS': '#F97316',    // orange-500
+            'TERMINEE': '#22C55E',    // green-500
+            'ANNULEE': '#EF4444',     // red-500
+        };
+        const statusBorder = statusBorderColors[tache.statut] || '#9CA3AF';
+
+        // Status-based background colors
+        const statusBgColors: Record<string, string> = {
+            'PLANIFIEE': '#EFF6FF',   // blue-50
+            'NON_DEBUTEE': '#F9FAFB', // gray-50
+            'EN_COURS': '#FFF7ED',    // orange-50
+            'TERMINEE': '#F0FDF4',    // green-50
+            'ANNULEE': '#FEF2F2',     // red-50
+        };
+        const statusBg = statusBgColors[tache.statut] || '#F9FAFB';
+
+        // Status-based text colors
+        const statusTextColors: Record<string, string> = {
+            'PLANIFIEE': '#1E40AF',   // blue-800
+            'NON_DEBUTEE': '#374151', // gray-700
+            'EN_COURS': '#9A3412',    // orange-800
+            'TERMINEE': '#166534',    // green-800
+            'ANNULEE': '#991B1B',     // red-800
+        };
+        const statusText = statusTextColors[tache.statut] || '#374151';
+
+        return {
+            style: {
+                backgroundColor: statusBg,
+                color: statusText,
+                borderLeft: `4px solid ${statusBorder}`,
+                borderTop: `3px solid ${priorityBorder}`,
+            },
+            className: `text-xs rounded shadow-sm opacity-95 hover:opacity-100 hover:shadow-md transition-all cursor-pointer`
+        };
+    };
+
+    // Drag & Drop handlers
+    const handleEventDrop = useCallback(async ({ event, start, end }: EventInteractionArgs<CalendarEvent>) => {
+        try {
+            const tache = event.resource;
+            await planningService.updateTache(tache.id, {
+                date_debut_planifiee: (start as Date).toISOString(),
+                date_fin_planifiee: (end as Date).toISOString()
+            });
+            // Update local state optimistically
+            setTaches(prev => prev.map(t =>
+                t.id === tache.id
+                    ? { ...t, date_debut_planifiee: (start as Date).toISOString(), date_fin_planifiee: (end as Date).toISOString() }
+                    : t
+            ));
+        } catch (err) {
+            console.error('Erreur lors du déplacement de la tâche:', err);
+            alert('Erreur lors du déplacement de la tâche');
+            // Reload data to restore correct state
+            loadData();
+        }
+    }, []);
+
+    const handleEventResize = useCallback(async ({ event, start, end }: EventInteractionArgs<CalendarEvent>) => {
+        try {
+            const tache = event.resource;
+            await planningService.updateTache(tache.id, {
+                date_debut_planifiee: (start as Date).toISOString(),
+                date_fin_planifiee: (end as Date).toISOString()
+            });
+            // Update local state optimistically
+            setTaches(prev => prev.map(t =>
+                t.id === tache.id
+                    ? { ...t, date_debut_planifiee: (start as Date).toISOString(), date_fin_planifiee: (end as Date).toISOString() }
+                    : t
+            ));
+        } catch (err) {
+            console.error('Erreur lors du redimensionnement de la tâche:', err);
+            alert('Erreur lors du redimensionnement de la tâche');
+            // Reload data to restore correct state
+            loadData();
+        }
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-full">
+                <div className="text-gray-500">Chargement...</div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex items-center justify-center h-full">
+                <div className="text-red-500">{error}</div>
+            </div>
+        );
+    }
 
     return (
         <div className="p-4 sm:p-6 h-full flex flex-col">
@@ -356,122 +541,384 @@ const Planning: React.FC = () => {
             <div className="mb-6 flex justify-between items-start">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Planning</h1>
-                    <p className="text-gray-500 mt-1">Gestion des interventions planifiées</p>
+                    <p className="text-gray-500 mt-1">Gestion des tâches planifiées</p>
                 </div>
-                <button
-                    onClick={() => setShowCreateForm(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
-                >
-                    <Plus className="w-4 h-4" />
-                    Nouvelle tâche
-                </button>
+
             </div>
 
             {/* Filters & View Toggle */}
-            <div className="mb-6 flex flex-col sm:flex-row gap-3">
-                {/* View Mode */}
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setViewMode('calendar')}
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${viewMode === 'calendar'
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                    >
-                        <Calendar className="w-4 h-4 inline mr-2" />
-                        Calendrier
-                    </button>
-                    <button
-                        onClick={() => setViewMode('list')}
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${viewMode === 'list'
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                    >
-                        Liste
-                    </button>
+            <div className="mb-6 flex flex-col gap-4">
+                {/* Ligne du haut : Recherche et Vue */}
+                <div className="flex flex-col sm:flex-row justify-between gap-4">
+                    <div className="relative flex-1 max-w-md">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <input
+                            type="text"
+                            placeholder="Rechercher une tâche, un client..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                        />
+                    </div>
+
+                    <div className="flex bg-gray-100 p-1 rounded-lg self-start">
+                        <button
+                            onClick={() => setViewMode('calendar')}
+                            className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${viewMode === 'calendar'
+                                ? 'bg-white text-emerald-600 shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
+                                }`}
+                        >
+                            Calendrier
+                        </button>
+                        <button
+                            onClick={() => setViewMode('list')}
+                            className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${viewMode === 'list'
+                                ? 'bg-white text-emerald-600 shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
+                                }`}
+                        >
+                            Liste
+                        </button>
+                    </div>
+                    {viewMode === 'calendar' && (
+                        <button
+                            onClick={handleExportPDF}
+                            disabled={isExporting}
+                            className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm shadow-sm disabled:opacity-50"
+                        >
+                            {isExporting ? '...' : <Download className="w-4 h-4" />}
+                            <span className="hidden sm:inline">Exporter PDF</span>
+                        </button>
+                    )}
                 </div>
 
-                {/* Team Filter */}
-                <select
-                    value={filterTeam}
-                    onChange={(e) => setFilterTeam(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                >
-                    <option value="all">Toutes les équipes</option>
-                    {MOCK_TEAMS.map((team) => (
-                        <option key={team.id} value={team.id}>{team.name}</option>
-                    ))}
-                </select>
+                {/* Ligne du bas : Filtres déroulants */}
+                <div className="flex flex-wrap gap-3 items-center">
+                    <div className="flex items-center gap-2 text-gray-500 text-sm">
+                        <Filter className="w-4 h-4" />
+                        <span className="hidden sm:inline">Filtres ({filteredTaches.length}) :</span>
+                    </div>
+
+                    <select
+                        value={filterClient}
+                        onChange={(e) => setFilterClient(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                        className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg outline-none focus:border-emerald-500 bg-white"
+                    >
+                        <option value="all">Tous les clients</option>
+                        {clients.map(c => (
+                            <option key={c.utilisateur} value={c.utilisateur}>
+                                {(c as any).nom_structure || c.nomStructure || 'Client sans nom'}
+                            </option>
+                        ))}
+                    </select>
+
+                    <select
+                        value={filterType}
+                        onChange={(e) => setFilterType(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                        className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg outline-none focus:border-emerald-500 bg-white"
+                    >
+                        <option value="all">Tous les types</option>
+                        {typesTaches.map(t => (
+                            <option key={t.id} value={t.id}>{t.nom_tache}</option>
+                        ))}
+                    </select>
+
+                    <select
+                        value={filterStatut}
+                        onChange={(e) => setFilterStatut(e.target.value)}
+                        className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg outline-none focus:border-emerald-500 bg-white"
+                    >
+                        <option value="all">Tous les statuts</option>
+                        {Object.entries(STATUT_TACHE_LABELS).map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                        ))}
+                    </select>
+
+                    <select
+                        value={filterEquipe}
+                        onChange={(e) => setFilterEquipe(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                        className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg outline-none focus:border-emerald-500 bg-white"
+                    >
+                        <option value="all">Toutes les équipes</option>
+                        {equipes.map((equipe) => (
+                            <option key={equipe.id} value={equipe.id}>
+                                {equipe.nomEquipe}
+                            </option>
+                        ))}
+                    </select>
+                </div>
             </div>
 
+
             {/* Content */}
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-hidden bg-white rounded-lg border border-gray-200">
                 {viewMode === 'calendar' ? (
-                    <CalendarView
-                        interventions={filteredInterventions}
-                        onInterventionClick={setSelectedIntervention}
-                    />
+                    <div className="h-full p-4" ref={calendarRef}>
+                        <DnDCalendar
+                            components={{
+                                event: TaskEvent
+                            }}
+                            localizer={localizer}
+                            events={events}
+                            startAccessor="start"
+                            endAccessor="end"
+                            style={{ height: '100%' }}
+                            messages={{
+                                next: "Suivant",
+                                previous: "Précédent",
+                                today: "Aujourd'hui",
+                                month: "Mois",
+                                week: "Semaine",
+                                day: "Jour",
+                                agenda: "Agenda",
+                                date: "Date",
+                                time: "Heure",
+                                event: "Événement",
+                                noEventsInRange: "Aucune tâche dans cette période.",
+                            }}
+                            formats={{
+                                timeGutterFormat: 'HH:mm',
+                                eventTimeRangeFormat: ({ start, end }, culture, localizer) =>
+                                    `${localizer?.format(start, 'HH:mm', culture)} - ${localizer?.format(end, 'HH:mm', culture)}`,
+                                agendaTimeRangeFormat: ({ start, end }, culture, localizer) =>
+                                    `${localizer?.format(start, 'HH:mm', culture)} - ${localizer?.format(end, 'HH:mm', culture)}`,
+                                dayHeaderFormat: 'dddd d MMMM',
+                                dayRangeHeaderFormat: ({ start, end }, culture, localizer) =>
+                                    `${localizer?.format(start, 'd MMM', culture)} - ${localizer?.format(end, 'd MMM', culture)}`,
+                            }}
+                            culture='fr'
+                            min={new Date(2024, 0, 1, 7, 0, 0)}
+                            max={new Date(2024, 0, 1, 19, 0, 0)}
+                            step={30}
+                            timeslots={2}
+                            onSelectEvent={(event) => setSelectedTache(event.resource)}
+                            eventPropGetter={eventPropGetter}
+                            views={['month', 'week', 'day', 'agenda']}
+                            onEventDrop={handleEventDrop}
+                            onEventResize={handleEventResize}
+                            resizable
+                            draggableAccessor={() => true}
+                        />
+                    </div>
                 ) : (
-                    <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3 overflow-y-auto h-full">
-                        {filteredInterventions.map((int) => (
-                            <div
-                                key={int.id}
-                                onClick={() => setSelectedIntervention(int)}
-                                className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                            >
-                                <div className="flex justify-between items-start mb-2">
-                                    <h3 className="font-semibold text-gray-900">{int.title}</h3>
-                                    <StatusBadge status={int.status} type="intervention" />
+                    <div className="p-4 space-y-3 overflow-y-auto h-full">
+                        {filteredTaches.map((tache) => {
+                            const statutColors = STATUT_TACHE_COLORS[tache.statut];
+                            const prioriteColors = PRIORITE_COLORS[tache.priorite];
+
+                            return (
+                                <div
+                                    key={tache.id}
+                                    onClick={() => setSelectedTache(tache)}
+                                    className={`p-4 border rounded-lg cursor-pointer transition-all ${!tache.client_detail
+                                        ? 'border-orange-300 bg-orange-50 hover:bg-orange-100'
+                                        : 'border-gray-200 hover:bg-gray-50'
+                                        }`}
+                                >
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                            <h3 className="font-semibold text-gray-900">
+                                                {tache.type_tache_detail.nom_tache}
+                                            </h3>
+                                            <div className="text-sm text-gray-600 flex items-center gap-2">
+                                                {((tache.client_detail as any)?.nom_structure || tache.client_detail?.nomStructure) ? (
+                                                    ((tache.client_detail as any)?.nom_structure || tache.client_detail?.nomStructure)
+                                                ) : (
+                                                    <>
+                                                        <span className="text-orange-600 italic">Aucun client assigné</span>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setSelectedTache(tache);
+                                                                setShowCreateForm(true);
+                                                            }}
+                                                            className="p-1 hover:bg-emerald-100 rounded-full text-emerald-600 transition-colors"
+                                                            title="Attribuer un client"
+                                                        >
+                                                            <UserPlus className="w-4 h-4" />
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statutColors.bg} ${statutColors.text}`}>
+                                                {STATUT_TACHE_LABELS[tache.statut]}
+                                            </span>
+                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${prioriteColors.bg} ${prioriteColors.text}`}>
+                                                P{tache.priorite}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                                        <div className="flex items-center gap-2">
+                                            <Clock className="w-4 h-4" />
+                                            {new Date(tache.date_debut_planifiee).toLocaleString('fr-FR')}
+                                        </div>
+                                        {/* Display multiple equipes or single legacy equipe */}
+                                        {(tache.equipes_detail?.length > 0 || tache.equipe_detail) && (
+                                            <div className="flex items-center gap-2">
+                                                <Users className="w-4 h-4" />
+                                                <span className="truncate">
+                                                    {tache.equipes_detail?.length > 0
+                                                        ? tache.equipes_detail.map(e => e.nomEquipe).join(', ')
+                                                        : tache.equipe_detail?.nomEquipe}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
-                                    <div className="flex items-center gap-2">
-                                        <Calendar className="w-4 h-4" />
-                                        {new Date(int.scheduledDate).toLocaleDateString('fr-FR')}
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Clock className="w-4 h-4" />
-                                        {int.scheduledTime || '--:--'}
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <MapPin className="w-4 h-4" />
-                                        {getSiteById(int.siteId)?.name}
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Users className="w-4 h-4" />
-                                        {getTeamById(int.teamId)?.name}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>
 
-            {/* Create Task Modal */}
-            {showCreateForm && (
-                <CreateTaskModal
-                    onClose={() => setShowCreateForm(false)}
-                    onCreate={handleCreateTask}
-                />
-            )}
+            {/* Create/Edit Modal */}
+            {
+                showCreateForm && (
+                    <TaskFormModal
+                        tache={selectedTache || undefined}
+                        initialValues={initialTaskValues}
+                        preSelectedObjects={preSelectedObjects}
+                        equipes={equipes}
+                        typesTaches={typesTaches}
+                        onClose={() => { setShowCreateForm(false); setSelectedTache(null); setInitialTaskValues(undefined); setPreSelectedObjects(undefined); }}
+                        onSubmit={selectedTache ? handleUpdateTache : handleCreateTache}
+                        onResetCharge={handleResetCharge}
+                    />
+                )
+            }
 
-            {/* Intervention Detail Modal (reuse from Interventions page) */}
-            {selectedIntervention && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6">
-                        <h2 className="text-2xl font-bold mb-4">{selectedIntervention.title}</h2>
-                        <p className="text-gray-600 mb-4">{selectedIntervention.description}</p>
-                        <button
-                            onClick={() => setSelectedIntervention(null)}
-                            className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200"
-                        >
-                            Fermer
-                        </button>
+            {/* Detail Modal */}
+            {
+                selectedTache && !showCreateForm && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6">
+                            <div className="flex justify-between items-start mb-4">
+                                <h2 className="text-2xl font-bold">
+                                    {selectedTache.type_tache_detail.nom_tache}
+                                </h2>
+                                <button
+                                    onClick={() => setSelectedTache(null)}
+                                    className="text-gray-400 hover:text-gray-600"
+                                >
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <span className="text-sm font-medium text-gray-500">Client</span>
+                                    <p className="text-gray-900">
+                                        {(selectedTache.client_detail as any)?.nom_structure || selectedTache.client_detail?.nomStructure || 'Aucun client assigné'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <span className="text-sm font-medium text-gray-500">Dates</span>
+                                    <p className="text-gray-900">
+                                        Du {new Date(selectedTache.date_debut_planifiee).toLocaleString('fr-FR')} <br />
+                                        Au {new Date(selectedTache.date_fin_planifiee).toLocaleString('fr-FR')}
+                                    </p>
+                                </div>
+                                <div>
+                                    <span className="text-sm font-medium text-gray-500">Statut</span>
+                                    <p className="text-gray-900">{STATUT_TACHE_LABELS[selectedTache.statut]}</p>
+                                </div>
+                                <div>
+                                    <span className="text-sm font-medium text-gray-500">Priorité</span>
+                                    <p className="text-gray-900">{PRIORITE_LABELS[selectedTache.priorite]}</p>
+                                </div>
+                                <div>
+                                    <span className="text-sm font-medium text-gray-500">Charge estimée</span>
+                                    <p className="text-gray-900 flex items-center gap-2">
+                                        {selectedTache.charge_estimee_heures !== null ? (
+                                            <>
+                                                <Timer className="w-4 h-4 text-emerald-600" />
+                                                {selectedTache.charge_estimee_heures} heures
+                                                {selectedTache.charge_manuelle && (
+                                                    <span className="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full">
+                                                        Manuelle
+                                                    </span>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <span className="text-gray-400 italic">Non calculée</span>
+                                        )}
+                                    </p>
+                                </div>
+                                {selectedTache.commentaires && (
+                                    <div>
+                                        <span className="text-sm font-medium text-gray-500">Commentaires</span>
+                                        <p className="text-gray-900">{selectedTache.commentaires}</p>
+                                    </div>
+                                )}
+
+                                {selectedTache.id_recurrence_parent && (
+                                    <div className="mt-2 p-2 bg-blue-50 text-blue-800 text-xs rounded border border-blue-100 flex items-center gap-2">
+                                        <Clock className="w-3 h-3" />
+                                        Cette tâche fait partie d'une série récurrente.
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="mt-6 flex gap-3">
+                                <button
+                                    onClick={() => setShowCreateForm(true)}
+                                    className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Edit className="w-4 h-4" />
+                                    Modifier
+                                </button>
+                                <button
+                                    onClick={() => handleDeleteTache(selectedTache.id)}
+                                    className="px-4 py-2 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-2"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                    Supprimer
+                                </button>
+                                <button
+                                    onClick={() => setSelectedTache(null)}
+                                    className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                                >
+                                    Fermer
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* Delete Confirmation Modal */}
+            {tacheToDelete && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 text-center">
+                        <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600">
+                            <Trash2 className="w-6 h-6" />
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">Confirmer la suppression</h3>
+                        <p className="text-sm text-gray-500 mb-6">
+                            Êtes-vous sûr de vouloir supprimer cette tâche ? Cette action est irréversible.
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setTacheToDelete(null)}
+                                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                onClick={confirmDelete}
+                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                                Supprimer
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
-        </div>
+        </div >
     );
 };
 

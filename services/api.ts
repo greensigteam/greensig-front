@@ -11,6 +11,7 @@ export const hasExistingToken = () => {
 import logger from './logger';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+import { db } from './db';
 
 // Wrapper fetch pour ajouter automatiquement le token
 export async function apiFetch(url: string, options: RequestInit = {}) {
@@ -160,9 +161,9 @@ function calculatePolygonCentroid(coordinates: number[][][]): { lat: number; lng
 
   for (let i = 0; i < n; i++) {
     const coord = ring[i];
-    if (coord) {
-      sumLng += coord[0];
-      sumLat += coord[1];
+    if (coord && coord.length >= 2) {
+      sumLng += coord[0] || 0;
+      sumLat += coord[1] || 0;
     }
   }
 
@@ -222,7 +223,7 @@ function transformSiteToFrontend(site: SiteGeoJSON, index: number): SiteFrontend
     coordinates,
     description: site.properties.adresse || `Site ${site.properties.code_site}`,
     category,
-    color,
+    color: color || '#22c55e',
     code_site: site.properties.code_site,
     adresse: site.properties.adresse,
     superficie_totale: site.properties.superficie_totale,
@@ -243,23 +244,39 @@ const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
  * Utilise un cache de 5 minutes pour éviter les requêtes répétées
  */
 export async function fetchAllSites(forceRefresh = false): Promise<SiteFrontend[]> {
-  // Vérifier le cache
   const now = Date.now()
+
+  // 1. Vérifier le cache mémoire (très rapide)
   if (!forceRefresh && sitesCache && (now - sitesCacheTimestamp) < CACHE_DURATION) {
     return sitesCache
   }
 
   try {
+    // 2. Vérifier Dexie (Persistant) si on n'a pas de cache mémoire
+    if (!forceRefresh) {
+      const localSites = await db.sites.toArray();
+      if (localSites.length > 0) {
+        // Optionnel : ne pas utiliser le cache s'il est trop vieux (ex: > 1 jour)
+        const oldestEntry = Math.min(...localSites.map(s => s.lastUpdated));
+        if ((now - oldestEntry) < (24 * 60 * 60 * 1000)) {
+          const transformed = localSites.map(ls => ls.data as SiteFrontend);
+          sitesCache = transformed;
+          sitesCacheTimestamp = now;
+          logger.info(`Sites chargés depuis Dexie: ${transformed.length}`);
+          return transformed;
+        }
+      }
+    }
+
+    // 3. Sinon, charger depuis l'API
     const allSites: SiteGeoJSON[] = []
     let page = 1
     let hasMore = true
 
-    // Charger toutes les pages
     while (hasMore) {
       const response = await apiFetch(`${API_BASE_URL}/sites/?page=${page}`)
       const data = await handleResponse<SiteResponse>(response)
 
-      // Gérer les deux formats possibles (avec ou sans FeatureCollection)
       let features: SiteGeoJSON[]
       if (data.results && 'type' in data.results && data.results.type === 'FeatureCollection') {
         features = data.results.features
@@ -270,31 +287,36 @@ export async function fetchAllSites(forceRefresh = false): Promise<SiteFrontend[
       }
 
       allSites.push(...features)
-
       hasMore = data.next !== null
       page++
-
-      // Sécurité : max 10 pages
       if (page > 10) break
     }
 
-    // Transformer en format frontend
     const transformedSites = allSites.map((site, index) => transformSiteToFrontend(site, index))
 
-    // Mettre en cache
+    // 4. Sauvegarder dans Dexie pour la prochaine fois
+    await db.sites.clear(); // On remplace tout pour la liste complète
+    await db.sites.bulkAdd(transformedSites.map(s => ({
+      id: s.id,
+      name: s.name,
+      lastUpdated: now,
+      data: s
+    })));
+
     sitesCache = transformedSites
     sitesCacheTimestamp = now
 
-    logger.info(`Sites chargés: ${transformedSites.length} sites depuis l'API`)
+    logger.info(`Sites chargés depuis API et sauvés dans Dexie: ${transformedSites.length}`);
     return transformedSites
 
   } catch (error) {
     logger.error('Erreur fetchAllSites:', error)
+    if (sitesCache) return sitesCache
 
-    // Retourner le cache même expiré en cas d'erreur
-    if (sitesCache) {
-      logger.warn('Utilisation du cache expiré suite à une erreur')
-      return sitesCache
+    // Tentative ultime : même si forceRefresh=true, si l'API échoue, on prend Dexie
+    const fallbackSites = await db.sites.toArray();
+    if (fallbackSites.length > 0) {
+      return fallbackSites.map(ls => ls.data);
     }
 
     throw error
@@ -339,6 +361,7 @@ export async function searchSites(query: string): Promise<SiteFrontend[]> {
 export function clearSitesCache() {
   sitesCache = null
   sitesCacheTimestamp = 0
+  db.sites.clear(); // Vide aussi Dexie
 }
 
 // Anciennes fonctions conservées pour compatibilité
@@ -358,6 +381,183 @@ export async function fetchSiteById(id: number) {
     return handleResponse(response)
   } catch (error) {
     logger.error(`Erreur fetchSiteById(${id}):`, error)
+    throw error
+  }
+}
+
+/**
+ * Détecte le site contenant une géométrie donnée
+ * @param geometry - GeoJSON geometry (Point, Polygon, LineString)
+ * @returns Site info if found, or throws error with message
+ */
+export interface DetectedSiteResult {
+  site: {
+    id: number
+    nom_site: string
+    code_site: string
+  }
+  sous_site: {
+    id: number
+    nom: string
+  } | null
+}
+
+export async function detectSiteFromGeometry(geometry: {
+  type: string
+  coordinates: number[] | number[][] | number[][][]
+}): Promise<DetectedSiteResult> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/sites/detect/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ geometry }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'Aucun site trouvé pour cette position')
+    }
+
+    return await response.json()
+  } catch (error: any) {
+    logger.error('Erreur detectSiteFromGeometry:', error)
+    throw error
+  }
+}
+
+export interface CreateSiteData {
+  nom_site: string
+  code_site?: string  // Auto-generated by backend if not provided
+  client: number  // Client PK (utilisateur ID) - Required
+  adresse?: string
+  superficie_totale?: number
+  date_debut_contrat?: string
+  date_fin_contrat?: string
+  actif?: boolean
+  geometrie_emprise: {
+    type: 'Polygon'
+    coordinates: number[][][]
+  }
+}
+
+export async function createSite(data: CreateSiteData): Promise<SiteFrontend> {
+  try {
+    // Format as GeoJSON Feature for DRF-GIS
+    const geoJsonPayload = {
+      type: 'Feature',
+      geometry: data.geometrie_emprise,
+      properties: {
+        nom_site: data.nom_site,
+        client: data.client,  // Client PK - Required
+        // code_site is auto-generated by backend, only send if explicitly provided
+        ...(data.code_site && { code_site: data.code_site }),
+        adresse: data.adresse || null,
+        superficie_totale: data.superficie_totale || null,
+        date_debut_contrat: data.date_debut_contrat || null,
+        date_fin_contrat: data.date_fin_contrat || null,
+        actif: data.actif !== undefined ? data.actif : true,
+      }
+    }
+
+    const response = await apiFetch(`${API_BASE_URL}/sites/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(geoJsonPayload),
+    })
+
+    const result = await handleResponse<any>(response)
+
+    // Transform to SiteFrontend format
+    const coords = result.geometry?.coordinates?.[0]?.[0] || [0, 0]
+    return {
+      id: String(result.id || result.properties?.id),
+      name: result.properties?.nom_site || data.nom_site,
+      coordinates: { lat: coords[1], lng: coords[0] },
+      description: result.properties?.adresse || '',
+      category: 'INFRASTRUCTURE' as const,
+      color: '#22c55e',
+      code_site: result.properties?.code_site,
+      adresse: result.properties?.adresse,
+      superficie_totale: result.properties?.superficie_totale,
+      actif: result.properties?.actif,
+      date_debut_contrat: result.properties?.date_debut_contrat,
+      date_fin_contrat: result.properties?.date_fin_contrat,
+    }
+  } catch (error) {
+    logger.error('Erreur createSite:', error)
+    throw error
+  }
+}
+
+export interface UpdateSiteData {
+  nom_site?: string
+  code_site?: string
+  adresse?: string
+  superficie_totale?: number | null
+  date_debut_contrat?: string | null
+  date_fin_contrat?: string | null
+  actif?: boolean
+}
+
+export async function updateSite(id: number, data: UpdateSiteData): Promise<SiteFrontend> {
+  try {
+    // Use PATCH for partial updates
+    const response = await apiFetch(`${API_BASE_URL}/sites/${id}/`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        type: 'Feature',
+        properties: data,
+      }),
+    })
+
+    const result = await handleResponse<any>(response)
+
+    // Invalidate sites cache
+    sitesCache = null
+
+    // Transform to SiteFrontend format
+    const coords = result.geometry?.coordinates?.[0]?.[0] || [0, 0]
+    return {
+      id: String(result.id || result.properties?.id),
+      name: result.properties?.nom_site,
+      coordinates: { lat: coords[1], lng: coords[0] },
+      description: result.properties?.adresse || '',
+      category: 'INFRASTRUCTURE' as const,
+      color: '#22c55e',
+      code_site: result.properties?.code_site,
+      adresse: result.properties?.adresse,
+      superficie_totale: result.properties?.superficie_totale,
+      actif: result.properties?.actif,
+      date_debut_contrat: result.properties?.date_debut_contrat,
+      date_fin_contrat: result.properties?.date_fin_contrat,
+    }
+  } catch (error) {
+    logger.error('Erreur updateSite:', error)
+    throw error
+  }
+}
+
+export async function deleteSite(id: number): Promise<void> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/sites/${id}/`, {
+      method: 'DELETE',
+    })
+
+    if (!response.ok && response.status !== 204) {
+      throw new Error('Erreur lors de la suppression du site')
+    }
+
+    // Invalidate sites cache
+    sitesCache = null
+  } catch (error) {
+    logger.error('Erreur deleteSite:', error)
     throw error
   }
 }
@@ -394,6 +594,35 @@ export interface InventoryResponse {
       [key: string]: any   // Propriétés spécifiques au type
     }
   }>
+}
+
+/**
+ * Récupère les données d'objets pour la carte avec filtrage BBOX et cache local.
+ */
+export async function fetchMapData(bbox: string, types: string, zoom: number): Promise<any> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/map/?bbox=${bbox}&types=${types}&zoom=${zoom}`);
+    const data = await handleResponse<any>(response);
+
+    if (data.features && data.features.length > 0) {
+      // Sauvegarder les objets en arrière-plan
+      const localObjects = data.features.map((f: any) => ({
+        id: `${f.properties.object_type}-${f.id}`,
+        objectId: f.id,
+        objectType: f.properties.object_type,
+        siteId: f.properties.site_id || null,
+        data: f,
+        lastUpdated: Date.now()
+      }));
+
+      db.inventory.bulkPut(localObjects).catch(err => logger.error('Dexie bulkPut error:', err));
+    }
+
+    return data;
+  } catch (error) {
+    logger.error('Erreur fetchMapData:', error);
+    throw error;
+  }
 }
 
 export async function fetchInventory(filters?: Record<string, string | number>): Promise<InventoryResponse> {
@@ -433,6 +662,18 @@ const typeToPathMap: Record<string, string> = {
 };
 
 export async function fetchInventoryItem(objectType: string, objectId: string): Promise<any> {
+  // 1. Tenter de récupérer depuis Dexie d'abord (ultra rapide)
+  try {
+    const localId = `${objectType}-${objectId}`;
+    const cached = await db.inventory.get(localId);
+    if (cached) {
+      logger.info(`Objet chargé depuis Dexie: ${localId}`);
+      return cached.data;
+    }
+  } catch (err) {
+    logger.warn('Erreur lecture Dexie:', err);
+  }
+
   const pathSegment = typeToPathMap[objectType.toLowerCase()];
 
   // If type is not in the mapping (e.g., 'equipement'), use the unified inventory endpoint
@@ -682,7 +923,7 @@ export async function updateInventoryItem(
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/${endpoint}/${objectId}/`, {
+    const response = await apiFetch(`${API_BASE_URL}/${endpoint}/${objectId}/`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -732,5 +973,490 @@ export async function fetchFilterOptions(type?: string): Promise<FilterOptions> 
       sizes: [],
       states: []
     }
+  }
+}
+
+// ==============================================================================
+// CRÉATION D'OBJETS (DESSIN)
+// ==============================================================================
+
+export interface CreateInventoryItemData {
+  geometry: {
+    type: 'Point' | 'LineString' | 'Polygon' | 'MultiPoint' | 'MultiLineString' | 'MultiPolygon';
+    coordinates: number[] | number[][] | number[][][] | number[][][][];
+  };
+  site_id: number;
+  sous_site_id?: number;
+  properties: Record<string, any>;
+}
+
+/**
+ * Create a new inventory item
+ * @param objectType - Type of object (Arbre, Gazon, Puit, etc.)
+ * @param data - Object data including geometry and properties
+ * @returns Created object in GeoJSON format
+ */
+export async function createInventoryItem(
+  objectType: string,
+  data: CreateInventoryItemData
+): Promise<any> {
+  const endpoint = typeToPathMap[objectType.toLowerCase()];
+
+  if (!endpoint) {
+    throw new ApiError(`Type d'objet non supporté: ${objectType}`);
+  }
+
+  try {
+    // Build the request body in GeoJSON format expected by DRF-GIS
+    const requestBody = {
+      type: 'Feature',
+      geometry: data.geometry,
+      properties: {
+        site: data.site_id,
+        sous_site: data.sous_site_id || null,
+        ...data.properties,
+      },
+    };
+
+    const response = await apiFetch(`${API_BASE_URL}/${endpoint}/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    return await handleResponse<any>(response);
+  } catch (error) {
+    logger.error(`Error creating ${objectType}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Delete an inventory item
+ * @param objectType - Type of object (arbre, gazon, puit, etc.)
+ * @param objectId - ID of the object
+ */
+export async function deleteInventoryItem(
+  objectType: string,
+  objectId: string
+): Promise<void> {
+  const endpoint = typeToPathMap[objectType.toLowerCase()];
+
+  if (!endpoint) {
+    throw new ApiError(`Type d'objet non supporté: ${objectType}`);
+  }
+
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/${endpoint}/${objectId}/`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok && response.status !== 204) {
+      throw new ApiError(`Erreur lors de la suppression: ${response.status}`, response.status);
+    }
+  } catch (error) {
+    logger.error(`Error deleting ${objectType} #${objectId}:`, error);
+    throw error;
+  }
+}
+
+// ==============================================================================
+// OPÉRATIONS GÉOMÉTRIQUES
+// ==============================================================================
+
+export interface GeometryOperationResult {
+  geometry?: any;
+  geometries?: any[];
+  stats?: Record<string, any>;
+  metrics?: Record<string, any>;
+  error?: string;
+}
+
+/**
+ * Simplify a geometry
+ */
+export async function simplifyGeometry(
+  geometry: any,
+  tolerance: number = 0.0001,
+  preserveTopology: boolean = true
+): Promise<GeometryOperationResult> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/geometry/simplify/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        geometry,
+        tolerance,
+        preserve_topology: preserveTopology,
+      }),
+    });
+    return handleResponse<GeometryOperationResult>(response);
+  } catch (error) {
+    logger.error('Error simplifying geometry:', error);
+    throw error;
+  }
+}
+
+/**
+ * Calculate geometry metrics (area, length, perimeter)
+ */
+export async function calculateGeometryMetrics(
+  geometry: any
+): Promise<GeometryOperationResult> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/geometry/calculate/`, {
+      method: 'POST',
+      body: JSON.stringify({ geometry }),
+    });
+    return handleResponse<GeometryOperationResult>(response);
+  } catch (error) {
+    logger.error('Error calculating geometry metrics:', error);
+    throw error;
+  }
+}
+
+/**
+ * Validate a geometry
+ */
+export async function validateGeometry(
+  geometry: any,
+  options?: {
+    targetType?: string;
+    siteId?: number;
+    checkDuplicates?: boolean;
+    checkWithinSite?: boolean;
+  }
+): Promise<any> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/geometry/validate/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        geometry,
+        target_type: options?.targetType,
+        site_id: options?.siteId,
+        check_duplicates: options?.checkDuplicates,
+        check_within_site: options?.checkWithinSite,
+      }),
+    });
+    return handleResponse<any>(response);
+  } catch (error) {
+    logger.error('Error validating geometry:', error);
+    throw error;
+  }
+}
+
+/**
+ * Create a buffer around a geometry
+ */
+export async function bufferGeometry(
+  geometry: any,
+  distanceMeters: number
+): Promise<GeometryOperationResult> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/geometry/buffer/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        geometry,
+        distance: distanceMeters,
+      }),
+    });
+    return handleResponse<GeometryOperationResult>(response);
+  } catch (error) {
+    logger.error('Error creating buffer:', error);
+    throw error;
+  }
+}
+
+/**
+ * Merge multiple polygons
+ */
+export async function mergePolygons(
+  polygons: any[]
+): Promise<GeometryOperationResult> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/geometry/merge/`, {
+      method: 'POST',
+      body: JSON.stringify({ polygons }),
+    });
+    return handleResponse<GeometryOperationResult>(response);
+  } catch (error) {
+    logger.error('Error merging polygons:', error);
+    throw error;
+  }
+}
+
+/**
+ * Split a polygon with a line
+ */
+export async function splitPolygon(
+  polygon: any,
+  splitLine: any
+): Promise<GeometryOperationResult> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/geometry/split/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        polygon,
+        split_line: splitLine,
+      }),
+    });
+    return handleResponse<GeometryOperationResult>(response);
+  } catch (error) {
+    logger.error('Error splitting polygon:', error);
+    throw error;
+  }
+}
+
+// ==============================================================================
+// IMPORT GÉOGRAPHIQUE
+// ==============================================================================
+
+export type ImportFormat = 'geojson' | 'kml' | 'shapefile' | 'auto';
+
+export interface ImportFeature {
+  index: number;
+  geometry: {
+    type: string;
+    coordinates: any;
+  };
+  properties: Record<string, any>;
+  original_properties?: Record<string, any>;
+}
+
+export interface ImportPreviewResponse {
+  format: string;
+  feature_count: number;
+  geometry_types: string[];
+  sample_properties: string[];
+  features: ImportFeature[];
+  suggested_mapping?: Record<string, string>;
+  bbox?: [number, number, number, number];
+}
+
+export interface ImportValidationResponse {
+  valid_count: number;
+  invalid_count: number;
+  warnings: Array<{
+    index: number;
+    message: string;
+    code: string;
+  }>;
+  errors: Array<{
+    index: number;
+    message: string;
+    code: string;
+  }>;
+  features: Array<{
+    index: number;
+    is_valid: boolean;
+    geometry_type: string;
+    mapped_properties: Record<string, any>;
+  }>;
+}
+
+export interface ImportExecuteResponse {
+  created: number[];
+  errors: Array<{
+    index: number;
+    error: string;
+  }>;
+  summary: {
+    total: number;
+    created: number;
+    failed: number;
+  };
+}
+
+export interface AttributeMapping {
+  [targetField: string]: string | null; // source field name or null
+}
+
+/**
+ * Preview an import file - upload and get features preview
+ * @param file - File to import (GeoJSON, KML, or Shapefile ZIP)
+ * @param format - Format hint ('auto' for auto-detection)
+ */
+export async function importPreview(
+  file: File,
+  format: ImportFormat = 'auto'
+): Promise<ImportPreviewResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('format', format);
+
+  try {
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    // Don't set Content-Type for FormData - browser will set it with boundary
+
+    const response = await fetch(`${API_BASE_URL}/import/preview/`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    return handleResponse<ImportPreviewResponse>(response);
+  } catch (error) {
+    logger.error('Error previewing import:', error);
+    throw error;
+  }
+}
+
+/**
+ * Validate import features with attribute mapping
+ * @param features - Features from preview
+ * @param targetType - Target object type (Arbre, Gazon, etc.)
+ * @param mapping - Attribute mapping configuration
+ * @param siteId - Target site ID (null if auto-detect)
+ * @param autoDetectSite - If true, detect site from geometry
+ */
+export async function importValidate(
+  features: ImportFeature[],
+  targetType: string,
+  mapping: AttributeMapping,
+  siteId: number | null,
+  autoDetectSite: boolean = false
+): Promise<ImportValidationResponse> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/import/validate/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        features,
+        target_type: targetType,
+        mapping,
+        site_id: siteId,
+        auto_detect_site: autoDetectSite,
+      }),
+    });
+
+    return handleResponse<ImportValidationResponse>(response);
+  } catch (error) {
+    logger.error('Error validating import:', error);
+    throw error;
+  }
+}
+
+/**
+ * Execute import - create objects in database
+ * @param features - Validated features
+ * @param targetType - Target object type
+ * @param mapping - Attribute mapping
+ * @param siteId - Target site ID (null if auto-detect)
+ * @param sousSiteId - Optional sous-site ID
+ * @param autoDetectSite - If true, detect site from geometry
+ */
+export async function importExecute(
+  features: ImportFeature[],
+  targetType: string,
+  mapping: AttributeMapping,
+  siteId: number | null,
+  sousSiteId?: number,
+  autoDetectSite: boolean = false
+): Promise<ImportExecuteResponse> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/import/execute/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        features,
+        target_type: targetType,
+        mapping,
+        site_id: siteId,
+        sous_site_id: sousSiteId,
+        auto_detect_site: autoDetectSite,
+      }),
+    });
+
+    return handleResponse<ImportExecuteResponse>(response);
+  } catch (error) {
+    logger.error('Error executing import:', error);
+    throw error;
+  }
+}
+
+// ==============================================================================
+// EXPORT GÉOGRAPHIQUE
+// ==============================================================================
+
+export type ExportFormat = 'csv' | 'xlsx' | 'geojson' | 'kml' | 'shapefile';
+
+/**
+ * Export data in various formats
+ * @param modelName - Model to export (arbres, gazons, etc.)
+ * @param format - Export format
+ * @param ids - Optional list of IDs to export (if not provided, exports all)
+ */
+export async function exportGeoData(
+  modelName: string,
+  format: ExportFormat,
+  ids?: number[]
+): Promise<Blob> {
+  try {
+    const params = new URLSearchParams();
+    params.append('format', format);
+    if (ids && ids.length > 0) {
+      params.append('ids', ids.join(','));
+    }
+
+    const response = await apiFetch(`${API_BASE_URL}/export/${modelName}/?${params}`);
+
+    if (!response.ok) {
+      throw new ApiError(`Erreur export ${format.toUpperCase()}: ${response.status}`, response.status);
+    }
+
+    return response.blob();
+  } catch (error) {
+    logger.error(`Error exporting ${modelName} as ${format}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Export selected inventory items
+ * @param objectType - Type of objects
+ * @param ids - List of object IDs
+ * @param format - Export format
+ */
+export async function exportSelection(
+  objectType: string,
+  ids: number[],
+  format: ExportFormat
+): Promise<Blob> {
+  const endpoint = typeToPathMap[objectType.toLowerCase()];
+  if (!endpoint) {
+    throw new ApiError(`Type d'objet non supporté: ${objectType}`);
+  }
+
+  return exportGeoData(endpoint, format, ids);
+}
+
+/**
+ * Get file extension for export format
+ */
+export function getExportFileExtension(format: ExportFormat): string {
+  switch (format) {
+    case 'csv': return '.csv';
+    case 'xlsx': return '.xlsx';
+    case 'geojson': return '.geojson';
+    case 'kml': return '.kml';
+    case 'shapefile': return '.zip';
+    default: return '.dat';
+  }
+}
+
+/**
+ * Get MIME type for export format
+ */
+export function getExportMimeType(format: ExportFormat): string {
+  switch (format) {
+    case 'csv': return 'text/csv';
+    case 'xlsx': return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    case 'geojson': return 'application/geo+json';
+    case 'kml': return 'application/vnd.google-earth.kml+xml';
+    case 'shapefile': return 'application/zip';
+    default: return 'application/octet-stream';
   }
 }

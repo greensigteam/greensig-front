@@ -1,47 +1,40 @@
 import {
   Utilisateur,
-  UtilisateurCreate,
-  UtilisateurUpdate,
   Client,
-  ClientCreate,
-  ClientUpdate,
-  OperateurCreate,
-  OperateurUpdate,
   OperateurList,
-  OperateurDetail,
+  UtilisateurUpdate,
+  ClientUpdate,
+  OperateurUpdate,
   Role,
   NomRole,
-  NOM_ROLE_LABELS,
-  Competence,
-  NiveauCompetence,
-  NIVEAU_COMPETENCE_LABELS
-  , STATUT_OPERATEUR_LABELS, STATUT_OPERATEUR_COLORS, getBadgeColors
+  NOM_ROLE_LABELS
 } from '../types/users';
+import {
+  CreateAdminModal,
+  CreateClientModal,
+  CreateChefEquipeModal,
+  CreateOperateurModal,
+  UserTypeMenu
+} from '../components/users/CreateUserModals';
+import { UserDetailModalSelector } from '../components/users/UserDetailModals';
 import React, { useState, useEffect } from 'react';
 import {
-  Plus,
   Users as UsersIcon,
   UserPlus,
   UserCheck,
-  UserX,
   Shield,
   Building2,
   Search,
   X,
   Edit2,
   Trash2,
-  Eye,
-  EyeOff,
   Mail,
-  Phone,
-  Calendar,
   Award,
   Check,
   AlertCircle,
   Save
 } from 'lucide-react';
-import { DataTable, Column } from '../components/DataTable';
-import { Tab } from '@headlessui/react';
+import { DataTable } from '../components/DataTable';
 
 // ...existing code...
 
@@ -50,20 +43,14 @@ import {
   fetchUtilisateurs,
   fetchClients,
   fetchRoles,
-  createUtilisateur,
   updateUtilisateur,
   deleteUtilisateur,
-  createClient,
   updateClient,
-  createOperateur,
   fetchOperateurById,
   updateOperateur,
-  fetchStatistiquesUtilisateurs,
   fetchOperateurs,
   attribuerRole,
-  retirerRole,
-  fetchCompetences,
-  affecterCompetence
+  retirerRole
 } from '../services/usersApi';
 
 // ============================================================================
@@ -83,607 +70,7 @@ const RoleBadge: React.FC<{ role: NomRole }> = ({ role }) => {
   );
 };
 
-// ============================================================================
-// MODAL - Creer un utilisateur
-// ============================================================================
 
-interface CreateUserModalProps {
-  onClose: () => void;
-  onCreated: () => void;
-  roles: NomRole[];
-}
-
-const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated, roles }) => {
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [tabIndex, setTabIndex] = useState(0);
-
-  // Common fields
-  // Liste des rôles objets pour mapping id/nomRole (accessible dans tout le composant)
-  const [roleObjects, setRoleObjects] = useState<Role[]>([]);
-  // Role selection (single role now)
-  const [selectedRole, setSelectedRole] = useState<NomRole | null>(null);
-  // Rôles de l'utilisateur courant (pour vérifier si c'est un admin)
-  const [currentUserRoles, setCurrentUserRoles] = useState<NomRole[]>([]);
-  const [formData, setFormData] = useState({
-    email: '',
-    nom: '',
-    prenom: '',
-    password: '',
-    passwordConfirm: ''
-  });
-  // Operateur-specific field
-  const [matricule, setMatricule] = useState('');
-  // Competence selection
-  const [competences, setCompetences] = useState<Competence[]>([]);
-  const [selectedCompetences, setSelectedCompetences] = useState<{ competenceId: number; niveau: NiveauCompetence }[]>([]);
-
-  // Fetch competences when OPERATEUR is selected
-  useEffect(() => {
-    if (selectedRole === 'OPERATEUR') {
-      fetchCompetences().then(setCompetences);
-    }
-  }, [selectedRole]);
-
-  // Charger les rôles objets au montage
-  useEffect(() => {
-    fetchRoles().then(setRoleObjects);
-  }, []);
-
-  const handleCompetenceChange = (competenceId: number, niveau: NiveauCompetence) => {
-    setSelectedCompetences((prev) => {
-      const exists = prev.find((c) => c.competenceId === competenceId);
-      if (exists) {
-        return prev.map((c) => c.competenceId === competenceId ? { ...c, niveau } : c);
-      } else {
-        return [...prev, { competenceId, niveau }];
-      }
-    });
-  };
-
-  const handleRemoveCompetence = (competenceId: number) => {
-    setSelectedCompetences((prev) => prev.filter((c) => c.competenceId !== competenceId));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    if (formData.password !== formData.passwordConfirm) {
-      setError('Les mots de passe ne correspondent pas');
-      return;
-    }
-
-    if (formData.password.length < 8) {
-      setError('Le mot de passe doit contenir au moins 8 caractères');
-      return;
-    }
-
-    if (!selectedRole) {
-      setError('Sélectionnez un rôle');
-      return;
-    }
-
-    // If OPERATEUR or CHEF_EQUIPE is selected, require matricule
-    if ((selectedRole === 'OPERATEUR' || selectedRole === 'CHEF_EQUIPE') && !matricule.trim()) {
-      setError("Le matricule est requis pour un opérateur/chef d'équipe");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Nouvelle logique : comportement par rôle (single-role forms)
-        if (selectedRole === 'OPERATEUR' || selectedRole === 'CHEF_EQUIPE') {
-          const operateur = await createOperateur({
-            email: formData.email,
-            nom: formData.nom,
-            prenom: formData.prenom,
-            password: formData.password,
-            numeroImmatriculation: matricule || '',
-            dateEmbauche: new Date().toISOString().split('T')[0],
-            telephone: ''
-          });
-          // Recherche l'opérateur créé par email pour obtenir son ID
-          const { results } = await fetchOperateurs({ search: formData.email });
-          const op = results && results.length > 0 ? results[0] : null;
-          if (op) {
-            for (const comp of selectedCompetences) {
-              await affecterCompetence(op.utilisateur, comp);
-            }
-            // Si le rôle sélectionné est CHEF_EQUIPE, attribuer le rôle au user/operateur
-            if (selectedRole === 'CHEF_EQUIPE') {
-              const roleObj = roleObjects.find(r => r.nomRole === 'CHEF_EQUIPE');
-              if (roleObj) await attribuerRole(op.utilisateur.toString(), roleObj.id.toString());
-            }
-          }
-        } else {
-        // Cas classique : création utilisateur puis attribution des rôles
-        const user = await createUtilisateur({
-          email: formData.email,
-          nom: formData.nom,
-          prenom: formData.prenom,
-          password: formData.password,
-          passwordConfirm: formData.password, // Ajouté pour respecter UtilisateurCreate
-          actif: true
-        });
-        // Attribuer le rôle sélectionné
-        if (selectedRole) {
-          const roleObj = roleObjects.find(r => r.nomRole === selectedRole);
-          if (roleObj) await attribuerRole(user.id.toString(), roleObj.id.toString());
-        }
-      }
-      onCreated();
-      onClose();
-    } catch (err: any) {
-      // Gestion explicite des erreurs 400 lors de la création d'utilisateur
-      if (err?.response?.status === 400) {
-        setError('Erreur de validation : vérifiez les champs du formulaire.');
-      } else {
-        setError('Erreur inconnue lors de la création de l’utilisateur.');
-      }
-      setLoading(false);
-      return;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900">Nouvel utilisateur</h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-          <div className="p-6 space-y-4">
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
-                <AlertCircle className="w-5 h-5" />
-                <span className="text-sm">{error}</span>
-              </div>
-            )}
-            <Tab.Group selectedIndex={tabIndex} onChange={setTabIndex}>
-              <Tab.List className="flex space-x-2 border-b mb-4">
-                <Tab className={({ selected }) =>
-                  selected ? 'px-4 py-2 border-b-2 border-emerald-500 font-semibold' : 'px-4 py-2 text-gray-500'}>
-                  Informations
-                </Tab>
-                {selectedRole === 'OPERATEUR' && (
-                  <Tab className={({ selected }) =>
-                    selected ? 'px-4 py-2 border-b-2 border-emerald-500 font-semibold' : 'px-4 py-2 text-gray-500'}>
-                    Compétences
-                  </Tab>
-                )}
-              </Tab.List>
-              <Tab.Panels>
-                <Tab.Panel>
-                  {/* Onglet Informations */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Prénom <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        required
-                        type="text"
-                        value={formData.prenom}
-                        onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Nom <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        required
-                        type="text"
-                        value={formData.nom}
-                        onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        required
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Mot de passe <span className="text-red-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <input
-                          required
-                          type={showPassword ? 'text' : 'password'}
-                          value={formData.password}
-                          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                          className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Confirmer <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        required
-                        type={showPassword ? 'text' : 'password'}
-                        value={formData.passwordConfirm}
-                        onChange={(e) => setFormData({ ...formData, passwordConfirm: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                      />
-                    </div>
-                  </div>
-                  {/* Role selection (single-role buttons) */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Rôle <span className="text-red-500">*</span></label>
-                    <div className="flex gap-2 flex-wrap">
-                      {Object.keys(NOM_ROLE_LABELS).map((role) => (
-                        <button
-                          key={role}
-                          type="button"
-                          onClick={() => setSelectedRole(role as NomRole)}
-                          className={`px-3 py-1 rounded-full border ${selectedRole === role ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200 bg-white'} text-sm flex items-center gap-2`}
-                        >
-                          <RoleBadge role={role as NomRole} />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {(selectedRole === 'OPERATEUR' || selectedRole === 'CHEF_EQUIPE') && (
-                    <div className="mt-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Matricule <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        required={selectedRole === 'OPERATEUR'}
-                        type="text"
-                        value={matricule}
-                        onChange={(e) => setMatricule(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                        placeholder="Ex: OP-2024-007"
-                      />
-                    </div>
-                  )}
-                </Tab.Panel>
-                {selectedRole === 'OPERATEUR' && (
-                  <Tab.Panel>
-                    {/* Onglet Compétences */}
-                    <div className="mb-2 text-sm text-gray-600">Sélectionnez les compétences à affecter à l'opérateur (optionnel).</div>
-                    {competences.length === 0 ? (
-                      <div className="text-gray-500 text-sm">Aucune compétence disponible.</div>
-                    ) : (
-                      <table className="min-w-full border text-sm mt-2">
-                        <thead>
-                          <tr className="bg-gray-100">
-                            <th className="px-2 py-1 border">Compétence</th>
-                            <th className="px-2 py-1 border">Catégorie</th>
-                            <th className="px-2 py-1 border">Niveau</th>
-                            <th className="px-2 py-1 border">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {competences.map((comp) => {
-                            const selected = selectedCompetences.find((c) => c.competenceId === comp.id);
-                            return (
-                              <tr key={comp.id} className={selected ? 'bg-emerald-50' : ''}>
-                                <td className="px-2 py-1 border font-medium">{comp.nomCompetence}</td>
-                                <td className="px-2 py-1 border text-gray-500">{comp.categorieDisplay}</td>
-                                <td className="px-2 py-1 border">
-                                  <select
-                                    className="border rounded px-2 py-1 text-sm"
-                                    value={selected ? selected.niveau : ''}
-                                    onChange={(e) => {
-                                      const niveau = e.target.value as NiveauCompetence;
-                                      if (niveau) handleCompetenceChange(comp.id, niveau);
-                                    }}
-                                  >
-                                    <option value="">Niveau...</option>
-                                    {Object.keys(NIVEAU_COMPETENCE_LABELS).map((niv) => (
-                                      <option key={niv} value={niv}>{NIVEAU_COMPETENCE_LABELS[niv as NiveauCompetence]}</option>
-                                    ))}
-                                  </select>
-                                </td>
-                                <td className="px-2 py-1 border text-center">
-                                  {selected && (
-                                    <button type="button" className="text-red-500 text-xs" onClick={() => handleRemoveCompetence(comp.id)}>
-                                      Retirer
-                                    </button>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    )}
-                  </Tab.Panel>
-                )}
-              </Tab.Panels>
-            </Tab.Group>
-          </div>
-          <div className="p-6 border-t border-gray-200 flex gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-            >
-              {loading ? 'Création...' : 'Créer'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-// ============================================================================
-// MODAL - Detail Utilisateur
-// ============================================================================
-
-interface UserDetailModalProps {
-  user: Utilisateur;
-  onClose: () => void;
-  onToggleActive: (id: number, actif: boolean) => void;
-  onEdit: (user: Utilisateur) => void;
-  clients: Client[];
-  operateurs: OperateurList[];
-}
-
-const UserDetailModal: React.FC<UserDetailModalProps> = ({ user, onClose, onToggleActive, onEdit, clients, operateurs }) => {
-  const [operateurDetail, setOperateurDetail] = useState<OperateurDetail | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-    const loadOperateurDetail = async () => {
-      if (!user.roles.includes('OPERATEUR')) return;
-      // trouver l'item dans la liste operateurs (peut être présent même sans profil complet)
-      const op = operateurs.find(o => o.utilisateur === user.id);
-      if (!op) return;
-      setLoadingDetail(true);
-      try {
-        const detail = await fetchOperateurById(op.utilisateur);
-        if (mounted) setOperateurDetail(detail);
-      } catch (e) {
-        // si l'endpoint ne renvoie pas de detail, on ignore
-      } finally {
-        if (mounted) setLoadingDetail(false);
-      }
-    };
-    loadOperateurDetail();
-    return () => { mounted = false; };
-  }, [user, operateurs]);
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
-        <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`p-3 rounded-full ${user.roles.includes('ADMIN') ? 'bg-purple-100' :
-              user.roles.includes('OPERATEUR') ? 'bg-blue-100' :
-                user.roles.includes('CHEF_EQUIPE') ? 'bg-yellow-100' :
-                  user.roles.includes('CLIENT') ? 'bg-green-100' : 'bg-gray-100'
-              }`}>
-              {user.roles.includes('ADMIN') ? (
-                <Shield className="w-6 h-6 text-purple-600" />
-              ) : user.roles.includes('OPERATEUR') ? (
-                <UserCheck className="w-6 h-6 text-blue-600" />
-              ) : user.roles.includes('CHEF_EQUIPE') ? (
-                <Award className="w-6 h-6 text-yellow-600" />
-              ) : (
-                <Building2 className="w-6 h-6 text-green-600" />
-              )}
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">{user.fullName}</h2>
-
-            </div>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-4 overflow-y-auto flex-1">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium text-gray-500">Email</label>
-              <p className="text-gray-900 flex items-center gap-2">
-                <Mail className="w-4 h-4 text-gray-400" />
-                {user.email}
-              </p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-500">Statut</label>
-              <p className="mt-1">
-                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${user.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
-                  {user.actif ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-                  {user.actif ? 'Actif' : 'Inactif'}
-                </span>
-              </p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-500">Date de creation</label>
-              <p className="text-gray-900 flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-gray-400" />
-                {new Date(user.dateCreation).toLocaleDateString('fr-FR')}
-              </p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-500">Derniere connexion</label>
-              <p className="text-gray-900">
-                {user.derniereConnexion
-                  ? new Date(user.derniereConnexion).toLocaleString('fr-FR')
-                  : 'Jamais'
-                }
-              </p>
-            </div>
-          </div>
-
-          {user.roles.length > 0 && (
-            <div>
-              <label className="text-sm font-medium text-gray-500 mb-2 block">Roles</label>
-              <div className="flex flex-wrap gap-2">
-                {user.roles.map((role) => (
-                  <span
-                    key={role}
-                    className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium flex items-center gap-1"
-                  >
-                    <Award className="w-3 h-3" />
-                    {NOM_ROLE_LABELS[role]}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Role-specific details */}
-          {user.roles.includes('CLIENT') && (
-            <div className="p-6 border-t border-gray-100">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Détails client</h3>
-              {(() => {
-                const clientData = clients.find(c => c.utilisateur === user.id);
-                if (!clientData) return <p className="text-sm text-gray-500">Aucun profil client associé.</p>;
-                return (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-gray-500">Structure</p>
-                      <p className="text-gray-900">{clientData.nomStructure || '-'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Email facturation</p>
-                      <p className="text-gray-900">{clientData.emailFacturation || '-'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Téléphone</p>
-                      <p className="text-gray-900">{clientData.telephone || '-'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Contact principal</p>
-                      <p className="text-gray-900">{clientData.contactPrincipal || '-'}</p>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          )}
-
-          {user.roles.includes('OPERATEUR') && (
-            <div className="p-6 border-t border-gray-100">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Détails opérateur</h3>
-              {loadingDetail ? (
-                <p className="text-sm text-gray-500">Chargement...</p>
-              ) : operateurDetail ? (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-gray-500">Matricule</p>
-                    <p className="text-gray-900">{operateurDetail.numeroImmatriculation || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Statut</p>
-                    <div className="mt-1">
-                      {(() => {
-                        const safe = getBadgeColors(STATUT_OPERATEUR_COLORS, operateurDetail.statut as any);
-                        const label = operateurDetail.statut ? STATUT_OPERATEUR_LABELS[operateurDetail.statut] : 'Non renseigné';
-                        return (
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${safe.bg} ${safe.text}`}>
-                            {label}
-                          </span>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Équipe</p>
-                    <p className="text-gray-900">{operateurDetail.equipeNom || 'Non affecte'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Date d'embauche</p>
-                    <p className="text-gray-900">{operateurDetail.dateEmbauche ? new Date(operateurDetail.dateEmbauche).toLocaleDateString('fr-FR') : '-'}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-xs text-gray-500">Compétences</p>
-                    {operateurDetail.competencesDetail && operateurDetail.competencesDetail.length > 0 ? (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {operateurDetail.competencesDetail.map((c) => (
-                          <div key={c.id} className="px-2 py-1 bg-gray-50 rounded text-sm text-gray-700">
-                            {c.competenceDetail?.nomCompetence || c.competence} — {NIVEAU_COMPETENCE_LABELS[c.niveau]}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-gray-500 mt-1">Aucune compétence renseignée.</p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">Profil opérateur non disponible.</p>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="p-6 border-t border-gray-200 flex gap-3">
-          <button
-            onClick={() => onEdit(user)}
-            className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center justify-center gap-2"
-          >
-            <Edit2 className="w-4 h-4" />
-            Modifier
-          </button>
-          <button
-            onClick={() => onToggleActive(user.id, !user.actif)}
-            className={`flex-1 px-4 py-2 rounded-lg flex items-center justify-center gap-2 ${user.actif
-              ? 'bg-red-100 text-red-700 hover:bg-red-200'
-              : 'bg-green-100 text-green-700 hover:bg-green-200'
-              }`}
-          >
-            {user.actif ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-            {user.actif ? 'Desactiver' : 'Reactiver'}
-          </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200"
-          >
-            Fermer
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // ============================================================================
 // MODAL - Editer un utilisateur
@@ -842,60 +229,89 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
             {/* Gestion des rôles pour les admins */}
             {currentUserRoles.includes('ADMIN') && (
               <div className="mb-4">
-                <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                <h3 className="font-medium text-gray-900 flex items-center gap-2 mb-3">
                   <span className="inline-block w-4 h-4 bg-gray-300 rounded-full" />
-                  Gestion des rôles
+                  Rôles de l'utilisateur
                 </h3>
-                {roleError && (
-                  <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm mb-2">{roleError}</div>
-                )}
-                <div className="flex flex-wrap gap-2">
-                  {allRoles.map((roleObj) => {
-                    const roleName = roleObj.nomRole;
-                    const hasRole = userRoles.includes(roleName);
-                    return (
-                      <div key={roleObj.id} className="flex items-center gap-1 border rounded px-2 py-1">
-                        <span className="text-xs font-semibold">{NOM_ROLE_LABELS[roleName]}</span>
-                        {hasRole ? (
-                          <button
-                            type="button"
-                            disabled={roleLoading === roleName}
-                            className="text-red-600 text-xs ml-2 px-1 hover:underline"
-                            onClick={async () => {
-                              setRoleLoading(roleName);
-                              setRoleError(null);
-                              try {
-                                await retirerRole(user.id.toString(), roleObj.id.toString());
-                                setUserRoles((prev) => prev.filter((r) => r !== roleName));
-                              } catch (err: any) {
-                                setRoleError(err.message || 'Erreur lors du retrait du rôle');
-                              } finally {
-                                setRoleLoading(null);
-                              }
-                            }}
-                          >Retirer</button>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={roleLoading === roleName}
-                            className="text-emerald-600 text-xs ml-2 px-1 hover:underline"
-                            onClick={async () => {
-                              setRoleLoading(roleName);
-                              setRoleError(null);
-                              try {
-                                await attribuerRole(user.id.toString(), roleObj.id.toString());
-                                setUserRoles((prev) => [...prev, roleName]);
-                              } catch (err: any) {
-                                setRoleError(err.message || 'Erreur lors de l\'attribution du rôle');
-                              } finally {
-                                setRoleLoading(null);
-                              }
-                            }}
-                          >Ajouter</button>
-                        )}
-                      </div>
-                    );
-                  })}
+
+                {/* Rôles automatiques (lecture seule) */}
+                <div className="mb-4">
+                  <p className="text-xs text-gray-500 mb-2">Rôles attribués automatiquement :</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['CLIENT', 'OPERATEUR', 'CHEF_EQUIPE'].map((roleName) => {
+                      const hasRole = userRoles.includes(roleName as NomRole);
+                      if (!hasRole) return null;
+                      return (
+                        <div key={roleName} className="flex items-center gap-1 border border-gray-300 bg-gray-50 rounded px-2 py-1">
+                          <span className="text-xs font-semibold text-gray-700">
+                            {NOM_ROLE_LABELS[roleName as NomRole]}
+                          </span>
+                          <span className="text-xs text-gray-500 ml-1">(automatique)</span>
+                        </div>
+                      );
+                    })}
+                    {!userRoles.some(r => ['CLIENT', 'OPERATEUR', 'CHEF_EQUIPE'].includes(r)) && (
+                      <span className="text-xs text-gray-500 italic">Aucun rôle automatique</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Rôles manuels (modifiables) */}
+                <div>
+                  <p className="text-xs text-gray-500 mb-2">Rôle administrateur (modifiable) :</p>
+                  {roleError && (
+                    <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm mb-2">{roleError}</div>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {allRoles
+                      .filter(roleObj => roleObj.nomRole === 'ADMIN')
+                      .map((roleObj) => {
+                        const roleName = roleObj.nomRole;
+                        const hasRole = userRoles.includes(roleName);
+                        return (
+                          <div key={roleObj.id} className="flex items-center gap-1 border rounded px-2 py-1">
+                            <span className="text-xs font-semibold">{NOM_ROLE_LABELS[roleName]}</span>
+                            {hasRole ? (
+                              <button
+                                type="button"
+                                disabled={roleLoading === roleName}
+                                className="text-red-600 text-xs ml-2 px-1 hover:underline disabled:opacity-50"
+                                onClick={async () => {
+                                  setRoleLoading(roleName);
+                                  setRoleError(null);
+                                  try {
+                                    await retirerRole(user.id.toString(), roleObj.id.toString());
+                                    setUserRoles((prev) => prev.filter((r) => r !== roleName));
+                                  } catch (err: any) {
+                                    setRoleError(err.message || 'Erreur lors du retrait du rôle');
+                                  } finally {
+                                    setRoleLoading(null);
+                                  }
+                                }}
+                              >Retirer</button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={roleLoading === roleName}
+                                className="text-emerald-600 text-xs ml-2 px-1 hover:underline disabled:opacity-50"
+                                onClick={async () => {
+                                  setRoleLoading(roleName);
+                                  setRoleError(null);
+                                  try {
+                                    await attribuerRole(user.id.toString(), roleObj.id.toString());
+                                    setUserRoles((prev) => [...prev, roleName]);
+                                  } catch (err: any) {
+                                    setRoleError(err.message || 'Erreur lors de l\'attribution du rôle');
+                                  } finally {
+                                    setRoleLoading(null);
+                                  }
+                                }}
+                              >Ajouter</button>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
                 </div>
               </div>
             )}
@@ -1126,7 +542,6 @@ const Users: React.FC = () => {
   const [utilisateurs, setUtilisateurs] = useState<Utilisateur[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [operateurs, setOperateurs] = useState<OperateurList[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
   const [stats, setStats] = useState<{
     total: number;
     actifs: number;
@@ -1137,9 +552,32 @@ const Users: React.FC = () => {
   } | null>(null);
 
   // Modals
-  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [showUserTypeMenu, setShowUserTypeMenu] = useState(false);
+  const [showCreateAdmin, setShowCreateAdmin] = useState(false);
+  const [showCreateClient, setShowCreateClient] = useState(false);
+  const [showCreateChefEquipe, setShowCreateChefEquipe] = useState(false);
+  const [showCreateOperateur, setShowCreateOperateur] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Utilisateur | null>(null);
   const [editingUser, setEditingUser] = useState<Utilisateur | null>(null);
+
+  // Handler pour la sélection du type d'utilisateur
+  const handleUserTypeSelect = (type: NomRole) => {
+    setShowUserTypeMenu(false);
+    switch (type) {
+      case 'ADMIN':
+        setShowCreateAdmin(true);
+        break;
+      case 'CLIENT':
+        setShowCreateClient(true);
+        break;
+      case 'CHEF_EQUIPE':
+        setShowCreateChefEquipe(true);
+        break;
+      case 'OPERATEUR':
+        setShowCreateOperateur(true);
+        break;
+    }
+  };
 
   // Load data
   useEffect(() => {
@@ -1149,18 +587,15 @@ const Users: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [utilisateursRes, clientsRes, operateursRes, rolesRes, statsRes] = await Promise.all([
+      const [utilisateursRes, clientsRes, operateursRes] = await Promise.all([
         fetchUtilisateurs(),
         fetchClients(),
-        fetchOperateurs(),
-        fetchRoles(),
-        fetchStatistiquesUtilisateurs()
+        fetchOperateurs()
       ]);
 
       setUtilisateurs(utilisateursRes.results);
       setClients(clientsRes.results);
       setOperateurs(operateursRes.results);
-      setRoles(rolesRes);
       // Calcul local à partir de la liste d'utilisateurs pour s'assurer que
       // les cartes statistiques reflètent les rôles (un utilisateur peut avoir plusieurs rôles).
       const users = utilisateursRes.results || [];
@@ -1229,7 +664,7 @@ const Users: React.FC = () => {
     return true;
   });
 
-  // Columns
+  // Columns - Mêmes colonnes pour tous les onglets (affichage des infos utilisateur)
   const columns = [
     {
       key: 'fullName',
@@ -1258,7 +693,6 @@ const Users: React.FC = () => {
         </div>
       )
     },
-    // Colonne 'Type' supprimée : affichage des rôles uniquement dans la colonne 'Roles'
     {
       key: 'roles',
       label: 'Roles',
@@ -1310,7 +744,7 @@ const Users: React.FC = () => {
           <p className="text-gray-500 mt-1">Administrateurs, operateurs et clients</p>
         </div>
         <button
-          onClick={() => setShowCreateUser(true)}
+          onClick={() => setShowUserTypeMenu(true)}
           className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
         >
           <UserPlus className="w-4 h-4" />
@@ -1493,25 +927,52 @@ const Users: React.FC = () => {
       </div>
 
       {/* Modals */}
-      {showCreateUser && (
-        <CreateUserModal
-          onClose={() => setShowCreateUser(false)}
+      {showUserTypeMenu && (
+        <UserTypeMenu
+          onSelect={handleUserTypeSelect}
+          onClose={() => setShowUserTypeMenu(false)}
+        />
+      )}
+
+      {showCreateAdmin && (
+        <CreateAdminModal
+          onClose={() => setShowCreateAdmin(false)}
           onCreated={loadData}
-          roles={roles.map(r => r.nomRole)}
+        />
+      )}
+
+      {showCreateClient && (
+        <CreateClientModal
+          onClose={() => setShowCreateClient(false)}
+          onCreated={loadData}
+        />
+      )}
+
+      {showCreateChefEquipe && (
+        <CreateChefEquipeModal
+          onClose={() => setShowCreateChefEquipe(false)}
+          onCreated={loadData}
+        />
+      )}
+
+      {showCreateOperateur && (
+        <CreateOperateurModal
+          onClose={() => setShowCreateOperateur(false)}
+          onCreated={loadData}
         />
       )}
 
       {selectedUser && (
-        <UserDetailModal
+        <UserDetailModalSelector
           user={selectedUser}
+          clients={clients}
+          operateurs={operateurs}
           onClose={() => setSelectedUser(null)}
-          onToggleActive={handleToggleActive}
           onEdit={(user) => {
             setSelectedUser(null);
             setEditingUser(user);
           }}
-          clients={clients}
-          operateurs={operateurs}
+          onToggleActive={handleToggleActive}
         />
       )}
 

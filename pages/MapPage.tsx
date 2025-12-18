@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { X, AlertTriangle } from 'lucide-react';
 import { VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND } from '../constants';
 import { MapLayerType, Coordinates, OverlayState, MapObjectDetail, Measurement, MeasurementType } from '../types';
 import { MOCK_SITES } from '../services/mockData';
-import { searchObjects, geoJSONToLatLng, fetchAllSites, SiteFrontend, exportPDF, downloadBlob } from '../services/api';
+import { searchObjects, geoJSONToLatLng, fetchAllSites, SiteFrontend, exportPDF, downloadBlob, deleteInventoryItem } from '../services/api';
 import { useSearch } from '../hooks/useSearch';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useMapContext } from '../contexts/MapContext';
 import { useToast } from '../contexts/ToastContext';
 import { useSelection } from '../contexts/SelectionContext';
+import { useDrawing } from '../contexts/DrawingContext';
 import logger from '../services/logger';
 
 // ✅ IMPORT SUB-COMPONENTS
@@ -18,6 +20,18 @@ import { MapObjectDetailCard } from '../components/map/MapObjectDetailCard';
 import { MapLayersPanel } from '../components/map/MapLayersPanel';
 import { MapZoomControls } from '../components/map/MapZoomControls';
 import { SelectionPanel } from '../components/map/SelectionPanel';
+import ObjectTypeSelector from '../components/map/ObjectTypeSelector';
+import { SiteCarousel } from '../components/map/SiteCarousel';
+import { CreateSiteModal } from '../components/map/CreateSiteModal';
+import SiteEditModal from '../components/sites/SiteEditModal';
+import CreateObjectModal from '../components/CreateObjectModal';
+import ImportWizard from '../components/import/ImportWizard';
+import ExportPanel from '../components/export/ExportPanel';
+import TaskFormModal, { InventoryObjectOption } from '../components/planning/TaskFormModal';
+import { planningService } from '../services/planningService';
+import { fetchEquipes } from '../services/usersApi';
+import { TypeTache, TacheCreate } from '../types/planning';
+import { EquipeList } from '../types/users';
 
 // Types pour la symbologie
 interface SymbologyConfig {
@@ -125,22 +139,106 @@ export const MapPage: React.FC<MapPageProps> = ({
   // ✅ USE TOAST - For user notifications
   const { showToast } = useToast();
 
+  // ✅ USE NAVIGATE - For page navigation
+  const navigate = useNavigate();
+  const location = useLocation();
+
   // ✅ USE SELECTION - For multi-object selection
-  const { toggleSelectionMode, isSelectionMode, selectedObjects } = useSelection();
+  const { toggleSelectionMode, isSelectionMode, selectedObjects, getSelectedIds, addMultipleToSelection, setSelectionMode } = useSelection();
+
+  // ✅ USE DRAWING - For drawing/editing tools
+  const {
+    drawingMode,
+    setDrawingMode,
+    editingMode,
+    setEditingMode,
+    isDrawing,
+    drawnGeometry,
+    clearDrawnGeometry,
+    pendingObjectType,
+    setPendingObjectType,
+    calculatedMetrics,
+  } = useDrawing();
 
   // ========== STATE MANAGEMENT ==========
   const [showLayers, setShowLayers] = useState(false);
   const [showZoomWarning, setShowZoomWarning] = useState(false);
 
+  // ✅ Import/Export modals state
+  const [showImportWizard, setShowImportWizard] = useState(false);
+  const [showExportPanel, setShowExportPanel] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showTypeSelector, setShowTypeSelector] = useState(false);
+  const [showCreateSiteModal, setShowCreateSiteModal] = useState(false);
+  const [isCreatingSite, setIsCreatingSite] = useState(false);
+
   // Sites dynamiques chargés depuis l'API
   const [sites, setSites] = useState<SiteFrontend[]>([]);
   const [sitesLoading, setSitesLoading] = useState(true);
+  const [isCarouselOpen, setIsCarouselOpen] = useState(true);
+  const [editingSite, setEditingSite] = useState<SiteFrontend | null>(null);
 
   // États pour les onglets Filtres/Symbologie
   const [layersPanelTab, setLayersPanelTab] = useState<'layers' | 'filters' | 'symbology'>('layers');
   const [symbologyConfig] = useState<Record<string, SymbologyConfig>>(createDefaultSymbology);
 
   const [isExporting, setIsExporting] = useState(false);
+
+  // Task Creation State
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [taskModalInitialValues, setTaskModalInitialValues] = useState<Partial<TacheCreate>>({});
+  const [taskPreSelectedObjects, setTaskPreSelectedObjects] = useState<InventoryObjectOption[]>([]);
+  const [typesTaches, setTypesTaches] = useState<TypeTache[]>([]);
+  const [equipes, setEquipes] = useState<EquipeList[]>([]);
+
+  // ========== HANDLE NAVIGATION FROM INVENTORY ==========
+  useEffect(() => {
+    const state = location.state as { highlightFromInventory?: boolean; selectedObjects?: any[] } | null;
+
+    if (state?.highlightFromInventory && state?.selectedObjects?.length) {
+      // Convert inventory objects to MapObjectDetail format
+      const mapObjects: MapObjectDetail[] = state.selectedObjects.map((obj: any) => ({
+        id: obj.id,
+        type: obj.type,
+        title: obj.title,
+        subtitle: obj.subtitle || '',
+        attributes: obj.attributes || {},
+        geometry: obj.coordinates ? {
+          type: 'Point' as const,
+          coordinates: [obj.coordinates.lng, obj.coordinates.lat]
+        } : undefined
+      }));
+
+      // Activate selection mode and add objects
+      setSelectionMode(true);
+      addMultipleToSelection(mapObjects);
+
+      // Calculate bounding box and zoom to fit all objects
+      if (state.selectedObjects.length > 0) {
+        const coords = state.selectedObjects
+          .filter((obj: any) => obj.coordinates?.lat && obj.coordinates?.lng)
+          .map((obj: any) => obj.coordinates);
+
+        if (coords.length > 0) {
+          // Calculate center of all objects
+          const avgLat = coords.reduce((sum: number, c: any) => sum + c.lat, 0) / coords.length;
+          const avgLng = coords.reduce((sum: number, c: any) => sum + c.lng, 0) / coords.length;
+
+          // Zoom to center with appropriate zoom level
+          setTargetLocation({
+            coordinates: { lat: avgLat, lng: avgLng },
+            zoom: coords.length === 1 ? 18 : 16
+          });
+        }
+      }
+
+      // Show notification
+      showToast(`${mapObjects.length} objet(s) affiché(s) sur la carte`, 'success');
+
+      // Clear the navigation state to prevent re-processing on refresh
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state]);
 
   // ========== LOAD SITES FROM API ==========
   useEffect(() => {
@@ -166,6 +264,80 @@ export const MapPage: React.FC<MapPageProps> = ({
     code_site: s.code_site,
     coordinates: s.coordinates
   })), [sites]);
+
+  // ✅ Adjust ScaleLine position when carousel opens/closes
+  useEffect(() => {
+    const scaleLine = document.querySelector('.ol-scale-line') as HTMLElement;
+    if (scaleLine) {
+      scaleLine.style.transition = 'all 0.3s ease';
+      scaleLine.style.left = 'auto';
+      scaleLine.style.right = '24px';
+      scaleLine.style.bottom = isCarouselOpen ? '220px' : '24px';
+    }
+  }, [isCarouselOpen]);
+
+  // ========== TASK MANAGEMENT ==========
+  const loadTaskData = async () => {
+    try {
+      const [types, teamData] = await Promise.all([
+        planningService.getTypesTaches(),
+        fetchEquipes()
+      ]);
+      setTypesTaches(types);
+      // Handle paginated response for equipes
+      const teams = Array.isArray(teamData) ? teamData : (teamData as any).results || [];
+      setEquipes(teams);
+    } catch (err: any) {
+      console.error("Error loading task data", err);
+      showToast("Erreur lors du chargement des données de planification", "error");
+    }
+  };
+
+  const handleCreateTask = async (object?: MapObjectDetail) => {
+    // Load data if needed
+    if (typesTaches.length === 0) {
+      await loadTaskData();
+    }
+
+    const initialValues: Partial<TacheCreate> = {};
+    const preSelected: InventoryObjectOption[] = [];
+
+    if (object) {
+      // Only add if ID is numeric (skip sites or non-inventory items if needed)
+      const objId = Number(object.id);
+      if (!isNaN(objId)) {
+        // Try to get superficie from attributes (various possible keys)
+        const superficieStr = object.attributes?.['superficie_calculee']
+          || object.attributes?.['Surface (m²)']
+          || object.attributes?.['area_sqm'];
+        const superficie = superficieStr ? parseFloat(superficieStr) : undefined;
+
+        preSelected.push({
+          id: objId,
+          type: object.type,
+          nom: object.title,
+          site: object.subtitle || '', // MapObjectDetail subtitle is site often
+          soussite: object.attributes?.['Sous-site'],
+          superficie: !isNaN(superficie as number) ? superficie : undefined
+        });
+      }
+    }
+
+    setTaskPreSelectedObjects(preSelected);
+    setTaskModalInitialValues(initialValues);
+    setIsTaskModalOpen(true);
+  };
+
+  const handleTaskSubmit = async (data: TacheCreate) => {
+    try {
+      await planningService.createTache(data);
+      showToast("Tâche créée avec succès", "success");
+      setIsTaskModalOpen(false);
+    } catch (err: any) {
+      console.error("Error creating task", err);
+      showToast(err.message || "Erreur lors de la création de la tâche", "error");
+    }
+  };
 
   // ========== SEARCH HOOK ==========
   const {
@@ -429,6 +601,106 @@ export const MapPage: React.FC<MapPageProps> = ({
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ✅ Show type selector when a geometry is drawn (for objects, not sites)
+  useEffect(() => {
+    if (drawnGeometry && !pendingObjectType && !isCreatingSite) {
+      setShowTypeSelector(true);
+    }
+  }, [drawnGeometry, pendingObjectType, isCreatingSite]);
+
+  // ✅ Show site creation modal when polygon is drawn while creating a site
+  useEffect(() => {
+    if (isCreatingSite && drawnGeometry?.type === 'Polygon') {
+      setShowCreateSiteModal(true);
+    }
+  }, [isCreatingSite, drawnGeometry]);
+
+  // ✅ Show create modal when type is selected
+  useEffect(() => {
+    if (pendingObjectType && drawnGeometry) {
+      setShowTypeSelector(false);
+      setShowCreateModal(true);
+    }
+  }, [pendingObjectType, drawnGeometry]);
+
+  // ✅ Handle object type selection
+  const handleTypeSelected = (typeId: string) => {
+    setPendingObjectType(typeId);
+    setShowTypeSelector(false);
+  };
+
+  // ✅ Handle create modal close
+  const handleCreateModalClose = () => {
+    setShowCreateModal(false);
+    clearDrawnGeometry();
+  };
+
+  // ✅ Handle object created successfully
+  const handleObjectCreated = (objectData: any) => {
+    showToast(`${pendingObjectType} créé avec succès!`, 'success');
+    setShowCreateModal(false);
+    clearDrawnGeometry();
+    // Trigger a refresh of map data
+    window.dispatchEvent(new CustomEvent('refresh-map-data'));
+  };
+
+  // ✅ Handle import success
+  const handleImportSuccess = (count: number, type: string) => {
+    showToast(`${count} ${type}(s) importé(s) avec succès!`, 'success');
+    setShowImportWizard(false);
+    // Trigger a refresh of map data
+    window.dispatchEvent(new CustomEvent('refresh-map-data'));
+  };
+
+  // ✅ Handle site carousel events
+  const handleSiteHover = (siteId: string | null) => {
+    // TODO: Highlight site on map when hovered
+    console.log('Site hover:', siteId);
+  };
+
+  const handleSiteSelect = (site: SiteFrontend) => {
+    // Zoom to site location
+    if (site.coordinates) {
+      setTargetLocation({
+        coordinates: site.coordinates,
+        zoom: 17
+      });
+    }
+    showToast(`Site "${site.name}" sélectionné`, 'info');
+  };
+
+  const handleViewSite = (site: SiteFrontend) => {
+    navigate(`/sites/${site.id}`);
+  };
+
+  const handleCreateSite = () => {
+    // Start polygon drawing mode directly
+    setIsCreatingSite(true);
+    setDrawingMode('polygon');
+    showToast('Dessinez le contour du site sur la carte', 'info');
+  };
+
+  // ✅ Handle site creation success
+  const handleSiteCreated = (newSite: SiteFrontend) => {
+    // Add the new site to the list
+    setSites(prev => [...prev, newSite]);
+    // Reset state
+    setIsCreatingSite(false);
+    setShowCreateSiteModal(false);
+    clearDrawnGeometry();
+    // Invalidate cache by forcing refresh next time
+    fetchAllSites(true);
+    // Trigger map refresh
+    window.dispatchEvent(new CustomEvent('refresh-map-data'));
+  };
+
+  // ✅ Handle site creation modal close
+  const handleCreateSiteModalClose = () => {
+    setShowCreateSiteModal(false);
+    setIsCreatingSite(false);
+    clearDrawnGeometry();
+  };
+
   // ========== RENDER ==========
   return (
     <>
@@ -449,7 +721,7 @@ export const MapPage: React.FC<MapPageProps> = ({
         isSidebarCollapsed={isSidebarCollapsed}
       />
 
-      {/* 2. Floating Tools Component */}
+      {/* 2. Floating Tools Component (includes drawing tools) */}
       <MapFloatingTools
         isPanelOpen={isPanelOpen}
         onToggleMap={onToggleMap}
@@ -467,23 +739,69 @@ export const MapPage: React.FC<MapPageProps> = ({
         isSelectionMode={isSelectionMode}
         onToggleSelection={toggleSelectionMode}
         selectionCount={selectedObjects.length}
+        onImport={() => setShowImportWizard(true)}
+        onExport={() => setShowExportPanel(true)}
       />
 
       {/* 3. Selection Panel */}
       <SelectionPanel
         onCreateIntervention={() => {
-          // TODO: Navigate to intervention creation page with selected objects
-          showToast(`Création d'intervention pour ${selectedObjects.length} objets`, 'info');
+          // Convert selected objects to the format expected by Planning page
+          const objectsForPlanning = selectedObjects.map(obj => ({
+            id: parseInt(obj.id, 10),
+            type: obj.type,
+            nom: obj.title || obj.type,
+            site: obj.subtitle || '',
+            soussite: obj.attributes?.sous_site_nom
+          }));
+
+          // Navigate to Planning page with pre-selected objects
+          navigate('/planning', {
+            state: {
+              createTaskFromSelection: true,
+              preSelectedObjects: objectsForPlanning,
+              objectCount: selectedObjects.length
+            }
+          });
+        }}
+        onDeleteObjects={async () => {
+          // Delete all selected objects
+          let successCount = 0;
+          let errorCount = 0;
+
+          for (const obj of selectedObjects) {
+            try {
+              await deleteInventoryItem(obj.type, obj.id);
+              successCount++;
+            } catch (error) {
+              logger.error(`Failed to delete ${obj.type} #${obj.id}:`, error);
+              errorCount++;
+            }
+          }
+
+          // Show result
+          if (errorCount === 0) {
+            showToast(`${successCount} objet${successCount > 1 ? 's supprimés' : ' supprimé'} avec succès`, 'success');
+          } else {
+            showToast(`${successCount} supprimé(s), ${errorCount} erreur(s)`, 'warning');
+          }
+
+          // Clear selection and refresh map
+          window.dispatchEvent(new CustomEvent('refresh-map-data'));
         }}
         isSidebarCollapsed={isSidebarCollapsed}
       />
 
       {/* 4. Object Detail Card */}
       <MapObjectDetailCard
-        selectedObject={selectedObject || null}
+        selectedObject={selectedObject}
         onClose={onCloseObjectDetail}
+        onViewCentreGest={() => {
+          // Placeholder for future implementation
+          console.log('View Centre Gest', selectedObject);
+        }}
+        onCreateTask={() => handleCreateTask(selectedObject || undefined)}
       />
-
       {/* 4. Layers Panel Component */}
       <MapLayersPanel
         showLayers={showLayers}
@@ -503,7 +821,84 @@ export const MapPage: React.FC<MapPageProps> = ({
         onZoomIn={onZoomIn}
         onZoomOut={handleZoomOutClick}
         isSidebarCollapsed={isSidebarCollapsed}
+        isCarouselOpen={isCarouselOpen}
       />
+
+      {/* 6. Object Type Selector Modal */}
+      {showTypeSelector && drawnGeometry && (
+        <ObjectTypeSelector
+          isOpen={showTypeSelector}
+          onClose={() => {
+            setShowTypeSelector(false);
+            clearDrawnGeometry();
+          }}
+          onSelect={handleTypeSelected}
+          geometryType={drawnGeometry.type as 'Point' | 'LineString' | 'Polygon'}
+        />
+      )}
+
+      {/* 7. Create Object Modal */}
+      {showCreateModal && pendingObjectType && drawnGeometry && (
+        <CreateObjectModal
+          isOpen={showCreateModal}
+          onClose={handleCreateModalClose}
+          objectType={pendingObjectType}
+          geometry={drawnGeometry}
+          metrics={calculatedMetrics}
+          onSuccess={handleObjectCreated}
+        />
+      )}
+
+      {/* 8. Import Wizard Modal */}
+      <ImportWizard
+        isOpen={showImportWizard}
+        onClose={() => setShowImportWizard(false)}
+        onSuccess={handleImportSuccess}
+      />
+
+      {/* 9. Export Panel Modal */}
+      <ExportPanel
+        isOpen={showExportPanel}
+        onClose={() => setShowExportPanel(false)}
+        selectedType={selectedObjects.length > 0 ? selectedObjects[0]?.type : undefined}
+        selectedIds={getSelectedIds()}
+      />
+
+      {/* 10. Create Site Modal */}
+      <CreateSiteModal
+        isOpen={showCreateSiteModal}
+        onClose={handleCreateSiteModalClose}
+        onSuccess={handleSiteCreated}
+        geometry={drawnGeometry}
+        metrics={calculatedMetrics}
+      />
+
+      {/* 11. Site Carousel */}
+      <SiteCarousel
+        sites={sites}
+        isLoading={sitesLoading}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onSiteHover={handleSiteHover}
+        onSiteSelect={handleSiteSelect}
+        onViewSite={handleViewSite}
+        onCreateSite={handleCreateSite}
+        onEditSite={setEditingSite}
+        onToggle={setIsCarouselOpen}
+      />
+
+      {/* 12. Site Edit Modal */}
+      {editingSite && (
+        <SiteEditModal
+          site={editingSite}
+          isOpen={!!editingSite}
+          onClose={() => setEditingSite(null)}
+          onSaved={(updatedSite) => {
+            setSites(prev => prev.map(s => s.id === updatedSite.id ? updatedSite : s));
+            fetchAllSites(true); // Refresh cache
+            window.dispatchEvent(new CustomEvent('refresh-map-data')); // Refresh map
+          }}
+        />
+      )}
 
       {/* Zoom Warning Modal */}
       {showZoomWarning && (
@@ -541,6 +936,17 @@ export const MapPage: React.FC<MapPageProps> = ({
             </div>
           </div>
         </div>
+      )}
+      {/* Task Creation Modal */}
+      {isTaskModalOpen && (
+        <TaskFormModal
+          initialValues={taskModalInitialValues}
+          preSelectedObjects={taskPreSelectedObjects}
+          typesTaches={typesTaches}
+          equipes={equipes}
+          onClose={() => setIsTaskModalOpen(false)}
+          onSubmit={handleTaskSubmit}
+        />
       )}
     </>
   );

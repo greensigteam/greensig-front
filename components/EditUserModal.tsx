@@ -125,13 +125,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
     actif: user.actif
   });
 
-  const [clientFields, setClientFields] = useState({
-    nomStructure: clientData?.nomStructure || '',
-    adresse: clientData?.adresse || '',
-    telephone: clientData?.telephone || '',
-    contactPrincipal: clientData?.contactPrincipal || '',
-    emailFacturation: clientData?.emailFacturation || ''
-  });
+
 
   const [operateurFields, setOperateurFields] = useState({
     numeroImmatriculation: initialOperateur?.numeroImmatriculation || '',
@@ -151,16 +145,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
         actif: formData.actif
       });
 
-      if (userRoles && userRoles.includes('CLIENT') && clientData) {
-        const clientUpdate: ClientUpdate = {
-          nomStructure: clientFields.nomStructure,
-          adresse: clientFields.adresse,
-          telephone: clientFields.telephone,
-          contactPrincipal: clientFields.contactPrincipal,
-          emailFacturation: clientFields.emailFacturation
-        };
-        await updateClient(clientData.utilisateur, clientUpdate);
-      }
+
 
       if (userRoles && (userRoles.includes('OPERATEUR') || userRoles.includes('CHEF_EQUIPE'))) {
         // if operateur profile exists, update it; otherwise create one
@@ -350,66 +335,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
               </span>
             </div>
 
-            {userRoles.includes('CLIENT') && (
-              <>
-                <hr className="my-4" />
-                <h3 className="font-medium text-gray-900 flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-gray-400" />
-                  Informations structure
-                </h3>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nom de la structure</label>
-                  <input
-                    type="text"
-                    value={clientFields.nomStructure}
-                    onChange={(e) => setClientFields({ ...clientFields, nomStructure: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Adresse</label>
-                  <input
-                    type="text"
-                    value={clientFields.adresse}
-                    onChange={(e) => setClientFields({ ...clientFields, adresse: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Telephone</label>
-                    <input
-                      type="tel"
-                      value={clientFields.telephone}
-                      onChange={(e) => setClientFields({ ...clientFields, telephone: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Contact principal</label>
-                    <input
-                      type="text"
-                      value={clientFields.contactPrincipal}
-                      onChange={(e) => setClientFields({ ...clientFields, contactPrincipal: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email de facturation</label>
-                  <input
-                    type="email"
-                    value={clientFields.emailFacturation}
-                    onChange={(e) => setClientFields({ ...clientFields, emailFacturation: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                  />
-                </div>
-              </>
-            )}
 
             {(userRoles.includes('OPERATEUR') || userRoles.includes('CHEF_EQUIPE')) && (
               <>
