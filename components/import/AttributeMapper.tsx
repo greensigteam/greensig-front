@@ -4,6 +4,8 @@ import {
     HelpCircle,
     AlertCircle,
     Loader2,
+    MapPin,
+    Crosshair,
 } from 'lucide-react';
 import { AttributeMapping, fetchAllSites, SiteFrontend } from '../../services/api';
 import { OBJECT_TYPES, getObjectTypesByGeometry } from '../../contexts/DrawingContext';
@@ -18,6 +20,8 @@ interface AttributeMapperProps {
     onTargetTypeChange: (type: string) => void;
     siteId: number | null;
     onSiteIdChange: (siteId: number | null) => void;
+    autoDetectSite: boolean;
+    onAutoDetectSiteChange: (autoDetect: boolean) => void;
 }
 
 export default function AttributeMapper({
@@ -29,6 +33,8 @@ export default function AttributeMapper({
     onTargetTypeChange,
     siteId,
     onSiteIdChange,
+    autoDetectSite,
+    onAutoDetectSiteChange,
 }: AttributeMapperProps) {
     const [sites, setSites] = useState<SiteFrontend[]>([]);
     const [isLoadingSites, setIsLoadingSites] = useState(true);
@@ -160,33 +166,107 @@ export default function AttributeMapper({
 
             {/* Site Selection - Only show if target type requires a site */}
             {requiresSite && (
-                <div className="bg-gray-50 rounded-lg p-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                    <label className="block text-sm font-medium text-gray-700">
                         Site de destination <span className="text-red-500">*</span>
                     </label>
-                    {isLoadingSites ? (
-                        <div className="flex items-center gap-2 text-gray-500">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Chargement des sites...
-                        </div>
-                    ) : sites.length === 0 ? (
-                        <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 p-3 rounded-lg">
-                            <AlertCircle className="w-5 h-5" />
-                            <span>Aucun site disponible. Importez d'abord un fichier de Sites.</span>
-                        </div>
-                    ) : (
-                        <select
-                            value={siteId || ''}
-                            onChange={(e) => onSiteIdChange(e.target.value ? parseInt(e.target.value) : null)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+
+                    {/* Auto-detect toggle */}
+                    <div className="flex gap-3">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                onAutoDetectSiteChange(true);
+                                onSiteIdChange(null);
+                            }}
+                            className={`flex-1 flex items-center gap-3 p-3 rounded-lg border-2 transition-colors ${
+                                autoDetectSite
+                                    ? 'border-emerald-500 bg-emerald-50'
+                                    : 'border-gray-200 hover:border-gray-300'
+                            }`}
                         >
-                            <option value="">Sélectionner un site...</option>
-                            {sites.map(site => (
-                                <option key={site.id} value={site.id}>
-                                    {site.name}
-                                </option>
-                            ))}
-                        </select>
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                                autoDetectSite ? 'bg-emerald-100' : 'bg-gray-100'
+                            }`}>
+                                <Crosshair className={`w-5 h-5 ${autoDetectSite ? 'text-emerald-600' : 'text-gray-500'}`} />
+                            </div>
+                            <div className="text-left">
+                                <div className={`font-medium text-sm ${autoDetectSite ? 'text-emerald-700' : 'text-gray-700'}`}>
+                                    Détection automatique
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                    Assigne chaque objet au site contenant sa géométrie
+                                </div>
+                            </div>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => onAutoDetectSiteChange(false)}
+                            className={`flex-1 flex items-center gap-3 p-3 rounded-lg border-2 transition-colors ${
+                                !autoDetectSite
+                                    ? 'border-blue-500 bg-blue-50'
+                                    : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                        >
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                                !autoDetectSite ? 'bg-blue-100' : 'bg-gray-100'
+                            }`}>
+                                <MapPin className={`w-5 h-5 ${!autoDetectSite ? 'text-blue-600' : 'text-gray-500'}`} />
+                            </div>
+                            <div className="text-left">
+                                <div className={`font-medium text-sm ${!autoDetectSite ? 'text-blue-700' : 'text-gray-700'}`}>
+                                    Site unique
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                    Tous les objets seront assignés au même site
+                                </div>
+                            </div>
+                        </button>
+                    </div>
+
+                    {/* Auto-detect info */}
+                    {autoDetectSite && (
+                        <div className="flex items-start gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800">
+                            <Crosshair className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                            <div className="text-sm">
+                                <p className="font-medium">Mode détection automatique</p>
+                                <p className="text-emerald-600">
+                                    Chaque objet sera automatiquement assigné au site dont l'emprise contient sa géométrie.
+                                    Les objets hors de tout site seront signalés comme erreurs.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Manual site selection */}
+                    {!autoDetectSite && (
+                        <>
+                            {isLoadingSites ? (
+                                <div className="flex items-center gap-2 text-gray-500">
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Chargement des sites...
+                                </div>
+                            ) : sites.length === 0 ? (
+                                <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 p-3 rounded-lg">
+                                    <AlertCircle className="w-5 h-5" />
+                                    <span>Aucun site disponible. Importez d'abord un fichier de Sites.</span>
+                                </div>
+                            ) : (
+                                <select
+                                    value={siteId || ''}
+                                    onChange={(e) => onSiteIdChange(e.target.value ? parseInt(e.target.value) : null)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="">Sélectionner un site...</option>
+                                    {sites.map(site => (
+                                        <option key={site.id} value={site.id}>
+                                            {site.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
+                        </>
                     )}
                 </div>
             )}

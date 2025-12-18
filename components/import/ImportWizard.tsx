@@ -62,6 +62,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
     const [selectedFeatures, setSelectedFeatures] = useState<ImportFeature[]>([]);
     const [targetType, setTargetType] = useState<string>('');
     const [siteId, setSiteId] = useState<number | null>(null);
+    const [autoDetectSite, setAutoDetectSite] = useState<boolean>(false);
     const [attributeMapping, setAttributeMapping] = useState<AttributeMapping>({});
     const [validationResult, setValidationResult] = useState<ImportValidationResponse | null>(null);
     const [executeResult, setExecuteResult] = useState<ImportExecuteResponse | null>(null);
@@ -77,6 +78,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
         setSelectedFeatures([]);
         setTargetType('');
         setSiteId(null);
+        setAutoDetectSite(false);
         setAttributeMapping({});
         setValidationResult(null);
         setExecuteResult(null);
@@ -184,8 +186,11 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
     const handleValidationStep = async () => {
         // Site is not required for Site objects
         const requiresSite = targetType !== 'Site';
-        if (!targetType || (requiresSite && !siteId)) {
-            showToast(requiresSite ? 'Veuillez sélectionner un site et un type d\'objet' : 'Veuillez sélectionner un type d\'objet', 'error');
+        // Site selection is valid if: autoDetectSite is enabled OR a specific siteId is selected
+        const hasSiteConfig = autoDetectSite || !!siteId;
+
+        if (!targetType || (requiresSite && !hasSiteConfig)) {
+            showToast(requiresSite ? 'Veuillez sélectionner un site ou activer la détection automatique' : 'Veuillez sélectionner un type d\'objet', 'error');
             return;
         }
 
@@ -195,7 +200,8 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                 selectedFeatures,
                 targetType,
                 attributeMapping,
-                requiresSite ? siteId! : null
+                requiresSite ? siteId : null,
+                requiresSite ? autoDetectSite : false
             );
             setValidationResult(result);
             setCurrentStep('validation');
@@ -209,7 +215,8 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
     // Execute step - import data
     const handleExecuteStep = async () => {
         const requiresSite = targetType !== 'Site';
-        if (!targetType || (requiresSite && !siteId)) return;
+        const hasSiteConfig = autoDetectSite || !!siteId;
+        if (!targetType || (requiresSite && !hasSiteConfig)) return;
 
         setIsLoading(true);
         try {
@@ -217,7 +224,9 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                 selectedFeatures,
                 targetType,
                 attributeMapping,
-                requiresSite ? siteId! : null
+                requiresSite ? siteId : null,
+                undefined, // sousSiteId
+                requiresSite ? autoDetectSite : false
             );
             setExecuteResult(result);
             setCurrentStep('complete');
@@ -251,7 +260,9 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
             case 'mapping':
                 // Site is not required for Site objects
                 const requiresSite = targetType !== 'Site';
-                return !!targetType && (!requiresSite || !!siteId);
+                // Site config is valid if autoDetect is enabled OR a specific site is selected
+                const hasSiteConfig = autoDetectSite || !!siteId;
+                return !!targetType && (!requiresSite || hasSiteConfig);
             case 'validation':
                 return validationResult !== null && validationResult.valid_count > 0;
             default:
@@ -441,6 +452,8 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                             onTargetTypeChange={setTargetType}
                             siteId={siteId}
                             onSiteIdChange={setSiteId}
+                            autoDetectSite={autoDetectSite}
+                            onAutoDetectSiteChange={setAutoDetectSite}
                         />
                     )}
 

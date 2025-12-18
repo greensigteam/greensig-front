@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
     CheckCircle2,
     XCircle,
@@ -7,6 +7,8 @@ import {
     ChevronUp,
     RefreshCw,
     Info,
+    MapPin,
+    Ban,
 } from 'lucide-react';
 import { ImportValidationResponse } from '../../services/api';
 
@@ -30,7 +32,43 @@ export default function ValidationResults({ result, onRetry }: ValidationResults
         setExpandedFeatures(newExpanded);
     };
 
-    const validPercent = Math.round((result.valid_count / (result.valid_count + result.invalid_count)) * 100);
+    // Calculate error breakdown by type
+    const errorBreakdown = useMemo(() => {
+        const breakdown: Record<string, number> = {};
+        result.errors.forEach(error => {
+            const code = error.code || 'OTHER';
+            breakdown[code] = (breakdown[code] || 0) + 1;
+        });
+        return breakdown;
+    }, [result.errors]);
+
+    // Count objects outside sites
+    const outsideSiteCount = errorBreakdown['NO_SITE_FOUND'] || 0;
+
+    // Check if any features have detected site info (auto-detect mode)
+    const hasAutoDetectedSites = result.features.some(f =>
+        (f as any).detected_site_name !== undefined
+    );
+
+    // Group valid features by detected site
+    const siteGroups = useMemo(() => {
+        if (!hasAutoDetectedSites) return null;
+
+        const groups: Record<string, { siteName: string; count: number }> = {};
+        result.features.forEach(f => {
+            if (f.is_valid) {
+                const siteName = (f as any).detected_site_name || 'Site inconnu';
+                if (!groups[siteName]) {
+                    groups[siteName] = { siteName, count: 0 };
+                }
+                groups[siteName].count++;
+            }
+        });
+        return Object.values(groups);
+    }, [result.features, hasAutoDetectedSites]);
+
+    const totalCount = result.valid_count + result.invalid_count;
+    const validPercent = totalCount > 0 ? Math.round((result.valid_count / totalCount) * 100) : 0;
 
     return (
         <div className="space-y-6">
@@ -41,15 +79,15 @@ export default function ValidationResults({ result, onRetry }: ValidationResults
                     <div className="text-2xl font-bold text-green-700">
                         {result.valid_count}
                     </div>
-                    <div className="text-sm text-green-600">Valides</div>
+                    <div className="text-sm text-green-600">Seront importés</div>
                 </div>
 
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-                    <XCircle className="w-8 h-8 mx-auto text-red-600 mb-2" />
+                    <Ban className="w-8 h-8 mx-auto text-red-600 mb-2" />
                     <div className="text-2xl font-bold text-red-700">
                         {result.invalid_count}
                     </div>
-                    <div className="text-sm text-red-600">Invalides</div>
+                    <div className="text-sm text-red-600">Seront exclus</div>
                 </div>
 
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
@@ -81,6 +119,69 @@ export default function ValidationResults({ result, onRetry }: ValidationResults
                 </div>
             </div>
 
+            {/* Objects outside sites warning */}
+            {outsideSiteCount > 0 && (
+                <div className="flex items-start gap-3 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                    <MapPin className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                        <p className="font-medium text-orange-800">
+                            {outsideSiteCount} objet(s) hors des limites de site
+                        </p>
+                        <p className="text-sm text-orange-600 mt-1">
+                            Ces objets ne sont contenus dans aucun site existant et seront automatiquement exclus de l'import.
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* Site distribution for auto-detect mode */}
+            {hasAutoDetectedSites && siteGroups && siteGroups.length > 0 && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                        <MapPin className="w-5 h-5 text-emerald-600" />
+                        <span className="font-medium text-emerald-800">
+                            Répartition par site (détection automatique)
+                        </span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {siteGroups.map((group, i) => (
+                            <div key={i} className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-emerald-100">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                <span className="text-sm text-gray-700 truncate flex-1">
+                                    {group.siteName}
+                                </span>
+                                <span className="text-sm font-medium text-emerald-600">
+                                    {group.count}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Error breakdown */}
+            {result.invalid_count > 0 && Object.keys(errorBreakdown).length > 1 && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <div className="font-medium text-gray-700 mb-2">Détail des exclusions :</div>
+                    <div className="space-y-1 text-sm">
+                        {Object.entries(errorBreakdown).map(([code, count]) => (
+                            <div key={code} className="flex items-center gap-2">
+                                <XCircle className="w-4 h-4 text-red-500" />
+                                <span className="text-gray-600">
+                                    {code === 'NO_SITE_FOUND' && 'Hors des limites de site'}
+                                    {code === 'MISSING_GEOMETRY' && 'Géométrie manquante'}
+                                    {code === 'INVALID_GEOMETRY' && 'Géométrie invalide'}
+                                    {code === 'CONVERSION_ERROR' && 'Erreur de conversion'}
+                                    {!['NO_SITE_FOUND', 'MISSING_GEOMETRY', 'INVALID_GEOMETRY', 'CONVERSION_ERROR'].includes(code) && code}
+                                    :
+                                </span>
+                                <span className="font-medium text-red-600">{count}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Errors Section */}
             {result.errors.length > 0 && (
                 <div className="border border-red-200 rounded-lg overflow-hidden">
@@ -91,7 +192,7 @@ export default function ValidationResults({ result, onRetry }: ValidationResults
                         <div className="flex items-center gap-2">
                             <XCircle className="w-5 h-5 text-red-600" />
                             <span className="font-medium text-red-800">
-                                Erreurs ({result.errors.length})
+                                Erreurs détaillées ({result.errors.length})
                             </span>
                         </div>
                         {showErrors ? (
@@ -102,7 +203,7 @@ export default function ValidationResults({ result, onRetry }: ValidationResults
                     </button>
 
                     {showErrors && (
-                        <div className="divide-y divide-red-100">
+                        <div className="divide-y divide-red-100 max-h-48 overflow-y-auto">
                             {result.errors.map((error, i) => (
                                 <div key={i} className="px-4 py-2 text-sm">
                                     <span className="font-medium text-red-700">
@@ -140,7 +241,7 @@ export default function ValidationResults({ result, onRetry }: ValidationResults
                     </button>
 
                     {showWarnings && (
-                        <div className="divide-y divide-yellow-100">
+                        <div className="divide-y divide-yellow-100 max-h-48 overflow-y-auto">
                             {result.warnings.map((warning, i) => (
                                 <div key={i} className="px-4 py-2 text-sm">
                                     <span className="font-medium text-yellow-700">
@@ -160,7 +261,7 @@ export default function ValidationResults({ result, onRetry }: ValidationResults
             {/* Features Preview */}
             <div>
                 <h4 className="font-medium text-gray-900 mb-2">
-                    Apercu des objets à créer
+                    Aperçu des objets ({result.valid_count} valide{result.valid_count > 1 ? 's' : ''})
                 </h4>
                 <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
                     {result.features.slice(0, 20).map((feature) => (
@@ -172,22 +273,35 @@ export default function ValidationResults({ result, onRetry }: ValidationResults
                                 onClick={() => toggleFeature(feature.index)}
                             >
                                 {feature.is_valid ? (
-                                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                                    <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
                                 ) : (
-                                    <XCircle className="w-4 h-4 text-red-600" />
+                                    <XCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
                                 )}
-                                <div className="flex-1">
+                                <div className="flex-1 min-w-0">
                                     <span className="font-medium">
                                         Feature #{feature.index + 1}
                                     </span>
                                     <span className="text-gray-500 text-sm ml-2">
                                         ({feature.geometry_type})
                                     </span>
+                                    {/* Show detected site name if available */}
+                                    {feature.is_valid && (feature as any).detected_site_name && (
+                                        <span className="ml-2 inline-flex items-center gap-1 text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
+                                            <MapPin className="w-3 h-3" />
+                                            {(feature as any).detected_site_name}
+                                        </span>
+                                    )}
+                                    {!feature.is_valid && (
+                                        <span className="ml-2 inline-flex items-center gap-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
+                                            <Ban className="w-3 h-3" />
+                                            Exclu
+                                        </span>
+                                    )}
                                 </div>
                                 {expandedFeatures.has(feature.index) ? (
-                                    <ChevronUp className="w-4 h-4 text-gray-400" />
+                                    <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" />
                                 ) : (
-                                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                                    <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
                                 )}
                             </div>
 
@@ -231,8 +345,8 @@ export default function ValidationResults({ result, onRetry }: ValidationResults
                     <Info className="w-5 h-5 text-blue-600 flex-shrink-0" />
                     <div className="flex-1">
                         <p className="text-sm text-blue-800">
-                            {result.invalid_count} objet(s) ne seront pas importés en raison d'erreurs.
-                            Vous pouvez modifier le mapping et réessayer.
+                            <strong>{result.invalid_count} objet(s)</strong> seront automatiquement exclus de l'import.
+                            Seuls les <strong>{result.valid_count} objet(s) valides</strong> seront créés.
                         </p>
                     </div>
                     <button
