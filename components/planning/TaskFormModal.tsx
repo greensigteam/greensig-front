@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, type FC, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { addDays, addWeeks, addMonths } from 'date-fns';
 import {
-    Clock, X, Search, ChevronDown, Timer, RefreshCw, Gauge, ExternalLink, Calculator, TreePine, AlertTriangle
+    Clock, X, Search, ChevronDown, Timer, RefreshCw, Gauge, ExternalLink, Calculator, TreePine, AlertTriangle, MapPin
 } from 'lucide-react';
 import { planningService } from '../../services/planningService';
 import { fetchInventory, type InventoryResponse } from '../../services/api';
@@ -135,16 +135,23 @@ const MultiEquipeSelector: FC<MultiEquipeSelectorProps> = ({ values, equipes, on
                         selectedEquipes.map(e => (
                             <span key={e.id} className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full">
                                 {e.nomEquipe}
-                                <button
-                                    type="button"
+                                <span
+                                    role="button"
+                                    tabIndex={0}
                                     onClick={(ev) => {
                                         ev.stopPropagation();
                                         toggleEquipe(e.id);
                                     }}
-                                    className="hover:text-red-500"
+                                    onKeyDown={(ev) => {
+                                        if (ev.key === 'Enter' || ev.key === ' ') {
+                                            ev.stopPropagation();
+                                            toggleEquipe(e.id);
+                                        }
+                                    }}
+                                    className="hover:text-red-500 cursor-pointer"
                                 >
                                     <X className="w-3 h-3" />
-                                </button>
+                                </span>
                             </span>
                         ))
                     ) : (
@@ -251,8 +258,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         parametres_recurrence: tache?.parametres_recurrence || null,
         reclamation: tache?.reclamation || initialValues?.reclamation || null,
         objets: tache?.objets_detail?.map(o => o.id) || initialValues?.objets || preSelectedObjects?.map(o => o.id) || [],
-        charge_estimee_heures: tache?.charge_estimee_heures || null,
-        nombre_operateurs: (tache as any)?.nombre_operateurs || initialValues?.nombre_operateurs || undefined
+        charge_estimee_heures: tache?.charge_estimee_heures || null
     });
 
     const [showRecurrence, setShowRecurrence] = useState(!!tache?.parametres_recurrence);
@@ -273,6 +279,14 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
     const [objectSearchQuery, setObjectSearchQuery] = useState('');
     const [availableObjects, setAvailableObjects] = useState<InventoryObjectOption[]>([]);
     const [loadingObjects, setLoadingObjects] = useState(false);
+
+    // Site lock: when objects are selected, only allow objects from the same site
+    const lockedSite = useMemo(() => {
+        if (selectedObjects.length > 0) {
+            return selectedObjects[0].site;
+        }
+        return null;
+    }, [selectedObjects]);
 
     // Validation state
     const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
@@ -299,18 +313,8 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
             }
         }
 
-        // Validation effectif
-        if (formData.nombre_operateurs && formData.equipes_ids && formData.equipes_ids.length > 0) {
-            const selectedTeams = equipes.filter(e => formData.equipes_ids?.includes(e.id));
-            const totalMembers = selectedTeams.reduce((sum, t) => sum + t.nombreMembres, 0);
-
-            if (formData.nombre_operateurs > totalMembers) {
-                warnings.push(`Le nombre d'opérateurs requis (${formData.nombre_operateurs}) dépasse l'effectif total des équipes sélectionnées (${totalMembers}).`);
-            }
-        }
-
         setValidationWarnings(warnings);
-    }, [formData.date_debut_planifiee, formData.date_fin_planifiee, formData.nombre_operateurs, formData.equipes_ids, equipes]);
+    }, [formData.date_debut_planifiee, formData.date_fin_planifiee]);
 
     // Fetch ratios on mount for charge preview
     useEffect(() => {
@@ -367,13 +371,24 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
             setLoadingObjects(true);
             fetchInventory({ page_size: 100 })
                 .then((response: InventoryResponse) => {
-                    const objects = response.results.map(item => ({
-                        id: item.id,
-                        type: item.properties.object_type,
-                        nom: item.properties.nom || item.properties.famille || `${item.properties.object_type} #${item.id}`,
-                        site: item.properties.site_nom,
-                        soussite: item.properties.sous_site_nom
-                    }));
+                    // Debug: vérifier la structure de la réponse
+                    console.log('API Response sample:', response.results[0]);
+
+                    const objects = response.results.map(item => {
+                        // L'id peut être au niveau Feature ou dans properties
+                        const objectId = item.id ?? item.properties?.id;
+                        return {
+                            id: objectId,
+                            type: item.properties.object_type,
+                            nom: item.properties.nom || item.properties.famille || `${item.properties.object_type} #${objectId}`,
+                            site: item.properties.site_nom,
+                            soussite: item.properties.sous_site_nom
+                        };
+                    });
+
+                    // Debug: vérifier les IDs
+                    console.log('Parsed objects (first 3):', objects.slice(0, 3));
+
                     setAvailableObjects(objects);
                 })
                 .catch(err => console.error('Erreur chargement objets:', err))
@@ -386,16 +401,27 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         setFormData(prev => ({ ...prev, objets: selectedObjects.map(o => o.id) }));
     }, [selectedObjects]);
 
-    // Filter available objects by search query
+    // Filter available objects by search query AND site lock
     const filteredObjects = useMemo(() => {
-        if (!objectSearchQuery.trim()) return availableObjects;
-        const q = objectSearchQuery.toLowerCase();
-        return availableObjects.filter(o =>
-            o.nom.toLowerCase().includes(q) ||
-            o.type.toLowerCase().includes(q) ||
-            o.site.toLowerCase().includes(q)
-        );
-    }, [availableObjects, objectSearchQuery]);
+        let filtered = availableObjects;
+
+        // If a site is locked (objects already selected), filter by that site
+        if (lockedSite) {
+            filtered = filtered.filter(o => o.site === lockedSite);
+        }
+
+        // Then apply search query filter
+        if (objectSearchQuery.trim()) {
+            const q = objectSearchQuery.toLowerCase();
+            filtered = filtered.filter(o =>
+                o.nom.toLowerCase().includes(q) ||
+                o.type.toLowerCase().includes(q) ||
+                o.site.toLowerCase().includes(q)
+            );
+        }
+
+        return filtered;
+    }, [availableObjects, objectSearchQuery, lockedSite]);
 
     // Auto-calculate end date based on occurrences
     useEffect(() => {
@@ -505,8 +531,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                 date_fin_planifiee: tache.date_fin_planifiee.slice(0, 16),
                 priorite: tache.priorite,
                 commentaires: tache.commentaires || '',
-                parametres_recurrence: tache.parametres_recurrence || null,
-                nombre_operateurs: (tache as any).nombre_operateurs
+                parametres_recurrence: tache.parametres_recurrence || null
             });
             setShowRecurrence(!!tache.parametres_recurrence);
         }
@@ -576,21 +601,6 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                 values={formData.equipes_ids || []}
                                 equipes={equipes}
                                 onChange={(ids) => setFormData({ ...formData, equipes_ids: ids })}
-                            />
-                        </div>
-
-                        {/* Nombre d'opérateurs */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Nombre d'opérateurs requis
-                            </label>
-                            <input
-                                type="number"
-                                min="1"
-                                value={formData.nombre_operateurs || ''}
-                                onChange={(e) => setFormData({ ...formData, nombre_operateurs: e.target.value ? parseInt(e.target.value) : undefined })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                placeholder="Nombre d'opérateurs..."
                             />
                         </div>
 
@@ -744,6 +754,25 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                 </button>
                             </div>
 
+                            {/* Site lock indicator */}
+                            {lockedSite && (
+                                <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-3">
+                                    <div className="flex items-center gap-2 text-sm text-blue-700">
+                                        <MapPin className="w-4 h-4" />
+                                        <span>Site : <strong>{lockedSite}</strong></span>
+                                        <span className="text-blue-500 text-xs">(seuls les objets de ce site sont affichés)</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedObjects([])}
+                                        className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                    >
+                                        <X className="w-3 h-3" />
+                                        Changer de site
+                                    </button>
+                                </div>
+                            )}
+
                             {/* Selected objects chips */}
                             {selectedObjects.length > 0 && (
                                 <div className="flex flex-wrap gap-2 mb-3">
@@ -785,7 +814,11 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                             <div className="text-center py-4 text-gray-500 text-sm">Chargement...</div>
                                         ) : filteredObjects.length === 0 ? (
                                             <div className="text-center py-4 text-gray-500 text-sm">
-                                                {objectSearchQuery ? 'Aucun résultat' : 'Aucun objet disponible'}
+                                                {objectSearchQuery
+                                                    ? 'Aucun résultat pour cette recherche'
+                                                    : lockedSite
+                                                        ? `Aucun autre objet disponible sur le site "${lockedSite}"`
+                                                        : 'Aucun objet disponible'}
                                             </div>
                                         ) : (
                                             filteredObjects.slice(0, 50).map((obj) => {

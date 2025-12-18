@@ -182,9 +182,6 @@ export interface TacheCreate {
     // Pour l'inventaire (ManyToMany IDs)
     objets?: number[];
 
-    // Nombre d'opérateurs requis
-    nombre_operateurs?: number;
-
     // Lien Réclamation
     reclamation?: number | null;
 
@@ -195,7 +192,6 @@ export interface TacheCreate {
 export interface TacheUpdate {
     id_equipe?: number | null; // Legacy single team
     equipes_ids?: number[]; // Multi-teams (US-PLAN-013)
-    nombre_operateurs?: number;
     date_debut_planifiee?: string;
     date_fin_planifiee?: string;
     priorite?: PrioriteTache;
