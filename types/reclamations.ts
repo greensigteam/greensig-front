@@ -35,7 +35,12 @@ export interface Reclamation {
     urgence_niveau?: string;
     urgence_couleur?: string;
 
-    client: number;
+    // Créateur de la réclamation (tout utilisateur)
+    createur?: number | null;
+    createur_nom?: string | null;
+
+    // Client concerné (optionnel)
+    client?: number | null;
     site?: number | null;
     site_nom?: string;
     zone?: number | null;
@@ -53,19 +58,31 @@ export interface Reclamation {
     statut: string;
 
     date_cloture_prevue?: string | null;
+    date_prise_en_compte?: string | null;
+    date_debut_traitement?: string | null;
+    date_resolution?: string | null;
+    justification_rejet?: string | null;
     date_cloture_reelle?: string | null;
 
-    photos?: any[]; // Utiliser le type Photo de suiviTaches si possible
+    photos?: any[]; // Photos directes de la réclamation
+    photos_taches?: any[]; // Photos des tâches liées
     historique?: HistoriqueReclamation[];
+    taches_liees_details?: any[]; // Détails des interventions
+    satisfaction?: {
+        id: number;
+        note: number;
+        commentaire?: string;
+        date_evaluation: string;
+    } | null;
 }
 
 export interface ReclamationCreate {
     type_reclamation: number;
     urgence: number;
-    site: number;
+    site?: number | null;
     zone?: number | null;
     description: string;
-    date_constatation: string;
+    date_constatation?: string;
     localisation?: any;
     photos?: any[];
 }

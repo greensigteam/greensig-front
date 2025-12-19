@@ -801,6 +801,18 @@ export const MapPage: React.FC<MapPageProps> = ({
           console.log('View Centre Gest', selectedObject);
         }}
         onCreateTask={() => handleCreateTask(selectedObject || undefined)}
+        onCreateReclamation={() => {
+          if (selectedObject && (selectedObject.type === 'Site' || selectedObject.type === 'site')) {
+            // Navigate to reclamations page with site pre-selected
+            navigate('/reclamations', {
+              state: {
+                createFromSite: true,
+                siteId: selectedObject.id,
+                siteName: selectedObject.title
+              }
+            });
+          }
+        }}
       />
       {/* 4. Layers Panel Component */}
       <MapLayersPanel

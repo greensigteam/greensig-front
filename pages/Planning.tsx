@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, memo, useRef, type FC } from 'react';
-import { Calendar as BigCalendar, dateFnsLocalizer, View } from 'react-big-calendar';
+import { Calendar as BigCalendar, dateFnsLocalizer } from 'react-big-calendar';
 import withDragAndDrop, { EventInteractionArgs } from 'react-big-calendar/lib/addons/dragAndDrop';
 import { useLocation } from 'react-router-dom';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
@@ -59,17 +59,16 @@ interface CalendarEvent {
 
 const TaskEvent = memo(function TaskEvent({ event }: { event: CalendarEvent }) {
     const tache = event.resource;
-    const clientName = (tache.client_detail as any)?.nom_structure || tache.client_detail?.nomStructure || 'Aucun client';
     const isUrgent = tache.priorite === 5;
     const equipesCount = tache.equipes_detail?.length || (tache.equipe_detail ? 1 : 0);
     const equipesNames = tache.equipes_detail?.length > 0
-        ? tache.equipes_detail.map(e => e.nomEquipe).join(', ')
-        : tache.equipe_detail?.nomEquipe || '';
+        ? tache.equipes_detail.map(e => (e as any).nom_equipe || e.nomEquipe).join(', ')
+        : (tache.equipe_detail as any)?.nom_equipe || tache.equipe_detail?.nomEquipe || '';
 
     return (
         <div
             className="flex flex-col h-full justify-start leading-tight min-h-[24px] group relative"
-            title={`${tache.type_tache_detail.nom_tache}\nClient: ${clientName}\nPriorité: ${PRIORITE_LABELS[tache.priorite]}\n${equipesNames ? `Équipes: ${equipesNames}` : 'Aucune équipe'}\n${tache.charge_estimee_heures ? `Charge: ${tache.charge_estimee_heures}h` : ''}`}
+            title={`${tache.type_tache_detail.nom_tache}\nÉquipe: ${equipesNames || 'Aucune équipe'}\nPriorité: ${PRIORITE_LABELS[tache.priorite]}\n${tache.charge_estimee_heures ? `Charge: ${tache.charge_estimee_heures}h` : ''}`}
         >
             {/* Priority indicator + Task name */}
             <div className="font-semibold text-xs truncate flex items-center gap-1">
@@ -79,27 +78,24 @@ const TaskEvent = memo(function TaskEvent({ event }: { event: CalendarEvent }) {
                 {tache.type_tache_detail.nom_tache}
             </div>
 
-            {/* Client info */}
+            {/* Équipe info */}
             <div className="text-[10px] truncate opacity-90 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-black/20 shrink-0" />
-                {!tache.client_detail ? (
-                    <span className="text-red-700 font-bold flex items-center gap-1">
+                {equipesCount === 0 ? (
+                    <span className="text-orange-600 italic flex items-center gap-1">
                         <Users className="w-3 h-3" />
-                        Aucun client
+                        Aucune équipe
                     </span>
                 ) : (
-                    clientName
+                    <span className="flex items-center gap-1">
+                        <Users className="w-3 h-3" />
+                        {equipesNames}
+                    </span>
                 )}
             </div>
 
-            {/* Teams and charge info */}
+            {/* Charge info */}
             <div className="flex items-center gap-2 text-[9px] opacity-75 mt-0.5">
-                {equipesCount > 0 && (
-                    <span className="truncate flex items-center gap-0.5">
-                        <Users className="w-2.5 h-2.5" />
-                        {equipesCount > 1 ? `${equipesCount} équipes` : equipesNames}
-                    </span>
-                )}
                 {tache.charge_estimee_heures && (
                     <span className="flex items-center gap-0.5 text-emerald-700/80">
                         <Timer className="w-2.5 h-2.5" />
@@ -123,8 +119,9 @@ const Planning: FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Mode lecture seule pour CHEF_EQUIPE
+    // Mode lecture seule pour CHEF_EQUIPE et CLIENT
     const [isReadOnly, setIsReadOnly] = useState(false);
+    const [isClientView, setIsClientView] = useState(false);
 
     const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
     const [showCreateForm, setShowCreateForm] = useState(false);
@@ -213,10 +210,12 @@ const Planning: FC = () => {
             setEquipes(Array.isArray(equipesData) ? equipesData : []);
             setTypesTaches(typesData);
 
-            // Déterminer si l'utilisateur est en mode lecture seule (CHEF_EQUIPE sans rôle ADMIN)
+            // Déterminer si l'utilisateur est en mode lecture seule (CHEF_EQUIPE sans ADMIN ou CLIENT)
             const roles = userData.roles || [];
             const isChefEquipeOnly = roles.includes('CHEF_EQUIPE') && !roles.includes('ADMIN');
-            setIsReadOnly(isChefEquipeOnly);
+            const isClient = roles.includes('CLIENT');
+            setIsReadOnly(isChefEquipeOnly || isClient);
+            setIsClientView(isClient);
         } catch (err) {
             setError('Erreur lors du chargement des données');
             console.error(err);
@@ -393,14 +392,14 @@ const Planning: FC = () => {
             // 4. Filtre Type
             if (filterType !== 'all' && t.type_tache_detail.id !== filterType) return false;
 
-            // 5. Recherche textuelle (Tâche, Client, Description)
+            // 5. Recherche textuelle (Tâche, Équipe, Description)
             if (searchTerm) {
                 const term = searchTerm.toLowerCase();
-                const clientName = ((t.client_detail as any)?.nom_structure || t.client_detail?.nomStructure || '').toLowerCase();
+                const equipesNames = (t.equipes_detail?.map(e => (e as any).nom_equipe || e.nomEquipe).join(' ') || (t.equipe_detail as any)?.nom_equipe || t.equipe_detail?.nomEquipe || '').toLowerCase();
                 const taskName = t.type_tache_detail.nom_tache.toLowerCase();
                 const desc = (t.description_travaux || '').toLowerCase();
 
-                return taskName.includes(term) || clientName.includes(term) || desc.includes(term);
+                return taskName.includes(term) || equipesNames.includes(term) || desc.includes(term);
             }
 
             return true;
@@ -409,13 +408,18 @@ const Planning: FC = () => {
 
     // Map tasks to RBC events
     const events: CalendarEvent[] = useMemo(() => {
-        return filteredTaches.map(tache => ({
-            id: tache.id,
-            title: `${tache.type_tache_detail.nom_tache} - ${(tache.client_detail as any)?.nom_structure || tache.client_detail?.nomStructure || ''}`,
-            start: new Date(tache.date_debut_planifiee),
-            end: new Date(tache.date_fin_planifiee),
-            resource: tache
-        }));
+        return filteredTaches.map(tache => {
+            const equipesNames = tache.equipes_detail?.length > 0
+                ? tache.equipes_detail.map(e => (e as any).nom_equipe || e.nomEquipe).join(', ')
+                : (tache.equipe_detail as any)?.nom_equipe || tache.equipe_detail?.nomEquipe || '';
+            return {
+                id: tache.id,
+                title: `${tache.type_tache_detail.nom_tache}${equipesNames ? ` - ${equipesNames}` : ''}`,
+                start: new Date(tache.date_debut_planifiee),
+                end: new Date(tache.date_fin_planifiee),
+                resource: tache
+            };
+        });
     }, [filteredTaches]);
 
     // Custom coloring for events based on status and priority
@@ -432,8 +436,9 @@ const Planning: FC = () => {
         };
         const priorityBorder = priorityBorderColors[tache.priorite] || '#9CA3AF';
 
-        // Si pas de client, style d'alerte (orange/rouge) comme dans la liste
-        if (!tache.client_detail) {
+        // Si pas d'équipe, style d'alerte (orange) comme dans la liste
+        const hasEquipe = tache.equipes_detail?.length > 0 || tache.equipe_detail;
+        if (!hasEquipe) {
             return {
                 style: {
                     backgroundColor: '#FFF7ED', // orange-50
@@ -552,7 +557,11 @@ const Planning: FC = () => {
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Planning</h1>
                     <p className="text-gray-500 mt-1">
-                        {isReadOnly ? 'Visualisation des tâches assignées à vos équipes' : 'Gestion des tâches planifiées'}
+                        {isReadOnly
+                            ? (isClientView
+                                ? 'Visualisation des tâches planifiées sur vos sites'
+                                : 'Visualisation des tâches assignées à vos équipes')
+                            : 'Gestion des tâches planifiées'}
                     </p>
                 </div>
                 {isReadOnly && (
@@ -571,7 +580,7 @@ const Planning: FC = () => {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                         <input
                             type="text"
-                            placeholder="Rechercher une tâche, un client..."
+                            placeholder="Rechercher une tâche, une équipe..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
@@ -617,18 +626,20 @@ const Planning: FC = () => {
                         <span className="hidden sm:inline">Filtres ({filteredTaches.length}) :</span>
                     </div>
 
-                    <select
-                        value={filterClient}
-                        onChange={(e) => setFilterClient(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                        className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg outline-none focus:border-emerald-500 bg-white"
-                    >
-                        <option value="all">Tous les clients</option>
-                        {clients.map(c => (
-                            <option key={c.utilisateur} value={c.utilisateur}>
-                                {(c as any).nom_structure || c.nomStructure || 'Client sans nom'}
-                            </option>
-                        ))}
-                    </select>
+                    {!isClientView && (
+                        <select
+                            value={filterClient}
+                            onChange={(e) => setFilterClient(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg outline-none focus:border-emerald-500 bg-white"
+                        >
+                            <option value="all">Tous les clients</option>
+                            {clients.map(c => (
+                                <option key={c.utilisateur} value={c.utilisateur}>
+                                    {(c as any).nom_structure || c.nomStructure || 'Client sans nom'}
+                                </option>
+                            ))}
+                        </select>
+                    )}
 
                     <select
                         value={filterType}
@@ -724,11 +735,16 @@ const Planning: FC = () => {
                             const statutColors = STATUT_TACHE_COLORS[tache.statut];
                             const prioriteColors = PRIORITE_COLORS[tache.priorite];
 
+                            const equipesNames = tache.equipes_detail?.length > 0
+                                ? tache.equipes_detail.map(e => (e as any).nom_equipe || e.nomEquipe).join(', ')
+                                : (tache.equipe_detail as any)?.nom_equipe || tache.equipe_detail?.nomEquipe || '';
+                            const hasEquipe = tache.equipes_detail?.length > 0 || tache.equipe_detail;
+
                             return (
                                 <div
                                     key={tache.id}
                                     onClick={() => setSelectedTache(tache)}
-                                    className={`p-4 border rounded-lg cursor-pointer transition-all ${!tache.client_detail
+                                    className={`p-4 border rounded-lg cursor-pointer transition-all ${!hasEquipe
                                         ? 'border-orange-300 bg-orange-50 hover:bg-orange-100'
                                         : 'border-gray-200 hover:bg-gray-50'
                                         }`}
@@ -739,11 +755,12 @@ const Planning: FC = () => {
                                                 {tache.type_tache_detail.nom_tache}
                                             </h3>
                                             <div className="text-sm text-gray-600 flex items-center gap-2">
-                                                {((tache.client_detail as any)?.nom_structure || tache.client_detail?.nomStructure) ? (
-                                                    ((tache.client_detail as any)?.nom_structure || tache.client_detail?.nomStructure)
+                                                <Users className="w-4 h-4 text-gray-400" />
+                                                {hasEquipe ? (
+                                                    equipesNames
                                                 ) : (
                                                     <>
-                                                        <span className="text-orange-600 italic">Aucun client assigné</span>
+                                                        <span className="text-orange-600 italic">Aucune équipe assignée</span>
                                                         {!isReadOnly && (
                                                             <button
                                                                 onClick={(e) => {
@@ -752,7 +769,7 @@ const Planning: FC = () => {
                                                                     setShowCreateForm(true);
                                                                 }}
                                                                 className="p-1 hover:bg-emerald-100 rounded-full text-emerald-600 transition-colors"
-                                                                title="Attribuer un client"
+                                                                title="Attribuer une équipe"
                                                             >
                                                                 <UserPlus className="w-4 h-4" />
                                                             </button>
@@ -781,8 +798,8 @@ const Planning: FC = () => {
                                                 <Users className="w-4 h-4" />
                                                 <span className="truncate">
                                                     {tache.equipes_detail?.length > 0
-                                                        ? tache.equipes_detail.map(e => e.nomEquipe).join(', ')
-                                                        : tache.equipe_detail?.nomEquipe}
+                                                        ? tache.equipes_detail.map(e => (e as any).nom_equipe || e.nomEquipe).join(', ')
+                                                        : (tache.equipe_detail as any)?.nom_equipe || tache.equipe_detail?.nomEquipe}
                                                 </span>
                                             </div>
                                         )}
@@ -829,9 +846,11 @@ const Planning: FC = () => {
 
                             <div className="space-y-4">
                                 <div>
-                                    <span className="text-sm font-medium text-gray-500">Client</span>
+                                    <span className="text-sm font-medium text-gray-500">Équipe(s)</span>
                                     <p className="text-gray-900">
-                                        {(selectedTache.client_detail as any)?.nom_structure || selectedTache.client_detail?.nomStructure || 'Aucun client assigné'}
+                                        {selectedTache.equipes_detail?.length > 0
+                                            ? selectedTache.equipes_detail.map(e => (e as any).nom_equipe || e.nomEquipe).join(', ')
+                                            : (selectedTache.equipe_detail as any)?.nom_equipe || selectedTache.equipe_detail?.nomEquipe || 'Aucune équipe assignée'}
                                     </p>
                                 </div>
                                 <div>

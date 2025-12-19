@@ -224,12 +224,14 @@ interface TaskFormModalProps {
     equipes: EquipeList[];
     typesTaches: TypeTache[];
     preSelectedObjects?: InventoryObjectOption[];
+    /** Filtre par site - ne charge que les objets de ce site */
+    siteFilter?: { id: number; name: string };
     onClose: () => void;
     onSubmit: (data: TacheCreate) => void;
     onResetCharge?: (tacheId: number) => Promise<void>;
 }
 
-const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, typesTaches, preSelectedObjects, onClose, onSubmit, onResetCharge }) => {
+const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, typesTaches, preSelectedObjects, siteFilter, onClose, onSubmit, onResetCharge }) => {
     // Initialize equipes from M2M or legacy single equipe
     const initialEquipesIds = (): number[] => {
         if (tache?.equipes_detail && tache.equipes_detail.length > 0) {
@@ -280,13 +282,17 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
     const [availableObjects, setAvailableObjects] = useState<InventoryObjectOption[]>([]);
     const [loadingObjects, setLoadingObjects] = useState(false);
 
-    // Site lock: when objects are selected, only allow objects from the same site
+    // Site lock: when objects are selected or siteFilter is set, only allow objects from the same site
     const lockedSite = useMemo(() => {
+        // Priority: siteFilter > selectedObjects
+        if (siteFilter) {
+            return siteFilter.name;
+        }
         if (selectedObjects.length > 0) {
             return selectedObjects[0].site;
         }
         return null;
-    }, [selectedObjects]);
+    }, [selectedObjects, siteFilter]);
 
     // Validation state
     const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
@@ -365,17 +371,13 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         };
     }, [formData.id_type_tache, selectedObjects, ratios]);
 
-    // Fetch inventory objects when selector is opened
+    // Fetch inventory objects when siteFilter is set (on mount) - for reclamation context
     useEffect(() => {
-        if (showObjectSelector && availableObjects.length === 0) {
+        if (siteFilter && availableObjects.length === 0) {
             setLoadingObjects(true);
-            fetchInventory({ page_size: 100 })
+            fetchInventory({ page_size: 200, site: siteFilter.id })
                 .then((response: InventoryResponse) => {
-                    // Debug: vérifier la structure de la réponse
-                    console.log('API Response sample:', response.results[0]);
-
                     const objects = response.results.map(item => {
-                        // L'id peut être au niveau Feature ou dans properties
                         const objectId = item.id ?? item.properties?.id;
                         return {
                             id: objectId,
@@ -386,15 +388,38 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                         };
                     });
 
-                    // Debug: vérifier les IDs
-                    console.log('Parsed objects (first 3):', objects.slice(0, 3));
+                    setAvailableObjects(objects);
+                    // Ouvrir automatiquement le sélecteur d'objets
+                    setShowObjectSelector(true);
+                })
+                .catch(err => console.error('Erreur chargement objets:', err))
+                .finally(() => setLoadingObjects(false));
+        }
+    }, [siteFilter]);
+
+    // Fetch inventory objects when selector is opened manually (without siteFilter)
+    useEffect(() => {
+        if (showObjectSelector && availableObjects.length === 0 && !siteFilter) {
+            setLoadingObjects(true);
+            fetchInventory({ page_size: 200 })
+                .then((response: InventoryResponse) => {
+                    const objects = response.results.map(item => {
+                        const objectId = item.id ?? item.properties?.id;
+                        return {
+                            id: objectId,
+                            type: item.properties.object_type,
+                            nom: item.properties.nom || item.properties.famille || `${item.properties.object_type} #${objectId}`,
+                            site: item.properties.site_nom,
+                            soussite: item.properties.sous_site_nom
+                        };
+                    });
 
                     setAvailableObjects(objects);
                 })
                 .catch(err => console.error('Erreur chargement objets:', err))
                 .finally(() => setLoadingObjects(false));
         }
-    }, [showObjectSelector]);
+    }, [showObjectSelector, siteFilter]);
 
     // Sync selectedObjects with formData.objets
     useEffect(() => {
@@ -762,14 +787,17 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                         <span>Site : <strong>{lockedSite}</strong></span>
                                         <span className="text-blue-500 text-xs">(seuls les objets de ce site sont affichés)</span>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setSelectedObjects([])}
-                                        className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                                    >
-                                        <X className="w-3 h-3" />
-                                        Changer de site
-                                    </button>
+                                    {/* Ne pas afficher le bouton "Changer de site" si le site est verrouillé par siteFilter */}
+                                    {!siteFilter && selectedObjects.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedObjects([])}
+                                            className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                        >
+                                            <X className="w-3 h-3" />
+                                            Changer de site
+                                        </button>
+                                    )}
                                 </div>
                             )}
 

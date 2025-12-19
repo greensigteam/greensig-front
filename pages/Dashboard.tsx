@@ -59,30 +59,69 @@ const Dashboard: React.FC = () => {
   const kpis = React.useMemo(() => {
     if (!statistics) return MOCK_KPIS;
 
+    // Si on a des stats spécifiques Chef d'Équipe, on les affiche en priorité
+    if (statistics.chef_equipe_stats) {
+      const stats = statistics.chef_equipe_stats;
+      return [
+        {
+          label: "Tâches Aujourd'hui",
+          value: stats.taches_today.toString(),
+          change: 0,
+          trend: 'neutral' as const,
+          icon: <Calendar className="w-5 h-5 text-blue-500" />
+        },
+        {
+          label: "Tâches En Cours",
+          value: stats.taches_en_cours.toString(),
+          change: 0,
+          trend: 'neutral' as const,
+          icon: <TrendingUp className="w-5 h-5 text-emerald-500" />
+        },
+        {
+          label: "Absences (Aujourd'hui)",
+          value: stats.absences_today.toString(),
+          change: 0,
+          trend: stats.absences_today > 0 ? 'down' as const : 'neutral' as const,
+          icon: <AlertCircle className="w-5 h-5 text-orange-500" />
+        },
+        {
+          label: "En Retard",
+          value: stats.taches_retard.toString(),
+          change: 0,
+          trend: stats.taches_retard > 0 ? 'down' as const : 'neutral' as const,
+          icon: <AlertTriangle className="w-5 h-5 text-red-500" />
+        }
+      ];
+    }
+
     return [
       {
         label: "Total Objets",
         value: statistics.global.total_objets.toString(),
         change: 0,
-        trend: 'neutral' as const
+        trend: 'neutral' as const,
+        icon: undefined
       },
       {
         label: "Végétation",
         value: statistics.global.total_vegetation.toString(),
         change: 0,
-        trend: 'up' as const
+        trend: 'up' as const,
+        icon: undefined
       },
       {
         label: "Sites Actifs",
         value: statistics.hierarchy.active_sites.toString(),
         change: 0,
-        trend: 'up' as const
+        trend: 'up' as const,
+        icon: undefined
       },
       {
         label: "Hydraulique",
         value: statistics.global.total_hydraulique.toString(),
         change: 0,
-        trend: 'neutral' as const
+        trend: 'neutral' as const,
+        icon: undefined
       },
     ];
   }, [statistics]);
@@ -132,6 +171,12 @@ const Dashboard: React.FC = () => {
                   {kpi.change > 0 ? '+' : ''}{kpi.change}%
                 </div>
               </div>
+              {/* @ts-ignore - icon property is optional and added for chef equipe */}
+              {(kpi as any).icon && (
+                <div className="absolute top-6 right-6 p-2 bg-slate-50 rounded-lg">
+                  {(kpi as any).icon}
+                </div>
+              )}
             </div>
           ))
         )}
@@ -170,13 +215,23 @@ const Dashboard: React.FC = () => {
                       task.statut === 'EN_COURS' ? 'bg-blue-500' : 'bg-slate-300'
                       }`}></div>
                     <div>
-                      <h3 className="font-bold text-slate-800">{task.type_tache_detail?.nom_tache} (Client: {task.client_detail?.nomStructure || 'N/A'})</h3>
+                      <h3 className="font-bold text-slate-800">
+                        {task.type_tache_detail?.nom_tache} (Équipe: {
+                          task.equipes_detail?.length > 0
+                            ? task.equipes_detail.map((e: any) => e.nom_equipe || e.nomEquipe).join(', ')
+                            : (task.equipe_detail as any)?.nom_equipe || task.equipe_detail?.nomEquipe || 'N/A'
+                        })
+                      </h3>
                       <div className="text-xs text-slate-500 flex items-center gap-2 mt-1">
                         <span className="bg-white px-2 py-0.5 rounded border border-slate-200">
                           {task.type_tache_detail?.nom_tache}
                         </span>
-                        {task.equipe_detail && (
-                          <span>Assigné à : {task.equipe_detail.nomEquipe}</span>
+                        {(task.equipes_detail?.length > 0 || task.equipe_detail) && (
+                          <span>Assigné à : {
+                            task.equipes_detail?.length > 0
+                              ? task.equipes_detail.map((e: any) => e.nom_equipe || e.nomEquipe).join(', ')
+                              : (task.equipe_detail as any)?.nom_equipe || task.equipe_detail?.nomEquipe
+                          }</span>
                         )}
                       </div>
                     </div>

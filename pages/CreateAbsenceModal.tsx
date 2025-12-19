@@ -53,6 +53,12 @@ const CreateAbsenceModal: React.FC<CreateAbsenceModalProps> = ({
     if (!form.dateFin) {
       return 'La date de fin est requise';
     }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startDate = new Date(form.dateDebut);
+    if (startDate < today) {
+      return 'La date de debut ne peut pas etre dans le passe';
+    }
     if (new Date(form.dateFin) < new Date(form.dateDebut)) {
       return 'La date de fin doit etre posterieure a la date de debut';
     }
@@ -195,6 +201,7 @@ const CreateAbsenceModal: React.FC<CreateAbsenceModalProps> = ({
                   name="dateDebut"
                   value={form.dateDebut}
                   onChange={handleChange}
+                  min={new Date().toISOString().split('T')[0]}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   required
                 />
