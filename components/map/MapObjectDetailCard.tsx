@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Eye, Navigation, FileText, Calendar as CalendarIcon, ClipboardList, AlertCircle } from 'lucide-react';
+import { X, Eye, Navigation, Calendar as CalendarIcon, ClipboardList, AlertCircle } from 'lucide-react';
 import type { MapObjectDetail } from '../../types';
 
 interface MapObjectDetailCardProps {
@@ -9,6 +9,7 @@ interface MapObjectDetailCardProps {
   onViewCentreGest?: () => void;
   onCreateTask?: () => void;
   onCreateReclamation?: () => void;
+  userRole?: string;
 }
 
 /**
@@ -24,17 +25,21 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
   selectedObject,
   onClose,
   onCreateTask,
-  onCreateReclamation
+  onCreateReclamation,
+  userRole
 }) => {
   const navigate = useNavigate();
 
   if (!selectedObject) return null;
 
+  const canCreateTask = userRole !== 'CHEF_EQUIPE' && userRole !== 'CLIENT';
+  const isSite = selectedObject.type === 'Site' || selectedObject.type === 'site';
+
   const handleViewDetails = () => {
     if (!selectedObject) return;
 
     // Special handling for Site details
-    if (selectedObject.type === 'Site' || selectedObject.type === 'site') {
+    if (isSite) {
       navigate(`/sites/${selectedObject.id}`);
       return;
     }
@@ -192,7 +197,7 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
         )}
 
         <div className="flex gap-2 mt-2">
-          {selectedObject.type === 'Site' ? (
+          {isSite ? (
             <>
               <button
                 onClick={handleViewDetails}
@@ -211,16 +216,21 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
             <>
               <button
                 onClick={handleViewDetails}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1"
+                className={`flex-1 ${canCreateTask
+                  ? 'bg-emerald-600 hover:bg-emerald-700'
+                  : 'bg-emerald-600 hover:bg-emerald-700 w-full'
+                  } text-white py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1`}
               >
                 <Eye className="w-3 h-3" /> Voir détails
               </button>
-              <button
-                onClick={onCreateTask}
-                className="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1"
-              >
-                <ClipboardList className="w-3 h-3" /> Créer une Tâche
-              </button>
+              {canCreateTask && (
+                <button
+                  onClick={onCreateTask}
+                  className="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1"
+                >
+                  <ClipboardList className="w-3 h-3" /> Créer une Tâche
+                </button>
+              )}
             </>
           )}
         </div>

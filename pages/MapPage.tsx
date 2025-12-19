@@ -105,6 +105,7 @@ interface MapPageProps {
   currentMeasurement?: Measurement | null;
   onClearMeasurements?: () => void;
   onRemoveMeasurement?: (id: string) => void;
+  userRole?: string;
 }
 
 export const MapPage: React.FC<MapPageProps> = ({
@@ -131,7 +132,8 @@ export const MapPage: React.FC<MapPageProps> = ({
   measurements,
   currentMeasurement,
   onClearMeasurements,
-  onRemoveMeasurement
+  onRemoveMeasurement,
+  userRole
 }) => {
   // ✅ USE MAP CONTEXT - Replaces window communication
   const mapContext = useMapContext();
@@ -745,6 +747,7 @@ export const MapPage: React.FC<MapPageProps> = ({
 
       {/* 3. Selection Panel */}
       <SelectionPanel
+        userRole={userRole}
         onCreateIntervention={() => {
           // Convert selected objects to the format expected by Planning page
           const objectsForPlanning = selectedObjects.map(obj => ({
@@ -796,6 +799,7 @@ export const MapPage: React.FC<MapPageProps> = ({
       <MapObjectDetailCard
         selectedObject={selectedObject || null}
         onClose={onCloseObjectDetail}
+        userRole={userRole}
         onViewCentreGest={() => {
           // Placeholder for future implementation
           console.log('View Centre Gest', selectedObject);

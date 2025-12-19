@@ -423,6 +423,7 @@ function App() {
                             currentMeasurement={currentMeasurement}
                             onClearMeasurements={handleClearMeasurements}
                             onRemoveMeasurement={handleRemoveMeasurement}
+                            userRole={user?.role}
                           />
                         }
                         children={null}

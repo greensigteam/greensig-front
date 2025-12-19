@@ -39,6 +39,7 @@ const Reclamations: React.FC = () => {
     // Helpers rôles
     const isAdmin = !!currentUser?.roles?.includes('ADMIN');
     const isClient = !!currentUser?.roles?.includes('CLIENT');
+    const isChefEquipe = !!currentUser?.roles?.includes('CHEF_EQUIPE');
 
     // UI State
     const [activeTab, setActiveTab] = useState<'reclamations' | 'taches'>('reclamations');
@@ -297,12 +298,13 @@ const Reclamations: React.FC = () => {
     const handleCloturer = async () => {
         if (!selectedReclamation) return;
 
-        // Vérification du statut
-        if (selectedReclamation.statut !== 'RESOLUE') {
+        // Vérification du statut des tâches
+        const hasUnfinishedTasks = selectedReclamation.taches_liees_details?.some((t: any) => t.statut !== 'TERMINEE');
+        if (hasUnfinishedTasks) {
             setModalConfig({
                 isOpen: true,
                 title: 'Impossible de clôturer',
-                message: 'La réclamation doit être au statut "Résolue" pour être clôturée.',
+                message: 'Toutes les tâches associées doivent être terminées pour clôturer la réclamation.',
                 variant: 'danger'
             });
             return;
@@ -566,18 +568,22 @@ const Reclamations: React.FC = () => {
                                                 ${rec.statut === 'NOUVELLE' ? 'bg-blue-100 text-blue-800' :
                                                         rec.statut === 'RESOLUE' ? 'bg-green-100 text-green-800' :
                                                             rec.statut === 'EN_COURS' ? 'bg-yellow-100 text-yellow-800' :
-                                                                'bg-gray-100 text-gray-800'}
+                                                                rec.statut === 'CLOTUREE' ? 'bg-purple-100 text-purple-800' :
+                                                                    'bg-gray-100 text-gray-800'}
                                             `}>
                                                     {rec.statut.toLowerCase().replace('_', ' ')}
                                                 </span>
                                             </td>
                                             <td className="p-4">
                                                 <div className="flex gap-2">
-                                                    {!isClient && (
+                                                    {!isClient && !isChefEquipe && (
                                                         <button
                                                             onClick={() => handleOpenTaskModal(rec)}
-                                                            className="p-1 text-purple-600 hover:bg-purple-50 rounded"
-                                                            title="Créer une tâche"
+                                                            disabled={rec.statut === 'CLOTUREE'}
+                                                            className={`p-1 rounded ${rec.statut === 'CLOTUREE'
+                                                                ? 'text-gray-400 cursor-not-allowed'
+                                                                : 'text-purple-600 hover:bg-purple-50'}`}
+                                                            title={rec.statut === 'CLOTUREE' ? "Réclamation clôturée" : "Créer une tâche"}
                                                         >
                                                             <ClipboardList className="w-4 h-4" />
                                                         </button>
@@ -1057,7 +1063,7 @@ const Reclamations: React.FC = () => {
                             </div>
 
                             <div className="flex justify-end pt-4 gap-3">
-                                {isAdmin && (
+                                {isAdmin && selectedReclamation.statut !== 'CLOTUREE' && (
                                     <button
                                         onClick={() => {
                                             const rec = selectedReclamation;
@@ -1076,10 +1082,17 @@ const Reclamations: React.FC = () => {
                                     </button>
                                 )}
                                 {/* User 6.6.12.3 - Bouton Clôturer (visible uniquement si RESOLUE) */}
-                                {selectedReclamation.statut === 'RESOLUE' && (
+                                {selectedReclamation.statut !== 'CLOTUREE' && selectedReclamation.statut !== 'REJETEE' && (
                                     <button
                                         onClick={handleCloturer}
-                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2"
+                                        disabled={selectedReclamation.taches_liees_details?.some((t: any) => t.statut !== 'TERMINEE')}
+                                        className={`px-4 py-2 text-white rounded-lg font-medium flex items-center gap-2 transition-all ${selectedReclamation.taches_liees_details?.some((t: any) => t.statut !== 'TERMINEE')
+                                            ? 'bg-gray-400 cursor-not-allowed opacity-60'
+                                            : 'bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg'
+                                            }`}
+                                        title={selectedReclamation.taches_liees_details?.some((t: any) => t.statut !== 'TERMINEE')
+                                            ? "Certaines tâches ne sont pas terminées"
+                                            : "Clôturer la réclamation"}
                                     >
                                         <Clock className="w-4 h-4" />
                                         Clôturer
