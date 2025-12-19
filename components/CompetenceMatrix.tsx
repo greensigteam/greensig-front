@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Save, RefreshCw, ChevronsLeft, ChevronsRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { RefreshCw, ChevronsLeft, ChevronsRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   Competence,
   OperateurList,
@@ -102,7 +102,11 @@ const CompetenceMatrix: React.FC<CompetenceMatrixProps> = ({
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [totalPages]);
-  const sortedCompetences = [...competences].sort((a, b) => (a.ordreAffichage || 0) - (b.ordreAffichage || 0));
+  // Utiliser useMemo pour recalculer le tri quand les compétences changent
+  const sortedCompetences = useMemo(
+    () => [...competences].sort((a, b) => (a.ordreAffichage || 0) - (b.ordreAffichage || 0)),
+    [competences]
+  );
 
   if (loading) {
     return (

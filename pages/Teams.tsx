@@ -81,7 +81,8 @@ import {
   fetchUtilisateurs,
   fetchClients,
   deleteOperateur,
-  deleteEquipe
+  deleteEquipe,
+  fetchCurrentUser
 } from '../services/usersApi';
 
 // ============================================================================
@@ -791,6 +792,13 @@ const Teams: React.FC = () => {
     dateFin: ''
   });
 
+  const [currentUser, setCurrentUser] = useState<Utilisateur | null>(null);
+
+  // Helpers rôles
+  const isAdmin = !!currentUser?.roles?.includes('ADMIN');
+  const isChefEquipe = !!currentUser?.roles?.includes('CHEF_EQUIPE');
+  const isChefEquipeOnly = isChefEquipe && !isAdmin;
+
   // Load data
   useEffect(() => {
     loadData();
@@ -808,7 +816,8 @@ const Teams: React.FC = () => {
         competencesRes,
         statsRes,
         utilisateursRes,
-        clientsRes
+        clientsRes,
+        currentUserRes
       ] = await Promise.all([
         fetchEquipes(),
         fetchOperateurs(),
@@ -818,8 +827,11 @@ const Teams: React.FC = () => {
         fetchCompetences(),
         fetchStatistiquesUtilisateurs(),
         fetchUtilisateurs(),
-        fetchClients()
+        fetchClients(),
+        fetchCurrentUser()
       ]);
+
+      setCurrentUser(currentUserRes);
 
       setEquipes(equipesRes.results);
       setOperateurs(operateursRes.results);
@@ -975,7 +987,6 @@ const Teams: React.FC = () => {
   const equipesColumns: Column<EquipeList>[] = [
     { key: 'nomEquipe', label: 'Nom' },
     { key: 'chefEquipeNom', label: "Chef d'equipe" },
-
     {
       key: 'nombreMembres',
       label: 'Membres',
@@ -1003,20 +1014,33 @@ const Teams: React.FC = () => {
       label: 'Actions',
       render: (e) => (
         <div className="flex gap-1">
-          <button
-            className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-            title="Modifier"
-            onClick={(ev) => { ev.stopPropagation(); setEditEquipe(e); }}
-          >
-            <Edit2 className="w-4 h-4" />
-          </button>
-          <button
-            className="p-1 text-red-600 hover:bg-red-100 rounded"
-            title="Supprimer"
-            onClick={(ev) => { ev.stopPropagation(); setDeleteEquipeId(e.id); }}
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {!isChefEquipeOnly && (
+            <>
+              <button
+                className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                title="Modifier"
+                onClick={(ev) => { ev.stopPropagation(); setEditEquipe(e); }}
+              >
+                <Edit2 className="w-4 h-4" />
+              </button>
+              <button
+                className="p-1 text-red-600 hover:bg-red-100 rounded"
+                title="Supprimer"
+                onClick={(ev) => { ev.stopPropagation(); setDeleteEquipeId(e.id); }}
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </>
+          )}
+          {isChefEquipeOnly && (
+            <button
+              className="p-1 text-gray-600 hover:bg-gray-100 rounded"
+              title="Voir détails"
+              onClick={(ev) => { ev.stopPropagation(); handleViewEquipe(e.id); }}
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+          )}
         </div>
       ),
       sortable: false
@@ -1053,27 +1077,39 @@ const Teams: React.FC = () => {
         </span>
       ),
       sortable: false
-    }
-    ,
+    },
     {
       key: 'actions',
       label: 'Actions',
       render: (o) => (
         <div className="flex gap-1">
-          <button
-            className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-            title="Modifier"
-            onClick={(ev) => { ev.stopPropagation(); const u = utilisateurs.find(us => us.id === o.utilisateur); if (u) setEditingUser(u); }}
-          >
-            <Edit2 className="w-4 h-4" />
-          </button>
-          <button
-            className="p-1 text-red-600 hover:bg-red-100 rounded"
-            title="Supprimer"
-            onClick={(ev) => { ev.stopPropagation(); setDeleteOperateurId(o.utilisateur); }}
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {!isChefEquipeOnly && (
+            <>
+              <button
+                className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                title="Modifier"
+                onClick={(ev) => { ev.stopPropagation(); const u = utilisateurs.find(us => us.id === o.utilisateur); if (u) setEditingUser(u); }}
+              >
+                <Edit2 className="w-4 h-4" />
+              </button>
+              <button
+                className="p-1 text-red-600 hover:bg-red-100 rounded"
+                title="Supprimer"
+                onClick={(ev) => { ev.stopPropagation(); setDeleteOperateurId(o.utilisateur); }}
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </>
+          )}
+          {isChefEquipeOnly && (
+            <button
+              className="p-1 text-gray-600 hover:bg-gray-100 rounded"
+              title="Voir détails"
+              onClick={(ev) => { ev.stopPropagation(); handleViewOperateur(o.utilisateur); }}
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+          )}
         </div>
       ),
       sortable: false
@@ -1121,7 +1157,6 @@ const Teams: React.FC = () => {
       label: 'Actions',
       render: (a) => (
         <div className="flex items-center gap-1">
-          {/* Bouton voir details */}
           <button
             onClick={(e) => { e.stopPropagation(); setSelectedAbsence(a); }}
             className="p-1 text-gray-600 hover:bg-gray-100 rounded"
@@ -1129,44 +1164,46 @@ const Teams: React.FC = () => {
           >
             <Eye className="w-4 h-4" />
           </button>
-          {/* Bouton modifier (seulement si DEMANDEE ou VALIDEE) */}
-          {(a.statut === 'DEMANDEE' || a.statut === 'VALIDEE') && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setEditingAbsence(a); }}
-              className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-              title="Modifier"
-            >
-              <Edit2 className="w-4 h-4" />
-            </button>
-          )}
-          {/* Boutons valider/refuser (seulement si DEMANDEE) */}
-          {a.statut === 'DEMANDEE' && (
+
+          {!isChefEquipeOnly && (
             <>
-              <button
-                onClick={(e) => { e.stopPropagation(); handleValiderAbsence(a.id); }}
-                className="p-1 text-green-600 hover:bg-green-100 rounded"
-                title="Valider"
-              >
-                <Check className="w-4 h-4" />
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); handleRefuserAbsence(a.id); }}
-                className="p-1 text-red-600 hover:bg-red-100 rounded"
-                title="Refuser"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              {(a.statut === 'DEMANDEE' || a.statut === 'VALIDEE') && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setEditingAbsence(a); }}
+                  className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                  title="Modifier"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+              )}
+              {a.statut === 'DEMANDEE' && (
+                <>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleValiderAbsence(a.id); }}
+                    className="p-1 text-green-600 hover:bg-green-100 rounded"
+                    title="Valider"
+                  >
+                    <Check className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleRefuserAbsence(a.id); }}
+                    className="p-1 text-red-600 hover:bg-red-100 rounded"
+                    title="Refuser"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </>
+              )}
+              {(a.statut === 'DEMANDEE' || a.statut === 'VALIDEE') && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setDeleteAbsenceId(a.id); }}
+                  className="p-1 text-red-600 hover:bg-red-100 rounded"
+                  title="Supprimer (annuler)"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             </>
-          )}
-          {/* Bouton supprimer (seulement si DEMANDEE ou VALIDEE) */}
-          {(a.statut === 'DEMANDEE' || a.statut === 'VALIDEE') && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setDeleteAbsenceId(a.id); }}
-              className="p-1 text-red-600 hover:bg-red-100 rounded"
-              title="Supprimer (annuler)"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
           )}
         </div>
       ),
@@ -1181,7 +1218,7 @@ const Teams: React.FC = () => {
     {
       key: 'actions',
       label: 'Actions',
-      render: (c: Competence) => (
+      render: (c: Competence) => !isChefEquipeOnly ? (
         <div className="flex items-center gap-2">
           <button
             className="p-1 text-blue-600 hover:bg-blue-100 rounded"
@@ -1198,6 +1235,8 @@ const Teams: React.FC = () => {
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
+      ) : (
+        <span className="text-gray-400 text-xs">-</span>
       ),
       sortable: false
     }
@@ -1221,13 +1260,15 @@ const Teams: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Gestion RH</h1>
           <p className="text-gray-500 mt-1">Equipes, operateurs et absences</p>
         </div>
-        <button
-          onClick={() => setShowCreateTeam(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
-        >
-          <Plus className="w-4 h-4" />
-          Nouvelle equipe
-        </button>
+        {!isChefEquipeOnly && (
+          <button
+            onClick={() => setShowCreateTeam(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+          >
+            <Plus className="w-4 h-4" />
+            Nouvelle equipe
+          </button>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -1399,12 +1440,14 @@ const Teams: React.FC = () => {
                   </span>
                 )}
               </div>
-              <button
-                onClick={() => setShowCreateAbsence(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm"
-              >
-                <Plus className="w-4 h-4" /> Nouvelle absence
-              </button>
+              {!isChefEquipeOnly && (
+                <button
+                  onClick={() => setShowCreateAbsence(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm"
+                >
+                  <Plus className="w-4 h-4" /> Nouvelle absence
+                </button>
+              )}
             </div>
 
             {/* Filtres compacts */}
@@ -1528,12 +1571,14 @@ const Teams: React.FC = () => {
                       </button>
                     )}
                   </div>
-                  <button
-                    onClick={() => { setEditingCompetence(null); setShowCompetenceModal(true); }}
-                    className="flex items-center gap-1 px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors font-medium text-xs"
-                  >
-                    <Plus className="w-3 h-3" /> Ajouter
-                  </button>
+                  {!isChefEquipeOnly && (
+                    <button
+                      onClick={() => { setEditingCompetence(null); setShowCompetenceModal(true); }}
+                      className="flex items-center gap-1 px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors font-medium text-xs"
+                    >
+                      <Plus className="w-3 h-3" /> Ajouter
+                    </button>
+                  )}
                 </div>
 
                 {/* Tableau */}
@@ -1574,217 +1619,243 @@ const Teams: React.FC = () => {
       </div>
 
       {/* Modals */}
-      {showCreateTeam && (
-        <CreateTeamModal
-          onClose={() => setShowCreateTeam(false)}
-          onCreated={loadData}
-          chefsPotentiels={chefsPotentiels}
-          operateursSansEquipe={operateursSansEquipe}
-        />
-      )}
+      {
+        showCreateTeam && (
+          <CreateTeamModal
+            onClose={() => setShowCreateTeam(false)}
+            onCreated={loadData}
+            chefsPotentiels={chefsPotentiels}
+            operateursSansEquipe={operateursSansEquipe}
+          />
+        )
+      }
 
-      {selectedOperateur && (
-        <OperateurDetailModal
-          operateur={selectedOperateur}
-          onClose={() => setSelectedOperateur(null)}
-        />
-      )}
+      {
+        selectedOperateur && (
+          <OperateurDetailModal
+            operateur={selectedOperateur}
+            onClose={() => setSelectedOperateur(null)}
+          />
+        )
+      }
 
-      {selectedEquipe && (
-        <EquipeDetailModal
-          equipe={selectedEquipe}
-          onClose={() => setSelectedEquipe(null)}
-        />
-      )}
+      {
+        selectedEquipe && (
+          <EquipeDetailModal
+            equipe={selectedEquipe}
+            onClose={() => setSelectedEquipe(null)}
+          />
+        )
+      }
 
-      {editingUser && (
-        <EditUserModal
-          user={editingUser}
-          clients={clients}
-          operateurs={operateurs}
-          onClose={() => setEditingUser(null)}
-          onUpdated={loadData}
-        />
-      )}
+      {
+        editingUser && (
+          <EditUserModal
+            user={editingUser}
+            clients={clients}
+            operateurs={operateurs}
+            onClose={() => setEditingUser(null)}
+            onUpdated={loadData}
+          />
+        )
+      }
 
-      {showCompetenceModal && (
-        <CompetenceModal
-          initial={editingCompetence || undefined}
-          onClose={() => { setShowCompetenceModal(false); setEditingCompetence(null); }}
-          onSaved={loadData}
-        />
-      )}
+      {
+        showCompetenceModal && (
+          <CompetenceModal
+            initial={editingCompetence || undefined}
+            onClose={() => { setShowCompetenceModal(false); setEditingCompetence(null); }}
+            onSaved={loadData}
+          />
+        )
+      }
 
-      {deleteCompetenceId !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm flex flex-col items-center">
-            <AlertCircle className="w-10 h-10 text-red-500 mb-2" />
-            <h2 className="text-lg font-bold mb-2">Supprimer la compétence ?</h2>
-            <p className="text-gray-600 mb-4">Cette action est irréversible.</p>
-            <div className="flex gap-2">
-              <button
-                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                onClick={() => setDeleteCompetenceId(null)}
-              >Annuler</button>
-              <button
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                onClick={async () => {
-                  try {
-                    await deleteCompetence(deleteCompetenceId as number);
-                    setDeleteCompetenceId(null);
-                    loadData();
-                  } catch (err) {
-                    alert('Erreur lors de la suppression');
-                  }
-                }}
-              >Supprimer</button>
+      {
+        deleteCompetenceId !== null && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm flex flex-col items-center">
+              <AlertCircle className="w-10 h-10 text-red-500 mb-2" />
+              <h2 className="text-lg font-bold mb-2">Supprimer la compétence ?</h2>
+              <p className="text-gray-600 mb-4">Cette action est irréversible.</p>
+              <div className="flex gap-2">
+                <button
+                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                  onClick={() => setDeleteCompetenceId(null)}
+                >Annuler</button>
+                <button
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                  onClick={async () => {
+                    try {
+                      await deleteCompetence(deleteCompetenceId as number);
+                      setDeleteCompetenceId(null);
+                      loadData();
+                    } catch (err) {
+                      alert('Erreur lors de la suppression');
+                    }
+                  }}
+                >Supprimer</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Modale édition équipe */}
-      {editEquipe && (
-        <EditEquipeModal
-          equipe={editEquipe}
-          onClose={() => setEditEquipe(null)}
-          onSaved={loadData}
-        />
-      )}
+      {
+        editEquipe && (
+          <EditEquipeModal
+            equipe={editEquipe}
+            onClose={() => setEditEquipe(null)}
+            onSaved={loadData}
+          />
+        )
+      }
 
       {/* Modale confirmation suppression */}
-      {deleteEquipeId !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm flex flex-col items-center">
-            <AlertCircle className="w-10 h-10 text-red-500 mb-2" />
-            <h2 className="text-lg font-bold mb-2">Supprimer l'équipe ?</h2>
-            <p className="text-gray-600 mb-4">Cette action est irréversible.</p>
-            <div className="flex gap-2">
-              <button
-                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                onClick={() => setDeleteEquipeId(null)}
-                disabled={actionLoading}
-              >Annuler</button>
-              <button
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                onClick={async () => {
-                  setActionLoading(true);
-                  try {
-                    await deleteEquipe(deleteEquipeId);
-                    setDeleteEquipeId(null);
-                    loadData();
-                  } catch (err) {
-                    alert('Erreur lors de la suppression');
-                  } finally {
-                    setActionLoading(false);
-                  }
-                }}
-                disabled={actionLoading}
-              >Supprimer</button>
+      {
+        deleteEquipeId !== null && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm flex flex-col items-center">
+              <AlertCircle className="w-10 h-10 text-red-500 mb-2" />
+              <h2 className="text-lg font-bold mb-2">Supprimer l'équipe ?</h2>
+              <p className="text-gray-600 mb-4">Cette action est irréversible.</p>
+              <div className="flex gap-2">
+                <button
+                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                  onClick={() => setDeleteEquipeId(null)}
+                  disabled={actionLoading}
+                >Annuler</button>
+                <button
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                  onClick={async () => {
+                    setActionLoading(true);
+                    try {
+                      await deleteEquipe(deleteEquipeId);
+                      setDeleteEquipeId(null);
+                      loadData();
+                    } catch (err) {
+                      alert('Erreur lors de la suppression');
+                    } finally {
+                      setActionLoading(false);
+                    }
+                  }}
+                  disabled={actionLoading}
+                >Supprimer</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
       {/* Modale confirmation suppression operateur */}
-      {deleteOperateurId !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm flex flex-col items-center">
-            <AlertCircle className="w-10 h-10 text-red-500 mb-2" />
-            <h2 className="text-lg font-bold mb-2">Supprimer l'opérateur ?</h2>
-            <p className="text-gray-600 mb-4">Cette action est irréversible.</p>
-            <div className="flex gap-2">
-              <button
-                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                onClick={() => setDeleteOperateurId(null)}
-                disabled={actionLoading}
-              >Annuler</button>
-              <button
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                onClick={async () => {
-                  setActionLoading(true);
-                  try {
-                    await deleteOperateur(deleteOperateurId as number);
-                    setDeleteOperateurId(null);
-                    loadData();
-                  } catch (err) {
-                    alert('Erreur lors de la suppression');
-                  } finally {
-                    setActionLoading(false);
-                  }
-                }}
-                disabled={actionLoading}
-              >Supprimer</button>
+      {
+        deleteOperateurId !== null && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm flex flex-col items-center">
+              <AlertCircle className="w-10 h-10 text-red-500 mb-2" />
+              <h2 className="text-lg font-bold mb-2">Supprimer l'opérateur ?</h2>
+              <p className="text-gray-600 mb-4">Cette action est irréversible.</p>
+              <div className="flex gap-2">
+                <button
+                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                  onClick={() => setDeleteOperateurId(null)}
+                  disabled={actionLoading}
+                >Annuler</button>
+                <button
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                  onClick={async () => {
+                    setActionLoading(true);
+                    try {
+                      await deleteOperateur(deleteOperateurId as number);
+                      setDeleteOperateurId(null);
+                      loadData();
+                    } catch (err) {
+                      alert('Erreur lors de la suppression');
+                    } finally {
+                      setActionLoading(false);
+                    }
+                  }}
+                  disabled={actionLoading}
+                >Supprimer</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Modale creation absence */}
-      {showCreateAbsence && (
-        <CreateAbsenceModal
-          operateurs={operateurs}
-          onClose={() => setShowCreateAbsence(false)}
-          onCreated={loadData}
-        />
-      )}
+      {
+        showCreateAbsence && (
+          <CreateAbsenceModal
+            operateurs={operateurs}
+            onClose={() => setShowCreateAbsence(false)}
+            onCreated={loadData}
+          />
+        )
+      }
 
       {/* Modale detail absence */}
-      {selectedAbsence && (
-        <AbsenceDetailModal
-          absence={selectedAbsence}
-          onClose={() => setSelectedAbsence(null)}
-        />
-      )}
+      {
+        selectedAbsence && (
+          <AbsenceDetailModal
+            absence={selectedAbsence}
+            onClose={() => setSelectedAbsence(null)}
+          />
+        )
+      }
 
       {/* Modale edition absence */}
-      {editingAbsence && (
-        <EditAbsenceModal
-          absence={editingAbsence}
-          onClose={() => setEditingAbsence(null)}
-          onUpdated={loadData}
-        />
-      )}
+      {
+        editingAbsence && (
+          <EditAbsenceModal
+            absence={editingAbsence}
+            onClose={() => setEditingAbsence(null)}
+            onUpdated={loadData}
+          />
+        )
+      }
 
       {/* Modale confirmation suppression absence */}
-      {deleteAbsenceId !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm flex flex-col items-center">
-            <AlertCircle className="w-10 h-10 text-red-500 mb-2" />
-            <h2 className="text-lg font-bold mb-2">Supprimer l'absence ?</h2>
-            <p className="text-gray-600 mb-4 text-center text-sm">
-              L'absence sera marquee comme annulee. Cette action ne peut pas etre annulee.
-            </p>
-            <div className="flex gap-2 w-full">
-              <button
-                className="flex-1 px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
-                onClick={() => setDeleteAbsenceId(null)}
-                disabled={actionLoading}
-              >
-                Annuler
-              </button>
-              <button
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                onClick={async () => {
-                  setActionLoading(true);
-                  try {
-                    await annulerAbsence(deleteAbsenceId);
-                    setDeleteAbsenceId(null);
-                    loadData();
-                  } catch (err) {
-                    alert('Erreur lors de la suppression');
-                  } finally {
-                    setActionLoading(false);
-                  }
-                }}
-                disabled={actionLoading}
-              >
-                {actionLoading ? 'Suppression...' : 'Supprimer'}
-              </button>
+      {
+        deleteAbsenceId !== null && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm flex flex-col items-center">
+              <AlertCircle className="w-10 h-10 text-red-500 mb-2" />
+              <h2 className="text-lg font-bold mb-2">Supprimer l'absence ?</h2>
+              <p className="text-gray-600 mb-4 text-center text-sm">
+                L'absence sera marquee comme annulee. Cette action ne peut pas etre annulee.
+              </p>
+              <div className="flex gap-2 w-full">
+                <button
+                  className="flex-1 px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+                  onClick={() => setDeleteAbsenceId(null)}
+                  disabled={actionLoading}
+                >
+                  Annuler
+                </button>
+                <button
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                  onClick={async () => {
+                    setActionLoading(true);
+                    try {
+                      await annulerAbsence(deleteAbsenceId);
+                      setDeleteAbsenceId(null);
+                      loadData();
+                    } catch (err) {
+                      alert('Erreur lors de la suppression');
+                    } finally {
+                      setActionLoading(false);
+                    }
+                  }}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? 'Suppression...' : 'Supprimer'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 };
 

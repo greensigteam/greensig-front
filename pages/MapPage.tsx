@@ -123,7 +123,7 @@ export const MapPage: React.FC<MapPageProps> = ({
   onCloseObjectDetail,
   isSidebarCollapsed,
   onToggleLayer,
-  clusteringEnabled = true,
+  clusteringEnabled = false,
   setClusteringEnabled,
   isMeasuring,
   measurementType,
@@ -794,13 +794,25 @@ export const MapPage: React.FC<MapPageProps> = ({
 
       {/* 4. Object Detail Card */}
       <MapObjectDetailCard
-        selectedObject={selectedObject}
+        selectedObject={selectedObject || null}
         onClose={onCloseObjectDetail}
         onViewCentreGest={() => {
           // Placeholder for future implementation
           console.log('View Centre Gest', selectedObject);
         }}
         onCreateTask={() => handleCreateTask(selectedObject || undefined)}
+        onCreateReclamation={() => {
+          if (selectedObject && (selectedObject.type === 'Site' || selectedObject.type === 'site')) {
+            // Navigate to reclamations page with site pre-selected
+            navigate('/reclamations', {
+              state: {
+                createFromSite: true,
+                siteId: selectedObject.id,
+                siteName: selectedObject.title
+              }
+            });
+          }
+        }}
       />
       {/* 4. Layers Panel Component */}
       <MapLayersPanel
@@ -869,7 +881,7 @@ export const MapPage: React.FC<MapPageProps> = ({
         isOpen={showCreateSiteModal}
         onClose={handleCreateSiteModalClose}
         onSuccess={handleSiteCreated}
-        geometry={drawnGeometry}
+        geometry={drawnGeometry as any}
         metrics={calculatedMetrics}
       />
 

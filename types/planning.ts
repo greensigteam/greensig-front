@@ -90,6 +90,8 @@ export interface RatioProductivite {
     ratio: number;
     description: string;
     actif: boolean;
+    created_at?: string;
+    updated_at?: string;
 }
 
 export interface RatioProductiviteCreate {

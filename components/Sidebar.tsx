@@ -31,7 +31,9 @@ const viewToPath: Record<string, string> = {
   USERS: '/users',
   // Client specific routes
   CLIENT_MAP: '/client/map',
-  CLIENT_CLAIMS: '/client/claims',
+  CLIENT_CLAIMS: '/reclamations',
+  CLIENT_PLANNING: '/planning',
+  CLIENT_INTERVENTIONS: '/claims',
 };
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -58,6 +60,8 @@ const Sidebar: React.FC<SidebarProps> = ({
     // Client specific menu items
     { id: 'CLIENT_MAP', label: 'Carte', icon: MapIcon, roles: ['CLIENT'] },
     { id: 'CLIENT_CLAIMS', label: 'Réclamations', icon: MessageSquare, roles: ['CLIENT'] },
+    { id: 'CLIENT_PLANNING', label: 'Planning', icon: Calendar, roles: ['CLIENT'] },
+    { id: 'CLIENT_INTERVENTIONS', label: 'Interventions', icon: ClipboardList, roles: ['CLIENT'] },
   ];
 
   const filteredItems = menuItems.filter(item => item.roles.includes(userRole));

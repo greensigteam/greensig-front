@@ -18,7 +18,6 @@ const RatiosProductivite = lazy(() => import('./pages/RatiosProductivite'));
 const SuiviTaches = lazy(() => import('./pages/SuiviTaches'));
 const Produits = lazy(() => import('./pages/Produits'));
 const Reporting = lazy(() => import('./pages/Reporting'));
-const ClientPortal = lazy(() => import('./pages/ClientPortal'));
 const Users = lazy(() => import('./pages/Users'));
 const Sites = lazy(() => import('./pages/Sites'));
 const SiteDetailPage = lazy(() => import('./pages/SiteDetailPage'));
@@ -39,7 +38,7 @@ import logger from './services/logger';
 
 const EMPTY_SITES: Site[] = [];
 
-// Simple loading fallback for lazy-loaded pages
+
 const PageLoadingFallback = () => (
   <div className="flex items-center justify-center h-full min-h-[400px]">
     <div className="flex flex-col items-center gap-3">
@@ -48,6 +47,15 @@ const PageLoadingFallback = () => (
     </div>
   </div>
 );
+
+// Composant pour protéger les routes par rôle
+const RequireRole = ({ user, roles, children }: { user: User, roles: string[], children: React.ReactNode }) => {
+  if (!user || !roles.includes(user.role)) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+};
+
 
 function App() {
   // Si un token existe, pas besoin du LoadingScreen avec video
@@ -70,7 +78,7 @@ function App() {
   const [selectedMapObject, setSelectedMapObject] = useState<MapObjectDetail | null>(null);
 
   const [isRouting, setIsRouting] = useState(false);
-  const [clusteringEnabled, setClusteringEnabled] = useState(true);
+  const [clusteringEnabled, setClusteringEnabled] = useState(false);
 
   // Measurement state
   const [isMeasuring, setIsMeasuring] = useState(false);
@@ -433,7 +441,12 @@ function App() {
                     <Route path="reclamations" element={<Suspense fallback={<PageLoadingFallback />}><Reclamations /></Suspense>} />
                     <Route path="reclamations/stats" element={<Suspense fallback={<PageLoadingFallback />}><ReclamationsDashboard /></Suspense>} />
                     <Route path="teams" element={<Suspense fallback={<PageLoadingFallback />}><Teams /></Suspense>} />
-                    <Route path="users" element={<Suspense fallback={<PageLoadingFallback />}><Users /></Suspense>} />
+                    <Route path="users" element={
+                      <RequireRole user={user} roles={['ADMIN']}>
+                        <Suspense fallback={<PageLoadingFallback />}><Users /></Suspense>
+                      </RequireRole>
+                    } />
+
                     <Route path="planning" element={<Suspense fallback={<PageLoadingFallback />}><Planning /></Suspense>} />
                     <Route path="ratios" element={<Suspense fallback={<PageLoadingFallback />}><RatiosProductivite /></Suspense>} />
                     <Route path="claims" element={<Suspense fallback={<PageLoadingFallback />}><SuiviTaches /></Suspense>} />
@@ -441,7 +454,6 @@ function App() {
                     <Route path="reporting" element={<Suspense fallback={<PageLoadingFallback />}><Reporting /></Suspense>} />
                     <Route path="client" element={<Navigate to="/client/map" replace />} />
                     <Route path="client/map" element={null} />
-                    <Route path="client/claims" element={<Suspense fallback={<PageLoadingFallback />}><ClientPortal user={user} /></Suspense>} />
                     {/* Add a /map route if you want a dedicated map view without the panel */}
                     <Route path="map" element={null} />
                   </Route>

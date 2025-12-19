@@ -804,6 +804,14 @@ export interface Statistics {
     total_vegetation: number
     total_hydraulique: number
   }
+  chef_equipe_stats?: {
+    taches_today: number
+    taches_en_cours: number
+    taches_a_faire: number
+    taches_retard: number
+    absences_today: number
+    equipes_count: number
+  }
 }
 
 export async function fetchStatistics(): Promise<Statistics> {

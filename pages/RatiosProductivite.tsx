@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, Edit, Trash2, X, Gauge, Filter } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, X, Gauge, Filter, Eye, Clock, Calendar, Info } from 'lucide-react';
 import { planningService } from '../services/planningService';
 import {
     RatioProductivite, RatioProductiviteCreate, TypeTache,
@@ -205,6 +205,7 @@ const RatiosProductivite: React.FC = () => {
     const [showForm, setShowForm] = useState(false);
     const [selectedRatio, setSelectedRatio] = useState<RatioProductivite | null>(null);
     const [ratioToDelete, setRatioToDelete] = useState<number | null>(null);
+    const [ratioDetails, setRatioDetails] = useState<RatioProductivite | null>(null);
 
     useEffect(() => {
         loadData();
@@ -414,6 +415,13 @@ const RatiosProductivite: React.FC = () => {
                                     <td className="px-4 py-3 text-right">
                                         <div className="flex justify-end gap-2">
                                             <button
+                                                onClick={() => setRatioDetails(ratio)}
+                                                className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                title="Voir les détails"
+                                            >
+                                                <Eye className="w-4 h-4" />
+                                            </button>
+                                            <button
                                                 onClick={() => { setSelectedRatio(ratio); setShowForm(true); }}
                                                 className="p-2 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                                                 title="Modifier"
@@ -469,6 +477,154 @@ const RatiosProductivite: React.FC = () => {
                                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                             >
                                 Supprimer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Details Modal */}
+            {ratioDetails && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
+                        {/* Header */}
+                        <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
+                                    <Gauge className="w-5 h-5" />
+                                </div>
+                                <h2 className="text-xl font-bold text-gray-900">
+                                    Détails du ratio
+                                </h2>
+                            </div>
+                            <button
+                                onClick={() => setRatioDetails(null)}
+                                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-6 space-y-5">
+                            {/* Type de tâche */}
+                            <div className="flex items-start gap-3">
+                                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 shrink-0">
+                                    <Info className="w-4 h-4" />
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-500">Type de tâche</p>
+                                    <p className="font-semibold text-gray-900">{ratioDetails.type_tache_nom}</p>
+                                </div>
+                            </div>
+
+                            {/* Type d'objet */}
+                            <div className="flex items-start gap-3">
+                                <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center text-purple-600 shrink-0">
+                                    <Gauge className="w-4 h-4" />
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-500">Type d'objet</p>
+                                    <p className="font-semibold text-gray-900">
+                                        <span className="bg-gray-100 px-2 py-1 rounded">
+                                            {ratioDetails.type_objet}
+                                        </span>
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Ratio et Unité */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600 shrink-0">
+                                        <Clock className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-500">Ratio</p>
+                                        <p className="font-mono font-bold text-2xl text-emerald-600">
+                                            {ratioDetails.ratio}
+                                            <span className="text-gray-400 text-sm font-normal ml-1">/h</span>
+                                        </p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-500">Unité de mesure</p>
+                                    <p className="font-semibold text-gray-900">
+                                        {UNITE_MESURE_LABELS[ratioDetails.unite_mesure]}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Explication du ratio */}
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                                <p className="text-sm text-emerald-800">
+                                    <strong>Interprétation :</strong> Un opérateur peut traiter{' '}
+                                    <span className="font-bold">{ratioDetails.ratio}</span>{' '}
+                                    {ratioDetails.unite_mesure === 'm2' ? 'm²' : ratioDetails.unite_mesure === 'ml' ? 'mètres linéaires' : 'unités'}{' '}
+                                    par heure pour la tâche "{ratioDetails.type_tache_nom}" sur un objet de type "{ratioDetails.type_objet}".
+                                </p>
+                            </div>
+
+                            {/* Statut */}
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-500">Statut</span>
+                                {ratioDetails.actif ? (
+                                    <span className="bg-green-100 text-green-700 text-sm font-medium px-3 py-1 rounded-full">
+                                        ✓ Actif
+                                    </span>
+                                ) : (
+                                    <span className="bg-gray-100 text-gray-500 text-sm font-medium px-3 py-1 rounded-full">
+                                        Inactif
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* Description */}
+                            {ratioDetails.description && (
+                                <div>
+                                    <p className="text-sm text-gray-500 mb-2">Description</p>
+                                    <div className="bg-gray-50 rounded-lg p-3 text-gray-700 text-sm">
+                                        {ratioDetails.description}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Dates */}
+                            {(ratioDetails.created_at || ratioDetails.updated_at) && (
+                                <div className="pt-4 border-t border-gray-200">
+                                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                                        <Calendar className="w-3 h-3" />
+                                        <span>
+                                            {ratioDetails.created_at && (
+                                                <>Créé le {new Date(ratioDetails.created_at).toLocaleDateString('fr-FR')}</>
+                                            )}
+                                            {ratioDetails.updated_at && ratioDetails.updated_at !== ratioDetails.created_at && (
+                                                <> • Modifié le {new Date(ratioDetails.updated_at).toLocaleDateString('fr-FR')}</>
+                                            )}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-6 border-t border-gray-200 flex gap-3">
+                            <button
+                                onClick={() => setRatioDetails(null)}
+                                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                            >
+                                Fermer
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setSelectedRatio(ratioDetails);
+                                    setRatioDetails(null);
+                                    setShowForm(true);
+                                }}
+                                className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Edit className="w-4 h-4" />
+                                Modifier
                             </button>
                         </div>
                     </div>
