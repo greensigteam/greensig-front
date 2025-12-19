@@ -190,10 +190,17 @@ function App() {
         try {
           const userRaw = await fetchCurrentUser();
 
-          // Determine role (default to first available or CLIENT)
+          // Determine role with priority: ADMIN > CHEF_EQUIPE > OPERATEUR > CLIENT
           let role: any = 'CLIENT';
           if (Array.isArray(userRaw.roles) && userRaw.roles.length > 0) {
-            role = userRaw.roles[0];
+            // Priority order for role selection
+            const rolePriority = ['ADMIN', 'CHEF_EQUIPE', 'OPERATEUR', 'CLIENT'];
+            for (const priorityRole of rolePriority) {
+              if (userRaw.roles.includes(priorityRole)) {
+                role = priorityRole;
+                break;
+              }
+            }
           } else if (userRaw.type_utilisateur) {
             role = userRaw.type_utilisateur;
           }

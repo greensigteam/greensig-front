@@ -242,6 +242,7 @@ const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 /**
  * Charge tous les sites depuis l'API et les transforme en format frontend
  * Utilise un cache de 5 minutes pour éviter les requêtes répétées
+ * Le backend filtre automatiquement selon les permissions de l'utilisateur
  */
 export async function fetchAllSites(forceRefresh = false): Promise<SiteFrontend[]> {
   const now = Date.now()
@@ -268,7 +269,7 @@ export async function fetchAllSites(forceRefresh = false): Promise<SiteFrontend[
       }
     }
 
-    // 3. Sinon, charger depuis l'API
+    // 3. Sinon, charger depuis l'API (filtré automatiquement par permissions)
     const allSites: SiteGeoJSON[] = []
     let page = 1
     let hasMore = true
@@ -598,6 +599,7 @@ export interface InventoryResponse {
 
 /**
  * Récupère les données d'objets pour la carte avec filtrage BBOX et cache local.
+ * Le backend filtre automatiquement selon les permissions de l'utilisateur.
  */
 export async function fetchMapData(bbox: string, types: string, zoom: number): Promise<any> {
   try {

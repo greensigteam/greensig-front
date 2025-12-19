@@ -12,6 +12,8 @@ export type PrioriteTache = 1 | 2 | 3 | 4 | 5;
 
 export type StatutTache = 'PLANIFIEE' | 'NON_DEBUTEE' | 'EN_COURS' | 'TERMINEE' | 'ANNULEE';
 
+export type EtatValidation = 'EN_ATTENTE' | 'VALIDEE' | 'REJETEE';
+
 export type FrequenceRecurrence = 'daily' | 'weekly' | 'monthly';
 
 export type RoleParticipation = 'CHEF' | 'MEMBRE';
@@ -34,6 +36,12 @@ export const STATUT_TACHE_LABELS: Record<StatutTache, string> = {
     EN_COURS: 'En cours',
     TERMINEE: 'Terminée',
     ANNULEE: 'Annulée'
+};
+
+export const ETAT_VALIDATION_LABELS: Record<EtatValidation, string> = {
+    EN_ATTENTE: 'En attente de validation',
+    VALIDEE: 'Validée',
+    REJETEE: 'Rejetée'
 };
 
 export const ROLE_PARTICIPATION_LABELS: Record<RoleParticipation, string> = {
@@ -155,6 +163,12 @@ export interface Tache {
     statut: StatutTache;
     note_qualite: number | null;
 
+    // Validation admin
+    etat_validation: EtatValidation;
+    date_validation: string | null;
+    validee_par: number | null;
+    commentaire_validation: string;
+
     parametres_recurrence: RecurrenceParams | null;
     id_recurrence_parent: number | null;
 
@@ -201,6 +215,9 @@ export interface TacheUpdate {
     objets?: number[];
     // Surcharge manuelle de la charge estimée
     charge_estimee_heures?: number | null;
+    // Dates réelles pour le suivi
+    date_debut_reelle?: string | null;
+    date_fin_reelle?: string | null;
 }
 
 export interface ParticipationCreate {
@@ -227,4 +244,10 @@ export const PRIORITE_COLORS: Record<PrioriteTache, { bg: string; text: string }
     3: { bg: 'bg-yellow-100', text: 'text-yellow-800' },
     4: { bg: 'bg-orange-100', text: 'text-orange-800' },
     5: { bg: 'bg-red-100', text: 'text-red-800' }
+};
+
+export const ETAT_VALIDATION_COLORS: Record<EtatValidation, { bg: string; text: string }> = {
+    EN_ATTENTE: { bg: 'bg-amber-100', text: 'text-amber-800' },
+    VALIDEE: { bg: 'bg-emerald-100', text: 'text-emerald-800' },
+    REJETEE: { bg: 'bg-red-100', text: 'text-red-800' }
 };
