@@ -8,12 +8,14 @@ interface SelectionPanelProps {
     onCreateIntervention?: () => void;
     onDeleteObjects?: () => void;
     isSidebarCollapsed?: boolean;
+    userRole?: string;
 }
 
 export const SelectionPanel: React.FC<SelectionPanelProps> = ({
     onCreateIntervention,
     onDeleteObjects,
-    isSidebarCollapsed = true
+    isSidebarCollapsed = true,
+    userRole
 }) => {
     const { selectedObjects, clearSelection, removeFromSelection, isSelectionMode, setSelectionMode, isBoxSelectionMode, setBoxSelectionMode } = useSelection();
     const { editingMode, setEditingMode } = useDrawing();
@@ -96,11 +98,10 @@ export const SelectionPanel: React.FC<SelectionPanelProps> = ({
             <div className="p-3 border-b border-slate-100 bg-indigo-50/50">
                 <button
                     onClick={handleBoxSelectionToggle}
-                    className={`w-full py-2.5 px-4 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 ${
-                        isBoxSelectionMode
-                            ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-300'
-                            : 'bg-white hover:bg-indigo-50 text-slate-700 border border-slate-200'
-                    }`}
+                    className={`w-full py-2.5 px-4 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 ${isBoxSelectionMode
+                        ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-300'
+                        : 'bg-white hover:bg-indigo-50 text-slate-700 border border-slate-200'
+                        }`}
                     title="Dessinez un rectangle pour sélectionner plusieurs objets"
                 >
                     <SquareDashedMousePointer className="w-4 h-4" />
@@ -151,97 +152,95 @@ export const SelectionPanel: React.FC<SelectionPanelProps> = ({
                 </div>
             )}
 
-            {/* Modification Tools - Only show when objects are selected */}
-            {selectedObjects.length > 0 && (
-            <div className="p-3 border-t border-slate-100 bg-blue-50/50">
-                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
-                    <Pencil className="w-3 h-3" />
-                    Modifier la géométrie
-                </div>
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => handleEditingMode('modify')}
-                        className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 ${
-                            editingMode === 'modify'
+            {/* Modification Tools - Only show when objects are selected and user is not Team Leader/Client */}
+            {selectedObjects.length > 0 && userRole !== 'CHEF_EQUIPE' && userRole !== 'CLIENT' && (
+                <div className="p-3 border-t border-slate-100 bg-blue-50/50">
+                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+                        <Pencil className="w-3 h-3" />
+                        Modifier la géométrie
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => handleEditingMode('modify')}
+                            className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 ${editingMode === 'modify'
                                 ? 'bg-blue-600 text-white shadow-md'
                                 : 'bg-white hover:bg-blue-50 text-slate-600 border border-slate-200'
-                        }`}
-                        title="Modifier les sommets des objets sélectionnés"
-                    >
-                        <MousePointer2 className="w-4 h-4" />
-                        <span>Sommets</span>
-                    </button>
-                    <button
-                        onClick={() => handleEditingMode('move')}
-                        className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 ${
-                            editingMode === 'move'
+                                }`}
+                            title="Modifier les sommets des objets sélectionnés"
+                        >
+                            <MousePointer2 className="w-4 h-4" />
+                            <span>Sommets</span>
+                        </button>
+                        <button
+                            onClick={() => handleEditingMode('move')}
+                            className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 ${editingMode === 'move'
                                 ? 'bg-blue-600 text-white shadow-md'
                                 : 'bg-white hover:bg-blue-50 text-slate-600 border border-slate-200'
-                        }`}
-                        title="Déplacer les objets sélectionnés"
-                    >
-                        <Move className="w-4 h-4" />
-                        <span>Déplacer</span>
-                    </button>
+                                }`}
+                            title="Déplacer les objets sélectionnés"
+                        >
+                            <Move className="w-4 h-4" />
+                            <span>Déplacer</span>
+                        </button>
+                    </div>
+                    {editingMode !== 'none' && (
+                        <p className="text-xs text-blue-600 mt-2 text-center">
+                            {editingMode === 'modify'
+                                ? 'Cliquez et faites glisser les sommets pour modifier'
+                                : 'Cliquez et faites glisser pour déplacer'}
+                        </p>
+                    )}
                 </div>
-                {editingMode !== 'none' && (
-                    <p className="text-xs text-blue-600 mt-2 text-center">
-                        {editingMode === 'modify'
-                            ? 'Cliquez et faites glisser les sommets pour modifier'
-                            : 'Cliquez et faites glisser pour déplacer'}
-                    </p>
-                )}
-            </div>
             )}
 
             {/* Actions */}
-            {selectedObjects.length > 0 && (
-            <div className="p-3 border-t border-slate-100 bg-slate-50/50 space-y-2">
-                {onCreateIntervention && (
-                    <button
-                        onClick={onCreateIntervention}
-                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-4 rounded-lg font-semibold text-sm transition-colors shadow-sm flex items-center justify-center gap-2"
-                    >
-                        <MapPin className="w-4 h-4" />
-                        Créer une tâche
-                    </button>
-                )}
+            {selectedObjects.length > 0 && userRole !== 'CHEF_EQUIPE' && userRole !== 'CLIENT' && (
+                <div className="p-3 border-t border-slate-100 bg-slate-50/50 space-y-2">
+                    {onCreateIntervention && (
+                        <button
+                            onClick={onCreateIntervention}
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-4 rounded-lg font-semibold text-sm transition-colors shadow-sm flex items-center justify-center gap-2"
+                        >
+                            <MapPin className="w-4 h-4" />
+                            Créer une tâche
+                        </button>
+                    )}
 
-                {/* Delete with confirmation */}
-                {!showDeleteConfirm ? (
-                    <button
-                        onClick={() => setShowDeleteConfirm(true)}
-                        className="w-full bg-white hover:bg-red-50 text-red-600 py-2 px-4 rounded-lg font-medium text-sm transition-colors border border-red-200 flex items-center justify-center gap-2"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                        Supprimer ({selectedObjects.length})
-                    </button>
-                ) : (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                        <div className="flex items-center gap-2 text-red-700 mb-2">
-                            <AlertTriangle className="w-4 h-4" />
-                            <span className="text-sm font-medium">Confirmer la suppression ?</span>
+                    {/* Delete with confirmation */}
+                    {!showDeleteConfirm ? (
+                        <button
+                            onClick={() => setShowDeleteConfirm(true)}
+                            className="w-full bg-white hover:bg-red-50 text-red-600 py-2 px-4 rounded-lg font-medium text-sm transition-colors border border-red-200 flex items-center justify-center gap-2"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                            Supprimer ({selectedObjects.length})
+                        </button>
+                    ) : (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                            <div className="flex items-center gap-2 text-red-700 mb-2">
+                                <AlertTriangle className="w-4 h-4" />
+                                <span className="text-sm font-medium">Confirmer la suppression ?</span>
+                            </div>
+                            <p className="text-xs text-red-600 mb-3">
+                                {selectedObjects.length} objet{selectedObjects.length > 1 ? 's seront supprimés' : ' sera supprimé'}. Cette action est irréversible.
+                            </p>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setShowDeleteConfirm(false)}
+                                    className="flex-1 bg-white hover:bg-slate-50 text-slate-600 py-1.5 px-3 rounded-md text-xs font-medium border border-slate-200"
+                                >
+                                    Annuler
+                                </button>
+                                <button
+                                    onClick={handleDelete}
+                                    className="flex-1 bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-md text-xs font-medium"
+                                >
+                                    Supprimer
+                                </button>
+                            </div>
                         </div>
-                        <p className="text-xs text-red-600 mb-3">
-                            {selectedObjects.length} objet{selectedObjects.length > 1 ? 's seront supprimés' : ' sera supprimé'}. Cette action est irréversible.
-                        </p>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => setShowDeleteConfirm(false)}
-                                className="flex-1 bg-white hover:bg-slate-50 text-slate-600 py-1.5 px-3 rounded-md text-xs font-medium border border-slate-200"
-                            >
-                                Annuler
-                            </button>
-                            <button
-                                onClick={handleDelete}
-                                className="flex-1 bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 rounded-md text-xs font-medium"
-                            >
-                                Supprimer
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </div>
+                    )}
+                </div>
             )}
         </div>
     );
