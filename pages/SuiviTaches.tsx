@@ -2,15 +2,16 @@ import React, { useState, useEffect } from 'react';
 import {
     Calendar, Clock, Search, MapPin,
     ChevronRight, Camera, Package, AlertCircle, Plus, Trash2,
-    Loader2, FileImage
+    Loader2, FileImage, Play, CheckCircle, XCircle, ThumbsUp, ThumbsDown, ShieldCheck
 } from 'lucide-react';
 import { planningService } from '../services/planningService';
+import { fetchCurrentUser } from '../services/api';
 import {
     fetchPhotosParTache, createPhoto, deletePhoto,
     fetchConsommationsParTache, createConsommation, deleteConsommation,
     fetchProduitsActifs
 } from '../services/suiviTachesApi';
-import { Tache, STATUT_TACHE_COLORS, PRIORITE_LABELS } from '../types/planning';
+import { Tache, STATUT_TACHE_COLORS, PRIORITE_LABELS, ETAT_VALIDATION_COLORS, ETAT_VALIDATION_LABELS } from '../types/planning';
 import { PhotoList, ConsommationProduit, ProduitList } from '../types/suiviTaches';
 
 const SuiviTaches: React.FC = () => {
@@ -30,6 +31,21 @@ const SuiviTaches: React.FC = () => {
     const [loadingPhotos, setLoadingPhotos] = useState(false);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const [loadingConsommations, setLoadingConsommations] = useState(false);
+    const [changingStatut, setChangingStatut] = useState(false);
+
+    // Type de photo sélectionné pour l'upload
+    const [selectedPhotoType, setSelectedPhotoType] = useState<'AVANT' | 'APRES'>('AVANT');
+
+    // Rôle utilisateur (pour afficher les boutons de validation admin)
+    const [isAdmin, setIsAdmin] = useState(false);
+
+    // Modal de validation
+    const [validationModal, setValidationModal] = useState<{
+        isOpen: boolean;
+        type: 'VALIDEE' | 'REJETEE';
+    } | null>(null);
+    const [validationComment, setValidationComment] = useState('');
+    const [validating, setValidating] = useState(false);
 
     // Form States
     const [newConsommation, setNewConsommation] = useState({
@@ -39,11 +55,31 @@ const SuiviTaches: React.FC = () => {
         commentaire: ''
     });
 
-    // Chargement initial des tâches
+    // Modal de confirmation
+    const [confirmModal, setConfirmModal] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        type: 'start' | 'complete' | 'cancel';
+        icon: 'play' | 'check' | 'x';
+    } | null>(null);
+
+    // Chargement initial des tâches (filtrées automatiquement par le backend selon les permissions)
     useEffect(() => {
         loadTaches();
         loadProduitsOptions();
+        loadUserRole();
     }, []);
+
+    const loadUserRole = async () => {
+        try {
+            const userData = await fetchCurrentUser();
+            const roles = userData.roles || [];
+            setIsAdmin(roles.includes('ADMIN'));
+        } catch (error) {
+            console.error("Erreur chargement rôle utilisateur", error);
+        }
+    };
 
     // Chargement détails quand une tâche est sélectionnée
     useEffect(() => {
@@ -56,10 +92,8 @@ const SuiviTaches: React.FC = () => {
     const loadTaches = async () => {
         setLoadingTasks(true);
         try {
-            // Charge les tâches du mois en cours par défaut, ou une liste paginée. 
-            // Ici on simplifie en demandant les 50 dernières tout court pour l'exemple
-            // Idéalement on filtrerait par date
-            const response = await planningService.getTaches({ page: 1 }); // TODO: Augmenter page_size si possible ou gérer pagination
+            // Le backend filtre automatiquement selon les permissions de l'utilisateur
+            const response = await planningService.getTaches({ page: 1 });
             setTaches(response.results);
         } catch (error) {
             console.error("Erreur chargement tâches", error);
@@ -107,7 +141,7 @@ const SuiviTaches: React.FC = () => {
             for (const file of files) {
                 await createPhoto({
                     fichier: file,
-                    type_photo: 'APRES', // Par défaut
+                    type_photo: selectedPhotoType,
                     tache: selectedTache.id,
                     legende: file.name
                 });
@@ -167,6 +201,97 @@ const SuiviTaches: React.FC = () => {
             setConsommations(prev => prev.filter(c => c.id !== consoId));
         } catch (error) {
             console.error("Erreur suppression consommation", error);
+        }
+    };
+
+    // --- ACTIONS STATUT ---
+
+    // Ouvre le modal de confirmation
+    const openConfirmModal = (type: 'start' | 'complete' | 'cancel') => {
+        const configs = {
+            start: {
+                title: 'Démarrer la tâche',
+                message: 'Êtes-vous sûr de vouloir démarrer cette tâche maintenant ? La date de début réelle sera enregistrée.',
+                icon: 'play' as const
+            },
+            complete: {
+                title: 'Terminer la tâche',
+                message: 'Êtes-vous sûr de vouloir marquer cette tâche comme terminée ? La date de fin réelle sera enregistrée.',
+                icon: 'check' as const
+            },
+            cancel: {
+                title: 'Annuler la tâche',
+                message: 'Êtes-vous sûr de vouloir annuler cette tâche ? Cette action peut être irréversible.',
+                icon: 'x' as const
+            }
+        };
+
+        setConfirmModal({
+            isOpen: true,
+            type,
+            ...configs[type]
+        });
+    };
+
+    // Exécute l'action confirmée
+    const executeConfirmedAction = async () => {
+        if (!selectedTache || !confirmModal) return;
+
+        setConfirmModal(null);
+        setChangingStatut(true);
+
+        try {
+            let nouveauStatut: 'EN_COURS' | 'TERMINEE' | 'ANNULEE';
+
+            switch (confirmModal.type) {
+                case 'start':
+                    nouveauStatut = 'EN_COURS';
+                    break;
+                case 'complete':
+                    nouveauStatut = 'TERMINEE';
+                    break;
+                case 'cancel':
+                    nouveauStatut = 'ANNULEE';
+                    break;
+            }
+
+            const updatedTache = await planningService.changeStatut(selectedTache.id, nouveauStatut);
+            setSelectedTache(updatedTache);
+            setTaches(prev => prev.map(t => t.id === updatedTache.id ? updatedTache : t));
+        } catch (error) {
+            console.error("Erreur changement statut", error);
+            alert("Erreur lors du changement de statut de la tâche");
+        } finally {
+            setChangingStatut(false);
+        }
+    };
+
+    // --- VALIDATION ADMIN ---
+
+    const openValidationModal = (type: 'VALIDEE' | 'REJETEE') => {
+        setValidationModal({ isOpen: true, type });
+        setValidationComment('');
+    };
+
+    const handleValidation = async () => {
+        if (!selectedTache || !validationModal) return;
+
+        setValidating(true);
+        try {
+            const result = await planningService.validerTache(
+                selectedTache.id,
+                validationModal.type,
+                validationComment
+            );
+            setSelectedTache(result.tache);
+            setTaches(prev => prev.map(t => t.id === result.tache.id ? result.tache : t));
+            setValidationModal(null);
+            setValidationComment('');
+        } catch (error) {
+            console.error("Erreur validation", error);
+            alert("Erreur lors de la validation de la tâche");
+        } finally {
+            setValidating(false);
         }
     };
 
@@ -241,13 +366,110 @@ const SuiviTaches: React.FC = () => {
                             <div className="flex justify-between items-start">
                                 <div>
                                     <h2 className="text-2xl font-bold text-gray-900">{selectedTache.type_tache_detail?.nom_tache}</h2>
-                                    <p className="text-gray-500 flex items-center gap-2 mt-1">
+                                    <p className="text-gray-500 flex items-center gap-2 mt-1 flex-wrap">
                                         <span className="bg-gray-100 px-2 py-0.5 rounded text-sm text-gray-700">#{selectedTache.id}</span>
                                         <span>Priorité: {PRIORITE_LABELS[selectedTache.priorite]}</span>
+                                        <span className={`px-2 py-0.5 rounded text-sm font-medium ${STATUT_TACHE_COLORS[selectedTache.statut]?.bg} ${STATUT_TACHE_COLORS[selectedTache.statut]?.text}`}>
+                                            {selectedTache.statut}
+                                        </span>
+                                        {/* Badge état de validation - visible uniquement pour les tâches terminées */}
+                                        {selectedTache.statut === 'TERMINEE' && (
+                                            <span className={`px-2 py-0.5 rounded text-sm font-medium flex items-center gap-1 ${ETAT_VALIDATION_COLORS[selectedTache.etat_validation]?.bg} ${ETAT_VALIDATION_COLORS[selectedTache.etat_validation]?.text}`}>
+                                                <ShieldCheck className="w-3 h-3" />
+                                                {ETAT_VALIDATION_LABELS[selectedTache.etat_validation]}
+                                            </span>
+                                        )}
                                     </p>
                                 </div>
                                 <div className="flex gap-2">
-                                    {/* Actions Globales Tâche si besoin (Clôturer, etc) */}
+                                    {/* Bouton Démarrer - visible si PLANIFIEE ou NON_DEBUTEE */}
+                                    {(selectedTache.statut === 'PLANIFIEE' || selectedTache.statut === 'NON_DEBUTEE') && (
+                                        <button
+                                            onClick={() => openConfirmModal('start')}
+                                            disabled={changingStatut}
+                                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                                        >
+                                            {changingStatut ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <Play className="w-4 h-4" />
+                                            )}
+                                            Démarrer
+                                        </button>
+                                    )}
+
+                                    {/* Bouton Terminer - visible si EN_COURS, désactivé si pas de photo APRES */}
+                                    {selectedTache.statut === 'EN_COURS' && (() => {
+                                        const hasPhotosApres = photos.some(p => p.type_photo === 'APRES');
+                                        return (
+                                            <button
+                                                onClick={() => openConfirmModal('complete')}
+                                                disabled={changingStatut || !hasPhotosApres}
+                                                title={!hasPhotosApres ? "Ajoutez au moins une photo après intervention pour terminer" : "Terminer la tâche"}
+                                                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors disabled:opacity-50 ${
+                                                    hasPhotosApres
+                                                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                }`}
+                                            >
+                                                {changingStatut ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    <CheckCircle className="w-4 h-4" />
+                                                )}
+                                                Terminer
+                                                {!hasPhotosApres && (
+                                                    <Camera className="w-4 h-4 ml-1" />
+                                                )}
+                                            </button>
+                                        );
+                                    })()}
+
+                                    {/* Bouton Annuler - visible si pas encore TERMINEE ou ANNULEE */}
+                                    {selectedTache.statut !== 'TERMINEE' && selectedTache.statut !== 'ANNULEE' && (
+                                        <button
+                                            onClick={() => openConfirmModal('cancel')}
+                                            disabled={changingStatut}
+                                            className="flex items-center gap-2 px-3 py-2 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
+                                            title="Annuler la tâche"
+                                        >
+                                            {changingStatut ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <XCircle className="w-4 h-4" />
+                                            )}
+                                        </button>
+                                    )}
+
+                                    {/* Boutons de validation ADMIN - visibles uniquement pour les tâches terminées en attente */}
+                                    {isAdmin && selectedTache.statut === 'TERMINEE' && selectedTache.etat_validation === 'EN_ATTENTE' && (
+                                        <>
+                                            <button
+                                                onClick={() => openValidationModal('VALIDEE')}
+                                                disabled={validating}
+                                                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                                            >
+                                                {validating ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    <ThumbsUp className="w-4 h-4" />
+                                                )}
+                                                Valider
+                                            </button>
+                                            <button
+                                                onClick={() => openValidationModal('REJETEE')}
+                                                disabled={validating}
+                                                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                                            >
+                                                {validating ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    <ThumbsDown className="w-4 h-4" />
+                                                )}
+                                                Rejeter
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
 
@@ -296,9 +518,25 @@ const SuiviTaches: React.FC = () => {
                                                 )}
                                             </div>
                                             <div>
-                                                <label className="text-xs font-semibold text-gray-500 uppercase">Date Planifiée</label>
+                                                <label className="text-xs font-semibold text-gray-500 uppercase">Date Début Planifiée</label>
                                                 <p className="text-gray-900">{new Date(selectedTache.date_debut_planifiee).toLocaleString()}</p>
                                             </div>
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-500 uppercase">Date Fin Planifiée</label>
+                                                <p className="text-gray-900">{new Date(selectedTache.date_fin_planifiee).toLocaleString()}</p>
+                                            </div>
+                                            {selectedTache.date_debut_reelle && (
+                                                <div>
+                                                    <label className="text-xs font-semibold text-emerald-600 uppercase">Date Début Réelle</label>
+                                                    <p className="text-gray-900">{new Date(selectedTache.date_debut_reelle).toLocaleString()}</p>
+                                                </div>
+                                            )}
+                                            {selectedTache.date_fin_reelle && (
+                                                <div>
+                                                    <label className="text-xs font-semibold text-blue-600 uppercase">Date Fin Réelle</label>
+                                                    <p className="text-gray-900">{new Date(selectedTache.date_fin_reelle).toLocaleString()}</p>
+                                                </div>
+                                            )}
                                             <div className="col-span-2">
                                                 <label className="text-xs font-semibold text-gray-500 uppercase">Description</label>
                                                 <p className="text-gray-900 mt-1">{selectedTache.description_travaux || 'Aucune description'}</p>
@@ -347,10 +585,75 @@ const SuiviTaches: React.FC = () => {
                                 </div>
                             )}
 
-                            {activeTab === 'photos' && (
+                            {activeTab === 'photos' && (() => {
+                                // Compter les photos par type
+                                const photosAvant = photos.filter(p => p.type_photo === 'AVANT').length;
+                                const photosApres = photos.filter(p => p.type_photo === 'APRES').length;
+                                const MAX_PHOTOS_PAR_TYPE = 3;
+                                const canAddAvant = photosAvant < MAX_PHOTOS_PAR_TYPE;
+                                const canAddApres = photosApres < MAX_PHOTOS_PAR_TYPE;
+                                const canAddSelected = selectedPhotoType === 'AVANT' ? canAddAvant : canAddApres;
+                                const currentCount = selectedPhotoType === 'AVANT' ? photosAvant : photosApres;
+
+                                return (
                                 <div className="space-y-6">
+                                    {/* Sélecteur de type de photo avec compteurs */}
+                                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-3">Type de photo à ajouter (max 3 par type)</label>
+                                        <div className="flex gap-3">
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedPhotoType('AVANT')}
+                                                className={`flex-1 flex flex-col items-center gap-1 px-4 py-3 rounded-xl font-medium transition-all ${
+                                                    selectedPhotoType === 'AVANT'
+                                                        ? 'bg-amber-100 text-amber-800 border-2 border-amber-400 shadow-sm'
+                                                        : 'bg-gray-50 text-gray-600 border-2 border-transparent hover:bg-gray-100'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <Camera className="w-5 h-5" />
+                                                    <span>Avant intervention</span>
+                                                </div>
+                                                <div className={`text-xs px-2 py-0.5 rounded-full ${
+                                                    canAddAvant
+                                                        ? 'bg-amber-200 text-amber-800'
+                                                        : 'bg-red-100 text-red-600'
+                                                }`}>
+                                                    {photosAvant}/{MAX_PHOTOS_PAR_TYPE}
+                                                </div>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedPhotoType('APRES')}
+                                                className={`flex-1 flex flex-col items-center gap-1 px-4 py-3 rounded-xl font-medium transition-all ${
+                                                    selectedPhotoType === 'APRES'
+                                                        ? 'bg-emerald-100 text-emerald-800 border-2 border-emerald-400 shadow-sm'
+                                                        : 'bg-gray-50 text-gray-600 border-2 border-transparent hover:bg-gray-100'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <CheckCircle className="w-5 h-5" />
+                                                    <span>Après intervention</span>
+                                                </div>
+                                                <div className={`text-xs px-2 py-0.5 rounded-full ${
+                                                    canAddApres
+                                                        ? 'bg-emerald-200 text-emerald-800'
+                                                        : 'bg-red-100 text-red-600'
+                                                }`}>
+                                                    {photosApres}/{MAX_PHOTOS_PAR_TYPE}
+                                                </div>
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     {/* Upload Zone */}
-                                    <div className="bg-white rounded-xl shadow-sm border border-dashed border-gray-300 p-8 text-center transition-colors hover:bg-gray-50">
+                                    <div className={`bg-white rounded-xl shadow-sm border-2 border-dashed p-8 text-center transition-colors ${
+                                        !canAddSelected
+                                            ? 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
+                                            : selectedPhotoType === 'AVANT'
+                                                ? 'border-amber-300 hover:bg-gray-50'
+                                                : 'border-emerald-300 hover:bg-gray-50'
+                                    }`}>
                                         <input
                                             type="file"
                                             id="photo-upload"
@@ -358,18 +661,54 @@ const SuiviTaches: React.FC = () => {
                                             accept="image/*"
                                             className="hidden"
                                             onChange={handlePhotoUpload}
-                                            disabled={uploadingPhoto}
+                                            disabled={uploadingPhoto || !canAddSelected}
                                         />
-                                        <label htmlFor="photo-upload" className="cursor-pointer flex flex-col items-center">
+                                        <label
+                                            htmlFor="photo-upload"
+                                            className={`flex flex-col items-center ${canAddSelected ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                                        >
                                             {uploadingPhoto ? (
                                                 <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mb-3" />
+                                            ) : !canAddSelected ? (
+                                                <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3 bg-gray-200 text-gray-400">
+                                                    <XCircle className="w-6 h-6" />
+                                                </div>
                                             ) : (
-                                                <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mb-3 text-emerald-600">
+                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${
+                                                    selectedPhotoType === 'AVANT'
+                                                        ? 'bg-amber-100 text-amber-600'
+                                                        : 'bg-emerald-100 text-emerald-600'
+                                                }`}>
                                                     <Camera className="w-6 h-6" />
                                                 </div>
                                             )}
-                                            <span className="text-lg font-medium text-gray-900">Ajouter des photos</span>
-                                            <span className="text-sm text-gray-500 mt-1">Cliquez pour parcourir (JPG, PNG)</span>
+                                            {canAddSelected ? (
+                                                <>
+                                                    <span className="text-lg font-medium text-gray-900">
+                                                        Ajouter des photos {selectedPhotoType === 'AVANT' ? 'avant' : 'après'} intervention
+                                                    </span>
+                                                    <span className="text-sm text-gray-500 mt-1">Cliquez pour parcourir (JPG, PNG)</span>
+                                                    <span className={`text-xs mt-2 px-3 py-1 rounded-full ${
+                                                        selectedPhotoType === 'AVANT'
+                                                            ? 'bg-amber-100 text-amber-700'
+                                                            : 'bg-emerald-100 text-emerald-700'
+                                                    }`}>
+                                                        {currentCount}/{MAX_PHOTOS_PAR_TYPE} photos
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className="text-lg font-medium text-gray-500">
+                                                        Limite atteinte
+                                                    </span>
+                                                    <span className="text-sm text-gray-400 mt-1">
+                                                        Maximum {MAX_PHOTOS_PAR_TYPE} photos {selectedPhotoType === 'AVANT' ? 'avant' : 'après'} intervention
+                                                    </span>
+                                                    <span className="text-xs mt-2 px-3 py-1 rounded-full bg-red-100 text-red-600">
+                                                        {currentCount}/{MAX_PHOTOS_PAR_TYPE} photos
+                                                    </span>
+                                                </>
+                                            )}
                                         </label>
                                     </div>
 
@@ -415,7 +754,8 @@ const SuiviTaches: React.FC = () => {
                                         </div>
                                     )}
                                 </div>
-                            )}
+                                );
+                            })()}
 
                             {activeTab === 'produits' && (
                                 <div className="space-y-6">
@@ -520,6 +860,185 @@ const SuiviTaches: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {/* Modal de confirmation */}
+            {confirmModal?.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                        {/* Header avec icône */}
+                        <div className={`p-6 text-center ${
+                            confirmModal.type === 'start' ? 'bg-emerald-50' :
+                            confirmModal.type === 'complete' ? 'bg-blue-50' : 'bg-red-50'
+                        }`}>
+                            <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 ${
+                                confirmModal.type === 'start' ? 'bg-emerald-100' :
+                                confirmModal.type === 'complete' ? 'bg-blue-100' : 'bg-red-100'
+                            }`}>
+                                {confirmModal.icon === 'play' && (
+                                    <Play className="w-8 h-8 text-emerald-600" />
+                                )}
+                                {confirmModal.icon === 'check' && (
+                                    <CheckCircle className="w-8 h-8 text-blue-600" />
+                                )}
+                                {confirmModal.icon === 'x' && (
+                                    <XCircle className="w-8 h-8 text-red-600" />
+                                )}
+                            </div>
+                            <h3 className={`text-xl font-bold ${
+                                confirmModal.type === 'start' ? 'text-emerald-900' :
+                                confirmModal.type === 'complete' ? 'text-blue-900' : 'text-red-900'
+                            }`}>
+                                {confirmModal.title}
+                            </h3>
+                        </div>
+
+                        {/* Corps du message */}
+                        <div className="p-6">
+                            <p className="text-gray-600 text-center mb-6">
+                                {confirmModal.message}
+                            </p>
+
+                            {/* Informations sur la tâche */}
+                            {selectedTache && (
+                                <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
+                                            <Calendar className="w-5 h-5 text-gray-500" />
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-gray-900">{selectedTache.type_tache_detail?.nom_tache}</p>
+                                            <p className="text-sm text-gray-500">#{selectedTache.id}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Boutons d'action */}
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setConfirmModal(null)}
+                                    className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                                >
+                                    Annuler
+                                </button>
+                                <button
+                                    onClick={executeConfirmedAction}
+                                    className={`flex-1 px-4 py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 ${
+                                        confirmModal.type === 'start'
+                                            ? 'bg-emerald-600 text-white hover:bg-emerald-700' :
+                                        confirmModal.type === 'complete'
+                                            ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                            : 'bg-red-600 text-white hover:bg-red-700'
+                                    }`}
+                                >
+                                    {confirmModal.icon === 'play' && <Play className="w-4 h-4" />}
+                                    {confirmModal.icon === 'check' && <CheckCircle className="w-4 h-4" />}
+                                    {confirmModal.icon === 'x' && <XCircle className="w-4 h-4" />}
+                                    Confirmer
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de validation ADMIN */}
+            {validationModal?.isOpen && selectedTache && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                        {/* Header avec icône */}
+                        <div className={`p-6 text-center ${
+                            validationModal.type === 'VALIDEE' ? 'bg-emerald-50' : 'bg-red-50'
+                        }`}>
+                            <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 ${
+                                validationModal.type === 'VALIDEE' ? 'bg-emerald-100' : 'bg-red-100'
+                            }`}>
+                                {validationModal.type === 'VALIDEE' ? (
+                                    <ThumbsUp className="w-8 h-8 text-emerald-600" />
+                                ) : (
+                                    <ThumbsDown className="w-8 h-8 text-red-600" />
+                                )}
+                            </div>
+                            <h3 className={`text-xl font-bold ${
+                                validationModal.type === 'VALIDEE' ? 'text-emerald-900' : 'text-red-900'
+                            }`}>
+                                {validationModal.type === 'VALIDEE' ? 'Valider la tâche' : 'Rejeter la tâche'}
+                            </h3>
+                        </div>
+
+                        {/* Corps */}
+                        <div className="p-6">
+                            <p className="text-gray-600 text-center mb-4">
+                                {validationModal.type === 'VALIDEE'
+                                    ? 'Confirmez-vous que cette tâche a été correctement réalisée ?'
+                                    : 'Indiquez la raison du rejet de cette tâche.'}
+                            </p>
+
+                            {/* Informations sur la tâche */}
+                            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
+                                        <Calendar className="w-5 h-5 text-gray-500" />
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-gray-900">{selectedTache.type_tache_detail?.nom_tache}</p>
+                                        <p className="text-sm text-gray-500">#{selectedTache.id}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Champ commentaire */}
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Commentaire {validationModal.type === 'REJETEE' && <span className="text-red-500">*</span>}
+                                </label>
+                                <textarea
+                                    value={validationComment}
+                                    onChange={(e) => setValidationComment(e.target.value)}
+                                    placeholder={validationModal.type === 'VALIDEE'
+                                        ? 'Commentaire optionnel...'
+                                        : 'Raison du rejet...'}
+                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
+                                    rows={3}
+                                    required={validationModal.type === 'REJETEE'}
+                                />
+                            </div>
+
+                            {/* Boutons d'action */}
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setValidationModal(null);
+                                        setValidationComment('');
+                                    }}
+                                    disabled={validating}
+                                    className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
+                                >
+                                    Annuler
+                                </button>
+                                <button
+                                    onClick={handleValidation}
+                                    disabled={validating || (validationModal.type === 'REJETEE' && !validationComment.trim())}
+                                    className={`flex-1 px-4 py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${
+                                        validationModal.type === 'VALIDEE'
+                                            ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                            : 'bg-red-600 text-white hover:bg-red-700'
+                                    }`}
+                                >
+                                    {validating ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : validationModal.type === 'VALIDEE' ? (
+                                        <ThumbsUp className="w-4 h-4" />
+                                    ) : (
+                                        <ThumbsDown className="w-4 h-4" />
+                                    )}
+                                    {validationModal.type === 'VALIDEE' ? 'Valider' : 'Rejeter'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

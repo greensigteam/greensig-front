@@ -11,6 +11,10 @@ const BASE_URL = '/api/planification';
 export const planningService = {
     // --- TACHES ---
 
+    /**
+     * Récupère les tâches avec pagination et filtres optionnels.
+     * Le backend filtre automatiquement selon les permissions de l'utilisateur.
+     */
     async getTaches(params: {
         start_date?: string,
         end_date?: string,
@@ -105,6 +109,55 @@ export const planningService = {
             body: JSON.stringify(data)
         });
         if (!response.ok) throw new Error('Erreur ajout participation');
+        return response.json();
+    },
+
+    // --- CHANGEMENT DE STATUT ---
+
+    /**
+     * Change le statut d'une tâche avec gestion automatique des dates réelles.
+     * - Démarrer (EN_COURS): définit date_debut_reelle à maintenant
+     * - Terminer (TERMINEE): définit date_fin_reelle à maintenant
+     */
+    async changeStatut(tacheId: number, nouveauStatut: 'EN_COURS' | 'TERMINEE' | 'ANNULEE' | 'PLANIFIEE'): Promise<Tache> {
+        const updateData: TacheUpdate = { statut: nouveauStatut };
+
+        // Gestion automatique des dates réelles
+        if (nouveauStatut === 'EN_COURS') {
+            updateData.date_debut_reelle = new Date().toISOString();
+        } else if (nouveauStatut === 'TERMINEE') {
+            updateData.date_fin_reelle = new Date().toISOString();
+        }
+
+        const response = await apiFetch(`${BASE_URL}/taches/${tacheId}/`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateData)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Erreur lors du changement de statut');
+        }
+        return response.json();
+    },
+
+    // --- VALIDATION ADMIN ---
+
+    /**
+     * Valide ou rejette une tâche terminée (ADMIN uniquement).
+     */
+    async validerTache(tacheId: number, etat: 'VALIDEE' | 'REJETEE', commentaire?: string): Promise<{ message: string; tache: Tache }> {
+        const response = await apiFetch(`${BASE_URL}/taches/${tacheId}/valider/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ etat, commentaire: commentaire || '' })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erreur lors de la validation');
+        }
         return response.json();
     },
 

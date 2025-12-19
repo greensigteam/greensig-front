@@ -8,12 +8,13 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 
 import {
-    Users, Clock, X, Trash2, Edit, Search, Filter, UserPlus, Timer, AlertTriangle, Download
+    Users, Clock, X, Trash2, Edit, Search, Filter, UserPlus, Timer, AlertTriangle, Download, Eye
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { planningService } from '../services/planningService';
 import { fetchClients, fetchEquipes } from '../services/usersApi';
+import { fetchCurrentUser } from '../services/api';
 import {
     Tache, TacheCreate, TacheUpdate, TypeTache,
     STATUT_TACHE_LABELS, STATUT_TACHE_COLORS,
@@ -122,6 +123,9 @@ const Planning: FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // Mode lecture seule pour CHEF_EQUIPE
+    const [isReadOnly, setIsReadOnly] = useState(false);
+
     const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [selectedTache, setSelectedTache] = useState<Tache | null>(null);
@@ -196,17 +200,23 @@ const Planning: FC = () => {
     const loadData = async () => {
         try {
             setLoading(true);
-            const [tachesData, clientsData, equipesData, typesData] = await Promise.all([
+            const [tachesData, clientsData, equipesData, typesData, userData] = await Promise.all([
                 planningService.getTaches(),
                 fetchClients().then(data => data.results || data),
                 fetchEquipes().then(data => data.results || data),
-                planningService.getTypesTaches()
+                planningService.getTypesTaches(),
+                fetchCurrentUser()
             ]);
 
             setTaches(tachesData.results || tachesData);
             setClients(Array.isArray(clientsData) ? clientsData : []);
             setEquipes(Array.isArray(equipesData) ? equipesData : []);
             setTypesTaches(typesData);
+
+            // Déterminer si l'utilisateur est en mode lecture seule (CHEF_EQUIPE sans rôle ADMIN)
+            const roles = userData.roles || [];
+            const isChefEquipeOnly = roles.includes('CHEF_EQUIPE') && !roles.includes('ADMIN');
+            setIsReadOnly(isChefEquipeOnly);
         } catch (err) {
             setError('Erreur lors du chargement des données');
             console.error(err);
@@ -541,9 +551,16 @@ const Planning: FC = () => {
             <div className="mb-6 flex justify-between items-start">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Planning</h1>
-                    <p className="text-gray-500 mt-1">Gestion des tâches planifiées</p>
+                    <p className="text-gray-500 mt-1">
+                        {isReadOnly ? 'Visualisation des tâches assignées à vos équipes' : 'Gestion des tâches planifiées'}
+                    </p>
                 </div>
-
+                {isReadOnly && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm">
+                        <Eye className="w-4 h-4" />
+                        <span>Mode lecture seule</span>
+                    </div>
+                )}
             </div>
 
             {/* Filters & View Toggle */}
@@ -695,10 +712,10 @@ const Planning: FC = () => {
                             onSelectEvent={(event) => setSelectedTache(event.resource)}
                             eventPropGetter={eventPropGetter}
                             views={['month', 'week', 'day', 'agenda']}
-                            onEventDrop={handleEventDrop}
-                            onEventResize={handleEventResize}
-                            resizable
-                            draggableAccessor={() => true}
+                            onEventDrop={isReadOnly ? undefined : handleEventDrop}
+                            onEventResize={isReadOnly ? undefined : handleEventResize}
+                            resizable={!isReadOnly}
+                            draggableAccessor={() => !isReadOnly}
                         />
                     </div>
                 ) : (
@@ -727,17 +744,19 @@ const Planning: FC = () => {
                                                 ) : (
                                                     <>
                                                         <span className="text-orange-600 italic">Aucun client assigné</span>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setSelectedTache(tache);
-                                                                setShowCreateForm(true);
-                                                            }}
-                                                            className="p-1 hover:bg-emerald-100 rounded-full text-emerald-600 transition-colors"
-                                                            title="Attribuer un client"
-                                                        >
-                                                            <UserPlus className="w-4 h-4" />
-                                                        </button>
+                                                        {!isReadOnly && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedTache(tache);
+                                                                    setShowCreateForm(true);
+                                                                }}
+                                                                className="p-1 hover:bg-emerald-100 rounded-full text-emerald-600 transition-colors"
+                                                                title="Attribuer un client"
+                                                            >
+                                                                <UserPlus className="w-4 h-4" />
+                                                            </button>
+                                                        )}
                                                     </>
                                                 )}
                                             </div>
@@ -775,9 +794,9 @@ const Planning: FC = () => {
                 )}
             </div>
 
-            {/* Create/Edit Modal */}
+            {/* Create/Edit Modal - Non disponible en mode lecture seule */}
             {
-                showCreateForm && (
+                showCreateForm && !isReadOnly && (
                     <TaskFormModal
                         tache={selectedTache || undefined}
                         initialValues={initialTaskValues}
@@ -864,23 +883,27 @@ const Planning: FC = () => {
                             </div>
 
                             <div className="mt-6 flex gap-3">
-                                <button
-                                    onClick={() => setShowCreateForm(true)}
-                                    className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
-                                >
-                                    <Edit className="w-4 h-4" />
-                                    Modifier
-                                </button>
-                                <button
-                                    onClick={() => handleDeleteTache(selectedTache.id)}
-                                    className="px-4 py-2 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-2"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                    Supprimer
-                                </button>
+                                {!isReadOnly && (
+                                    <>
+                                        <button
+                                            onClick={() => setShowCreateForm(true)}
+                                            className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <Edit className="w-4 h-4" />
+                                            Modifier
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteTache(selectedTache.id)}
+                                            className="px-4 py-2 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-2"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                            Supprimer
+                                        </button>
+                                    </>
+                                )}
                                 <button
                                     onClick={() => setSelectedTache(null)}
-                                    className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                                    className={`px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors ${isReadOnly ? 'flex-1' : ''}`}
                                 >
                                     Fermer
                                 </button>
