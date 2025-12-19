@@ -216,6 +216,7 @@ export interface InventoryObjectOption {
     nom: string;
     site: string;
     soussite?: string;
+    superficie?: number;
 }
 
 interface TaskFormModalProps {

@@ -87,8 +87,6 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     measurementType = 'distance',
     onMeasurementComplete,
     onMeasurementUpdate,
-    isRouting,
-    isSidebarCollapsed,
     isMiniMap = false,
     highlightedGeometry,
     onObjectModify,
@@ -258,7 +256,7 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
       const center = mapInstance.current.getView().getCenter();
       if (!center) return null;
       const [lng, lat] = toLonLat(center);
-      return { lat, lng };
+      return { lat: lat as number, lng: lng as number };
     },
     getMapElement: () => {
       return innerMapRef.current;
@@ -459,7 +457,7 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
       style: (feature) => {
         const props = feature.getProperties();
         const type = props.object_type;
-        return createClusterStyleForType(feature, type);
+        return createClusterStyleForType(feature as Feature, type);
       }
     });
     dataLayerRef.current = dataLayer;
@@ -512,7 +510,7 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
       if (onMoveEnd) {
         const view = map.getView();
         const center = toLonLat(view.getCenter()!);
-        onMoveEnd({ lat: center[1], lng: center[0] }, view.getZoom()!);
+        onMoveEnd({ lat: center[1] as number, lng: center[0] as number }, view.getZoom()!);
       }
 
       if (fetchDataTimeoutRef.current) {
@@ -661,7 +659,7 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
               source: typeSource,
               geometryFunction: (feature) => {
                 const geom = feature.getGeometry();
-                return geom?.getType() === 'Point' ? geom : null;
+                return (geom?.getType() === 'Point' ? geom : null) as Point;
               }
             });
             clusterSourcesRef.current[type] = typeCluster;
@@ -969,12 +967,12 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
   }, [visibleLayers]);
 
   // Visible layers effect
-  // Refetch when clustering is toggled
+  // Refetch when filters or clustering are toggled
   useEffect(() => {
     if (mapReady && mapInstance.current) {
       fetchData();
     }
-  }, [clusteringEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [clusteringEnabled, visibleLayers]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Listen for refresh-map-data event (triggered after object modification/deletion)
   useEffect(() => {

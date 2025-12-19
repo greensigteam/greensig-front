@@ -78,7 +78,7 @@ function App() {
   const [selectedMapObject, setSelectedMapObject] = useState<MapObjectDetail | null>(null);
 
   const [isRouting, setIsRouting] = useState(false);
-  const [clusteringEnabled, setClusteringEnabled] = useState(true);
+  const [clusteringEnabled, setClusteringEnabled] = useState(false);
 
   // Measurement state
   const [isMeasuring, setIsMeasuring] = useState(false);

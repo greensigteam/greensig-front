@@ -28,12 +28,14 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
 
             for (let i = 0; i < files.length && photos.length + newPhotos.length < maxPhotos; i++) {
                 const file = files[i];
+                if (!file) continue;
 
                 // Convert to base64 for mock storage
                 const reader = new FileReader();
                 const photoUrl = await new Promise<string>((resolve) => {
                     reader.onload = (e) => {
-                        resolve(e.target?.result as string);
+                        const result = e.target?.result;
+                        resolve(typeof result === 'string' ? result : '');
                     };
                     reader.readAsDataURL(file);
                 });
