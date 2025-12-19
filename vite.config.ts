@@ -9,6 +9,10 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       host: '0.0.0.0',
       allowedHosts: true, // Autorise Cloudflare Tunnel
+      hmr: {
+        clientPort: 443,
+        protocol: 'wss',
+      },
       proxy: {
         '/api': {
           target: 'http://127.0.0.1:8000',
