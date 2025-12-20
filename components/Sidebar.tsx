@@ -1,9 +1,10 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Map as MapIcon, Package, Calendar,
   ClipboardList, Users, UserCog, BarChart3,
-  LogOut, ChevronLeft, ChevronRight, AlertCircle, MapPin, Gauge, FileText, MessageSquare
+  LogOut, ChevronLeft, ChevronRight, AlertCircle, MapPin, Gauge, FileText, MessageSquare,
+  Settings, ChevronDown
 } from 'lucide-react';
 import { ViewState, Role } from '../types';
 
@@ -36,15 +37,46 @@ const viewToPath: Record<string, string> = {
   CLIENT_INTERVENTIONS: '/claims',
 };
 
+interface MenuItem {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  roles: string[];
+}
+
+interface MenuGroup {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  roles: string[];
+  children: MenuItem[];
+}
+
+type MenuEntry = MenuItem | MenuGroup;
+
+const isMenuGroup = (entry: MenuEntry): entry is MenuGroup => {
+  return 'children' in entry;
+};
+
 const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   userRole,
   collapsed,
   onToggle
 }) => {
+  const location = useLocation();
+  const [openGroups, setOpenGroups] = useState<string[]>(['PARAMETRES']);
+
+  const toggleGroup = (groupId: string) => {
+    setOpenGroups(prev =>
+      prev.includes(groupId)
+        ? prev.filter(id => id !== groupId)
+        : [...prev, groupId]
+    );
+  };
 
   // User Roles Configuration
-  const menuItems = [
+  const menuEntries: MenuEntry[] = [
     { id: 'DASHBOARD', label: 'Tableau de bord', icon: LayoutDashboard, roles: ['ADMIN', 'OPERATEUR', 'CHEF_EQUIPE'] },
     { id: 'MAP', label: 'Cartographie', icon: MapIcon, roles: ['ADMIN', 'OPERATEUR', 'CHEF_EQUIPE'] },
     { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['ADMIN', 'OPERATEUR', 'CHEF_EQUIPE'] },
@@ -55,8 +87,17 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'INTERVENTIONS', label: 'Réclamations', icon: AlertCircle, roles: ['ADMIN', 'OPERATEUR', 'CHEF_EQUIPE'] },
     { id: 'CLAIMS', label: 'Suivi des Tâches', icon: ClipboardList, roles: ['ADMIN', 'OPERATEUR', 'CHEF_EQUIPE'] },
     { id: 'TEAMS', label: 'Équipes', icon: Users, roles: ['ADMIN', 'CHEF_EQUIPE'] },
-    { id: 'USERS', label: 'Utilisateurs', icon: UserCog, roles: ['ADMIN'] },
     { id: 'REPORTING', label: 'Rapports', icon: BarChart3, roles: ['ADMIN'] },
+    // Paramètres dropdown group
+    {
+      id: 'PARAMETRES',
+      label: 'Paramètres',
+      icon: Settings,
+      roles: ['ADMIN'],
+      children: [
+        { id: 'USERS', label: 'Utilisateurs', icon: UserCog, roles: ['ADMIN'] },
+      ]
+    },
     // Client specific menu items
     { id: 'CLIENT_MAP', label: 'Carte', icon: MapIcon, roles: ['CLIENT'] },
     { id: 'CLIENT_CLAIMS', label: 'Réclamations', icon: MessageSquare, roles: ['CLIENT'] },
@@ -64,7 +105,19 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'CLIENT_INTERVENTIONS', label: 'Interventions', icon: ClipboardList, roles: ['CLIENT'] },
   ];
 
-  const filteredItems = menuItems.filter(item => item.roles.includes(userRole));
+  // Filter entries based on role
+  const filteredEntries = menuEntries.filter(entry => {
+    if (isMenuGroup(entry)) {
+      // Show group if user has access to at least one child
+      return entry.children.some(child => child.roles.includes(userRole));
+    }
+    return entry.roles.includes(userRole);
+  });
+
+  // Check if any child in a group is active
+  const isGroupActive = (group: MenuGroup): boolean => {
+    return group.children.some(child => location.pathname === viewToPath[child.id]);
+  };
 
   return (
     <aside
@@ -104,40 +157,115 @@ const Sidebar: React.FC<SidebarProps> = ({
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 custom-scrollbar">
         <ul className="space-y-1 px-2">
-          {filteredItems.map((item) => (
-            <li key={item.id}>
-              <NavLink
-                to={viewToPath[item.id]}
-                className={({ isActive }) =>
-                  `w-full flex items-center rounded-lg transition-all duration-200 group relative
-                  ${collapsed ? 'justify-center p-2.5' : 'px-3 py-2.5 gap-3'}
-                  ${isActive
-                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/30 ring-1 ring-emerald-400/20'
-                    : 'hover:bg-emerald-800/30 text-emerald-200/70 hover:text-white'}`
-                }
-                title={collapsed ? item.label : ''}
-              >
-                {({ isActive }) => (
-                  <>
-                    <item.icon
+          {filteredEntries.map((entry) => (
+            <li key={entry.id}>
+              {isMenuGroup(entry) ? (
+                // Dropdown group
+                <div>
+                  <button
+                    onClick={() => toggleGroup(entry.id)}
+                    className={`
+                      w-full flex items-center rounded-lg transition-all duration-200 group relative
+                      ${collapsed ? 'justify-center p-2.5' : 'px-3 py-2.5 gap-3'}
+                      ${isGroupActive(entry)
+                        ? 'bg-emerald-700/50 text-white'
+                        : 'hover:bg-emerald-800/30 text-emerald-200/70 hover:text-white'}
+                    `}
+                    title={collapsed ? entry.label : ''}
+                  >
+                    <entry.icon
                       className={`
                         shrink-0 transition-colors
                         ${collapsed ? 'w-6 h-6' : 'w-5 h-5'}
-                        ${isActive ? 'text-white' : 'text-emerald-300/70 group-hover:text-white'}
+                        ${isGroupActive(entry) ? 'text-white' : 'text-emerald-300/70 group-hover:text-white'}
                       `}
                     />
-
                     {!collapsed && (
-                      <span className="font-medium text-sm whitespace-nowrap">{item.label}</span>
+                      <>
+                        <span className="font-medium text-sm whitespace-nowrap flex-1 text-left">
+                          {entry.label}
+                        </span>
+                        <ChevronDown
+                          className={`w-4 h-4 transition-transform duration-200 ${
+                            openGroups.includes(entry.id) ? 'rotate-180' : ''
+                          }`}
+                        />
+                      </>
                     )}
+                  </button>
+                  {/* Dropdown children */}
+                  {!collapsed && openGroups.includes(entry.id) && (
+                    <ul className="mt-1 ml-4 pl-3 border-l border-emerald-700/50 space-y-1">
+                      {entry.children
+                        .filter(child => child.roles.includes(userRole))
+                        .map(child => (
+                          <li key={child.id}>
+                            <NavLink
+                              to={viewToPath[child.id]}
+                              className={({ isActive }) =>
+                                `w-full flex items-center rounded-lg transition-all duration-200 group relative px-3 py-2 gap-3
+                                ${isActive
+                                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/30 ring-1 ring-emerald-400/20'
+                                  : 'hover:bg-emerald-800/30 text-emerald-200/70 hover:text-white'}`
+                              }
+                            >
+                              {({ isActive }) => (
+                                <>
+                                  <child.icon
+                                    className={`
+                                      shrink-0 transition-colors w-4 h-4
+                                      ${isActive ? 'text-white' : 'text-emerald-300/70 group-hover:text-white'}
+                                    `}
+                                  />
+                                  <span className="font-medium text-sm whitespace-nowrap">
+                                    {child.label}
+                                  </span>
+                                  {isActive && (
+                                    <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-white/80" />
+                                  )}
+                                </>
+                              )}
+                            </NavLink>
+                          </li>
+                        ))}
+                    </ul>
+                  )}
+                </div>
+              ) : (
+                // Regular menu item
+                <NavLink
+                  to={viewToPath[entry.id]}
+                  className={({ isActive }) =>
+                    `w-full flex items-center rounded-lg transition-all duration-200 group relative
+                    ${collapsed ? 'justify-center p-2.5' : 'px-3 py-2.5 gap-3'}
+                    ${isActive
+                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/30 ring-1 ring-emerald-400/20'
+                      : 'hover:bg-emerald-800/30 text-emerald-200/70 hover:text-white'}`
+                  }
+                  title={collapsed ? entry.label : ''}
+                >
+                  {({ isActive }) => (
+                    <>
+                      <entry.icon
+                        className={`
+                          shrink-0 transition-colors
+                          ${collapsed ? 'w-6 h-6' : 'w-5 h-5'}
+                          ${isActive ? 'text-white' : 'text-emerald-300/70 group-hover:text-white'}
+                        `}
+                      />
 
-                    {/* Active Indicator Strip */}
-                    {isActive && !collapsed && (
-                      <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-white/80" />
-                    )}
-                  </>
-                )}
-              </NavLink>
+                      {!collapsed && (
+                        <span className="font-medium text-sm whitespace-nowrap">{entry.label}</span>
+                      )}
+
+                      {/* Active Indicator Strip */}
+                      {isActive && !collapsed && (
+                        <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-white/80" />
+                      )}
+                    </>
+                  )}
+                </NavLink>
+              )}
             </li>
           ))}
         </ul>
