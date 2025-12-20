@@ -73,7 +73,8 @@ function App() {
     parcels: true,
     networks: false,
     greenSpaces: true,
-    works: false
+    works: false,
+    reclamations: true
   });
   const [selectedMapObject, setSelectedMapObject] = useState<MapObjectDetail | null>(null);
 

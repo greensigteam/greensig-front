@@ -5,7 +5,8 @@ import { Vector as VectorLayer } from 'ol/layer';
 import { Style, Fill, Stroke, Circle as CircleStyle } from 'ol/style';
 import { Draw, Modify, Snap, Translate, Select } from 'ol/interaction';
 import { Overlay } from 'ol';
-import { Point, LineString, Polygon, Geometry } from 'ol/geom';
+import { Point, LineString, Polygon, Geometry, Circle } from 'ol/geom';
+import { fromCircle } from 'ol/geom/Polygon';
 import { getLength, getArea } from 'ol/sphere';
 import { unByKey } from 'ol/Observable';
 import { GeoJSON } from 'ol/format';
@@ -325,10 +326,11 @@ export const useDrawingTools = ({
         }
 
         // Map drawing mode to OL type
-        const typeMap: Record<DrawingMode, 'Point' | 'LineString' | 'Polygon' | undefined> = {
+        const typeMap: Record<DrawingMode, 'Point' | 'LineString' | 'Polygon' | 'Circle' | undefined> = {
             'point': 'Point',
             'line': 'LineString',
             'polygon': 'Polygon',
+            'circle': 'Circle',
             'none': undefined,
         };
 
@@ -375,6 +377,17 @@ export const useDrawingTools = ({
 
                         const metrics = calculateMetrics(geom);
                         onDrawUpdateRef.current?.(metrics);
+                    } else if (geom instanceof Circle) {
+                        // For circles, show radius and calculated area
+                        const radius = geom.getRadius();
+                        const area = Math.PI * radius * radius;
+                        output = `Rayon: ${formatLength(radius)}<br/>Surface: ${formatArea(area)}`;
+                        tooltipPosition = geom.getCenter();
+
+                        // Convert to polygon to calculate metrics
+                        const polygonFromCircle = fromCircle(geom, 64);
+                        const metrics = calculateMetrics(polygonFromCircle);
+                        onDrawUpdateRef.current?.(metrics);
                     }
 
                     if (measureTooltipElementRef.current) {
@@ -389,9 +402,16 @@ export const useDrawingTools = ({
 
         draw.on('drawend', (evt) => {
             const feature = evt.feature;
-            const geom = feature.getGeometry();
+            let geom = feature.getGeometry();
 
             if (geom) {
+                // Convert Circle to Polygon (64 sides) for GeoJSON compatibility
+                if (geom instanceof Circle) {
+                    const polygonFromCircle = fromCircle(geom, 64);
+                    geom = polygonFromCircle;
+                    feature.setGeometry(polygonFromCircle);
+                }
+
                 // Convert to GeoJSON
                 const geoJSONGeom = geoJSONFormat.current.writeGeometryObject(geom, {
                     featureProjection: 'EPSG:3857',

@@ -105,6 +105,11 @@ export const SiteCarousel: React.FC<SiteCarouselProps> = ({
           <h3 className="text-xs font-semibold text-emerald-300 uppercase tracking-wider">
             Sites ({sites.length})
           </h3>
+          {/*
+           * DÉSACTIVÉ par demande du Product Owner (20/12/2024)
+           * Bouton de création de site retiré temporairement.
+           * Pour réactiver : décommenter le bloc ci-dessous.
+           *
           {onCreateSite && (
             <button
               onClick={onCreateSite}
@@ -114,6 +119,7 @@ export const SiteCarousel: React.FC<SiteCarouselProps> = ({
               <Plus className="w-5 h-5" strokeWidth={2.5} />
             </button>
           )}
+          */}
         </div>
 
         {/* Cards Container */}

@@ -1,10 +1,16 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, X, MapPin, Calendar, FileText, Leaf, Droplet, AlertCircle, ClipboardList, Trash2, Map } from 'lucide-react';
+import { Search, Filter, X, MapPin, Calendar, FileText, Leaf, Droplet, AlertCircle, ClipboardList, Trash2, Map as MapIcon, Ban } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
 import { MOCK_INVENTORY, InventoryItem } from '../services/mockData';
 import { fetchInventory, ApiError, type InventoryResponse, type InventoryFilters, fetchAllSites, type SiteFrontend, fetchFilterOptions } from '../services/api';
+import { planningService } from '../services/planningService';
+import { fetchEquipes } from '../services/usersApi';
+import TaskFormModal, { InventoryObjectOption } from '../components/planning/TaskFormModal';
+import { TypeTache, TacheCreate } from '../types/planning';
+import { EquipeList } from '../types/users';
+import { useToast } from '../contexts/ToastContext';
 
 // Inventory Detail Modal
 const InventoryDetailModal: React.FC<{
@@ -175,15 +181,44 @@ const InventoryDetailModal: React.FC<{
 const VEGETATION_TYPES = ['Arbre', 'Palmier', 'Gazon', 'Arbuste', 'Vivace', 'Cactus', 'Graminee'];
 const HYDROLOGY_TYPES = ['Puit', 'Pompe', 'Vanne', 'Clapet', 'Canalisation', 'Aspersion', 'Goutte', 'Ballon'];
 
+// Interface for cached selected item data
+interface SelectedItemData {
+  id: string;
+  type: string;
+  name: string;
+  siteId: string;
+  zone: string;
+  code: string;
+  state: string;
+  coordinates: { lat: number; lng: number };
+}
+
 // Main Inventory Component
 const Inventory: React.FC = () => {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [mainTab, setMainTab] = useState<'tous' | 'vegetation' | 'hydrologie'>('tous');
 
   // Selection state for creating tasks
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Cache for selected items data (persists across page changes)
+  const [selectedItemsCache, setSelectedItemsCache] = useState<Map<string, SelectedItemData>>(new Map());
+
+  // Task type compatibility state
+  const [isTaskCompatible, setIsTaskCompatible] = useState(true);
+  const [compatibilityLoading, setCompatibilityLoading] = useState(false);
+  const [applicableTasksCount, setApplicableTasksCount] = useState<number | null>(null);
+  const [incompatibleTypesMessage, setIncompatibleTypesMessage] = useState<string | null>(null);
+
+  // Task modal state
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalEquipes, setModalEquipes] = useState<EquipeList[]>([]);
+  const [modalTypesTaches, setModalTypesTaches] = useState<TypeTache[]>([]);
+  const [taskSubmitting, setTaskSubmitting] = useState(false);
 
   // Advanced Filters
   const [filters, setFilters] = useState({
@@ -389,6 +424,178 @@ const Inventory: React.FC = () => {
       };
     });
   }, [apiInventory, sites]);
+
+  // Get the set of IDs currently visible in inventoryData
+  const visibleIds = useMemo(() => {
+    return new Set(inventoryData.map(item => item.id));
+  }, [inventoryData]);
+
+  // Custom selection handler that maintains the cache across filter changes
+  const handleSelectionChange = useCallback((newSelectedIds: Set<string>) => {
+    // Update cache: only remove items that are VISIBLE and were unchecked
+    setSelectedItemsCache(prevCache => {
+      const newCache = new Map(prevCache);
+
+      // For items currently visible in inventoryData:
+      // - If checked (in newSelectedIds), keep/add to cache
+      // - If unchecked (not in newSelectedIds), remove from cache
+      for (const id of visibleIds) {
+        if (newSelectedIds.has(id)) {
+          // Item is visible AND selected - add to cache if not present
+          if (!newCache.has(id)) {
+            const item = inventoryData.find(i => i.id === id);
+            if (item) {
+              newCache.set(id, {
+                id: item.id,
+                type: item.type,
+                name: item.name,
+                siteId: typeof item.siteId === 'string' ? item.siteId : item.siteId,
+                zone: item.zone,
+                code: item.code,
+                state: item.state,
+                coordinates: item.coordinates
+              });
+            }
+          }
+        } else {
+          // Item is visible but NOT selected - remove from cache
+          newCache.delete(id);
+        }
+      }
+
+      return newCache;
+    });
+
+    // Merge: keep non-visible selected items + add visible selected items
+    setSelectedIds(prevSelectedIds => {
+      const merged = new Set<string>();
+
+      // Keep items that are NOT visible (from other filters)
+      for (const id of prevSelectedIds) {
+        if (!visibleIds.has(id)) {
+          merged.add(id);
+        }
+      }
+
+      // Add items that ARE visible and selected
+      for (const id of newSelectedIds) {
+        if (visibleIds.has(id)) {
+          merged.add(id);
+        }
+      }
+
+      return merged;
+    });
+  }, [inventoryData, visibleIds]);
+
+  // Check task type compatibility when selection changes (use cached data)
+  useEffect(() => {
+    if (selectedItemsCache.size === 0) {
+      setIsTaskCompatible(true);
+      setApplicableTasksCount(null);
+      setIncompatibleTypesMessage(null);
+      return;
+    }
+
+    // Get unique types from cached selected items
+    const uniqueTypes = [...new Set(
+      Array.from(selectedItemsCache.values()).map(item => {
+        // Capitalize first letter to match backend type names
+        const type = item.type;
+        return type.charAt(0).toUpperCase() + type.slice(1);
+      })
+    )];
+
+    // If only one type, always compatible
+    if (uniqueTypes.length <= 1) {
+      setIsTaskCompatible(true);
+      setApplicableTasksCount(null);
+      setIncompatibleTypesMessage(null);
+      return;
+    }
+
+    // Check compatibility with API
+    setCompatibilityLoading(true);
+    setIncompatibleTypesMessage(null);
+
+    planningService.getApplicableTypesTaches(uniqueTypes)
+      .then(result => {
+        setIsTaskCompatible(result.types_taches.length > 0);
+        setApplicableTasksCount(result.types_taches.length);
+
+        if (result.types_taches.length === 0) {
+          setIncompatibleTypesMessage(
+            `Les types sélectionnés (${uniqueTypes.join(', ')}) n'ont aucune tâche en commun.`
+          );
+        }
+      })
+      .catch(err => {
+        console.error('Erreur vérification compatibilité:', err);
+        setIsTaskCompatible(true); // Assume compatible on error
+      })
+      .finally(() => setCompatibilityLoading(false));
+  }, [selectedItemsCache]);
+
+  // Convert cached items to InventoryObjectOption format for TaskFormModal
+  const preSelectedObjects: InventoryObjectOption[] = useMemo(() => {
+    return Array.from(selectedItemsCache.values()).map(item => ({
+      id: parseInt(item.id, 10),
+      type: item.type.charAt(0).toUpperCase() + item.type.slice(1),
+      nom: item.name,
+      site: item.siteId,
+      soussite: item.zone
+    }));
+  }, [selectedItemsCache]);
+
+  // Open task creation modal - fetch required data first
+  const handleOpenTaskModal = async () => {
+    setModalLoading(true);
+    try {
+      // Get unique types from selection
+      const uniqueTypes = [...new Set(
+        Array.from(selectedItemsCache.values()).map(item =>
+          item.type.charAt(0).toUpperCase() + item.type.slice(1)
+        )
+      )];
+
+      // Fetch equipes and applicable task types in parallel
+      const [equipesData, typesTachesResult] = await Promise.all([
+        fetchEquipes(),
+        planningService.getApplicableTypesTaches(uniqueTypes)
+      ]);
+
+      setModalEquipes(equipesData.results || []);
+      setModalTypesTaches(typesTachesResult.types_taches);
+      setShowTaskModal(true);
+    } catch (error) {
+      console.error('Erreur chargement données modale:', error);
+      showToast('Erreur lors du chargement des données', 'error');
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  // Handle task creation from modal
+  const handleTaskSubmit = async (data: TacheCreate) => {
+    setTaskSubmitting(true);
+    try {
+      await planningService.createTache(data);
+      showToast('Tâche créée avec succès', 'success');
+
+      // Clear selection
+      setSelectedIds(new Set());
+      setSelectedItemsCache(new Map());
+      setShowTaskModal(false);
+
+      // Navigate to planning page
+      navigate('/planning');
+    } catch (error) {
+      console.error('Erreur création tâche:', error);
+      showToast('Erreur lors de la création de la tâche', 'error');
+    } finally {
+      setTaskSubmitting(false);
+    }
+  };
 
 
   // ============================================================================
@@ -924,8 +1131,8 @@ const Inventory: React.FC = () => {
               currentPage={currentPage}
               onPageChange={setCurrentPage}
               selectable
-              selectedIds={selectedIds}
-              onSelectionChange={setSelectedIds}
+              selectedIds={new Set([...selectedIds].filter(id => visibleIds.has(id)))}
+              onSelectionChange={handleSelectionChange}
               getItemId={(item) => item.id}
             />
           </>
@@ -933,43 +1140,73 @@ const Inventory: React.FC = () => {
       </div>
 
       {/* Floating Action Bar when items are selected */}
-      {selectedIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 px-6 py-4 flex items-center gap-6">
+      {selectedItemsCache.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-[95vw]">
+          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 px-4 py-3 flex items-center gap-4">
             {/* Selection count */}
-            <div className="flex items-center gap-2">
-              <span className="bg-emerald-100 text-emerald-700 font-bold px-3 py-1 rounded-full">
-                {selectedIds.size}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="bg-emerald-100 text-emerald-700 font-bold px-2.5 py-0.5 rounded-full text-sm">
+                {selectedItemsCache.size}
               </span>
-              <span className="text-gray-600">
-                objet{selectedIds.size > 1 ? 's' : ''} sélectionné{selectedIds.size > 1 ? 's' : ''}
+              <span className="text-gray-600 text-sm whitespace-nowrap">
+                sélectionné{selectedItemsCache.size > 1 ? 's' : ''}
               </span>
+              {/* Show selected types - compact */}
+              <div className="flex gap-1">
+                {[...new Set(Array.from(selectedItemsCache.values()).map(item => item.type))].map(type => (
+                  <span
+                    key={type}
+                    className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded capitalize"
+                  >
+                    {type}
+                  </span>
+                ))}
+              </div>
             </div>
 
             {/* Divider */}
-            <div className="h-8 w-px bg-gray-200"></div>
+            <div className="h-6 w-px bg-gray-200 flex-shrink-0"></div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-3">
+            {/* Incompatibility warning - compact */}
+            {!isTaskCompatible && !compatibilityLoading && (
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-red-50 border border-red-200 rounded-lg flex-shrink-0">
+                <Ban className="w-3.5 h-3.5 text-red-500" />
+                <span className="text-xs text-red-700 whitespace-nowrap">Types incompatibles</span>
+              </div>
+            )}
+
+            {/* Compatibility info - compact */}
+            {isTaskCompatible && applicableTasksCount !== null && !compatibilityLoading && (
+              <div className="flex items-center gap-1 px-2 py-1 bg-emerald-50 border border-emerald-200 rounded-lg flex-shrink-0">
+                <span className="text-xs text-emerald-700 whitespace-nowrap">
+                  ✓ {applicableTasksCount} tâche{applicableTasksCount > 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
+
+            {/* Actions - compact buttons */}
+            <div className="flex items-center gap-2 flex-shrink-0">
               {/* Clear selection */}
               <button
-                onClick={() => setSelectedIds(new Set())}
-                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex items-center gap-2"
+                onClick={() => {
+                  setSelectedIds(new Set());
+                  setSelectedItemsCache(new Map());
+                }}
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Effacer la sélection"
               >
                 <X className="w-4 h-4" />
-                Effacer
               </button>
 
               {/* Show on map */}
               <button
                 onClick={() => {
-                  // Get selected items data with coordinates
-                  const selectedItems = inventoryData.filter(item => selectedIds.has(item.id));
-                  const objectsForMap = selectedItems.map(item => ({
+                  const cachedItems = Array.from(selectedItemsCache.values());
+                  const objectsForMap = cachedItems.map(item => ({
                     id: item.id,
                     type: item.type,
                     title: item.name,
-                    subtitle: typeof item.siteId === 'string' ? item.siteId : sites.find(s => s.id === item.siteId)?.name || '',
+                    subtitle: item.siteId,
                     coordinates: item.coordinates,
                     attributes: {
                       code: item.code,
@@ -977,8 +1214,6 @@ const Inventory: React.FC = () => {
                       zone: item.zone
                     }
                   }));
-
-                  // Navigate to Map page with selected objects
                   navigate('/map', {
                     state: {
                       highlightFromInventory: true,
@@ -986,42 +1221,45 @@ const Inventory: React.FC = () => {
                     }
                   });
                 }}
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium shadow-sm"
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-sm font-medium shadow-sm whitespace-nowrap"
               >
-                <Map className="w-4 h-4" />
-                Afficher sur la carte
+                <MapIcon className="w-4 h-4" />
+                Carte
               </button>
 
               {/* Create task */}
               <button
-                onClick={() => {
-                  // Get selected items data
-                  const selectedItems = inventoryData.filter(item => selectedIds.has(item.id));
-                  const objectsForPlanning = selectedItems.map(item => ({
-                    id: parseInt(item.id, 10),
-                    type: item.type,
-                    nom: item.name,
-                    site: typeof item.siteId === 'string' ? item.siteId : sites.find(s => s.id === item.siteId)?.name || '',
-                    soussite: item.zone
-                  }));
-
-                  // Navigate to Planning page with pre-selected objects
-                  navigate('/planning', {
-                    state: {
-                      createTaskFromSelection: true,
-                      preSelectedObjects: objectsForPlanning,
-                      objectCount: selectedItems.length
-                    }
-                  });
-                }}
-                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium shadow-sm"
+                onClick={handleOpenTaskModal}
+                disabled={!isTaskCompatible || compatibilityLoading || modalLoading}
+                className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 text-sm font-medium shadow-sm whitespace-nowrap ${
+                  !isTaskCompatible || compatibilityLoading || modalLoading
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                }`}
               >
-                <ClipboardList className="w-4 h-4" />
-                Créer une tâche
+                {compatibilityLoading || modalLoading ? (
+                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <ClipboardList className="w-4 h-4" />
+                    Tâche
+                  </>
+                )}
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Task Creation Modal */}
+      {showTaskModal && (
+        <TaskFormModal
+          equipes={modalEquipes}
+          typesTaches={modalTypesTaches}
+          preSelectedObjects={preSelectedObjects}
+          onClose={() => setShowTaskModal(false)}
+          onSubmit={handleTaskSubmit}
+        />
       )}
     </div>
   );

@@ -187,6 +187,58 @@ export const fetchSatisfactionByReclamation = async (reclamationId: number): Pro
 };
 
 // ============================================================================
+// CARTE - RÉCLAMATIONS POUR AFFICHAGE SUR LA CARTE
+// ============================================================================
+
+export interface ReclamationMapFeature {
+    type: 'Feature';
+    id: string;
+    geometry: {
+        type: string;
+        coordinates: number[] | number[][] | number[][][];
+    };
+    properties: {
+        id: number;
+        object_type: 'Reclamation';
+        numero_reclamation: string;
+        statut: string;
+        statut_display: string;
+        couleur_statut: string;
+        urgence: string | null;
+        urgence_couleur: string | null;
+        type_reclamation: string | null;
+        description: string | null;
+        site_nom: string | null;
+        zone_nom: string | null;
+        date_creation: string | null;
+    };
+}
+
+export interface ReclamationMapResponse {
+    type: 'FeatureCollection';
+    features: ReclamationMapFeature[];
+    count: number;
+    statut_colors: Record<string, string>;
+}
+
+/**
+ * Récupère les réclamations pour affichage sur la carte.
+ * Retourne uniquement les réclamations non clôturées avec une localisation.
+ */
+export const fetchReclamationsForMap = async (params?: {
+    bbox?: string;
+    statut?: string;
+}): Promise<ReclamationMapResponse> => {
+    const queryParams = new URLSearchParams();
+    if (params?.bbox) queryParams.append('bbox', params.bbox);
+    if (params?.statut) queryParams.append('statut', params.statut);
+
+    const url = `${API_BASE_URL}/reclamations/map/${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    const response = await fetch(url, { headers: getAuthHeaders() });
+    return handleResponse<ReclamationMapResponse>(response);
+};
+
+// ============================================================================
 // USER 6.6.14 - STATISTIQUES
 // ============================================================================
 

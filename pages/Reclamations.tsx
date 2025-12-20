@@ -95,7 +95,13 @@ const Reclamations: React.FC = () => {
 
     // Handle navigation from MapPage with site pre-selected
     useEffect(() => {
-        const state = location.state as { createFromSite?: boolean; siteId?: number | string; siteName?: string } | null;
+        const state = location.state as {
+            createFromSite?: boolean;
+            siteId?: number | string;
+            siteName?: string;
+            openReclamationId?: number | string;
+        } | null;
+
         if (state?.createFromSite && state?.siteId) {
             // Pre-fill the form with the site
             setFormData({ site: Number(state.siteId) });
@@ -104,7 +110,27 @@ const Reclamations: React.FC = () => {
             // Clear the navigation state
             navigate(location.pathname, { replace: true, state: {} });
         }
-    }, [location.state, navigate]);
+
+        // Ouvrir une réclamation spécifique depuis la carte
+        if (state?.openReclamationId) {
+            const recId = Number(state.openReclamationId);
+            // Attendre que les données soient chargées puis ouvrir la réclamation
+            const openReclamation = () => {
+                const rec = reclamations.find(r => r.id === recId);
+                if (rec) {
+                    setSelectedReclamation(rec);
+                    // Clear the navigation state
+                    navigate(location.pathname, { replace: true, state: {} });
+                }
+            };
+
+            // Si les réclamations sont déjà chargées, ouvrir directement
+            if (reclamations.length > 0) {
+                openReclamation();
+            }
+            // Sinon, le useEffect se relancera quand reclamations sera mis à jour
+        }
+    }, [location.state, navigate, reclamations]);
 
     const loadData = async () => {
         setLoading(true);
@@ -275,6 +301,9 @@ const Reclamations: React.FC = () => {
             setSelectedReclamation(updatedRec);
             setReclamations(prev => prev.map(r => r.id === updatedRec.id ? updatedRec : r));
 
+            // Rafraîchir les réclamations sur la carte (changement de statut)
+            window.dispatchEvent(new Event('refresh-reclamations'));
+
             setIsAssignModalOpen(false);
             setModalConfig({
                 isOpen: true,
@@ -316,6 +345,9 @@ const Reclamations: React.FC = () => {
             // Update local state
             setSelectedReclamation(updatedRec);
             setReclamations(prev => prev.map(r => r.id === updatedRec.id ? updatedRec : r));
+
+            // Rafraîchir les réclamations sur la carte (la réclamation clôturée disparaîtra)
+            window.dispatchEvent(new Event('refresh-reclamations'));
 
             setModalConfig({
                 isOpen: true,

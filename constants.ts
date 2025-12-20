@@ -66,3 +66,27 @@ export const HYDRO_LEGEND = [
 export const SITE_LEGEND = [
   { type: "Site", color: "#3b82f6" }
 ];
+
+// Légende Réclamations - Couleurs par statut (synchronisé avec le backend)
+export const RECLAMATION_STATUS_COLORS: Record<string, string> = {
+  'NOUVELLE': '#ef4444',        // Rouge vif - nouvelle réclamation
+  'PRISE_EN_COMPTE': '#f97316', // Orange - prise en compte
+  'EN_COURS': '#eab308',        // Jaune - en cours de traitement
+  'RESOLUE': '#22c55e',         // Vert - résolue, en attente de clôture
+  'REJETEE': '#6b7280',         // Gris - rejetée
+};
+
+export const RECLAMATION_STATUS_LABELS: Record<string, string> = {
+  'NOUVELLE': 'Nouvelle',
+  'PRISE_EN_COMPTE': 'Prise en compte',
+  'EN_COURS': 'En cours',
+  'RESOLUE': 'Résolue',
+  'REJETEE': 'Rejetée',
+};
+
+export const RECLAMATION_LEGEND = [
+  { type: "NOUVELLE", color: "#ef4444", label: "Nouvelle" },
+  { type: "PRISE_EN_COMPTE", color: "#f97316", label: "Prise en compte" },
+  { type: "EN_COURS", color: "#eab308", label: "En cours" },
+  { type: "RESOLUE", color: "#22c55e", label: "Résolue" },
+];
