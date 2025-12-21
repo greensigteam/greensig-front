@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { X, MapPin, Calendar, Circle, Pentagon, Target } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, MapPin, Calendar, Circle, Pentagon, Target, AlertTriangle, Loader2, CheckCircle2 } from 'lucide-react';
 import { TypeReclamation, Urgence, ReclamationCreate, Reclamation } from '../../types/reclamations';
 import { GeoJSONGeometry } from '../../types';
-import { createReclamation, uploadPhoto } from '../../services/reclamationsApi';
+import { createReclamation, uploadPhoto, detectSiteFromGeometry, DetectedSiteInfo } from '../../services/reclamationsApi';
 import { PhotoUpload } from '../shared/PhotoUpload';
 
 interface ReclamationFormModalProps {
@@ -33,6 +33,58 @@ export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // État pour la détection du site
+    const [detectedSite, setDetectedSite] = useState<DetectedSiteInfo | null>(null);
+    const [isDetectingSite, setIsDetectingSite] = useState(false);
+    const [siteDetectionError, setSiteDetectionError] = useState<string | null>(null);
+
+    // Détecter le site quand le modal s'ouvre avec une géométrie
+    useEffect(() => {
+        const detectSite = async () => {
+            if (!isOpen || !geometry) return;
+
+            // Si on a déjà un site pré-sélectionné, pas besoin de détecter
+            if (preSelectedSiteId) {
+                setDetectedSite({
+                    site_id: preSelectedSiteId,
+                    site_nom: preSelectedSiteName || null,
+                    zone_id: null,
+                    zone_nom: null
+                });
+                return;
+            }
+
+            const geom = geometry;
+            if (!geom) return;
+
+            setIsDetectingSite(true);
+            setSiteDetectionError(null);
+
+            try {
+                const result = await detectSiteFromGeometry({
+                    type: geom.type,
+                    coordinates: geom.coordinates
+                });
+
+                setDetectedSite(result);
+
+                if (!result.site_id) {
+                    setSiteDetectionError("La zone indiquée ne correspond à aucun site connu. Veuillez dessiner à l'intérieur d'un site.");
+                } else {
+                    // Mettre à jour le formData avec le site détecté
+                    setFormData(prev => ({ ...prev, site: result.site_id! }));
+                }
+            } catch (err: any) {
+                console.error('Error detecting site:', err);
+                setSiteDetectionError("Erreur lors de la détection du site.");
+            } finally {
+                setIsDetectingSite(false);
+            }
+        };
+
+        detectSite();
+    }, [isOpen, geometry, preSelectedSiteId, preSelectedSiteName]);
+
     if (!isOpen) return null;
 
     // Determine geometry type label
@@ -59,19 +111,27 @@ export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
 
         // Simple area calculation using shoelace formula
         const coords = geometry.coordinates as number[][][];
-        if (!coords[0]) return null;
+        if (!coords || !coords[0] || coords[0].length < 3) return null;
 
         const ring = coords[0];
+        const firstPoint = ring[0];
+        if (!firstPoint || firstPoint.length < 2) return null;
+
         let area = 0;
         for (let i = 0; i < ring.length - 1; i++) {
-            area += ring[i][0] * ring[i + 1][1];
-            area -= ring[i + 1][0] * ring[i][1];
+            const p1 = ring[i];
+            const p2 = ring[i + 1];
+            if (p1 && p1.length >= 2 && p2 && p2.length >= 2) {
+                area += (p1[0] ?? 0) * (p2[1] ?? 0);
+                area -= (p2[0] ?? 0) * (p1[1] ?? 0);
+            }
         }
         area = Math.abs(area / 2);
 
         // Convert from degrees^2 to approximate m^2 (rough estimate at ~45 lat)
         const metersPerDegree = 111320;
-        const areaM2 = area * metersPerDegree * metersPerDegree * Math.cos(ring[0][1] * Math.PI / 180);
+        const latitude = firstPoint[1] ?? 0;
+        const areaM2 = area * metersPerDegree * metersPerDegree * Math.cos(latitude * Math.PI / 180);
 
         if (areaM2 > 10000) {
             return `${(areaM2 / 10000).toFixed(2)} ha`;
@@ -97,9 +157,9 @@ export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
         try {
             // Build payload with geometry
             const payload: ReclamationCreate = {
-                type_reclamation: formData.type_reclamation,
-                urgence: formData.urgence,
-                description: formData.description,
+                type_reclamation: formData.type_reclamation!,
+                urgence: formData.urgence!,
+                description: formData.description!,
                 date_constatation: formData.date_constatation,
                 site: formData.site,
                 localisation: geometry, // Include drawn geometry
@@ -114,7 +174,7 @@ export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
                     const fd = new FormData();
                     fd.append('fichier', file);
                     fd.append('type_photo', 'RECLAMATION');
-                    fd.append('reclamation', String(newReclamation.id));
+                    fd.append('reclamation', newReclamation.id.toString());
                     fd.append('legende', 'Photo jointe');
                     return uploadPhoto(fd);
                 });
@@ -180,15 +240,46 @@ export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
                             </div>
                         )}
 
-                        {/* Pre-selected site indicator */}
-                        {preSelectedSiteName && (
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2">
-                                <MapPin className="w-4 h-4 text-blue-600" />
-                                <span className="text-sm text-blue-800">
-                                    Site: <strong>{preSelectedSiteName}</strong>
+                        {/* Indicateur de site détecté */}
+                        {isDetectingSite ? (
+                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center gap-3">
+                                <Loader2 className="w-5 h-5 text-slate-500 animate-spin" />
+                                <span className="text-sm text-slate-600">
+                                    Détection du site en cours...
                                 </span>
                             </div>
-                        )}
+                        ) : siteDetectionError ? (
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-3">
+                                <div className="p-2 bg-red-100 rounded-lg">
+                                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                                </div>
+                                <div className="flex-1">
+                                    <span className="text-sm font-medium text-red-800">
+                                        Aucun site détecté
+                                    </span>
+                                    <p className="text-xs text-red-600 mt-0.5">
+                                        {siteDetectionError}
+                                    </p>
+                                </div>
+                            </div>
+                        ) : detectedSite?.site_id ? (
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-center gap-3">
+                                <div className="p-2 bg-emerald-100 rounded-lg">
+                                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                                </div>
+                                <div className="flex-1">
+                                    <span className="text-sm font-medium text-emerald-800">
+                                        Site: {detectedSite.site_nom}
+                                    </span>
+                                    {detectedSite.zone_nom && (
+                                        <p className="text-xs text-emerald-600 mt-0.5">
+                                            Zone: {detectedSite.zone_nom}
+                                        </p>
+                                    )}
+                                </div>
+                                <MapPin className="w-4 h-4 text-emerald-500" />
+                            </div>
+                        ) : null}
 
                         {/* Type de problème */}
                         <div>
@@ -292,14 +383,17 @@ export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
                         </button>
                         <button
                             type="submit"
-                            disabled={isSubmitting}
-                            className="flex-1 px-4 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium shadow-sm hover:shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                            disabled={isSubmitting || isDetectingSite || !!siteDetectionError}
+                            className="flex-1 px-4 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            title={siteDetectionError ? "Impossible de créer sans site détecté" : undefined}
                         >
                             {isSubmitting ? (
                                 <>
                                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                     Création...
                                 </>
+                            ) : siteDetectionError ? (
+                                'Site requis'
                             ) : (
                                 'Signaler'
                             )}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Eye, Navigation, Calendar as CalendarIcon, ClipboardList, AlertCircle, AlertTriangle } from 'lucide-react';
+import { X, Eye, Navigation, Calendar as CalendarIcon, ClipboardList, AlertTriangle } from 'lucide-react';
+
 import type { MapObjectDetail } from '../../types';
 import { RECLAMATION_STATUS_COLORS } from '../../constants';
 
@@ -9,7 +10,8 @@ interface MapObjectDetailCardProps {
   onClose?: () => void;
   onViewCentreGest?: () => void;
   onCreateTask?: () => void;
-  onCreateReclamation?: () => void;
+
+
   userRole?: string;
 }
 
@@ -26,8 +28,8 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
   selectedObject,
   onClose,
   onCreateTask,
-  onCreateReclamation,
   userRole
+
 }) => {
   const navigate = useNavigate();
 
@@ -268,16 +270,11 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
             <>
               <button
                 onClick={handleViewDetails}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1 w-full"
               >
                 <Eye className="w-3 h-3" /> Voir détails
               </button>
-              <button
-                onClick={onCreateReclamation}
-                className="flex-1 bg-orange-600 hover:bg-orange-700 text-white py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1"
-              >
-                <AlertCircle className="w-3 h-3" /> Réclamation
-              </button>
+
             </>
           ) : (
             <>

@@ -114,23 +114,22 @@ const Reclamations: React.FC = () => {
         // Ouvrir une réclamation spécifique depuis la carte
         if (state?.openReclamationId) {
             const recId = Number(state.openReclamationId);
-            // Attendre que les données soient chargées puis ouvrir la réclamation
-            const openReclamation = () => {
-                const rec = reclamations.find(r => r.id === recId);
-                if (rec) {
-                    setSelectedReclamation(rec);
-                    // Clear the navigation state
-                    navigate(location.pathname, { replace: true, state: {} });
+
+            // Charger les détails complets (comme handleDetails)
+            const openReclamation = async () => {
+                try {
+                    const fullRec = await fetchReclamationById(recId);
+                    setSelectedReclamation(fullRec);
+                } catch (error) {
+                    console.error('Erreur chargement réclamation:', error);
                 }
+                // Clear the navigation state
+                navigate(location.pathname, { replace: true, state: {} });
             };
 
-            // Si les réclamations sont déjà chargées, ouvrir directement
-            if (reclamations.length > 0) {
-                openReclamation();
-            }
-            // Sinon, le useEffect se relancera quand reclamations sera mis à jour
+            openReclamation();
         }
-    }, [location.state, navigate, reclamations]);
+    }, [location.state, navigate]);
 
     const loadData = async () => {
         setLoading(true);
@@ -1113,8 +1112,9 @@ const Reclamations: React.FC = () => {
                                         Créer une tâche
                                     </button>
                                 )}
-                                {/* User 6.6.12.3 - Bouton Clôturer (visible uniquement si RESOLUE) */}
-                                {selectedReclamation.statut !== 'CLOTUREE' && selectedReclamation.statut !== 'REJETEE' && (
+                                {/* User 6.6.12.3 - Bouton Clôturer (visible uniquement si RESOLUE et non client) */}
+                                {selectedReclamation.statut !== 'CLOTUREE' && selectedReclamation.statut !== 'REJETEE' && !isClient && (
+
                                     <button
                                         onClick={handleCloturer}
                                         disabled={selectedReclamation.taches_liees_details?.some((t: any) => t.statut !== 'TERMINEE')}
