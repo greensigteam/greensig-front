@@ -10,6 +10,7 @@ interface MapObjectDetailCardProps {
   onClose?: () => void;
   onViewCentreGest?: () => void;
   onCreateTask?: () => void;
+  onCreateReclamation?: () => void;
 
 
   userRole?: string;
@@ -28,6 +29,7 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
   selectedObject,
   onClose,
   onCreateTask,
+  onCreateReclamation,
   userRole
 
 }) => {
@@ -274,7 +276,14 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
               >
                 <Eye className="w-3 h-3" /> Voir détails
               </button>
-
+              {onCreateReclamation && (
+                <button
+                  onClick={onCreateReclamation}
+                  className="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1"
+                >
+                  <AlertTriangle className="w-3 h-3" /> Signaler
+                </button>
+              )}
             </>
           ) : (
             <>

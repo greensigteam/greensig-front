@@ -4,7 +4,7 @@ import { X, AlertTriangle } from 'lucide-react';
 import { VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND } from '../constants';
 import { MapLayerType, Coordinates, OverlayState, MapObjectDetail, Measurement, MeasurementType } from '../types';
 import { MOCK_SITES } from '../services/mockData';
-import { searchObjects, geoJSONToLatLng, fetchAllSites, SiteFrontend, exportPDF, downloadBlob, deleteInventoryItem } from '../services/api';
+import { searchObjects, geoJSONToLatLng, fetchAllSites, SiteFrontend, exportPDF, downloadBlob, deleteInventoryItem, ImportExecuteResponse } from '../services/api';
 import { useSearch } from '../hooks/useSearch';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useMapContext } from '../contexts/MapContext';
@@ -170,6 +170,13 @@ export const MapPage: React.FC<MapPageProps> = ({
     startDrawing,
     cancelDrawing,
   } = useDrawing();
+
+  // ✅ Clear persistent drawing state on mount to prevent "white page" issues
+  useEffect(() => {
+    clearDrawnGeometry();
+    setDrawingMode('none');
+    setPendingObjectType(null);
+  }, []);
 
   // ========== STATE MANAGEMENT ==========
   const [showLayers, setShowLayers] = useState(false);
@@ -693,10 +700,10 @@ export const MapPage: React.FC<MapPageProps> = ({
 
   // ✅ Show type selector when a geometry is drawn (for objects, not sites)
   useEffect(() => {
-    if (drawnGeometry && !pendingObjectType && !isCreatingSite) {
+    if (drawnGeometry && !pendingObjectType && !isCreatingSite && !isReportingProblem) {
       setShowTypeSelector(true);
     }
-  }, [drawnGeometry, pendingObjectType, isCreatingSite]);
+  }, [drawnGeometry, pendingObjectType, isCreatingSite, isReportingProblem]);
 
   // ✅ Show site creation modal when polygon is drawn while creating a site
   useEffect(() => {
@@ -735,8 +742,9 @@ export const MapPage: React.FC<MapPageProps> = ({
   };
 
   // ✅ Handle import success
-  const handleImportSuccess = (count: number, type: string) => {
-    showToast(`${count} ${type}(s) importé(s) avec succès!`, 'success');
+  // ✅ Handle import success
+  const handleImportSuccess = (result: ImportExecuteResponse) => {
+    showToast(`${result.summary.created} objet(s) importé(s) avec succès!`, 'success');
     setShowImportWizard(false);
     // Trigger a refresh of map data
     window.dispatchEvent(new CustomEvent('refresh-map-data'));
@@ -945,7 +953,7 @@ export const MapPage: React.FC<MapPageProps> = ({
       />
 
       {/* 6. Object Type Selector Modal */}
-      {showTypeSelector && drawnGeometry && (
+      {showTypeSelector && drawnGeometry && !isReportingProblem && (
         <ObjectTypeSelector
           isOpen={showTypeSelector}
           onClose={() => {
