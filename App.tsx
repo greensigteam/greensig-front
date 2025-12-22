@@ -3,11 +3,11 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
-import { MapPage } from './pages/MapPage';
-import { OLMap } from './components/OLMap';
 import LoadingScreen from './components/LoadingScreen';
 
 // Lazy load heavy pages for better initial bundle size
+const MapPage = lazy(() => import('./pages/MapPage').then(m => ({ default: m.MapPage })));
+const OLMap = lazy(() => import('./components/OLMap').then(m => ({ default: m.OLMap })));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const InventoryDetailPage = lazy(() => import('./pages/InventoryDetailPage'));
 const Reclamations = lazy(() => import('./pages/Reclamations'));

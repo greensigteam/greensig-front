@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Search, AlertCircle, Eye, Edit2, Trash2, X, Tag, MapPin, ClipboardList, Calendar, Clock, Users, Star, TrendingUp } from 'lucide-react';
 import { Reclamation, TypeReclamation, Urgence, ReclamationCreate } from '../types/reclamations';
@@ -34,6 +34,7 @@ const Reclamations: React.FC = () => {
     const [reclamations, setReclamations] = useState<Reclamation[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
     const [currentUser, setCurrentUser] = useState<Utilisateur | null>(null);
 
     // Helpers rôles
@@ -88,6 +89,14 @@ const Reclamations: React.FC = () => {
         message: '',
         variant: 'info'
     });
+
+    // Debounce search term (300ms delay)
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
     useEffect(() => {
         loadData();
@@ -476,16 +485,16 @@ const Reclamations: React.FC = () => {
     };
 
 
-    const filteredReclamations = reclamations.filter(r =>
-        r.numero_reclamation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredReclamations = useMemo(() => reclamations.filter(r =>
+        r.numero_reclamation?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        r.description?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+    ), [reclamations, debouncedSearchTerm]);
 
-    const filteredTaches = tachesLiees.filter(t =>
-        t.type_tache_detail.nom_tache.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        ((t.client_detail as any)?.nom_structure || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.description_travaux?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredTaches = useMemo(() => tachesLiees.filter(t =>
+        t.type_tache_detail.nom_tache.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        ((t.client_detail as any)?.nom_structure || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        t.description_travaux?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+    ), [tachesLiees, debouncedSearchTerm]);
 
     return (
         <div className="p-6 space-y-6 bg-slate-50 min-h-screen">

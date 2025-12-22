@@ -10,8 +10,8 @@ import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 import {
     Users, Clock, X, Trash2, Edit, Search, Filter, UserPlus, Timer, AlertTriangle, Download, Eye
 } from 'lucide-react';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
+// Dynamic imports pour réduire le bundle initial (PDF export utilisé rarement)
+// html2canvas et jsPDF sont importés dynamiquement dans handleExportPDF
 import { planningService } from '../services/planningService';
 import { fetchClients, fetchEquipes } from '../services/usersApi';
 import { fetchCurrentUser } from '../services/api';
@@ -130,6 +130,7 @@ const Planning: FC = () => {
 
     // Nouveaux filtres
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
     const [filterClient, setFilterClient] = useState<number | 'all'>('all');
     const [filterStatut, setFilterStatut] = useState<string>('all');
     const [filterType, setFilterType] = useState<number | 'all'>('all');
@@ -142,6 +143,14 @@ const Planning: FC = () => {
     const location = useLocation();
     const [initialTaskValues, setInitialTaskValues] = useState<Partial<TacheCreate> | undefined>(undefined);
     const [preSelectedObjects, setPreSelectedObjects] = useState<InventoryObjectOption[] | undefined>(undefined);
+
+    // Debounce search term (300ms delay)
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
     // Handle navigation from Reclamations
     useEffect(() => {
@@ -189,23 +198,26 @@ const Planning: FC = () => {
         }
     }, [location]);
 
-    // Load initial data
+    // Load stable data only once (clients, equipes, types, user)
     useEffect(() => {
-        loadData();
+        loadStableData();
     }, []);
 
-    const loadData = async () => {
+    // Load tasks separately (can be refreshed independently)
+    useEffect(() => {
+        loadTaches();
+    }, []);
+
+    const loadStableData = async () => {
         try {
             setLoading(true);
-            const [tachesData, clientsData, equipesData, typesData, userData] = await Promise.all([
-                planningService.getTaches(),
+            const [clientsData, equipesData, typesData, userData] = await Promise.all([
                 fetchClients().then(data => data.results || data),
                 fetchEquipes().then(data => data.results || data),
                 planningService.getTypesTaches(),
                 fetchCurrentUser()
             ]);
 
-            setTaches(tachesData.results || tachesData);
             setClients(Array.isArray(clientsData) ? clientsData : []);
             setEquipes(Array.isArray(equipesData) ? equipesData : []);
             setTypesTaches(typesData);
@@ -224,11 +236,28 @@ const Planning: FC = () => {
         }
     };
 
+    const loadTaches = async () => {
+        try {
+            const tachesData = await planningService.getTaches();
+            setTaches(tachesData.results || tachesData);
+        } catch (err) {
+            console.error('Erreur chargement tâches:', err);
+        }
+    };
+
     const handleExportPDF = async () => {
         if (!calendarRef.current) return;
         setIsExporting(true);
 
         try {
+            // Dynamic imports pour réduire le bundle initial
+            const [html2canvasModule, jsPDFModule] = await Promise.all([
+                import('html2canvas'),
+                import('jspdf')
+            ]);
+            const html2canvas = html2canvasModule.default;
+            const { jsPDF } = jsPDFModule;
+
             const canvas = await html2canvas(calendarRef.current, {
                 scale: 2, // Meilleure qualité
                 useCORS: true,
@@ -321,7 +350,7 @@ const Planning: FC = () => {
                 date_fin_planifiee: new Date(data.date_fin_planifiee).toISOString()
             };
             await planningService.updateTache(selectedTache.id, updateData);
-            await loadData();
+            await loadTaches();
             setShowCreateForm(false);
             setSelectedTache(null);
         } catch (err) {
@@ -339,7 +368,7 @@ const Planning: FC = () => {
             };
 
             await planningService.createTache(createData);
-            await loadData();
+            await loadTaches();
             setShowCreateForm(false);
         } catch (err) {
             alert('Erreur lors de la création de la tâche');
@@ -355,7 +384,7 @@ const Planning: FC = () => {
         if (!tacheToDelete) return;
         try {
             await planningService.deleteTache(tacheToDelete);
-            await loadData();
+            await loadTaches();
             setSelectedTache(null);
             setTacheToDelete(null);
         } catch (err) {
@@ -367,7 +396,7 @@ const Planning: FC = () => {
     const handleResetCharge = async (tacheId: number) => {
         try {
             await planningService.resetCharge(tacheId);
-            await loadData();
+            await loadTaches();
         } catch (err) {
             alert('Erreur lors du recalcul de la charge');
             console.error(err);
@@ -393,8 +422,8 @@ const Planning: FC = () => {
             if (filterType !== 'all' && t.type_tache_detail.id !== filterType) return false;
 
             // 5. Recherche textuelle (Tâche, Équipe, Description)
-            if (searchTerm) {
-                const term = searchTerm.toLowerCase();
+            if (debouncedSearchTerm) {
+                const term = debouncedSearchTerm.toLowerCase();
                 const equipesNames = (t.equipes_detail?.map(e => (e as any).nom_equipe || e.nomEquipe).join(' ') || (t.equipe_detail as any)?.nom_equipe || t.equipe_detail?.nomEquipe || '').toLowerCase();
                 const taskName = t.type_tache_detail.nom_tache.toLowerCase();
                 const desc = (t.description_travaux || '').toLowerCase();
@@ -404,7 +433,7 @@ const Planning: FC = () => {
 
             return true;
         });
-    }, [taches, filterEquipe, filterClient, filterStatut, filterType, searchTerm]);
+    }, [taches, filterEquipe, filterClient, filterStatut, filterType, debouncedSearchTerm]);
 
     // Map tasks to RBC events
     const events: CalendarEvent[] = useMemo(() => {
@@ -508,8 +537,8 @@ const Planning: FC = () => {
         } catch (err) {
             console.error('Erreur lors du déplacement de la tâche:', err);
             alert('Erreur lors du déplacement de la tâche');
-            // Reload data to restore correct state
-            loadData();
+            // Reload tasks to restore correct state
+            loadTaches();
         }
     }, []);
 
@@ -529,8 +558,8 @@ const Planning: FC = () => {
         } catch (err) {
             console.error('Erreur lors du redimensionnement de la tâche:', err);
             alert('Erreur lors du redimensionnement de la tâche');
-            // Reload data to restore correct state
-            loadData();
+            // Reload tasks to restore correct state
+            loadTaches();
         }
     }, []);
 
