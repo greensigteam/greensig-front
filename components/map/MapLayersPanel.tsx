@@ -1,7 +1,7 @@
 import React from 'react';
-import { Layers, Filter, Grid, X, MapIcon, ImageIcon, Mountain, Navigation, Trees } from 'lucide-react';
-import { MAP_LAYERS, VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND } from '../../constants';
-import type { MapLayerType } from '../../types';
+import { Layers, Filter, Grid, X, MapIcon, ImageIcon, Mountain, Navigation, Trees, AlertTriangle } from 'lucide-react';
+import { MAP_LAYERS, VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND, RECLAMATION_LEGEND } from '../../constants';
+import type { MapLayerType, OverlayState } from '../../types';
 import { useMapContext } from '../../contexts/MapContext';
 
 interface MapLayersPanelProps {
@@ -15,6 +15,9 @@ interface MapLayersPanelProps {
   toggleMapLayerVisibility: (layerId: string, visible: boolean) => void;
   clusteringEnabled: boolean;
   setClusteringEnabled?: (enabled: boolean) => void;
+  // Overlays props for reclamations toggle
+  overlays?: OverlayState;
+  onToggleOverlay?: (key: keyof OverlayState) => void;
 }
 
 export const MapLayersPanel: React.FC<MapLayersPanelProps> = ({
@@ -27,7 +30,9 @@ export const MapLayersPanel: React.FC<MapLayersPanelProps> = ({
   layerVisibility,
   toggleMapLayerVisibility,
   clusteringEnabled,
-  setClusteringEnabled
+  setClusteringEnabled,
+  overlays,
+  onToggleOverlay
 }) => {
   // ✅ Use MapContext for batch operations
   const mapContext = useMapContext();
@@ -253,6 +258,48 @@ export const MapLayersPanel: React.FC<MapLayersPanelProps> = ({
                 ))}
               </div>
             </div>
+
+            {/* Réclamations Section */}
+            {onToggleOverlay && (
+              <div className="mb-3">
+                <div className="text-xs font-semibold text-orange-600 uppercase tracking-wide mb-1 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  Réclamations
+                </div>
+                <div className="space-y-1 pl-1">
+                  {/* Toggle principal pour afficher/masquer toutes les réclamations */}
+                  <div className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded transition-colors">
+                    <input
+                      type="checkbox"
+                      id="filter-reclamations"
+                      checked={overlays?.reclamations !== false}
+                      onChange={() => onToggleOverlay('reclamations')}
+                      className="w-4 h-4 rounded text-orange-600 focus:ring-orange-500 cursor-pointer border-gray-300"
+                    />
+                    <label htmlFor="filter-reclamations" className="flex items-center gap-2 cursor-pointer flex-1 select-none">
+                      <span className="w-4 h-4 rounded shadow-sm border border-black/10 flex items-center justify-center bg-orange-500 text-white text-[8px] font-bold">!</span>
+                      <span className="text-sm text-gray-700 font-medium">Afficher sur la carte</span>
+                    </label>
+                  </div>
+
+                  {/* Légende des statuts */}
+                  {overlays?.reclamations && (
+                    <div className="mt-2 pl-6 space-y-1">
+                      <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Légende des statuts</div>
+                      {RECLAMATION_LEGEND.map(item => (
+                        <div key={item.type} className="flex items-center gap-2 py-0.5">
+                          <span
+                            className="w-3 h-3 rounded-full border border-white shadow-sm"
+                            style={{ backgroundColor: item.color }}
+                          ></span>
+                          <span className="text-xs text-gray-600">{item.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -186,9 +186,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                           {entry.label}
                         </span>
                         <ChevronDown
-                          className={`w-4 h-4 transition-transform duration-200 ${
-                            openGroups.includes(entry.id) ? 'rotate-180' : ''
-                          }`}
+                          className={`w-4 h-4 transition-transform duration-200 ${openGroups.includes(entry.id) ? 'rotate-180' : ''
+                            }`}
                         />
                       </>
                     )}
@@ -201,7 +200,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         .map(child => (
                           <li key={child.id}>
                             <NavLink
-                              to={viewToPath[child.id]}
+                              to={viewToPath[child.id] || '#'}
                               className={({ isActive }) =>
                                 `w-full flex items-center rounded-lg transition-all duration-200 group relative px-3 py-2 gap-3
                                 ${isActive
@@ -234,7 +233,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               ) : (
                 // Regular menu item
                 <NavLink
-                  to={viewToPath[entry.id]}
+                  to={viewToPath[entry.id] || '#'}
                   className={({ isActive }) =>
                     `w-full flex items-center rounded-lg transition-all duration-200 group relative
                     ${collapsed ? 'justify-center p-2.5' : 'px-3 py-2.5 gap-3'}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, memo } from 'react';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, Square, CheckSquare, MinusSquare } from 'lucide-react';
 
 export interface Column<T> {
@@ -31,7 +31,7 @@ export interface DataTableProps<T> {
     getItemId?: (item: T) => string;
 }
 
-export function DataTable<T extends Record<string, any>>({
+function DataTableInner<T extends Record<string, any>>({
     data,
     columns,
     onRowClick,
@@ -64,7 +64,7 @@ export function DataTable<T extends Record<string, any>>({
     const isAllCurrentPageSelected = currentDataIds.size > 0 && selectedInCurrentPage === currentDataIds.size;
     const isSomeCurrentPageSelected = selectedInCurrentPage > 0 && selectedInCurrentPage < currentDataIds.size;
 
-    const handleSelectAll = () => {
+    const handleSelectAll = useCallback(() => {
         if (!onSelectionChange) return;
 
         const newSelected = new Set(selectedIds);
@@ -76,9 +76,9 @@ export function DataTable<T extends Record<string, any>>({
             currentDataIds.forEach(id => newSelected.add(id));
         }
         onSelectionChange(newSelected);
-    };
+    }, [onSelectionChange, selectedIds, isAllCurrentPageSelected, currentDataIds]);
 
-    const handleSelectItem = (itemId: string, e: React.MouseEvent) => {
+    const handleSelectItem = useCallback((itemId: string, e: React.MouseEvent) => {
         e.stopPropagation();
         if (!onSelectionChange) return;
 
@@ -89,7 +89,7 @@ export function DataTable<T extends Record<string, any>>({
             newSelected.add(itemId);
         }
         onSelectionChange(newSelected);
-    };
+    }, [onSelectionChange, selectedIds]);
 
     // Use external or local state
     const currentPage = serverSide ? externalCurrentPage : localCurrentPage;
@@ -125,25 +125,25 @@ export function DataTable<T extends Record<string, any>>({
     const displayStartIndex = (currentPage - 1) * itemsPerPage;
     const displayEndIndex = Math.min(displayStartIndex + itemsPerPage, displayTotalItems);
 
-    const handleSort = (columnKey: string, sortable?: boolean) => {
+    const handleSort = useCallback((columnKey: string, sortable?: boolean) => {
         if (sortable === false) return;
 
         if (sortColumn === columnKey) {
-            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+            setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
         } else {
             setSortColumn(columnKey);
             setSortDirection('asc');
         }
-    };
+    }, [sortColumn]);
 
-    const goToPage = (page: number) => {
+    const goToPage = useCallback((page: number) => {
         const newPage = Math.max(1, Math.min(page, totalPages));
         if (serverSide && onPageChange) {
             onPageChange(newPage);
         } else {
             setLocalCurrentPage(newPage);
         }
-    };
+    }, [totalPages, serverSide, onPageChange]);
 
     return (
         <div className="bg-white h-full flex flex-col">
@@ -298,3 +298,6 @@ export function DataTable<T extends Record<string, any>>({
         </div >
     );
 }
+
+// Wrapper pour supporter les generics avec memo
+export const DataTable = memo(DataTableInner) as typeof DataTableInner;

@@ -114,6 +114,7 @@ export interface OverlayState {
   networks: boolean;
   greenSpaces: boolean;
   works: boolean;
+  reclamations: boolean;
 }
 
 // User 1.1.5 - Detailed Object Interface
@@ -209,7 +210,7 @@ export interface Measurement {
 // DRAWING & EDITING TYPES
 // ==============================================================================
 
-export type DrawingMode = 'none' | 'point' | 'line' | 'polygon';
+export type DrawingMode = 'none' | 'point' | 'line' | 'polygon' | 'circle';
 export type EditingMode = 'none' | 'modify' | 'move' | 'delete';
 
 export type ObjectCategory = 'vegetation' | 'hydraulique' | 'site';

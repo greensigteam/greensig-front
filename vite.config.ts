@@ -4,15 +4,21 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+
+  // Configuration HMR conditionnelle :
+  // - En tunnel (VITE_USE_TUNNEL=true) : wss sur port 443
+  // - En local : configuration par défaut (ws sur le port du serveur)
+  const useTunnel = env.VITE_USE_TUNNEL === 'true';
+
   return {
     server: {
       port: 3000,
       host: '0.0.0.0',
       allowedHosts: true, // Autorise Cloudflare Tunnel
-      hmr: {
+      hmr: useTunnel ? {
         clientPort: 443,
         protocol: 'wss',
-      },
+      } : true,  // 'true' = configuration automatique pour dev local
       proxy: {
         '/api': {
           target: 'http://127.0.0.1:8000',

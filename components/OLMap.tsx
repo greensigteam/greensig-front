@@ -16,7 +16,7 @@ import { Point } from 'ol/geom';
 import { defaults as defaultControls, ScaleLine } from 'ol/control';
 
 import { LayerConfig, Coordinates, MapSearchResult, UserLocation, MapObjectDetail, OverlayState, MapHandle, Measurement, MeasurementType } from "../types";
-import { INITIAL_POSITION, VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND } from "../constants";
+import { INITIAL_POSITION, VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND, RECLAMATION_STATUS_COLORS } from "../constants";
 import { createMarkerIcon, createSiteIcon, OBJECT_COLORS, TYPE_TO_API } from '../utils/mapHelpers';
 import { useSearchHighlight } from '../hooks/useSearchHighlight';
 import { useUserLocationDisplay } from '../hooks/useUserLocationDisplay';
@@ -30,6 +30,7 @@ import { useSelection } from '../contexts/SelectionContext';
 import { useDrawing } from '../contexts/DrawingContext';
 import logger from '../services/logger';
 import { fetchMapData } from '../services/api';
+import { fetchReclamationsForMap } from '../services/reclamationsApi';
 
 
 
@@ -82,6 +83,7 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     searchResult,
     onMoveEnd,
     onObjectClick,
+    overlays,
     clusteringEnabled,
     isMeasuring = false,
     measurementType = 'distance',
@@ -108,6 +110,10 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
   const vectorSourceRef = useRef<VectorSource | null>(null);
   const clusterSourcesRef = useRef<Record<string, Cluster>>({}); // ✅ Clusters by type
   const clusterLayersRef = useRef<Record<string, VectorLayer<VectorSource>>>({});
+
+  // ✅ Réclamations layer refs
+  const reclamationsLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const reclamationsSourceRef = useRef<VectorSource | null>(null);
 
   // ✅ Refs for state accessed in event listeners (prevent stale closures)
   const clusteringEnabledRef = useRef(clusteringEnabled);
@@ -462,10 +468,54 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     });
     dataLayerRef.current = dataLayer;
 
+    // ✅ Réclamations Layer - Affiche les réclamations non clôturées avec code couleur
+    const reclamationsSource = new VectorSource();
+    reclamationsSourceRef.current = reclamationsSource;
+
+    const reclamationsLayer = new VectorLayer({
+      source: reclamationsSource,
+      zIndex: 100, // Au-dessus des objets mais en-dessous de la sélection
+      style: (feature) => {
+        const props = feature.getProperties();
+        const statut = props.statut || 'NOUVELLE';
+        const color = RECLAMATION_STATUS_COLORS[statut] || '#ef4444';
+        const geomType = feature.getGeometry()?.getType();
+
+        // Style de base avec bordure blanche pour plus de visibilité
+        if (geomType === 'Point') {
+          // Point: cercle avec icône d'alerte
+          return new Style({
+            image: new CircleStyle({
+              radius: 12,
+              fill: new Fill({ color: color }),
+              stroke: new Stroke({ color: '#ffffff', width: 3 })
+            }),
+            text: new Text({
+              text: '!',
+              font: 'bold 14px sans-serif',
+              fill: new Fill({ color: '#ffffff' }),
+              offsetY: 1
+            })
+          });
+        } else {
+          // Polygon/LineString: contour coloré avec remplissage semi-transparent
+          return new Style({
+            fill: new Fill({ color: `${color}40` }), // 25% opacity
+            stroke: new Stroke({
+              color: color,
+              width: 3,
+              lineDash: [8, 4] // Ligne pointillée pour différencier des objets normaux
+            })
+          });
+        }
+      }
+    });
+    reclamationsLayerRef.current = reclamationsLayer;
+
     // Create map (without hook layers to avoid "Duplicate item" error)
     const map = new Map({
       target: innerMapRef.current,
-      layers: [baseLayer, sitesLayer, dataLayer, selectionLayer], // ✅ Only our own layers
+      layers: [baseLayer, sitesLayer, dataLayer, reclamationsLayer, selectionLayer], // ✅ Réclamations ajoutée
       overlays: [overlay], // ✅ Only our own overlay
       view: new View({
         center: fromLonLat([INITIAL_POSITION.lng, INITIAL_POSITION.lat]),
@@ -504,6 +554,7 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
 
     // Initial data fetch
     fetchData();
+    fetchReclamations();
 
     // MoveEnd event with debouncing
     map.on('moveend', () => {
@@ -519,6 +570,7 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
 
       fetchDataTimeoutRef.current = setTimeout(() => {
         fetchData();
+        fetchReclamations();
       }, 300);
     });
 
@@ -763,6 +815,65 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     }
   };
 
+  // ✅ Fetch Reclamations - Récupère les réclamations pour affichage sur la carte
+  const fetchReclamations = async () => {
+    // Ne pas charger si la couche n'est pas visible ou si c'est une mini-carte
+    if (!overlays?.reclamations || isMiniMap) {
+      reclamationsSourceRef.current?.clear();
+      return;
+    }
+
+    if (!mapInstance.current || !reclamationsSourceRef.current) {
+      return;
+    }
+
+    try {
+      const view = mapInstance.current.getView();
+      const extent = view.calculateExtent(mapInstance.current.getSize());
+      const [west, south, east, north] = transformExtent(extent, 'EPSG:3857', 'EPSG:4326');
+
+      const data = await fetchReclamationsForMap({
+        bbox: `${west},${south},${east},${north}`
+      });
+
+      if (data.type !== 'FeatureCollection') {
+        throw new Error('Invalid GeoJSON');
+      }
+
+      const geojsonFormat = new GeoJSON();
+      const features: Feature[] = [];
+
+      data.features.forEach((feat) => {
+        const feature = geojsonFormat.readFeature(feat, {
+          dataProjection: 'EPSG:4326',
+          featureProjection: 'EPSG:3857'
+        }) as Feature;
+
+        // Copier les propriétés importantes
+        feature.setId(feat.id);
+        feature.set('object_type', 'Reclamation');
+        feature.set('statut', feat.properties.statut);
+        feature.set('numero_reclamation', feat.properties.numero_reclamation);
+        feature.set('statut_display', feat.properties.statut_display);
+        feature.set('couleur_statut', feat.properties.couleur_statut);
+        feature.set('urgence', feat.properties.urgence);
+        feature.set('type_reclamation', feat.properties.type_reclamation);
+        feature.set('description', feat.properties.description);
+        feature.set('site_nom', feat.properties.site_nom);
+        feature.set('id', feat.properties.id);
+
+        features.push(feature);
+      });
+
+      reclamationsSourceRef.current.clear();
+      reclamationsSourceRef.current.addFeatures(features);
+
+      console.log(`✅ Loaded ${features.length} reclamations on map`);
+    } catch (err) {
+      logger.error('Error fetching reclamations:', err);
+    }
+  };
+
   // Base layer update
   useEffect(() => {
     if (!mapInstance.current) return;
@@ -974,6 +1085,20 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     }
   }, [clusteringEnabled, visibleLayers]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ✅ Toggle réclamations visibility and refetch when overlay changes
+  useEffect(() => {
+    if (!mapReady || !reclamationsLayerRef.current) return;
+
+    const isVisible = overlays?.reclamations ?? true;
+    reclamationsLayerRef.current.setVisible(isVisible);
+
+    if (isVisible) {
+      fetchReclamations();
+    } else {
+      reclamationsSourceRef.current?.clear();
+    }
+  }, [overlays?.reclamations, mapReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Listen for refresh-map-data event (triggered after object modification/deletion)
   useEffect(() => {
     const handleRefreshMapData = () => {
@@ -988,6 +1113,21 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
       window.removeEventListener('refresh-map-data', handleRefreshMapData);
     };
   }, [mapReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ✅ Listen for refresh-reclamations event (triggered after reclamation creation/update)
+  useEffect(() => {
+    const handleRefreshReclamations = () => {
+      console.log('[OLMap] Received refresh-reclamations event');
+      if (mapReady && mapInstance.current && overlays?.reclamations) {
+        fetchReclamations();
+      }
+    };
+
+    window.addEventListener('refresh-reclamations', handleRefreshReclamations);
+    return () => {
+      window.removeEventListener('refresh-reclamations', handleRefreshReclamations);
+    };
+  }, [mapReady, overlays?.reclamations]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ✅ New Effect: Handle specific highlightedGeometry (from Detail Page)
   useEffect(() => {

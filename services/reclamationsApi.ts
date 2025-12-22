@@ -146,8 +146,39 @@ export const uploadPhoto = async (formData: FormData): Promise<any> => {
     }
 
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ detail: 'Erreur upload photo' }));
-        throw new Error(error.detail || `Erreur upload ${response.status}`);
+        const contentType = response.headers.get('content-type');
+        let error: any = {};
+
+        try {
+            if (contentType && contentType.includes('application/json')) {
+                error = await response.json();
+            } else {
+                const text = await response.text();
+                console.error('Server error (non-JSON):', text);
+                error = { detail: `Erreur serveur (${response.status}): ${text.substring(0, 200)}` };
+            }
+        } catch (parseError) {
+            console.error('Error parsing response:', parseError);
+            error = { detail: `Erreur serveur (${response.status})` };
+        }
+
+        console.error('Upload photo error response:', error);
+
+        // Gérer les différents formats d'erreur DRF
+        let errorMessage = 'Erreur upload photo';
+        if (error.detail) {
+            errorMessage = error.detail;
+        } else if (error.non_field_errors) {
+            errorMessage = error.non_field_errors.join(', ');
+        } else if (typeof error === 'object') {
+            // Erreurs de champs spécifiques
+            const fieldErrors = Object.entries(error)
+                .filter(([key]) => key !== 'detail')
+                .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
+                .join('; ');
+            if (fieldErrors) errorMessage = fieldErrors;
+        }
+        throw new Error(errorMessage);
     }
     return response.json();
 };
@@ -184,6 +215,85 @@ export const fetchSatisfactionByReclamation = async (reclamationId: number): Pro
     const data = await handleResponse<any>(response);
     const results = data.results || data;
     return results.length > 0 ? results[0] : null;
+};
+
+// ============================================================================
+// DETECTION DE SITE DEPUIS GEOMETRIE
+// ============================================================================
+
+export interface DetectedSiteInfo {
+    site_id: number | null;
+    site_nom: string | null;
+    zone_id: number | null;
+    zone_nom: string | null;
+}
+
+/**
+ * Détecte le site correspondant à une géométrie (point, polygone, etc.)
+ * Utilisé pour afficher le site avant la création d'une réclamation.
+ */
+export const detectSiteFromGeometry = async (geometry: {
+    type: string;
+    coordinates: number[] | number[][] | number[][][] | number[][][][];
+}): Promise<DetectedSiteInfo> => {
+    const response = await fetch(`${API_BASE_URL}/reclamations/detect-site/`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ geometry })
+    });
+    return handleResponse<DetectedSiteInfo>(response);
+};
+
+// ============================================================================
+// CARTE - RÉCLAMATIONS POUR AFFICHAGE SUR LA CARTE
+// ============================================================================
+
+export interface ReclamationMapFeature {
+    type: 'Feature';
+    id: string;
+    geometry: {
+        type: string;
+        coordinates: number[] | number[][] | number[][][];
+    };
+    properties: {
+        id: number;
+        object_type: 'Reclamation';
+        numero_reclamation: string;
+        statut: string;
+        statut_display: string;
+        couleur_statut: string;
+        urgence: string | null;
+        urgence_couleur: string | null;
+        type_reclamation: string | null;
+        description: string | null;
+        site_nom: string | null;
+        zone_nom: string | null;
+        date_creation: string | null;
+    };
+}
+
+export interface ReclamationMapResponse {
+    type: 'FeatureCollection';
+    features: ReclamationMapFeature[];
+    count: number;
+    statut_colors: Record<string, string>;
+}
+
+/**
+ * Récupère les réclamations pour affichage sur la carte.
+ * Retourne uniquement les réclamations non clôturées avec une localisation.
+ */
+export const fetchReclamationsForMap = async (params?: {
+    bbox?: string;
+    statut?: string;
+}): Promise<ReclamationMapResponse> => {
+    const queryParams = new URLSearchParams();
+    if (params?.bbox) queryParams.append('bbox', params.bbox);
+    if (params?.statut) queryParams.append('statut', params.statut);
+
+    const url = `${API_BASE_URL}/reclamations/map/${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    const response = await fetch(url, { headers: getAuthHeaders() });
+    return handleResponse<ReclamationMapResponse>(response);
 };
 
 // ============================================================================

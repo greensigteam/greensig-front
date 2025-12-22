@@ -941,7 +941,18 @@ export async function updateInventoryItem(
       body: JSON.stringify(data),
     });
 
-    return await handleResponse<any>(response);
+    const result = await handleResponse<any>(response);
+
+    // Invalider le cache Dexie pour cet objet (force refetch depuis API)
+    try {
+      const localId = `${objectType}-${objectId}`;
+      await db.inventory.delete(localId);
+      logger.info(`Cache invalidé pour objet modifié: ${localId}`);
+    } catch (cacheError) {
+      logger.warn('Erreur invalidation cache Dexie:', cacheError);
+    }
+
+    return result;
   } catch (error) {
     logger.error(`Error updating ${objectType} #${objectId}:`, error);
     throw error;
@@ -1036,7 +1047,18 @@ export async function createInventoryItem(
       body: JSON.stringify(requestBody),
     });
 
-    return await handleResponse<any>(response);
+    const result = await handleResponse<any>(response);
+
+    // Invalider le cache Dexie pour cet objet (force refetch depuis API)
+    try {
+      const localId = `${objectType}-${result.id || result.properties?.id}`;
+      await db.inventory.delete(localId);
+      logger.info(`Cache invalidé pour nouvel objet: ${localId}`);
+    } catch (cacheError) {
+      logger.warn('Erreur invalidation cache Dexie:', cacheError);
+    }
+
+    return result;
   } catch (error) {
     logger.error(`Error creating ${objectType}:`, error);
     throw error;
@@ -1065,6 +1087,15 @@ export async function deleteInventoryItem(
 
     if (!response.ok && response.status !== 204) {
       throw new ApiError(`Erreur lors de la suppression: ${response.status}`, response.status);
+    }
+
+    // Invalider le cache Dexie pour cet objet supprimé
+    try {
+      const localId = `${objectType}-${objectId}`;
+      await db.inventory.delete(localId);
+      logger.info(`Cache invalidé pour objet supprimé: ${localId}`);
+    } catch (cacheError) {
+      logger.warn('Erreur invalidation cache Dexie:', cacheError);
     }
   } catch (error) {
     logger.error(`Error deleting ${objectType} #${objectId}:`, error);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Plus,
   Users,
@@ -743,6 +743,7 @@ const Teams: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('equipes');
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
 
   // Data
   const [equipes, setEquipes] = useState<EquipeList[]>([]);
@@ -799,10 +800,28 @@ const Teams: React.FC = () => {
   const isChefEquipe = !!currentUser?.roles?.includes('CHEF_EQUIPE');
   const isChefEquipeOnly = isChefEquipe && !isAdmin;
 
-  // Load data
+  // Debounce search query (300ms delay)
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Load stable data once (currentUser - doesn't change during session)
+  useEffect(() => {
+    loadStableData();
     loadData();
   }, []);
+
+  const loadStableData = async () => {
+    try {
+      const currentUserRes = await fetchCurrentUser();
+      setCurrentUser(currentUserRes);
+    } catch (error) {
+      console.error('Erreur chargement user:', error);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -816,8 +835,7 @@ const Teams: React.FC = () => {
         competencesRes,
         statsRes,
         utilisateursRes,
-        clientsRes,
-        currentUserRes
+        clientsRes
       ] = await Promise.all([
         fetchEquipes(),
         fetchOperateurs(),
@@ -827,11 +845,8 @@ const Teams: React.FC = () => {
         fetchCompetences(),
         fetchStatistiquesUtilisateurs(),
         fetchUtilisateurs(),
-        fetchClients(),
-        fetchCurrentUser()
+        fetchClients()
       ]);
-
-      setCurrentUser(currentUserRes);
 
       setEquipes(equipesRes.results);
       setOperateurs(operateursRes.results);
@@ -911,23 +926,23 @@ const Teams: React.FC = () => {
     }
   };
 
-  // Filter data
-  const filteredEquipes = equipes
+  // Filter data (using debounced search for performance)
+  const filteredEquipes = useMemo(() => equipes
     .filter(e => e.actif)
     .filter(e =>
-      e.nomEquipe.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (e.chefEquipeNom || '').toLowerCase().includes(searchQuery.toLowerCase())
-    );
+      e.nomEquipe.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+      (e.chefEquipeNom || '').toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+    ), [equipes, debouncedSearchQuery]);
 
-  const filteredOperateurs = operateurs.filter(o =>
-    o.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    o.numeroImmatriculation.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredOperateurs = useMemo(() => operateurs.filter(o =>
+    o.fullName.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+    o.numeroImmatriculation.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+  ), [operateurs, debouncedSearchQuery]);
 
-  const filteredAbsences = absences.filter(a => {
+  const filteredAbsences = useMemo(() => absences.filter(a => {
     // Filtre par recherche (operateur, motif, type)
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.toLowerCase();
       const matchOperateur = a.operateurNom.toLowerCase().includes(query);
       const matchMotif = a.motif?.toLowerCase().includes(query);
       const matchType = TYPE_ABSENCE_LABELS[a.typeAbsence]?.toLowerCase().includes(query);
@@ -953,15 +968,15 @@ const Teams: React.FC = () => {
       return false;
     }
     return true;
-  });
+  }), [absences, debouncedSearchQuery, absenceFilters]);
 
   const operateursSansEquipe = operateurs.filter(o => o.equipe === null && o.actif);
 
   // Filtrage des competences
-  const filteredCompetences = competences.filter(c => {
+  const filteredCompetences = useMemo(() => competences.filter(c => {
     // Filtre par recherche
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.toLowerCase();
       const matchNom = c.nomCompetence.toLowerCase().includes(query);
       const matchDescription = c.description?.toLowerCase().includes(query);
       const matchCategorie = CATEGORIE_COMPETENCE_LABELS[c.categorie]?.toLowerCase().includes(query);
@@ -974,8 +989,7 @@ const Teams: React.FC = () => {
       return false;
     }
     return true;
-  }).sort((a, b) => (a.ordreAffichage || 0) - (b.ordreAffichage || 0));
-
+  }).sort((a, b) => (a.ordreAffichage || 0) - (b.ordreAffichage || 0)), [competences, debouncedSearchQuery, competenceFilter]);
 
 
   // Columns

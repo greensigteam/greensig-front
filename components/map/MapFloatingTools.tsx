@@ -17,10 +17,16 @@ import {
   Redo2,
   FolderInput,
   FileOutput,
+  AlertTriangle,
+  MapPin,
+  Target,
 } from 'lucide-react';
 import { Measurement, MeasurementType, DrawingMode } from '../../types';
 import { useDrawing, getObjectTypesByGeometry } from '../../contexts/DrawingContext';
 import ObjectTypeSelector from './ObjectTypeSelector';
+
+// Type for reclamation drawing mode (subset of DrawingMode)
+export type ReportDrawingMode = 'none' | 'point' | 'circle' | 'polygon';
 
 interface MapFloatingToolsProps {
   isPanelOpen: boolean;
@@ -42,6 +48,12 @@ interface MapFloatingToolsProps {
   // Drawing tools props
   onImport?: () => void;
   onExport?: () => void;
+  // Report problem props
+  onReportProblem?: () => void;
+  isReportingProblem?: boolean;
+  reportDrawingMode?: ReportDrawingMode;
+  onStartReportDrawing?: (mode: ReportDrawingMode) => void;
+  onCancelReporting?: () => void;
 }
 
 /**
@@ -74,6 +86,11 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
   selectionCount = 0,
   onImport,
   onExport,
+  onReportProblem,
+  isReportingProblem = false,
+  reportDrawingMode = 'none',
+  onStartReportDrawing,
+  onCancelReporting,
 }) => {
   const [showMeasureTools, setShowMeasureTools] = useState(false);
   const [showDrawingTools, setShowDrawingTools] = useState(false);
@@ -216,7 +233,11 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
 
         <div className="h-px bg-slate-100 w-full" />
 
-        {/* Drawing Tools Toggle */}
+        {/*
+         * DÉSACTIVÉ par demande du Product Owner (20/12/2024)
+         * Outils de dessin retirés temporairement.
+         * Pour réactiver : décommenter le bloc ci-dessous.
+         *
         <button
           onClick={toggleDrawingTools}
           className={`p-3 transition-colors ${showDrawingTools || isDrawingActive ? 'bg-emerald-600 text-white' : 'hover:bg-slate-50 text-slate-600'}`}
@@ -226,6 +247,7 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
         </button>
 
         <div className="h-px bg-slate-100 w-full" />
+        */}
 
         {/* Measurement Toggle */}
         <button
@@ -266,9 +288,93 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
         >
           {isExporting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Printer className="w-5 h-5" />}
         </button>
+
+        {/* Report Problem Button */}
+        {onReportProblem && (
+          <>
+            <div className="h-px bg-slate-100 w-full" />
+            <button
+              onClick={onReportProblem}
+              className={`p-3 transition-colors ${isReportingProblem ? 'bg-orange-500 text-white' : 'hover:bg-slate-50 text-orange-500 hover:text-orange-600'}`}
+              title="Signaler un problème"
+            >
+              <AlertTriangle className="w-5 h-5" />
+            </button>
+          </>
+        )}
       </div>
 
-      {/* ===== DRAWING TOOLS PANEL ===== */}
+      {/* Report Problem Panel */}
+      {isReportingProblem && onStartReportDrawing && onCancelReporting && (
+        <div className="bg-white/95 backdrop-blur-md shadow-xl rounded-xl border border-white/20 p-3 ring-1 ring-black/5 w-64 animate-in slide-in-from-right-2 duration-200">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-semibold text-slate-700 text-sm flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-orange-500" />
+              Signaler un problème
+            </h4>
+            <button onClick={onCancelReporting} className="text-slate-400 hover:text-slate-600">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <p className="text-xs text-slate-500 mb-3">
+            Délimitez la zone affectée sur la carte :
+          </p>
+
+          <div className="flex gap-1 bg-slate-50 rounded-lg p-1 mb-3">
+            <button
+              onClick={() => onStartReportDrawing('point')}
+              className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${
+                reportDrawingMode === 'point'
+                  ? 'bg-orange-500 text-white shadow-md'
+                  : 'hover:bg-white text-slate-600 hover:shadow-sm'
+              }`}
+              title="Pointer un lieu précis"
+            >
+              <Target className="w-4 h-4" />
+              <span className="text-[9px] font-medium">Point</span>
+            </button>
+            <button
+              onClick={() => onStartReportDrawing('circle')}
+              className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${
+                reportDrawingMode === 'circle'
+                  ? 'bg-orange-500 text-white shadow-md'
+                  : 'hover:bg-white text-slate-600 hover:shadow-sm'
+              }`}
+              title="Dessiner un cercle"
+            >
+              <Circle className="w-4 h-4" />
+              <span className="text-[9px] font-medium">Cercle</span>
+            </button>
+            <button
+              onClick={() => onStartReportDrawing('polygon')}
+              className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${
+                reportDrawingMode === 'polygon'
+                  ? 'bg-orange-500 text-white shadow-md'
+                  : 'hover:bg-white text-slate-600 hover:shadow-sm'
+              }`}
+              title="Dessiner une zone libre"
+            >
+              <Pentagon className="w-4 h-4" />
+              <span className="text-[9px] font-medium">Zone</span>
+            </button>
+          </div>
+
+          {reportDrawingMode !== 'none' && (
+            <div className="text-xs text-orange-600 bg-orange-50 rounded-lg p-2 border border-orange-100">
+              {reportDrawingMode === 'point' && "Cliquez sur la carte pour placer le point"}
+              {reportDrawingMode === 'circle' && "Cliquez et glissez pour dessiner le cercle"}
+              {reportDrawingMode === 'polygon' && "Cliquez pour ajouter des points, double-cliquez pour terminer"}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/*
+       * DÉSACTIVÉ par demande du Product Owner (20/12/2024)
+       * Panneau d'outils de dessin retiré temporairement.
+       * Pour réactiver : décommenter le bloc ci-dessous.
+       *
       {(showDrawingTools || isDrawingActive) && (
         <div className="bg-white/95 backdrop-blur-md shadow-xl rounded-xl border border-white/20 p-3 ring-1 ring-black/5 w-64 animate-in slide-in-from-right-2 duration-200">
           <div className="flex items-center justify-between mb-3">
@@ -278,7 +384,6 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
             </button>
           </div>
 
-          {/* Object Type Selector Modal */}
           {showTypeSelector && pendingDrawingMode && (
             <ObjectTypeSelector
               geometryType={
@@ -293,7 +398,6 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
             />
           )}
 
-          {/* Drawing Buttons */}
           <div className="mb-3">
             <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Dessiner</div>
             <div className="flex gap-1 bg-slate-50 rounded-lg p-1">
@@ -336,7 +440,6 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
             </div>
           </div>
 
-          {/* Import/Export Buttons */}
           <div className="mb-3">
             <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Données</div>
             <div className="flex gap-2">
@@ -359,7 +462,6 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
             </div>
           </div>
 
-          {/* Undo/Redo Buttons */}
           <div className="mb-3">
             <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Historique</div>
             <div className="flex gap-2">
@@ -392,7 +494,6 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
             </div>
           </div>
 
-          {/* Current Drawing Status */}
           {(isDrawing || currentGeometry) && (
             <div className="border-t border-slate-100 pt-3">
               <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">En cours</div>
@@ -409,7 +510,6 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
                 </div>
               )}
 
-              {/* Metrics display */}
               {calculatedMetrics && (
                 <div className="text-[10px] space-y-1 bg-emerald-50 rounded-lg p-2 mb-2 border border-emerald-100">
                   {calculatedMetrics.area_m2 !== undefined && (
@@ -443,7 +543,6 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
                 </div>
               )}
 
-              {/* Cancel button */}
               <button
                 onClick={handleCancelDrawing}
                 className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors text-slate-600"
@@ -454,7 +553,6 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
             </div>
           )}
 
-          {/* Help text */}
           {!isDrawing && !currentGeometry && (
             <p className="text-[10px] text-slate-400 italic text-center pt-2 border-t border-slate-100">
               Sélectionnez un outil pour commencer
@@ -462,6 +560,7 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
           )}
         </div>
       )}
+      */}
 
       {/* ===== MEASUREMENT TOOLS PANEL ===== */}
       {(showMeasureTools || isMeasuring) && (

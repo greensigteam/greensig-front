@@ -1,14 +1,17 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Eye, Navigation, Calendar as CalendarIcon, ClipboardList, AlertCircle } from 'lucide-react';
+import { X, Eye, Navigation, Calendar as CalendarIcon, ClipboardList, AlertTriangle } from 'lucide-react';
+
 import type { MapObjectDetail } from '../../types';
+import { RECLAMATION_STATUS_COLORS } from '../../constants';
 
 interface MapObjectDetailCardProps {
   selectedObject: MapObjectDetail | null;
   onClose?: () => void;
   onViewCentreGest?: () => void;
   onCreateTask?: () => void;
-  onCreateReclamation?: () => void;
+
+
   userRole?: string;
 }
 
@@ -25,8 +28,8 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
   selectedObject,
   onClose,
   onCreateTask,
-  onCreateReclamation,
   userRole
+
 }) => {
   const navigate = useNavigate();
 
@@ -34,6 +37,7 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
 
   const canCreateTask = userRole !== 'CHEF_EQUIPE' && userRole !== 'CLIENT';
   const isSite = selectedObject.type === 'Site' || selectedObject.type === 'site';
+  const isReclamation = selectedObject.type === 'Reclamation';
 
   const handleViewDetails = () => {
     if (!selectedObject) return;
@@ -41,6 +45,16 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
     // Special handling for Site details
     if (isSite) {
       navigate(`/sites/${selectedObject.id}`);
+      return;
+    }
+
+    // Special handling for Reclamation details
+    if (isReclamation) {
+      navigate('/reclamations', {
+        state: {
+          openReclamationId: selectedObject.id
+        }
+      });
       return;
     }
 
@@ -90,24 +104,54 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
       'Surface totale': 'Surface totale',
       'Date début contrat': 'Début contrat',
       'Date fin contrat': 'Fin contrat',
-      'Actif': 'Actif'
+      'Actif': 'Actif',
+
+      // Reclamation fields
+      'numero_reclamation': 'N° Réclamation',
+      'statut': 'Statut',
+      'statut_display': 'Statut',
+      'urgence': 'Urgence',
+      'type_reclamation': 'Type',
+      'description': 'Description',
+      // 'site_nom' déjà défini plus haut
+      'zone_nom': 'Zone',
+      'date_creation': 'Date création',
+      'couleur_statut': 'Couleur'
     };
 
     return translations[key] || key;
   };
 
+  // Déterminer le style du header selon le type
+  const getHeaderStyle = () => {
+    if (isSite) {
+      return { backgroundColor: selectedObject.attributes?.Couleur as string || '#3b82f6' };
+    }
+    if (isReclamation) {
+      const statut = selectedObject.attributes?.statut as string;
+      const color = RECLAMATION_STATUS_COLORS[statut] || '#f97316';
+      return { background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)` };
+    }
+    return {};
+  };
+
+  const getHeaderClass = () => {
+    if (isSite) return '';
+    if (isReclamation) return '';
+    return 'bg-gradient-to-br from-emerald-600 to-teal-700';
+  };
+
+  const getBadgeClass = () => {
+    if (isSite) return 'text-blue-100 bg-black/20';
+    if (isReclamation) return 'text-orange-100 bg-black/20';
+    return 'text-emerald-100 bg-black/20';
+  };
+
   return (
     <div className="absolute top-20 right-4 w-80 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-white/40 animate-slide-in pointer-events-auto ring-1 ring-black/5 z-50 overflow-hidden">
       <div
-        className={`h-28 relative p-4 flex flex-col justify-end ${selectedObject.type !== 'Site'
-          ? 'bg-gradient-to-br from-emerald-600 to-teal-700'
-          : ''
-          }`}
-        style={
-          selectedObject.type === 'Site'
-            ? { backgroundColor: selectedObject.attributes?.Couleur as string || '#3b82f6' }
-            : {}
-        }
+        className={`h-28 relative p-4 flex flex-col justify-end ${getHeaderClass()}`}
+        style={getHeaderStyle()}
       >
         <button
           onClick={onClose}
@@ -115,13 +159,20 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
         >
           <X className="w-4 h-4" />
         </button>
-        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded w-fit mb-1 ${selectedObject.type === 'Site' ? 'text-blue-100 bg-black/20' : 'text-emerald-100 bg-black/20'
-          }`}>
-          {selectedObject.type}
+        {isReclamation && (
+          <AlertTriangle className="absolute top-3 left-4 w-5 h-5 text-white/80" />
+        )}
+        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded w-fit mb-1 ${getBadgeClass()}`}>
+          {isReclamation ? 'Réclamation' : selectedObject.type}
         </span>
         <h3 className="text-lg font-bold text-white leading-tight">{selectedObject.title}</h3>
         {selectedObject.attributes?.['Catégorie'] && selectedObject.type === 'Site' && (
           <span className="text-xs text-white/80 mt-1">{selectedObject.attributes['Catégorie']}</span>
+        )}
+        {isReclamation && selectedObject.attributes?.statut_display && (
+          <span className="text-xs text-white/90 mt-1 font-medium">
+            Statut: {selectedObject.attributes.statut_display}
+          </span>
         )}
       </div>
       <div className="p-4 space-y-4">
@@ -144,6 +195,16 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
 
             // Pour les sites, ignorer Description (déjà affiché) et Couleur
             if (selectedObject.type === 'Site' && (key === 'Description' || key === 'Couleur')) {
+              return null;
+            }
+
+            // Pour les réclamations, ignorer les champs techniques et ceux déjà affichés
+            if (isReclamation && (
+              key === 'couleur_statut' ||
+              key === 'statut' ||
+              key === 'statut_display' ||
+              key === 'object_type'
+            )) {
               return null;
             }
 
@@ -197,20 +258,23 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
         )}
 
         <div className="flex gap-2 mt-2">
-          {isSite ? (
+          {isReclamation ? (
+            // Boutons pour les réclamations
+            <button
+              onClick={handleViewDetails}
+              className="flex-1 bg-orange-600 hover:bg-orange-700 text-white py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1"
+            >
+              <Eye className="w-3 h-3" /> Voir détails
+            </button>
+          ) : isSite ? (
             <>
               <button
                 onClick={handleViewDetails}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1 w-full"
               >
                 <Eye className="w-3 h-3" /> Voir détails
               </button>
-              <button
-                onClick={onCreateReclamation}
-                className="flex-1 bg-orange-600 hover:bg-orange-700 text-white py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1"
-              >
-                <AlertCircle className="w-3 h-3" /> Réclamation
-              </button>
+
             </>
           ) : (
             <>

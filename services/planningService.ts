@@ -43,6 +43,7 @@ export const planningService = {
     },
 
     async createTache(data: TacheCreate): Promise<Tache> {
+        console.log('Creating task with data:', JSON.stringify(data, null, 2));
         const response = await apiFetch(`${BASE_URL}/taches/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -50,7 +51,8 @@ export const planningService = {
         });
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.detail || 'Erreur lors de la création de la tâche');
+            console.error('Task creation error response:', error);
+            throw new Error(error.detail || JSON.stringify(error) || 'Erreur lors de la création de la tâche');
         }
         return response.json();
     },
@@ -85,6 +87,35 @@ export const planningService = {
         // Gestion souple : si array direct ou si format paginé
         if (Array.isArray(data)) return data;
         return data.results || [];
+    },
+
+    /**
+     * Récupère les types de tâches applicables à une liste de types d'objets.
+     * Un type de tâche est applicable si un RatioProductivite existe pour TOUS les types fournis.
+     *
+     * @param typesObjets - Liste des types d'objets (ex: ['Arbre', 'Gazon', 'Palmier'])
+     * @returns Liste des types de tâches applicables
+     */
+    async getApplicableTypesTaches(typesObjets: string[]): Promise<{
+        types_objets_demandes: string[];
+        nombre_types_taches: number;
+        types_taches: TypeTache[];
+    }> {
+        if (!typesObjets || typesObjets.length === 0) {
+            // Si aucun type fourni, retourner tous les types
+            const allTypes = await this.getTypesTaches();
+            return {
+                types_objets_demandes: [],
+                nombre_types_taches: allTypes.length,
+                types_taches: allTypes
+            };
+        }
+
+        const typesParam = typesObjets.join(',');
+        const response = await apiFetch(`${BASE_URL}/types-taches/applicables/?types_objets=${encodeURIComponent(typesParam)}`);
+
+        if (!response.ok) throw new Error('Erreur chargement types tâches applicables');
+        return response.json();
     },
 
     async createTypeTache(data: { nom_tache: string; description?: string }): Promise<TypeTache> {

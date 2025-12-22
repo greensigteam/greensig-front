@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Search, AlertCircle, Eye, Edit2, Trash2, X, Tag, MapPin, ClipboardList, Calendar, Clock, Users, Star, TrendingUp } from 'lucide-react';
 import { Reclamation, TypeReclamation, Urgence, ReclamationCreate } from '../types/reclamations';
@@ -34,6 +34,7 @@ const Reclamations: React.FC = () => {
     const [reclamations, setReclamations] = useState<Reclamation[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
     const [currentUser, setCurrentUser] = useState<Utilisateur | null>(null);
 
     // Helpers rôles
@@ -89,13 +90,27 @@ const Reclamations: React.FC = () => {
         variant: 'info'
     });
 
+    // Debounce search term (300ms delay)
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
     useEffect(() => {
         loadData();
     }, []);
 
     // Handle navigation from MapPage with site pre-selected
     useEffect(() => {
-        const state = location.state as { createFromSite?: boolean; siteId?: number | string; siteName?: string } | null;
+        const state = location.state as {
+            createFromSite?: boolean;
+            siteId?: number | string;
+            siteName?: string;
+            openReclamationId?: number | string;
+        } | null;
+
         if (state?.createFromSite && state?.siteId) {
             // Pre-fill the form with the site
             setFormData({ site: Number(state.siteId) });
@@ -103,6 +118,25 @@ const Reclamations: React.FC = () => {
             setIsCreateModalOpen(true);
             // Clear the navigation state
             navigate(location.pathname, { replace: true, state: {} });
+        }
+
+        // Ouvrir une réclamation spécifique depuis la carte
+        if (state?.openReclamationId) {
+            const recId = Number(state.openReclamationId);
+
+            // Charger les détails complets (comme handleDetails)
+            const openReclamation = async () => {
+                try {
+                    const fullRec = await fetchReclamationById(recId);
+                    setSelectedReclamation(fullRec);
+                } catch (error) {
+                    console.error('Erreur chargement réclamation:', error);
+                }
+                // Clear the navigation state
+                navigate(location.pathname, { replace: true, state: {} });
+            };
+
+            openReclamation();
         }
     }, [location.state, navigate]);
 
@@ -275,6 +309,9 @@ const Reclamations: React.FC = () => {
             setSelectedReclamation(updatedRec);
             setReclamations(prev => prev.map(r => r.id === updatedRec.id ? updatedRec : r));
 
+            // Rafraîchir les réclamations sur la carte (changement de statut)
+            window.dispatchEvent(new Event('refresh-reclamations'));
+
             setIsAssignModalOpen(false);
             setModalConfig({
                 isOpen: true,
@@ -316,6 +353,9 @@ const Reclamations: React.FC = () => {
             // Update local state
             setSelectedReclamation(updatedRec);
             setReclamations(prev => prev.map(r => r.id === updatedRec.id ? updatedRec : r));
+
+            // Rafraîchir les réclamations sur la carte (la réclamation clôturée disparaîtra)
+            window.dispatchEvent(new Event('refresh-reclamations'));
 
             setModalConfig({
                 isOpen: true,
@@ -445,16 +485,16 @@ const Reclamations: React.FC = () => {
     };
 
 
-    const filteredReclamations = reclamations.filter(r =>
-        r.numero_reclamation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredReclamations = useMemo(() => reclamations.filter(r =>
+        r.numero_reclamation?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        r.description?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+    ), [reclamations, debouncedSearchTerm]);
 
-    const filteredTaches = tachesLiees.filter(t =>
-        t.type_tache_detail.nom_tache.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        ((t.client_detail as any)?.nom_structure || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.description_travaux?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredTaches = useMemo(() => tachesLiees.filter(t =>
+        t.type_tache_detail.nom_tache.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        ((t.client_detail as any)?.nom_structure || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        t.description_travaux?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+    ), [tachesLiees, debouncedSearchTerm]);
 
     return (
         <div className="p-6 space-y-6 bg-slate-50 min-h-screen">
@@ -1081,8 +1121,9 @@ const Reclamations: React.FC = () => {
                                         Créer une tâche
                                     </button>
                                 )}
-                                {/* User 6.6.12.3 - Bouton Clôturer (visible uniquement si RESOLUE) */}
-                                {selectedReclamation.statut !== 'CLOTUREE' && selectedReclamation.statut !== 'REJETEE' && (
+                                {/* User 6.6.12.3 - Bouton Clôturer (visible uniquement si RESOLUE et non client) */}
+                                {selectedReclamation.statut !== 'CLOTUREE' && selectedReclamation.statut !== 'REJETEE' && !isClient && (
+
                                     <button
                                         onClick={handleCloturer}
                                         disabled={selectedReclamation.taches_liees_details?.some((t: any) => t.statut !== 'TERMINEE')}

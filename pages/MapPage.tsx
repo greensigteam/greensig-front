@@ -28,10 +28,15 @@ import CreateObjectModal from '../components/CreateObjectModal';
 import ImportWizard from '../components/import/ImportWizard';
 import ExportPanel from '../components/export/ExportPanel';
 import TaskFormModal, { InventoryObjectOption } from '../components/planning/TaskFormModal';
+import { ReclamationFormModal } from '../components/reclamations/ReclamationFormModal';
 import { planningService } from '../services/planningService';
 import { fetchEquipes } from '../services/usersApi';
+import { fetchTypesReclamations, fetchUrgences } from '../services/reclamationsApi';
 import { TypeTache, TacheCreate } from '../types/planning';
+import { TypeReclamation, Urgence, Reclamation } from '../types/reclamations';
 import { EquipeList } from '../types/users';
+import { ReportDrawingMode } from '../components/map/MapFloatingTools';
+import { GeoJSONGeometry, DrawingMode } from '../types';
 
 // Types pour la symbologie
 interface SymbologyConfig {
@@ -120,6 +125,8 @@ export const MapPage: React.FC<MapPageProps> = ({
   exportMapCanvas,
   isPanelOpen = true,
   onToggleMap,
+  overlays,
+  onToggleOverlay,
   selectedObject,
   onCloseObjectDetail,
   isSidebarCollapsed,
@@ -160,6 +167,8 @@ export const MapPage: React.FC<MapPageProps> = ({
     pendingObjectType,
     setPendingObjectType,
     calculatedMetrics,
+    startDrawing,
+    cancelDrawing,
   } = useDrawing();
 
   // ========== STATE MANAGEMENT ==========
@@ -192,6 +201,14 @@ export const MapPage: React.FC<MapPageProps> = ({
   const [taskPreSelectedObjects, setTaskPreSelectedObjects] = useState<InventoryObjectOption[]>([]);
   const [typesTaches, setTypesTaches] = useState<TypeTache[]>([]);
   const [equipes, setEquipes] = useState<EquipeList[]>([]);
+
+  // Reclamation/Report Problem State
+  const [isReportingProblem, setIsReportingProblem] = useState(false);
+  const [reportDrawingMode, setReportDrawingMode] = useState<ReportDrawingMode>('none');
+  const [reportGeometry, setReportGeometry] = useState<GeoJSONGeometry | null>(null);
+  const [showReclamationModal, setShowReclamationModal] = useState(false);
+  const [typesReclamation, setTypesReclamation] = useState<TypeReclamation[]>([]);
+  const [urgences, setUrgencesReclamation] = useState<Urgence[]>([]);
 
   // ========== HANDLE NAVIGATION FROM INVENTORY ==========
   useEffect(() => {
@@ -335,11 +352,82 @@ export const MapPage: React.FC<MapPageProps> = ({
       await planningService.createTache(data);
       showToast("Tâche créée avec succès", "success");
       setIsTaskModalOpen(false);
+      // Navigate to planning page after successful creation
+      navigate('/planning');
     } catch (err: any) {
       console.error("Error creating task", err);
       showToast(err.message || "Erreur lors de la création de la tâche", "error");
     }
   };
+
+  // ========== REPORT PROBLEM HANDLERS ==========
+
+  // Load reclamation reference data
+  const loadReclamationData = async () => {
+    try {
+      const [typesData, urgencesData] = await Promise.all([
+        fetchTypesReclamations(),
+        fetchUrgences()
+      ]);
+      setTypesReclamation(typesData);
+      setUrgencesReclamation(urgencesData);
+    } catch (err: any) {
+      console.error("Error loading reclamation data", err);
+      showToast("Erreur lors du chargement des données", "error");
+    }
+  };
+
+  // Handle clicking "Signaler un problème" button
+  const handleReportProblem = async () => {
+    // Load reference data if needed
+    if (typesReclamation.length === 0) {
+      await loadReclamationData();
+    }
+    setIsReportingProblem(true);
+    setReportDrawingMode('none');
+    // Close other panels
+    setShowLayers(false);
+  };
+
+  // Handle selecting a geometry type for reporting
+  const handleStartReportDrawing = (mode: ReportDrawingMode) => {
+    setReportDrawingMode(mode);
+    // Activate drawing mode via context
+    if (mode !== 'none') {
+      startDrawing(mode as DrawingMode);
+    }
+  };
+
+  // Handle canceling report mode
+  const handleCancelReporting = () => {
+    setIsReportingProblem(false);
+    setReportDrawingMode('none');
+    setReportGeometry(null);
+    cancelDrawing();
+    clearDrawnGeometry();
+  };
+
+  // Handle successful reclamation creation
+  const handleReclamationSuccess = (reclamation: Reclamation) => {
+    showToast(`Réclamation ${reclamation.numero_reclamation} créée avec succès`, "success");
+    setShowReclamationModal(false);
+    setReportGeometry(null);
+    setIsReportingProblem(false);
+    setReportDrawingMode('none');
+    // Clear drawn geometry from map
+    // Navigate to reclamations page
+    navigate('/reclamations');
+  };
+
+  // Effect to detect when drawing is complete in reporting mode
+  useEffect(() => {
+    if (isReportingProblem && drawnGeometry && reportDrawingMode !== 'none' && !showReclamationModal) {
+      // Drawing completed, open the reclamation modal
+      setReportGeometry(drawnGeometry);
+      setShowReclamationModal(true);
+      setReportDrawingMode('none');
+    }
+  }, [isReportingProblem, drawnGeometry, reportDrawingMode, showReclamationModal]);
 
   // ========== SEARCH HOOK ==========
   const {
@@ -743,29 +831,43 @@ export const MapPage: React.FC<MapPageProps> = ({
         selectionCount={selectedObjects.length}
         onImport={() => setShowImportWizard(true)}
         onExport={() => setShowExportPanel(true)}
+        onReportProblem={handleReportProblem}
+        isReportingProblem={isReportingProblem}
+        reportDrawingMode={reportDrawingMode}
+        onStartReportDrawing={handleStartReportDrawing}
+        onCancelReporting={handleCancelReporting}
       />
 
       {/* 3. Selection Panel */}
       <SelectionPanel
         userRole={userRole}
-        onCreateIntervention={() => {
-          // Convert selected objects to the format expected by Planning page
-          const objectsForPlanning = selectedObjects.map(obj => ({
-            id: parseInt(obj.id, 10),
-            type: obj.type,
-            nom: obj.title || obj.type,
-            site: obj.subtitle || '',
-            soussite: obj.attributes?.sous_site_nom
-          }));
+        onCreateIntervention={async () => {
+          // Load task data if needed
+          if (typesTaches.length === 0) {
+            await loadTaskData();
+          }
 
-          // Navigate to Planning page with pre-selected objects
-          navigate('/planning', {
-            state: {
-              createTaskFromSelection: true,
-              preSelectedObjects: objectsForPlanning,
-              objectCount: selectedObjects.length
-            }
+          // Convert selected objects to the format expected by TaskFormModal
+          const objectsForModal: InventoryObjectOption[] = selectedObjects.map(obj => {
+            const superficieStr = obj.attributes?.['superficie_calculee']
+              || obj.attributes?.['Surface (m²)']
+              || obj.attributes?.['area_sqm'];
+            const superficie = superficieStr ? parseFloat(superficieStr) : undefined;
+
+            return {
+              id: parseInt(obj.id, 10),
+              type: obj.type,
+              nom: obj.title || obj.type,
+              site: obj.subtitle || '',
+              soussite: obj.attributes?.sous_site_nom,
+              superficie: !isNaN(superficie as number) ? superficie : undefined
+            };
           });
+
+          // Open modal directly instead of navigating
+          setTaskPreSelectedObjects(objectsForModal);
+          setTaskModalInitialValues({});
+          setIsTaskModalOpen(true);
         }}
         onDeleteObjects={async () => {
           // Delete all selected objects
@@ -830,6 +932,8 @@ export const MapPage: React.FC<MapPageProps> = ({
         toggleMapLayerVisibility={toggleMapLayerVisibility}
         clusteringEnabled={clusteringEnabled}
         setClusteringEnabled={setClusteringEnabled}
+        overlays={overlays}
+        onToggleOverlay={onToggleOverlay}
       />
 
       {/* 5. Zoom Controls Component */}
@@ -962,6 +1066,23 @@ export const MapPage: React.FC<MapPageProps> = ({
           equipes={equipes}
           onClose={() => setIsTaskModalOpen(false)}
           onSubmit={handleTaskSubmit}
+        />
+      )}
+
+      {/* Reclamation/Report Problem Modal */}
+      {showReclamationModal && reportGeometry && (
+        <ReclamationFormModal
+          isOpen={showReclamationModal}
+          onClose={() => {
+            setShowReclamationModal(false);
+            setReportGeometry(null);
+            setIsReportingProblem(false);
+            clearDrawnGeometry();
+          }}
+          onSuccess={handleReclamationSuccess}
+          geometry={reportGeometry}
+          types={typesReclamation}
+          urgences={urgences}
         />
       )}
     </>

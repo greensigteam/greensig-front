@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { X, Trash2, MapPin, MousePointer2, Move, Pencil, AlertTriangle, Square, SquareDashedMousePointer } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Trash2, MapPin, MousePointer2, Move, Pencil, AlertTriangle, Square, SquareDashedMousePointer, Ban } from 'lucide-react';
 import { useSelection } from '../../contexts/SelectionContext';
 import { useDrawing } from '../../contexts/DrawingContext';
 import { EditingMode } from '../../types';
+import { planningService } from '../../services/planningService';
 
 interface SelectionPanelProps {
     onCreateIntervention?: () => void;
@@ -20,6 +21,46 @@ export const SelectionPanel: React.FC<SelectionPanelProps> = ({
     const { selectedObjects, clearSelection, removeFromSelection, isSelectionMode, setSelectionMode, isBoxSelectionMode, setBoxSelectionMode } = useSelection();
     const { editingMode, setEditingMode } = useDrawing();
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+    // State for task type compatibility check
+    const [isCompatible, setIsCompatible] = useState(true);
+    const [compatibilityLoading, setCompatibilityLoading] = useState(false);
+    const [applicableTasksCount, setApplicableTasksCount] = useState<number | null>(null);
+
+    // Get unique object types from selection
+    const uniqueObjectTypes = useMemo(() => {
+        return [...new Set(selectedObjects.map(obj => obj.type))];
+    }, [selectedObjects]);
+
+    // Check compatibility when selected objects change
+    useEffect(() => {
+        if (selectedObjects.length === 0) {
+            setIsCompatible(true);
+            setApplicableTasksCount(null);
+            return;
+        }
+
+        // If only one type, always compatible
+        if (uniqueObjectTypes.length <= 1) {
+            setIsCompatible(true);
+            setApplicableTasksCount(null);
+            return;
+        }
+
+        // Check if there are applicable task types for all selected object types
+        setCompatibilityLoading(true);
+        planningService.getApplicableTypesTaches(uniqueObjectTypes)
+            .then(result => {
+                setIsCompatible(result.types_taches.length > 0);
+                setApplicableTasksCount(result.types_taches.length);
+            })
+            .catch(err => {
+                console.error('Erreur vérification compatibilité:', err);
+                // On error, assume compatible to not block the user
+                setIsCompatible(true);
+            })
+            .finally(() => setCompatibilityLoading(false));
+    }, [selectedObjects, uniqueObjectTypes]);
 
     // Toggle box selection mode
     const handleBoxSelectionToggle = () => {
@@ -152,7 +193,11 @@ export const SelectionPanel: React.FC<SelectionPanelProps> = ({
                 </div>
             )}
 
-            {/* Modification Tools - Only show when objects are selected and user is not Team Leader/Client */}
+            {/*
+             * DÉSACTIVÉ par demande du Product Owner (20/12/2024)
+             * Outils de modification de géométrie retirés temporairement.
+             * Pour réactiver : décommenter le bloc ci-dessous.
+             *
             {selectedObjects.length > 0 && userRole !== 'CHEF_EQUIPE' && userRole !== 'CLIENT' && (
                 <div className="p-3 border-t border-slate-100 bg-blue-50/50">
                     <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
@@ -192,21 +237,66 @@ export const SelectionPanel: React.FC<SelectionPanelProps> = ({
                     )}
                 </div>
             )}
+            */}
 
             {/* Actions */}
             {selectedObjects.length > 0 && userRole !== 'CHEF_EQUIPE' && userRole !== 'CLIENT' && (
                 <div className="p-3 border-t border-slate-100 bg-slate-50/50 space-y-2">
+                    {/* Incompatibility Warning */}
+                    {!isCompatible && !compatibilityLoading && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-2.5 mb-2">
+                            <div className="flex items-start gap-2">
+                                <Ban className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="text-xs font-medium text-red-700">
+                                        Types incompatibles
+                                    </p>
+                                    <p className="text-xs text-red-600 mt-0.5">
+                                        Les types sélectionnés ({uniqueObjectTypes.join(', ')}) n'ont aucune tâche en commun.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Compatibility info when multiple types are compatible */}
+                    {isCompatible && applicableTasksCount !== null && uniqueObjectTypes.length > 1 && !compatibilityLoading && (
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2 mb-2">
+                            <p className="text-xs text-emerald-700 text-center">
+                                ✓ {applicableTasksCount} type{applicableTasksCount > 1 ? 's' : ''} de tâche{applicableTasksCount > 1 ? 's' : ''} applicable{applicableTasksCount > 1 ? 's' : ''} aux {uniqueObjectTypes.length} types sélectionnés
+                            </p>
+                        </div>
+                    )}
+
                     {onCreateIntervention && (
                         <button
                             onClick={onCreateIntervention}
-                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-4 rounded-lg font-semibold text-sm transition-colors shadow-sm flex items-center justify-center gap-2"
+                            disabled={!isCompatible || compatibilityLoading}
+                            className={`w-full py-2.5 px-4 rounded-lg font-semibold text-sm transition-colors shadow-sm flex items-center justify-center gap-2 ${
+                                !isCompatible || compatibilityLoading
+                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                            }`}
                         >
-                            <MapPin className="w-4 h-4" />
-                            Créer une tâche
+                            {compatibilityLoading ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                                    Vérification...
+                                </>
+                            ) : (
+                                <>
+                                    <MapPin className="w-4 h-4" />
+                                    Créer une tâche
+                                </>
+                            )}
                         </button>
                     )}
 
-                    {/* Delete with confirmation */}
+                    {/*
+                     * DÉSACTIVÉ par demande du Product Owner (20/12/2024)
+                     * Bouton de suppression retiré temporairement.
+                     * Pour réactiver : décommenter le bloc ci-dessous.
+                     *
                     {!showDeleteConfirm ? (
                         <button
                             onClick={() => setShowDeleteConfirm(true)}
@@ -240,6 +330,7 @@ export const SelectionPanel: React.FC<SelectionPanelProps> = ({
                             </div>
                         </div>
                     )}
+                    */}
                 </div>
             )}
         </div>

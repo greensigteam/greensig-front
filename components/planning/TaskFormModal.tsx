@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, type FC, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { addDays, addWeeks, addMonths } from 'date-fns';
 import {
-    Clock, X, Search, ChevronDown, Timer, RefreshCw, Gauge, ExternalLink, Calculator, TreePine, AlertTriangle, MapPin
+    Clock, X, Search, ChevronDown, Timer, RefreshCw, Gauge, ExternalLink, Calculator, TreePine, AlertTriangle, MapPin, Ban
 } from 'lucide-react';
 import { planningService } from '../../services/planningService';
 import { fetchInventory, type InventoryResponse } from '../../services/api';
@@ -250,12 +250,24 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         return [];
     };
 
+    // Default dates: today 8:00 to today 17:00
+    const getDefaultStartDate = () => {
+        const now = new Date();
+        now.setHours(8, 0, 0, 0);
+        return now.toISOString().slice(0, 16);
+    };
+    const getDefaultEndDate = () => {
+        const now = new Date();
+        now.setHours(17, 0, 0, 0);
+        return now.toISOString().slice(0, 16);
+    };
+
     const [formData, setFormData] = useState<TacheCreate>({
-        id_client: (tache?.client_detail && ((tache?.client_detail as any).utilisateur || tache?.client_detail?.utilisateur)) || initialValues?.id_client || null,
-        id_type_tache: tache?.type_tache_detail.id || initialValues?.id_type_tache || 0,
+        id_client: tache?.client_detail?.id || initialValues?.id_client || null,
+        id_type_tache: tache?.type_tache_detail?.id || initialValues?.id_type_tache || 0,
         equipes_ids: initialEquipesIds(),
-        date_debut_planifiee: tache?.date_debut_planifiee.slice(0, 16) || initialValues?.date_debut_planifiee || '',
-        date_fin_planifiee: tache?.date_fin_planifiee.slice(0, 16) || initialValues?.date_fin_planifiee || '',
+        date_debut_planifiee: tache?.date_debut_planifiee?.slice(0, 16) || initialValues?.date_debut_planifiee || getDefaultStartDate(),
+        date_fin_planifiee: tache?.date_fin_planifiee?.slice(0, 16) || initialValues?.date_fin_planifiee || getDefaultEndDate(),
         priorite: tache?.priorite || initialValues?.priorite || 3,
         commentaires: tache?.commentaires || initialValues?.commentaires || '',
         parametres_recurrence: tache?.parametres_recurrence || null,
@@ -282,6 +294,11 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
     const [objectSearchQuery, setObjectSearchQuery] = useState('');
     const [availableObjects, setAvailableObjects] = useState<InventoryObjectOption[]>([]);
     const [loadingObjects, setLoadingObjects] = useState(false);
+
+    // State for filtered task types based on selected objects
+    const [filteredTypesTaches, setFilteredTypesTaches] = useState<TypeTache[]>(typesTaches);
+    const [loadingFilteredTypes, setLoadingFilteredTypes] = useState(false);
+    const [incompatibleObjectsError, setIncompatibleObjectsError] = useState<string | null>(null);
 
     // Site lock: when objects are selected or siteFilter is set, only allow objects from the same site
     const lockedSite = useMemo(() => {
@@ -331,6 +348,47 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
             .catch(err => console.error('Erreur chargement ratios:', err))
             .finally(() => setLoadingRatios(false));
     }, []);
+
+    // Filter task types based on selected objects
+    useEffect(() => {
+        // If no objects selected, show all task types
+        if (selectedObjects.length === 0) {
+            setFilteredTypesTaches(typesTaches);
+            setIncompatibleObjectsError(null);
+            return;
+        }
+
+        // Get unique object types from selected objects
+        const uniqueTypes = [...new Set(selectedObjects.map(obj => obj.type))];
+
+        setLoadingFilteredTypes(true);
+        setIncompatibleObjectsError(null);
+
+        planningService.getApplicableTypesTaches(uniqueTypes)
+            .then(result => {
+                setFilteredTypesTaches(result.types_taches);
+
+                // If no applicable task types, show error
+                if (result.types_taches.length === 0) {
+                    const typesList = uniqueTypes.join(', ');
+                    setIncompatibleObjectsError(
+                        `Aucun type de tâche n'est applicable aux types d'objets sélectionnés (${typesList}). ` +
+                        `Veuillez sélectionner des objets compatibles ou configurer les ratios de productivité.`
+                    );
+                }
+
+                // If current selected task type is not in the filtered list, reset it
+                if (formData.id_type_tache && !result.types_taches.find(t => t.id === formData.id_type_tache)) {
+                    setFormData(prev => ({ ...prev, id_type_tache: 0 }));
+                }
+            })
+            .catch(err => {
+                console.error('Erreur chargement types applicables:', err);
+                // Fallback to all types on error
+                setFilteredTypesTaches(typesTaches);
+            })
+            .finally(() => setLoadingFilteredTypes(false));
+    }, [selectedObjects, typesTaches]);
 
     // Calculate estimated charge preview based on selected objects and ratios
     const chargePreview = useMemo(() => {
@@ -606,16 +664,61 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                             </div>
                         )}
 
+                        {/* Erreur d'incompatibilité des objets */}
+                        {incompatibleObjectsError && (
+                            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+                                <div className="flex items-start">
+                                    <div className="flex-shrink-0">
+                                        <Ban className="h-5 w-5 text-red-500" />
+                                    </div>
+                                    <div className="ml-3">
+                                        <h3 className="text-sm font-medium text-red-800">
+                                            Objets incompatibles
+                                        </h3>
+                                        <div className="mt-1 text-sm text-red-700">
+                                            {incompatibleObjectsError}
+                                        </div>
+                                        <div className="mt-2">
+                                            <Link
+                                                to="/ratios"
+                                                target="_blank"
+                                                className="text-sm text-red-600 hover:text-red-800 underline flex items-center gap-1"
+                                            >
+                                                <Gauge className="w-3 h-3" />
+                                                Configurer les ratios de productivité
+                                                <ExternalLink className="w-3 h-3" />
+                                            </Link>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Type de tâche avec création dynamique */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Type de tâche <span className="text-red-500">*</span>
+                                {selectedObjects.length > 0 && filteredTypesTaches.length < typesTaches.length && !loadingFilteredTypes && (
+                                    <span className="ml-2 text-xs text-amber-600 font-normal">
+                                        ({filteredTypesTaches.length} types applicables sur {typesTaches.length})
+                                    </span>
+                                )}
+                                {loadingFilteredTypes && (
+                                    <span className="ml-2 text-xs text-gray-400 font-normal">
+                                        Chargement...
+                                    </span>
+                                )}
                             </label>
                             <TypeTacheSelector
                                 value={formData.id_type_tache || null}
-                                typesTaches={typesTaches}
+                                typesTaches={filteredTypesTaches}
                                 onChange={(id) => setFormData({ ...formData, id_type_tache: id })}
                             />
+                            {selectedObjects.length > 0 && filteredTypesTaches.length > 0 && filteredTypesTaches.length < typesTaches.length && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Seuls les types de tâches applicables aux objets sélectionnés sont affichés.
+                                </p>
+                            )}
                         </div>
 
                         {/* Équipes avec sélection multiple (US-PLAN-013) */}
@@ -1170,7 +1273,8 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                         </button>
                         <button
                             type="submit"
-                            className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                            disabled={!!incompatibleObjectsError || filteredTypesTaches.length === 0}
+                            className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
                         >
                             {tache ? 'Modifier' : 'Créer'}
                         </button>
