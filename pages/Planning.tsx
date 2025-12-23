@@ -22,6 +22,7 @@ import {
 } from '../types/planning';
 import { Client, EquipeList } from '../types/users';
 import TaskFormModal, { InventoryObjectOption } from '../components/planning/TaskFormModal';
+import { StatusBadge } from '../components/StatusBadge';
 
 // ============================================================================
 // CONFIGURATION CALENDRIER
@@ -808,12 +809,20 @@ const Planning: FC = () => {
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statutColors.bg} ${statutColors.text}`}>
+                                            <StatusBadge
+                                                variant="custom"
+                                                bg={statutColors.bg}
+                                                text={statutColors.text}
+                                            >
                                                 {STATUT_TACHE_LABELS[tache.statut]}
-                                            </span>
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${prioriteColors.bg} ${prioriteColors.text}`}>
+                                            </StatusBadge>
+                                            <StatusBadge
+                                                variant="custom"
+                                                bg={prioriteColors.bg}
+                                                text={prioriteColors.text}
+                                            >
                                                 P{tache.priorite}
-                                            </span>
+                                            </StatusBadge>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">

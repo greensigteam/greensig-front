@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { User, ViewState, MapSearchResult, SearchSuggestion, TargetLocation } from '../types';
-import { fetchAllSites, type SiteFrontend } from '../services/api';
 import { Bell, X, Search, Loader2, MapPin, ChevronRight } from 'lucide-react';
 
 interface HeaderProps {
@@ -62,26 +61,11 @@ const Header: React.FC<HeaderProps> = ({
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const mobileSearchRef = useRef<HTMLDivElement>(null);
   const mobileInputRef = useRef<HTMLInputElement>(null);
-  const [sites, setSites] = useState<SiteFrontend[]>([]);
 
   // Determine current view from path
-  const currentView = Object.keys(PATH_TO_VIEW).find(path => location.pathname.startsWith(path)) 
+  const currentView = Object.keys(PATH_TO_VIEW).find(path => location.pathname.startsWith(path))
                       ? PATH_TO_VIEW[Object.keys(PATH_TO_VIEW).find(path => location.pathname.startsWith(path))!]
                       : 'DASHBOARD';
-
-  useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      try {
-        const s = await fetchAllSites();
-        if (mounted) setSites(s);
-      } catch (err) {
-        console.error('Erreur chargement sites header:', err);
-      }
-    };
-    load();
-    return () => { mounted = false };
-  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -320,45 +304,6 @@ const Header: React.FC<HeaderProps> = ({
             <X className="w-5 h-5" />
           </Link>
         </div>
-        
-        {onGeolocation && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onGeolocation}
-              className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
-              title="Ma position"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 2v4" /><path d="M12 18v4" /><path d="M4.93 4.93l2.83 2.83" /><path d="M16.24 16.24l2.83 2.83" /><path d="M2 12h4" /><path d="M18 12h4" /><path d="M4.93 19.07l2.83-2.83" /><path d="M16.24 7.76l2.83-2.83" /></svg>
-            </button>
-            <select
-              className="p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-              title="Aller à un site"
-              onChange={(e) => {
-                const id = e.target.value;
-                const site = sites.find(s => s.id === id);
-                if (site) {
-                  if (setTargetLocation) {
-                    setTargetLocation({ coordinates: site.coordinates, zoom: 16 });
-                  }
-                  if (setSearchResult) {
-                    setSearchResult({
-                      name: site.name,
-                      description: site.adresse || site.description || '',
-                      coordinates: site.coordinates,
-                      zoom: 16
-                    });
-                  }
-                }
-                (e.target as HTMLSelectElement).selectedIndex = 0;
-              }}
-            >
-              <option value="">Aller à un site...</option>
-              {sites.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
       </div>
     </header>
   );

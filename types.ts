@@ -41,19 +41,6 @@ export interface Task {
   zone?: string; // Added for User 3.3.1
 }
 
-export interface Claim {
-  id: string;
-  title: string;
-  status: 'NOUVEAU' | 'EN_COURS' | 'RESOLU' | 'EN_RETARD';
-  priority: 'HAUTE' | 'MOYENNE' | 'BASSE';
-  source: 'CLIENT' | 'INTERNE';
-  author: string;
-  date: string;
-  deadline?: string;
-  autoRating?: number; // 5/5 if auto-closed
-  location?: string;
-}
-
 export type HRStatus = 'DISPONIBLE' | 'OCCUPE' | 'MALADIE' | 'CONGE' | 'ACCIDENT' | 'ABSENT';
 
 export interface TeamMember {

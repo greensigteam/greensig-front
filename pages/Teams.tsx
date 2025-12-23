@@ -17,6 +17,7 @@ import {
   Building2
 } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
+import { StatusBadge } from '../components/StatusBadge';
 
 import EditEquipeModal from './EditEquipeModal';
 import CreateAbsenceModal from './CreateAbsenceModal';
@@ -39,18 +40,9 @@ import {
   StatutEquipe,
   StatutAbsence,
   NiveauCompetence,
-  STATUT_OPERATEUR_LABELS,
-  STATUT_OPERATEUR_COLORS,
-  STATUT_EQUIPE_LABELS,
-  STATUT_EQUIPE_COLORS,
   STATUT_ABSENCE_LABELS,
-  STATUT_ABSENCE_COLORS,
-  NIVEAU_COMPETENCE_LABELS,
-  NIVEAU_COMPETENCE_COLORS,
   CATEGORIE_COMPETENCE_LABELS,
   TYPE_ABSENCE_LABELS,
-  TYPE_ABSENCE_COLORS,
-  getBadgeColors,
 
   NOM_ROLE_LABELS,
   Utilisateur,
@@ -87,48 +79,6 @@ import {
 
 // ============================================================================
 // COMPONENTS - Badges
-// ============================================================================
-
-const StatutOperateurBadge: React.FC<{ statut?: StatutOperateur | null }> = ({ statut }) => {
-  const safe = getBadgeColors(STATUT_OPERATEUR_COLORS, statut);
-  const label = statut ? STATUT_OPERATEUR_LABELS[statut] : 'Non renseigné';
-  return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${safe.bg} ${safe.text}`}>
-      {label}
-    </span>
-  );
-};
-
-const StatutEquipeBadge: React.FC<{ statut?: StatutEquipe | null }> = ({ statut }) => {
-  const safe = getBadgeColors(STATUT_EQUIPE_COLORS, statut);
-  const label = statut ? STATUT_EQUIPE_LABELS[statut] : 'Non renseigné';
-  return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${safe.bg} ${safe.text}`}>
-      {label}
-    </span>
-  );
-};
-
-const StatutAbsenceBadge: React.FC<{ statut?: StatutAbsence | null }> = ({ statut }) => {
-  const safe = getBadgeColors(STATUT_ABSENCE_COLORS, statut);
-  const label = statut ? STATUT_ABSENCE_LABELS[statut] : 'Non renseigné';
-  return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${safe.bg} ${safe.text}`}>
-      {label}
-    </span>
-  );
-};
-
-const NiveauCompetenceBadge: React.FC<{ niveau?: NiveauCompetence | null }> = ({ niveau }) => {
-  const safe = getBadgeColors(NIVEAU_COMPETENCE_COLORS, niveau);
-  const label = niveau ? NIVEAU_COMPETENCE_LABELS[niveau] : 'Non renseigné';
-  return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${safe.bg} ${safe.text}`}>
-      {label}
-    </span>
-  );
-};
-
 // ============================================================================
 // MODAL - Creer une equipe
 // ============================================================================
@@ -491,16 +441,13 @@ const OperateurDetailModal: React.FC<OperateurDetailModalProps> = ({ operateur, 
             <div>
               <label className="text-sm font-medium text-gray-500">Statut compte</label>
               <div className="mt-1">
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${operateur.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
-                  {operateur.actif ? 'Actif' : 'Inactif'}
-                </span>
+                <StatusBadge variant="boolean" value={operateur.actif} labels={{ true: 'Actif', false: 'Inactif' }} />
               </div>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-500">Statut opérateur</label>
               <div className="mt-1">
-                <StatutOperateurBadge statut={operateur.statut} />
+                <StatusBadge variant="status" type="operateur" value={operateur.statut || ''} />
               </div>
             </div>
             <div>
@@ -512,14 +459,12 @@ const OperateurDetailModal: React.FC<OperateurDetailModalProps> = ({ operateur, 
               <div className="flex items-center gap-2 mt-1">
                 {operateur.utilisateurDetail?.roles && operateur.utilisateurDetail.roles.length > 0 ? (
                   operateur.utilisateurDetail.roles.map((r) => (
-                    <span key={r} className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      {NOM_ROLE_LABELS[r as keyof typeof NOM_ROLE_LABELS] || r}
-                    </span>
+                    <StatusBadge key={r} variant="role" value={r} />
                   ))
                 ) : (
-                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                  <StatusBadge variant="custom" bg="bg-gray-100" text="text-gray-800">
                     {operateur.estChefEquipe ? "Chef d'équipe" : 'Opérateur'}
-                  </span>
+                  </StatusBadge>
                 )}
 
                 {operateur.estChefEquipe && (
@@ -572,7 +517,7 @@ const OperateurDetailModal: React.FC<OperateurDetailModalProps> = ({ operateur, 
                         {comp.competenceDetail?.categorieDisplay}
                       </p>
                     </div>
-                    <NiveauCompetenceBadge niveau={comp.niveau} />
+                    <StatusBadge variant="status" type="competence" value={comp.niveau || ''} />
                   </div>
                 ))}
               </div>
@@ -621,16 +566,13 @@ const EquipeDetailModal: React.FC<EquipeDetailModalProps> = ({ equipe, onClose }
             <div>
               <label className="text-sm font-medium text-gray-500">Statut</label>
               <div className="mt-1">
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${equipe.actif ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
-                  {equipe.actif ? 'Active' : 'Inactive'}
-                </span>
+                <StatusBadge variant="boolean" value={equipe.actif} labels={{ true: 'Active', false: 'Inactive' }} />
               </div>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-500">Statut operationnel</label>
               <div className="mt-1">
-                <StatutEquipeBadge statut={equipe.statutOperationnel} />
+                <StatusBadge variant="status" type="equipe" value={equipe.statutOperationnel || ''} />
               </div>
             </div>
             <div>
@@ -679,11 +621,11 @@ const EquipeDetailModal: React.FC<EquipeDetailModalProps> = ({ equipe, onClose }
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <StatutOperateurBadge statut={membre.statut} />
+                    <StatusBadge variant="status" type="operateur" value={membre.statut || ''} />
                     {membre.estChefEquipe && (
-                      <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
+                      <StatusBadge variant="custom" bg="bg-emerald-100" text="text-emerald-700">
                         Chef
-                      </span>
+                      </StatusBadge>
                     )}
                   </div>
                 </div>
@@ -1009,18 +951,13 @@ const Teams: React.FC = () => {
     {
       key: 'statutOperationnel',
       label: 'Statut',
-      render: (e) => <StatutEquipeBadge statut={e.statutOperationnel} />,
+      render: (e) => <StatusBadge variant="status" type="equipe" value={e.statutOperationnel || ''} />,
       sortable: false
     },
     {
       key: 'actif',
       label: 'Actif',
-      render: (e) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${e.actif ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-          }`}>
-          {e.actif ? 'Oui' : 'Non'}
-        </span>
-      ),
+      render: (e) => <StatusBadge variant="boolean" value={e.actif} labels={{ true: 'Oui', false: 'Non' }} />,
       sortable: false
     },
     {
@@ -1068,16 +1005,16 @@ const Teams: React.FC = () => {
     {
       key: 'statut',
       label: 'Statut',
-      render: (o) => <StatutOperateurBadge statut={o.statut} />,
+      render: (o) => <StatusBadge variant="status" type="operateur" value={o.statut || ''} />,
       sortable: false
     },
     {
       key: 'estChefEquipe',
       label: "Chef d'equipe",
       render: (o) => o.estChefEquipe ? (
-        <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
+        <StatusBadge variant="custom" bg="bg-emerald-100" text="text-emerald-700">
           Oui
-        </span>
+        </StatusBadge>
       ) : '-',
       sortable: false
     },
@@ -1135,14 +1072,7 @@ const Teams: React.FC = () => {
     {
       key: 'typeAbsence',
       label: 'Type',
-      render: (a) => {
-        const safe = getBadgeColors(TYPE_ABSENCE_COLORS, a.typeAbsence);
-        return (
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${safe.bg} ${safe.text}`}>
-            {TYPE_ABSENCE_LABELS[a.typeAbsence]}
-          </span>
-        );
-      },
+      render: (a) => <StatusBadge variant="status" type="absence" value={a.typeAbsence || ''} />,
       sortable: false
     },
     {
@@ -1163,7 +1093,7 @@ const Teams: React.FC = () => {
     {
       key: 'statut',
       label: 'Statut',
-      render: (a) => <StatutAbsenceBadge statut={a.statut} />,
+      render: (a) => <StatusBadge variant="status" type="absence" value={a.statut || ''} />,
       sortable: false
     },
     {

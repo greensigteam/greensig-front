@@ -35,6 +35,7 @@ import {
   Save
 } from 'lucide-react';
 import { DataTable } from '../components/DataTable';
+import { StatusBadge } from '../components/StatusBadge';
 
 // ...existing code...
 
@@ -52,25 +53,6 @@ import {
   attribuerRole,
   retirerRole
 } from '../services/usersApi';
-
-// ============================================================================
-// COMPONENT - Role Badge
-const RoleBadge: React.FC<{ role: NomRole }> = ({ role }) => {
-  const colors: Record<NomRole, { bg: string; text: string }> = {
-    ADMIN: { bg: 'bg-purple-100', text: 'text-purple-800' },
-    OPERATEUR: { bg: 'bg-blue-100', text: 'text-blue-800' },
-    CLIENT: { bg: 'bg-green-100', text: 'text-green-800' },
-    CHEF_EQUIPE: { bg: 'bg-yellow-100', text: 'text-yellow-800' }
-  };
-  const c = colors[role] || { bg: 'bg-gray-100', text: 'text-gray-800' };
-  return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${c.bg} ${c.text}`}>
-      {NOM_ROLE_LABELS[role] || role}
-    </span>
-  );
-};
-
-
 
 // ============================================================================
 // MODAL - Editer un utilisateur
@@ -699,7 +681,7 @@ const Users: React.FC = () => {
       render: (u: Utilisateur) => u.roles.length > 0 ? (
         <div className="flex flex-wrap gap-1">
           {u.roles.slice(0, 5).map((role: NomRole) => (
-            <RoleBadge key={role} role={role} />
+            <StatusBadge key={role} variant="role" value={role} />
           ))}
           {u.roles.length > 5 && (
             <span className="text-xs text-gray-500">+{u.roles.length - 5}</span>
@@ -717,11 +699,7 @@ const Users: React.FC = () => {
       key: 'actif',
       label: 'Statut',
       render: (u: Utilisateur) => (
-        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${u.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-          }`}>
-          {u.actif ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-          {u.actif ? 'Actif' : 'Inactif'}
-        </span>
+        <StatusBadge variant="boolean" value={u.actif} labels={{ true: 'Actif', false: 'Inactif' }} />
       ),
       sortable: false
     }

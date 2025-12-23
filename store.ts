@@ -1,5 +1,5 @@
 
-import { InventoryItem, Task, Claim, TeamMember, KPI } from './types';
+import { InventoryItem, Task, TeamMember, KPI } from './types';
 
 export const MOCK_KPIS: KPI[] = [
   { label: "Interventions actives", value: 12, change: 5, trend: 'up' },
@@ -21,13 +21,6 @@ export const MOCK_TASKS: Task[] = [
   { id: '2', title: 'Taille Haies Avenue Jaurès', type: 'TAILLE', status: 'A_FAIRE', date: '2023-11-26', assignee: 'Équipe B', duration: '6h', zone: 'Avenue Jaurès' },
   { id: '3', title: 'Plantation Massifs Mairie', type: 'PLANTATION', status: 'TERMINE', date: '2023-11-24', assignee: 'Équipe C', duration: '2j', zone: 'Mairie' },
   { id: '4', title: 'Arrosage automatique secteur Nord', type: 'ARROSAGE', status: 'A_FAIRE', date: '2023-11-27', assignee: 'Auto', recurrence: '1x/jour', duration: '1h', zone: 'Secteur Nord' },
-];
-
-export const MOCK_CLAIMS: Claim[] = [
-  { id: '1', title: 'Branche tombée sur voirie', status: 'NOUVEAU', priority: 'HAUTE', source: 'CLIENT', author: 'Jean Dupont', date: '2023-11-25', deadline: '2023-11-26', location: 'Rue de la Paix' },
-  { id: '2', title: 'Banc public endommagé', status: 'EN_COURS', priority: 'MOYENNE', source: 'CLIENT', author: 'Sophie Martin', date: '2023-11-23', deadline: '2023-11-30', location: 'Square des Lilas' },
-  { id: '3', title: 'Poubelle débordante Square', status: 'RESOLU', priority: 'BASSE', source: 'INTERNE', author: 'Lucie Bernard', date: '2023-11-20', deadline: '2023-11-21', autoRating: 5, location: 'Square central' },
-  { id: '4', title: 'Fuite irrigation Zone C', status: 'EN_RETARD', priority: 'HAUTE', source: 'INTERNE', author: 'Marc V.', date: '2023-11-10', deadline: '2023-11-12', location: 'Stade Municipal' },
 ];
 
 export const MOCK_TEAM: TeamMember[] = [
