@@ -14,7 +14,7 @@ interface LayoutProps {
   isSidebarCollapsed: boolean;
   onToggleSidebar: () => void;
 
-  // Search Props
+  // Search Props (kept for compatibility but unused by Header now)
   searchQuery?: string;
   setSearchQuery?: (q: string) => void;
   onSearch?: () => void;
@@ -34,15 +34,6 @@ const Layout: React.FC<LayoutProps> = ({
   onLogout,
   isSidebarCollapsed,
   onToggleSidebar,
-  searchQuery,
-  setSearchQuery,
-  onSearch,
-  isSearching,
-  searchResult,
-  searchSuggestions,
-  onGeolocation,
-  setSearchResult,
-  setTargetLocation
 }) => {
   const location = useLocation();
   const isMapView = location.pathname === '/map' || location.pathname === '/';
@@ -93,16 +84,6 @@ const Layout: React.FC<LayoutProps> = ({
               <Header
                 user={user}
                 collapsed={false}
-                // Search pass-through
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                onSearch={onSearch}
-                isSearching={isSearching}
-                searchResult={searchResult}
-                searchSuggestions={searchSuggestions}
-                onGeolocation={onGeolocation}
-                setSearchResult={setSearchResult}
-                setTargetLocation={setTargetLocation}
               />
             </div>
 

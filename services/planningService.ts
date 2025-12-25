@@ -118,6 +118,25 @@ export const planningService = {
         return response.json();
     },
 
+    /**
+     * Récupère les types d'objets compatibles avec un type de tâche.
+     * Un type d'objet est compatible s'il existe un RatioProductivite actif.
+     *
+     * @param typeTacheId - ID du type de tâche
+     * @returns Liste des types d'objets compatibles
+     */
+    async getCompatibleObjectTypes(typeTacheId: number): Promise<{
+        type_tache_id: number;
+        type_tache_nom: string;
+        nombre_types_objets: number;
+        types_objets_compatibles: string[];
+    }> {
+        const response = await apiFetch(`${BASE_URL}/types-taches/${typeTacheId}/objets_compatibles/`);
+
+        if (!response.ok) throw new Error('Erreur chargement types objets compatibles');
+        return response.json();
+    },
+
     async createTypeTache(data: { nom_tache: string; description?: string }): Promise<TypeTache> {
         const response = await apiFetch(`${BASE_URL}/types-taches/`, {
             method: 'POST',

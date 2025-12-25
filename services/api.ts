@@ -90,6 +90,8 @@ export interface SiteGeoJSON {
   properties: {
     nom_site: string
     code_site: string
+    client: number
+    client_nom?: string
     adresse?: string
     superficie_totale?: number
     actif: boolean
@@ -122,6 +124,8 @@ export interface SiteFrontend {
   color: string
   // Données supplémentaires de l'API
   code_site?: string
+  client?: number
+  client_nom?: string
   adresse?: string
   superficie_totale?: number
   actif?: boolean
@@ -225,6 +229,8 @@ function transformSiteToFrontend(site: SiteGeoJSON, index: number): SiteFrontend
     category,
     color: color || '#22c55e',
     code_site: site.properties.code_site,
+    client: site.properties.client,
+    client_nom: site.properties.client_nom,
     adresse: site.properties.adresse,
     superficie_totale: site.properties.superficie_totale,
     actif: site.properties.actif,
@@ -482,6 +488,8 @@ export async function createSite(data: CreateSiteData): Promise<SiteFrontend> {
       category: 'INFRASTRUCTURE' as const,
       color: '#22c55e',
       code_site: result.properties?.code_site,
+      client: result.properties?.client,
+      client_nom: result.properties?.client_nom,
       adresse: result.properties?.adresse,
       superficie_totale: result.properties?.superficie_totale,
       actif: result.properties?.actif,
@@ -497,6 +505,7 @@ export async function createSite(data: CreateSiteData): Promise<SiteFrontend> {
 export interface UpdateSiteData {
   nom_site?: string
   code_site?: string
+  client?: number
   adresse?: string
   superficie_totale?: number | null
   date_debut_contrat?: string | null
@@ -533,6 +542,8 @@ export async function updateSite(id: number, data: UpdateSiteData): Promise<Site
       category: 'INFRASTRUCTURE' as const,
       color: '#22c55e',
       code_site: result.properties?.code_site,
+      client: result.properties?.client,
+      client_nom: result.properties?.client_nom,
       adresse: result.properties?.adresse,
       superficie_totale: result.properties?.superficie_totale,
       actif: result.properties?.actif,
@@ -875,6 +886,106 @@ export async function exportData(
     return response.blob()
   } catch (error) {
     logger.error(`Erreur exportData(${model}, ${format}):`, error)
+    throw error
+  }
+}
+
+/**
+ * Export Excel professionnel de l'inventaire avec formatage et filtres
+ * @param filters Filtres à appliquer (types, site, etat, famille, search)
+ * @returns Blob du fichier Excel
+ */
+export async function exportInventoryExcel(filters: {
+  types?: string[]  // ['Arbre', 'Palmier', 'Gazon']
+  site?: string
+  etat?: string
+  famille?: string
+  search?: string
+}): Promise<Blob> {
+  try {
+    // Construire les paramètres de requête
+    const params = new URLSearchParams()
+
+    if (filters.types && filters.types.length > 0) {
+      params.append('types', filters.types.join(','))
+    }
+
+    if (filters.site && filters.site !== 'all') {
+      params.append('site', filters.site)
+    }
+
+    if (filters.etat && filters.etat !== 'all') {
+      params.append('etat', filters.etat)
+    }
+
+    if (filters.famille && filters.famille !== 'all') {
+      params.append('famille', filters.famille)
+    }
+
+    if (filters.search) {
+      params.append('search', filters.search)
+    }
+
+    const url = `${API_BASE_URL}/export/inventory/excel/?${params.toString()}`
+    const response = await apiFetch(url)
+
+    if (!response.ok) {
+      throw new ApiError(`Erreur export Excel inventaire: ${response.status}`, response.status)
+    }
+
+    return response.blob()
+  } catch (error) {
+    logger.error('Erreur exportInventoryExcel:', error)
+    throw error
+  }
+}
+
+/**
+ * Export PDF professionnel de l'inventaire
+ * @param filters Filtres à appliquer (types, site, etat, famille, search)
+ * @returns Blob du fichier PDF
+ */
+export async function exportInventoryPDF(filters: {
+  types?: string[]
+  site?: string
+  etat?: string
+  famille?: string
+  search?: string
+}): Promise<Blob> {
+  try {
+    // Construire les paramètres de requête
+    const params = new URLSearchParams()
+
+    if (filters.types && filters.types.length > 0) {
+      params.append('types', filters.types.join(','))
+    }
+
+    if (filters.site && filters.site !== 'all') {
+      params.append('site', filters.site)
+    }
+
+    if (filters.etat && filters.etat !== 'all') {
+      params.append('etat', filters.etat)
+    }
+
+    if (filters.famille && filters.famille !== 'all') {
+      params.append('famille', filters.famille)
+    }
+
+    if (filters.search) {
+      params.append('search', filters.search)
+    }
+
+    const url = `${API_BASE_URL}/export/inventory/pdf/?${params.toString()}`
+    const response = await apiFetch(url)
+
+    if (!response.ok) {
+      throw new ApiError(`Erreur export PDF inventaire: ${response.status}`, response.status)
+    }
+
+    return response.blob()
+  } catch (error) {
+    logger.error('Erreur exportInventoryPDF:', error)
     throw error
   }
 }

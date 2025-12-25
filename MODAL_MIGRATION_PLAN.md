@@ -43,16 +43,16 @@
 
 ---
 
-## Modales à Migrer (17 restantes)
+## Modales à Migrer (6 restantes)
 
-### Groupe A - Modales Simples (Priorité Haute)
-Ces modales peuvent utiliser BaseModal directement sans wrapper spécialisé.
+### Groupe A - Modales Simples (Priorité Haute) ✅ TERMINÉ
+Ces modales ont été migrées vers DetailModal ou BaseModal.
 
-| Fichier | Lignes | Type | Complexité | Estimation |
-|---------|--------|------|------------|------------|
-| `pages/AbsenceDetailModal.tsx` | ? | Detail | Faible | 30min |
-| `components/ProduitDetailModal.tsx` | ? | Detail | Faible | 30min |
-| `components/map/GPSInputModal.tsx` | ? | Form | Moyenne | 45min |
+| Fichier | Lignes | Type | Complexité | Estimation | Statut |
+|---------|--------|------|------------|------------|--------|
+| `pages/AbsenceDetailModal.tsx` | 182 | Detail | Faible | 30min | ✅ Migré |
+| `components/ProduitDetailModal.tsx` | 156 | Detail | Faible | 30min | ✅ Migré |
+| `components/map/GPSInputModal.tsx` | 474 | Form | Moyenne | 45min | ✅ Migré |
 
 ### Groupe B - Modales de Formulaire (Priorité Haute)
 Ces modales bénéficieraient d'un **FormModal** wrapper.
@@ -67,16 +67,16 @@ Ces modales bénéficieraient d'un **FormModal** wrapper.
 | `components/sites/SiteEditModal.tsx` | 225 | Form+Recalcul | Moyenne | 1h | ✅ Migré |
 | `pages/EditEquipeModal.tsx` | 361 | Form+Tabs+Members | Très Haute | 2h | ✅ Migré |
 
-### Groupe C - Modales Complexes (Priorité Moyenne)
-Modales avec logique métier spécifique, à migrer en dernier.
+### Groupe C - Modales Complexes ✅ TERMINÉ (Priorité Moyenne)
+Modales avec logique métier spécifique, migrées avec succès.
 
-| Fichier | Lignes | Type | Complexité | Estimation |
-|---------|--------|------|------------|------------|
-| `components/CreateObjectModal.tsx` | ? | Complex | Haute | 2h |
-| `components/EditObjectModal.tsx` | ? | Complex | Haute | 2h |
-| `components/map/CreateSiteModal.tsx` | ? | Complex | Haute | 2h |
-| `components/planning/TaskFormModal.tsx` | 500+ | Complex | Très Haute | 3h |
-| `components/reclamations/ReclamationFormModal.tsx` | ? | Complex | Haute | 2h |
+| Fichier | Lignes | Type | Complexité | Estimation | Statut |
+|---------|--------|------|------------|------------|--------|
+| `components/EditObjectModal.tsx` | 404→372 | FormModal | Haute | 1h | ✅ Migré (-32 lignes) |
+| `components/map/CreateSiteModal.tsx` | 336→306 | FormModal | Haute | 1h | ✅ Migré (-30 lignes) |
+| `components/CreateObjectModal.tsx` | 457→456 | Custom | Haute | 1.5h | ✅ Migré (themeColor dynamique) |
+| `components/reclamations/ReclamationFormModal.tsx` | 409→367 | FormModal | Haute | 1.5h | ✅ Migré (-42 lignes) |
+| `components/planning/TaskFormModal.tsx` | 1288 | BaseModal | Très Haute | 3h | ✅ Migré ultra-légère |
 
 ### Groupe D - Modales Multi-Types (Priorité Moyenne)
 Fichiers contenant plusieurs modales.
@@ -201,17 +201,17 @@ Migrer les modales complexes en dernier.
 - [x] ConfirmModal.tsx refactorisé
 - [x] Build vérifié (11.77s)
 
-### Phase 2.2 - Wrappers Spécialisés ⏳
-- [ ] FormModal.tsx
-- [ ] DetailModal.tsx
+### Phase 2.2 - Wrappers Spécialisés ✅
+- [x] FormModal.tsx
+- [x] DetailModal.tsx
 
-### Phase 2.3 - Migrations ⏳
-- [ ] Groupe A: 0/3 modales (0%)
+### Phase 2.3 - Migrations ✅ 94% TERMINÉ
+- [x] Groupe A: 3/3 modales (100%) ✅ TERMINÉ
 - [x] Groupe B: 7/7 modales (100%) ✅ TERMINÉ
-- [ ] Groupe C: 0/5 modales (0%)
+- [x] Groupe C: 5/5 modales (100%) ✅ TERMINÉ 🎉
 - [ ] Groupe D: 0/2 fichiers (0%)
 
-### Total: 9/18 modales migrées (50%)
+### Total: 17/18 modales migrées (94%) 🎉
 
 ---
 

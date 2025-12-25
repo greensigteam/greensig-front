@@ -1,181 +1,17 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, X, MapPin, Calendar, FileText, Leaf, Droplet, AlertCircle, ClipboardList, Trash2, Map as MapIcon, Ban } from 'lucide-react';
+import { Search, Filter, X, MapPin, Calendar, FileText, Leaf, Droplet, AlertCircle, ClipboardList, Trash2, Map as MapIcon, Ban, Plus, RefreshCw, Activity, Sprout, Wrench, ChevronDown, Check, Printer, Download } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
 import { MOCK_INVENTORY, InventoryItem } from '../services/mockData';
-import { fetchInventory, ApiError, type InventoryResponse, type InventoryFilters, fetchAllSites, type SiteFrontend, fetchFilterOptions } from '../services/api';
+import { fetchInventory, ApiError, type InventoryResponse, type InventoryFilters, fetchAllSites, type SiteFrontend, fetchFilterOptions, exportData, exportInventoryExcel, exportInventoryPDF, downloadBlob } from '../services/api';
 import { planningService } from '../services/planningService';
 import { fetchEquipes } from '../services/usersApi';
 import TaskFormModal, { InventoryObjectOption } from '../components/planning/TaskFormModal';
 import { TypeTache, TacheCreate } from '../types/planning';
 import { EquipeList } from '../types/users';
 import { useToast } from '../contexts/ToastContext';
-
-// Inventory Detail Modal
-const InventoryDetailModal: React.FC<{
-  item: InventoryItem;
-  site?: SiteFrontend | null;
-  onClose: () => void;
-}> = ({ item, site, onClose }) => {
-  const [activeTab, setActiveTab] = useState<'info' | 'photos' | 'location' | 'history'>('info');
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="p-6 border-b border-gray-200 flex justify-between items-start">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">{item.name}</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              {item.code} • {site?.name || item.siteId} • {item.zone}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Tabs */}
-        <div className="border-b border-gray-200 px-6">
-          <div className="flex gap-6">
-            {[
-              { id: 'info', label: 'Informations' },
-              { id: 'photos', label: 'Photos' },
-              { id: 'location', label: 'Localisation' },
-              { id: 'history', label: 'Historique' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
-                  ? 'border-emerald-600 text-emerald-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {activeTab === 'info' && (
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="text-sm font-medium text-gray-500">Type</label>
-                <p className="mt-1 text-gray-900 capitalize">{item.type}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-500">État</label>
-                <div className="mt-1">
-                  <StatusBadge status={item.state} type="state" />
-                </div>
-              </div>
-              {item.species && (
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Espèce</label>
-                  <p className="mt-1 text-gray-900">{item.species}</p>
-                </div>
-              )}
-              {item.height && (
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Hauteur</label>
-                  <p className="mt-1 text-gray-900">{item.height} m</p>
-                </div>
-              )}
-              {item.diameter && (
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Diamètre</label>
-                  <p className="mt-1 text-gray-900">{item.diameter} cm</p>
-                </div>
-              )}
-              {item.surface && (
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Surface</label>
-                  <p className="mt-1 text-gray-900">{item.surface} m²</p>
-                </div>
-              )}
-              {item.lastIntervention && (
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Dernière intervention</label>
-                  <p className="mt-1 text-gray-900">{new Date(item.lastIntervention).toLocaleDateString('fr-FR')}</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'photos' && (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {item.photos.length > 0 ? (
-                item.photos.map((photo, index) => (
-                  <img
-                    key={index}
-                    src={photo}
-                    alt={`${item.name} ${index + 1}`}
-                    className="w-full aspect-square object-cover rounded-lg border border-gray-200"
-                  />
-                ))
-              ) : (
-                <div className="col-span-full text-center py-12 text-gray-500">
-                  Aucune photo disponible
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'location' && (
-            <div className="space-y-4">
-              <div className="bg-gray-100 rounded-lg p-4 h-64 flex items-center justify-center">
-                <div className="text-center text-gray-500">
-                  <MapPin className="w-12 h-12 mx-auto mb-2" />
-                  <p>Mini-carte à implémenter</p>
-                  <p className="text-sm mt-1">
-                    Coordonnées: {item.coordinates.lat.toFixed(4)}, {item.coordinates.lng.toFixed(4)}
-                  </p>
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-500">Adresse</label>
-                <p className="mt-1 text-gray-900">{site?.adresse || site?.description || item.siteId}</p>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'history' && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <Calendar className="w-4 h-4" />
-                <span>Historique des interventions</span>
-              </div>
-              <div className="text-center py-12 text-gray-500">
-                Historique à implémenter (lié au module Interventions)
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            Fermer
-          </button>
-          <button className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2">
-            <FileText className="w-4 h-4" />
-            Voir le rapport
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
+import { useSearch } from '../contexts/SearchContext';
 
 // Types de végétation et hydrologie pour les filtres
 const VEGETATION_TYPES = ['Arbre', 'Palmier', 'Gazon', 'Arbuste', 'Vivace', 'Cactus', 'Graminee'];
@@ -193,13 +29,132 @@ interface SelectedItemData {
   coordinates: { lat: number; lng: number };
 }
 
+// Composant CustomSelect pour des dropdowns modernes
+interface CustomSelectProps {
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+  icon?: React.ReactNode;
+  placeholder?: string;
+  className?: string;
+}
+
+const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, options, icon, placeholder, className = '' }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedLabel = options.find(opt => opt.value === value)?.label || placeholder || 'Sélectionner';
+
+  return (
+    <div className={`relative ${className}`} ref={containerRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full flex items-center justify-between bg-white border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm hover:border-gray-400 ${isOpen ? 'ring-2 ring-emerald-500/20 border-emerald-500' : ''}`}
+      >
+        <div className="flex items-center gap-2 truncate">
+          {icon && <span className="text-gray-500 flex-shrink-0">{icon}</span>}
+          <span className={`truncate ${value === 'all' ? 'text-gray-600' : 'text-gray-900 font-medium'}`}>
+            {selectedLabel}
+          </span>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ml-2 ${isOpen ? 'transform rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-auto animate-in fade-in zoom-in-95 duration-100">
+          <div className="py-1">
+            {options.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => {
+                  onChange(option.value);
+                  setIsOpen(false);
+                }}
+                className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between hover:bg-gray-50 transition-colors ${value === option.value ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-gray-700'}`}
+              >
+                <span className="truncate">{option.label}</span>
+                {value === option.value && <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Composant ExportDropdown
+const ExportDropdown = ({ onExportCSV, onExportExcel, onPrint }: { onExportCSV: () => void, onExportExcel: () => void, onPrint: () => void }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+      >
+        <Download className="w-4 h-4" />
+        <span>Exporter</span>
+        <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'transform rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-50 py-1 animate-in fade-in zoom-in-95 duration-100">
+          <button
+            onClick={() => { onExportCSV(); setIsOpen(false); }}
+            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+          >
+            <FileText className="w-4 h-4 text-emerald-600" />
+            CSV
+          </button>
+          <button
+            onClick={() => { onExportExcel(); setIsOpen(false); }}
+            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+          >
+            <FileText className="w-4 h-4 text-green-600" />
+            Excel (XLSX)
+          </button>
+          <div className="border-t border-gray-100 my-1"></div>
+          <button
+            onClick={() => { onPrint(); setIsOpen(false); }}
+            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+          >
+            <Printer className="w-4 h-4 text-gray-500" />
+            Imprimer
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Main Inventory Component
 const Inventory: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-  const [mainTab, setMainTab] = useState<'tous' | 'vegetation' | 'hydrologie'>('tous');
+  const { searchQuery, setPlaceholder } = useSearch();
+  const [mainTab, setMainTab] = useState<'tous' | 'vegetation' | 'hydraulique'>('tous');
 
   // Selection state for creating tasks
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -231,15 +186,6 @@ const Inventory: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [families, setFamilies] = useState<string[]>([]); // État pour stocker la liste des familles
 
-  // Debounce search term (500ms delay)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm);
-      setCurrentPage(1);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
-
   // API State
   const [apiInventory, setApiInventory] = useState<InventoryResponse | null>(null);
   const [isLoadingAPI, setIsLoadingAPI] = useState(false);
@@ -247,6 +193,10 @@ const Inventory: React.FC = () => {
 
   // Sites fetched from backend (replace MOCK_SITES)
   const [sites, setSites] = useState<SiteFrontend[]>([]);
+
+  useEffect(() => {
+    setPlaceholder('Rechercher dans l\'inventaire...');
+  }, [setPlaceholder]);
 
   useEffect(() => {
     let mounted = true;
@@ -306,7 +256,7 @@ const Inventory: React.FC = () => {
           } else {
             apiFilters.type = VEGETATION_TYPES.join(',');
           }
-        } else if (mainTab === 'hydrologie') {
+        } else if (mainTab === 'hydraulique') {
           if (filters.type !== 'all') {
             apiFilters.type = filters.type;
           } else {
@@ -350,8 +300,8 @@ const Inventory: React.FC = () => {
         }
 
         // Search filter
-        if (debouncedSearchTerm.trim()) {
-          apiFilters.search = debouncedSearchTerm.trim();
+        if (searchQuery.trim()) {
+          apiFilters.search = searchQuery.trim();
         }
 
         const data = await fetchInventory(apiFilters);
@@ -365,7 +315,7 @@ const Inventory: React.FC = () => {
     };
 
     loadInventory();
-  }, [mainTab, currentPage, filters, debouncedSearchTerm]);
+  }, [mainTab, currentPage, filters, searchQuery]);
 
   // Transform API data to InventoryItem format
   const inventoryData = useMemo((): InventoryItem[] => {
@@ -788,38 +738,24 @@ const Inventory: React.FC = () => {
 
   const columns = getColumns();
 
-  // Export function (adapté aux colonnes dynamiques)
-  const handleExport = () => {
+  // Export CSV
+  const handleExportCSV = () => {
     const filename = `inventaire_${filters.type !== 'all' ? filters.type + '_' : ''}${new Date().toISOString().split('T')[0]}.csv`;
-
-    // Générer les en-têtes basés sur les colonnes actuelles
     const headers = columns.map(col => col.label);
-
-    // Générer les données basées sur les colonnes actuelles
     const dataToExport = inventoryData.map(item => {
       return columns.map(col => {
         if (col.render) {
-          // Pour les colonnes avec render personnalisé, extraire la valeur
           if (col.key === 'siteId') {
             const site = sites.find(s => s.id === item.siteId);
             return site?.name || item.siteId || '-';
-          } else if (col.key === 'type') {
-            return item.type;
-          } else if (col.key === 'state') {
-            return item.state;
-          } else if (col.key === 'species') {
-            return item.species || '-';
-          } else if (col.key === 'height') {
-            return item.height ? `${item.height} m` : '-';
-          } else if (col.key === 'diameter') {
-            return item.diameter ? `${item.diameter} cm` : '-';
-          } else if (col.key === 'surface') {
-            return item.surface ? `${item.surface} m²` : '-';
-          } else if (col.key === 'lastIntervention') {
-            return item.lastIntervention ? new Date(item.lastIntervention).toLocaleDateString('fr-FR') : '-';
-          }
+          } else if (col.key === 'type') return item.type;
+          else if (col.key === 'state') return item.state;
+          else if (col.key === 'species') return item.species || '-';
+          else if (col.key === 'height') return item.height ? `${item.height} m` : '-';
+          else if (col.key === 'diameter') return item.diameter ? `${item.diameter} cm` : '-';
+          else if (col.key === 'surface') return item.surface ? `${item.surface} m²` : '-';
+          else if (col.key === 'lastIntervention') return item.lastIntervention ? new Date(item.lastIntervention).toLocaleDateString('fr-FR') : '-';
         }
-        // Pour les colonnes simples, retourner la valeur directement
         return (item as any)[col.key] || '-';
       });
     });
@@ -829,22 +765,102 @@ const Inventory: React.FC = () => {
       return;
     }
 
-    // Add BOM for Excel UTF-8 compatibility
     const csvContent = '\uFEFF' + [
       headers.join(';'),
       ...dataToExport.map(row => row.map((cell: any) => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', filename);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    downloadBlob(blob, filename);
+  };
+
+  // Export Excel amélioré
+  const handleExportExcel = async () => {
+    try {
+      // Déterminer les types à exporter selon le tab actif et le filtre type
+      let typesToExport: string[] = [];
+
+      if (mainTab === 'vegetation') {
+        if (filters.type !== 'all') {
+          typesToExport = [filters.type];
+        } else {
+          typesToExport = VEGETATION_TYPES;
+        }
+      } else if (mainTab === 'hydraulique') {
+        if (filters.type !== 'all') {
+          typesToExport = [filters.type];
+        } else {
+          typesToExport = HYDROLOGY_TYPES;
+        }
+      } else {
+        // Tab 'tous'
+        if (filters.type !== 'all') {
+          typesToExport = [filters.type];
+        } else {
+          typesToExport = [...VEGETATION_TYPES, ...HYDROLOGY_TYPES];
+        }
+      }
+
+      // Appeler la nouvelle API avec tous les filtres
+      const blob = await exportInventoryExcel({
+        types: typesToExport,
+        site: filters.site,
+        etat: filters.state,
+        famille: filters.family,
+        search: searchQuery
+      });
+
+      const filename = `inventaire_${new Date().toISOString().split('T')[0]}.xlsx`;
+      downloadBlob(blob, filename);
+      showToast("Export Excel réussi", "success");
+    } catch (error) {
+      console.error("Erreur export Excel:", error);
+      showToast("Erreur lors de l'export Excel", "error");
+    }
+  };
+
+  // Export PDF
+  const handlePrint = async () => {
+    try {
+      // Déterminer les types à exporter selon le tab actif et le filtre type
+      let typesToExport: string[] = [];
+
+      if (mainTab === 'vegetation') {
+        if (filters.type !== 'all') {
+          typesToExport = [filters.type];
+        } else {
+          typesToExport = VEGETATION_TYPES;
+        }
+      } else if (mainTab === 'hydraulique') {
+        if (filters.type !== 'all') {
+          typesToExport = [filters.type];
+        } else {
+          typesToExport = HYDROLOGY_TYPES;
+        }
+      } else {
+        // Tab 'tous'
+        if (filters.type !== 'all') {
+          typesToExport = [filters.type];
+        } else {
+          typesToExport = [...VEGETATION_TYPES, ...HYDROLOGY_TYPES];
+        }
+      }
+
+      // Appeler la nouvelle API avec tous les filtres
+      const blob = await exportInventoryPDF({
+        types: typesToExport,
+        site: filters.site,
+        etat: filters.state,
+        famille: filters.family,
+        search: searchQuery
+      });
+
+      const filename = `inventaire_${new Date().toISOString().split('T')[0]}.pdf`;
+      downloadBlob(blob, filename);
+      showToast("Export PDF réussi", "success");
+    } catch (error) {
+      console.error("Erreur export PDF:", error);
+      showToast("Erreur lors de l'export PDF", "error");
     }
   };
 
@@ -872,7 +888,7 @@ const Inventory: React.FC = () => {
     switch (mainTab) {
       case 'vegetation':
         return VEGETATION_TYPES;
-      case 'hydrologie':
+      case 'hydraulique':
         return HYDROLOGY_TYPES;
       default:
         return [...VEGETATION_TYPES, ...HYDROLOGY_TYPES];
@@ -881,22 +897,36 @@ const Inventory: React.FC = () => {
 
   return (
     <div className="p-6 h-full flex flex-col">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Inventaire</h1>
-        <p className="text-gray-500 mt-1">
-          Consultation du patrimoine vert • {apiInventory?.count || 0} élément{(apiInventory?.count || 0) > 1 ? 's' : ''} au total
-        </p>
-      </div>
+      {/* Styles pour l'impression */}
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          .print-content, .print-content * {
+            visibility: visible;
+          }
+          .print-content {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+          }
+          .no-print {
+            display: none !important;
+          }
+        }
+      `}</style>
 
-      {/* Main Tabs */}
-      <div className="mb-6">
-        <div className="flex gap-2 border-b border-gray-200">
+      {/* Toolbar */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex-shrink-0 no-print">
+        {/* Left: Main Tabs */}
+        <div className="flex items-center bg-gray-100 p-1 rounded-lg">
           <button
             onClick={() => setMainTab('tous')}
-            className={`flex items-center gap-2 px-6 py-3 font-medium text-sm border-b-2 transition-colors ${mainTab === 'tous'
-              ? 'border-emerald-600 text-emerald-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${mainTab === 'tous'
+              ? 'bg-white text-emerald-700 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
               }`}
           >
             <FileText className="w-4 h-4" />
@@ -904,41 +934,28 @@ const Inventory: React.FC = () => {
           </button>
           <button
             onClick={() => setMainTab('vegetation')}
-            className={`flex items-center gap-2 px-6 py-3 font-medium text-sm border-b-2 transition-colors ${mainTab === 'vegetation'
-              ? 'border-emerald-600 text-emerald-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${mainTab === 'vegetation'
+              ? 'bg-white text-emerald-700 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
               }`}
           >
             <Leaf className="w-4 h-4" />
             Végétation
           </button>
           <button
-            onClick={() => setMainTab('hydrologie')}
-            className={`flex items-center gap-2 px-6 py-3 font-medium text-sm border-b-2 transition-colors ${mainTab === 'hydrologie'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+            onClick={() => setMainTab('hydraulique')}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${mainTab === 'hydraulique'
+              ? 'bg-white text-blue-600 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
               }`}
           >
             <Droplet className="w-4 h-4" />
-            Hydrologie
+            Hydraulique
           </button>
         </div>
-      </div>
 
-      {/* Search Bar */}
-      <div className="mb-6 space-y-4">
-        <div className="flex gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Rechercher par nom, code, zone..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-            />
-          </div>
-
+        {/* Right: Actions */}
+        <div className="flex items-center gap-3">
           {/* Filter Toggle */}
           <button
             onClick={() => setShowFilters(!showFilters)}
@@ -956,149 +973,124 @@ const Inventory: React.FC = () => {
             )}
           </button>
 
-          {/* Export Button */}
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-          >
-            <FileText className="w-4 h-4" />
-            <span>Exporter</span>
-          </button>
-        </div>
-
-        {/* Indicateur de vue polymorphe */}
-        {filters.type !== 'all' && (
-          <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
-            <FileText className="w-4 h-4" />
-            <span>
-              Vue détaillée : <strong>{filters.type}</strong> - Colonnes spécifiques affichées
-            </span>
-          </div>
-        )}
-
-        {/* Type Filter Tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-2 border-b border-gray-200">
-          <button
-            onClick={() => setFilters({ ...filters, type: 'all' })}
-            className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all ${filters.type === 'all'
-              ? 'bg-emerald-600 text-white shadow-md'
-              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-              }`}
-          >
-            Tous
-          </button>
-          {getTypesForTab().map(type => (
-            <button
-              key={type}
-              onClick={() => setFilters({ ...filters, type })}
-              className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all ${filters.type === type
-                ? 'bg-emerald-600 text-white shadow-md'
-                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-                }`}
-            >
-              {type}
-            </button>
-          ))}
+          {/* Export Dropdown */}
+          <ExportDropdown 
+            onExportCSV={handleExportCSV}
+            onExportExcel={handleExportExcel}
+            onPrint={handlePrint}
+          />
         </div>
       </div>
 
       {/* Filters Panel */}
-      {/* Filters Panel (Compact V2) */}
       {showFilters && (
-        <div className="mb-6 pb-4 border-b border-gray-200">
-          <div className="flex flex-wrap gap-3 items-center">
-            {/* Reset Button (Moved to start for better workflow) */}
-            {hasActiveFilters && (
-              <button
-                onClick={resetFilters}
-                className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                title="Réinitialiser les filtres"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            )}
-
+        <div className="mb-6 pb-4 border-b border-gray-200 bg-gray-50 p-4 rounded-lg flex-shrink-0 no-print">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Site Filter */}
-            <div className="relative group">
-              <select
-                value={filters.site}
-                onChange={(e) => setFilters({ ...filters, site: e.target.value })}
-                className="appearance-none bg-white min-w-[160px] pl-3 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 hover:border-emerald-400 outline-none transition-all cursor-pointer"
-              >
-                <option value="all">📍 Site: Tous</option>
-                {sites.map((site) => (
-                  <option key={site.id} value={site.id}>
-                    {site.name}
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 group-hover:text-emerald-500">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
-              </div>
-            </div>
+            <CustomSelect
+              value={filters.site}
+              onChange={(val) => setFilters({ ...filters, site: val })}
+              options={[
+                { value: 'all', label: 'Site: Tous' },
+                ...sites.map(s => ({ value: s.id, label: s.name }))
+              ]}
+              icon={<MapPin className="w-4 h-4" />}
+            />
 
             {/* State Filter */}
-            <div className="relative group">
-              <select
-                value={filters.state}
-                onChange={(e) => setFilters({ ...filters, state: e.target.value })}
-                className="appearance-none bg-white min-w-[160px] pl-3 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 hover:border-emerald-400 outline-none transition-all cursor-pointer"
-              >
-                <option value="all">❤️ État: Tous</option>
-                <option value="bon">✅ Bon</option>
-                <option value="moyen">⚠️ Moyen</option>
-                <option value="mauvais">🛑 Mauvais</option>
-                <option value="critique">💀 Critique</option>
-              </select>
-              <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 group-hover:text-emerald-500">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
-              </div>
-            </div>
+            <CustomSelect
+              value={filters.state}
+              onChange={(val) => setFilters({ ...filters, state: val })}
+              options={[
+                { value: 'all', label: 'État: Tous' },
+                { value: 'bon', label: 'Bon' },
+                { value: 'moyen', label: 'Moyen' },
+                { value: 'mauvais', label: 'Mauvais' },
+                { value: 'critique', label: 'Critique' }
+              ]}
+              icon={<Activity className="w-4 h-4" />}
+            />
 
             {/* Family Filter */}
-            <div className="relative group">
-              <select
-                value={filters.family}
-                onChange={(e) => setFilters({ ...filters, family: e.target.value })}
-                className="appearance-none bg-white min-w-[160px] pl-3 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 hover:border-emerald-400 outline-none transition-all cursor-pointer"
-              >
-                <option value="all">🌿 Famille: Toutes</option>
-                {families.map((fam) => (
-                  <option key={fam} value={fam}>
-                    {fam}
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 group-hover:text-emerald-500">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
-              </div>
-            </div>
+            <CustomSelect
+              value={filters.family}
+              onChange={(val) => setFilters({ ...filters, family: val })}
+              options={[
+                { value: 'all', label: 'Famille: Toutes' },
+                ...families.map(f => ({ value: f, label: f }))
+              ]}
+              icon={<Sprout className="w-4 h-4" />}
+            />
 
             {/* Maintenance Filter */}
-            <div className="relative group flex-grow sm:flex-grow-0">
-              <select
-                value={filters.intervention}
-                onChange={(e) => setFilters({ ...filters, intervention: e.target.value })}
-                className="appearance-none w-full sm:w-auto bg-white min-w-[200px] pl-3 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 hover:border-emerald-400 outline-none transition-all cursor-pointer"
-              >
-                <option value="all">🛠️ Maintenance: Tout</option>
-                <option value="urgent">⚠️ Urgente (&gt; 6 mois)</option>
-                <option value="never">🆕 Jamais intervenu</option>
-                <option value="recent_30">📅 Récente (&lt; 30j)</option>
-              </select>
-              <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 group-hover:text-emerald-500">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
-              </div>
-            </div>
+            <CustomSelect
+              value={filters.intervention}
+              onChange={(val) => setFilters({ ...filters, intervention: val })}
+              options={[
+                { value: 'all', label: 'Maintenance: Tout' },
+                { value: 'urgent', label: 'Urgente (> 6 mois)' },
+                { value: 'never', label: 'Jamais intervenu' },
+                { value: 'recent_30', label: 'Récente (< 30j)' }
+              ]}
+              icon={<Wrench className="w-4 h-4" />}
+            />
           </div>
+          
+          {/* Reset Button */}
+          {hasActiveFilters && (
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={resetFilters}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4" />
+                Réinitialiser les filtres
+              </button>
+            </div>
+          )}
         </div>
       )}
 
+      {/* Indicateur de vue polymorphe */}
+      {filters.type !== 'all' && (
+        <div className="mb-4 flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 flex-shrink-0 no-print">
+          <FileText className="w-4 h-4" />
+          <span>
+            Vue détaillée : <strong>{filters.type}</strong> - Colonnes spécifiques affichées
+          </span>
+        </div>
+      )}
+
+      {/* Type Filter Tabs (Secondary) */}
+      <div className="mb-6 flex gap-2 overflow-x-auto pb-2 border-b border-gray-200 flex-shrink-0 no-print">
+        <button
+          onClick={() => setFilters({ ...filters, type: 'all' })}
+          className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all ${filters.type === 'all'
+            ? 'bg-emerald-600 text-white shadow-md'
+            : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+            }`}
+        >
+          Tous
+        </button>
+        {getTypesForTab().map(type => (
+          <button
+            key={type}
+            onClick={() => setFilters({ ...filters, type })}
+            className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all ${filters.type === type
+              ? 'bg-emerald-600 text-white shadow-md'
+              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+              }`}
+          >
+            {type}
+          </button>
+        ))}
+      </div>
+
       {/* Data Table */}
-      <div className="flex-1 overflow-auto min-h-[400px]">
+      <div className="flex-1 overflow-auto min-h-0 print-content">
         {/* Loading State */}
         {isLoadingAPI && (
-          <div className="flex items-center justify-center h-64">
+          <div className="flex items-center justify-center h-64 no-print">
             <div className="text-center">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mb-2"></div>
               <p className="text-gray-600">Chargement de l'inventaire...</p>
@@ -1108,7 +1100,7 @@ const Inventory: React.FC = () => {
 
         {/* Error State */}
         {apiError && !isLoadingAPI && (
-          <div className="flex items-center justify-center h-64">
+          <div className="flex items-center justify-center h-64 no-print">
             <div className="text-center bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
               <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
               <h3 className="text-lg font-semibold text-red-800 mb-2">Erreur de chargement</h3>
@@ -1141,7 +1133,7 @@ const Inventory: React.FC = () => {
 
       {/* Floating Action Bar when items are selected */}
       {selectedItemsCache.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-[95vw]">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-[95vw] no-print">
           <div className="bg-white rounded-xl shadow-2xl border border-gray-200 px-4 py-3 flex items-center gap-4">
             {/* Selection count */}
             <div className="flex items-center gap-2 flex-shrink-0">

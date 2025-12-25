@@ -265,6 +265,43 @@ export async function fetchClients(forceRefresh = false): Promise<PaginatedRespo
 }
 
 export async function createClient(data: ClientCreate): Promise<Client> {
+  // Si le logo est présent et est une data URL base64, utiliser FormData
+  if (data.logo && typeof data.logo === 'string' && data.logo.startsWith('data:')) {
+    const formData = new FormData();
+
+    // Convertir base64 en Blob
+    const base64Response = await fetch(data.logo);
+    const blob = await base64Response.blob();
+    formData.append('logo', blob, 'logo.png');
+
+    // Ajouter les champs obligatoires et optionnels
+    formData.append('email', data.email);
+    formData.append('nom', data.nom);
+    formData.append('prenom', data.prenom);
+    formData.append('password', data.password);
+    formData.append('nom_structure', data.nomStructure);
+
+    if (data.adresse) formData.append('adresse', data.adresse);
+    if (data.telephone) formData.append('telephone', data.telephone);
+    if (data.contactPrincipal) formData.append('contact_principal', data.contactPrincipal);
+    if (data.emailFacturation) formData.append('email_facturation', data.emailFacturation);
+
+    // Utiliser apiFetch directement sans Content-Type JSON
+    const response = await import('./apiFetch').then(m => m.apiFetch(`${USERS_API_URL}/clients/`, {
+      method: 'POST',
+      body: formData
+    }));
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      throw new ApiError(response.status, response.statusText, errorData);
+    }
+
+    const responseData = await response.json();
+    return snakeToCamel<Client>(responseData);
+  }
+
+  // Si pas de logo, utiliser JSON standard
   return fetchApi<Client>(`${USERS_API_URL}/clients/`, {
     method: 'POST',
     body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
@@ -275,9 +312,50 @@ export async function updateClient(
   id: number,
   data: ClientUpdate
 ): Promise<Client> {
+  console.log('📤 updateClient appelé:', { id, data, hasLogo: !!data.logo, logoType: typeof data.logo });
+
+  // Si le logo est présent et est une data URL base64, utiliser FormData
+  if (data.logo && typeof data.logo === 'string' && data.logo.startsWith('data:')) {
+    console.log('✅ Utilisation de FormData pour upload logo');
+    const formData = new FormData();
+
+    // Convertir base64 en Blob
+    const base64Response = await fetch(data.logo);
+    const blob = await base64Response.blob();
+    formData.append('logo', blob, 'logo.png');
+
+    // Ajouter les autres champs
+    if (data.nomStructure !== undefined) formData.append('nom_structure', data.nomStructure);
+    if (data.adresse !== undefined) formData.append('adresse', data.adresse);
+    if (data.telephone !== undefined) formData.append('telephone', data.telephone);
+    if (data.contactPrincipal !== undefined) formData.append('contact_principal', data.contactPrincipal);
+    if (data.emailFacturation !== undefined) formData.append('email_facturation', data.emailFacturation);
+
+    // Utiliser apiFetch directement sans Content-Type JSON
+    const response = await import('./apiFetch').then(m => m.apiFetch(`${USERS_API_URL}/clients/${id}/`, {
+      method: 'PATCH',
+      body: formData
+      // Pas de Content-Type header - le navigateur le définit automatiquement avec boundary
+    }));
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      console.error('❌ Erreur FormData:', { status: response.status, statusText: response.statusText, errorData });
+      throw new ApiError(response.status, response.statusText, errorData);
+    }
+
+    const responseData = await response.json();
+    return snakeToCamel<Client>(responseData);
+  }
+
+  // Si pas de logo ou logo === undefined (suppression), utiliser JSON standard
+  console.log('📝 Utilisation de JSON standard (pas de logo ou logo non modifié)');
+  const payload = camelToSnake(data as unknown as Record<string, unknown>);
+  console.log('📝 Payload JSON:', payload);
+
   return fetchApi<Client>(`${USERS_API_URL}/clients/${id}/`, {
     method: 'PATCH',
-    body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
+    body: JSON.stringify(payload)
   });
 }
 

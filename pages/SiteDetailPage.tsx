@@ -20,7 +20,8 @@ import {
     BarChart3,
     TrendingUp,
     Droplet,
-    Trees
+    Trees,
+    Users
 } from 'lucide-react';
 import {
     BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -288,6 +289,15 @@ const SiteDetailPage: React.FC = () => {
                                 </h2>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                                    <div>
+                                        <dt className="flex items-center gap-2 text-sm font-medium text-gray-500 mb-1">
+                                            <Users className="w-4 h-4" /> Client Propriétaire
+                                        </dt>
+                                        <dd className="text-base font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
+                                            {site.client_nom || 'Non assigné'}
+                                        </dd>
+                                    </div>
+
                                     <div>
                                         <dt className="flex items-center gap-2 text-sm font-medium text-gray-500 mb-1">
                                             <Hash className="w-4 h-4" /> Code Site

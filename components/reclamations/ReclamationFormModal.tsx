@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, MapPin, Calendar, Circle, Pentagon, Target, AlertTriangle, Loader2, CheckCircle2 } from 'lucide-react';
+import { MapPin, Calendar, Circle, Pentagon, Target, AlertTriangle, Loader2, CheckCircle2 } from 'lucide-react';
 import { TypeReclamation, Urgence, ReclamationCreate, Reclamation } from '../../types/reclamations';
 import { GeoJSONGeometry } from '../../types';
 import { createReclamation, uploadPhoto, detectSiteFromGeometry, DetectedSiteInfo } from '../../services/reclamationsApi';
 import { PhotoUpload } from '../shared/PhotoUpload';
+import { FormModal } from '../FormModal';
 
 interface ReclamationFormModalProps {
     isOpen: boolean;
@@ -84,8 +85,6 @@ export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
 
         detectSite();
     }, [isOpen, geometry, preSelectedSiteId, preSelectedSiteName]);
-
-    if (!isOpen) return null;
 
     // Determine geometry type label
     const getGeometryLabel = () => {
@@ -193,215 +192,174 @@ export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
         }
     };
 
+    if (!isOpen) return null;
+
     return (
-        <div
-            className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 pointer-events-auto"
-            onClick={(e) => e.stopPropagation()}
+        <FormModal
+            isOpen={isOpen}
+            onClose={onClose}
+            onSubmit={handleSubmit}
+            title="Signaler un Problème"
+            icon={<AlertTriangle className="w-5 h-5" />}
+            size="lg"
+            loading={isSubmitting}
+            error={error}
+            submitLabel={isSubmitting ? 'Création...' : 'Signaler'}
+            submitVariant="danger"
+            cancelLabel="Annuler"
+            submitDisabled={isSubmitting || isDetectingSite || !!siteDetectionError}
         >
-            <div
-                className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]"
-                onClick={(e) => e.stopPropagation()}
-            >
-                {/* Header */}
-                <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 shrink-0">
-                    <h2 className="text-lg font-bold text-slate-800">
-                        Signaler un Problème
-                    </h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-red-500 transition-colors">
-                        <X className="w-5 h-5" />
-                    </button>
+            {/* Geometry indicator */}
+            {geometryInfo && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 flex items-center gap-3 -mt-2 mb-4">
+                    <div className="p-2 bg-orange-100 rounded-lg">
+                        <geometryInfo.icon className="w-5 h-5 text-orange-600" />
+                    </div>
+                    <div>
+                        <span className="text-sm font-medium text-orange-800">
+                            Zone délimitée : {geometryInfo.label}
+                        </span>
+                        {areaDisplay && (
+                            <p className="text-xs text-orange-600">
+                                Surface approximative : {areaDisplay}
+                            </p>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Indicateur de site détecté */}
+            {isDetectingSite ? (
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center gap-3 mb-4">
+                    <Loader2 className="w-5 h-5 text-slate-500 animate-spin" />
+                    <span className="text-sm text-slate-600">
+                        Détection du site en cours...
+                    </span>
+                </div>
+            ) : siteDetectionError ? (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-red-100 rounded-lg">
+                        <AlertTriangle className="w-5 h-5 text-red-600" />
+                    </div>
+                    <div className="flex-1">
+                        <span className="text-sm font-medium text-red-800">
+                            Aucun site détecté
+                        </span>
+                        <p className="text-xs text-red-600 mt-0.5">
+                            {siteDetectionError}
+                        </p>
+                    </div>
+                </div>
+            ) : detectedSite?.site_id ? (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-emerald-100 rounded-lg">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    <div className="flex-1">
+                        <span className="text-sm font-medium text-emerald-800">
+                            Site: {detectedSite.site_nom}
+                        </span>
+                        {detectedSite.zone_nom && (
+                            <p className="text-xs text-emerald-600 mt-0.5">
+                                Zone: {detectedSite.zone_nom}
+                            </p>
+                        )}
+                    </div>
+                    <MapPin className="w-4 h-4 text-emerald-500" />
+                </div>
+            ) : null}
+
+            <div className="space-y-4">
+                {/* Type de problème */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Type de problème <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                        required
+                        value={formData.type_reclamation || ''}
+                        className="w-full rounded-lg border-gray-300 border p-2.5 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+                        onChange={e => setFormData({ ...formData, type_reclamation: Number(e.target.value) })}
+                    >
+                        <option value="">Sélectionner un type...</option>
+                        {types.map(t => (
+                            <option key={t.id} value={t.id}>{t.nom_reclamation}</option>
+                        ))}
+                    </select>
                 </div>
 
-                <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-                    <div className="p-6 space-y-4 overflow-y-auto flex-1">
-                        {/* Error message */}
-                        {error && (
-                            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-                                {error}
-                            </div>
-                        )}
-
-                        {/* Geometry indicator */}
-                        {geometryInfo && (
-                            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 flex items-center gap-3">
-                                <div className="p-2 bg-orange-100 rounded-lg">
-                                    <geometryInfo.icon className="w-5 h-5 text-orange-600" />
-                                </div>
-                                <div>
-                                    <span className="text-sm font-medium text-orange-800">
-                                        Zone délimitée : {geometryInfo.label}
-                                    </span>
-                                    {areaDisplay && (
-                                        <p className="text-xs text-orange-600">
-                                            Surface approximative : {areaDisplay}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Indicateur de site détecté */}
-                        {isDetectingSite ? (
-                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center gap-3">
-                                <Loader2 className="w-5 h-5 text-slate-500 animate-spin" />
-                                <span className="text-sm text-slate-600">
-                                    Détection du site en cours...
-                                </span>
-                            </div>
-                        ) : siteDetectionError ? (
-                            <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-3">
-                                <div className="p-2 bg-red-100 rounded-lg">
-                                    <AlertTriangle className="w-5 h-5 text-red-600" />
-                                </div>
-                                <div className="flex-1">
-                                    <span className="text-sm font-medium text-red-800">
-                                        Aucun site détecté
-                                    </span>
-                                    <p className="text-xs text-red-600 mt-0.5">
-                                        {siteDetectionError}
-                                    </p>
-                                </div>
-                            </div>
-                        ) : detectedSite?.site_id ? (
-                            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-center gap-3">
-                                <div className="p-2 bg-emerald-100 rounded-lg">
-                                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                                </div>
-                                <div className="flex-1">
-                                    <span className="text-sm font-medium text-emerald-800">
-                                        Site: {detectedSite.site_nom}
-                                    </span>
-                                    {detectedSite.zone_nom && (
-                                        <p className="text-xs text-emerald-600 mt-0.5">
-                                            Zone: {detectedSite.zone_nom}
-                                        </p>
-                                    )}
-                                </div>
-                                <MapPin className="w-4 h-4 text-emerald-500" />
-                            </div>
-                        ) : null}
-
-                        {/* Type de problème */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Type de problème <span className="text-red-500">*</span>
-                            </label>
-                            <select
-                                required
-                                value={formData.type_reclamation || ''}
-                                className="w-full rounded-lg border-gray-300 border p-2.5 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
-                                onChange={e => setFormData({ ...formData, type_reclamation: Number(e.target.value) })}
+                {/* Urgence */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Urgence <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                        {urgences.map(u => (
+                            <button
+                                key={u.id}
+                                type="button"
+                                onClick={() => setFormData({ ...formData, urgence: u.id })}
+                                className={`
+                                    flex items-center justify-center p-2 rounded-lg border text-sm font-medium transition-all
+                                    ${formData.urgence === u.id
+                                        ? 'border-orange-500 bg-orange-50 text-orange-700 ring-1 ring-orange-500'
+                                        : 'border-gray-200 hover:border-gray-300 text-gray-600'}
+                                `}
                             >
-                                <option value="">Sélectionner un type...</option>
-                                {types.map(t => (
-                                    <option key={t.id} value={t.id}>{t.nom_reclamation}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Urgence */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Urgence <span className="text-red-500">*</span>
-                            </label>
-                            <div className="grid grid-cols-2 gap-2">
-                                {urgences.map(u => (
-                                    <button
-                                        key={u.id}
-                                        type="button"
-                                        onClick={() => setFormData({ ...formData, urgence: u.id })}
-                                        className={`
-                                            flex items-center justify-center p-2 rounded-lg border text-sm font-medium transition-all
-                                            ${formData.urgence === u.id
-                                                ? 'border-orange-500 bg-orange-50 text-orange-700 ring-1 ring-orange-500'
-                                                : 'border-gray-200 hover:border-gray-300 text-gray-600'}
-                                        `}
-                                    >
-                                        {u.niveau_urgence}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Description */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Description <span className="text-red-500">*</span>
-                            </label>
-                            <textarea
-                                required
-                                rows={4}
-                                value={formData.description || ''}
-                                className="w-full rounded-lg border-gray-300 border p-3 focus:ring-2 focus:ring-orange-500 outline-none resize-none"
-                                placeholder="Décrivez le problème rencontré..."
-                                onChange={e => setFormData({ ...formData, description: e.target.value })}
-                            />
-                        </div>
-
-                        {/* Date de constatation */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Date de constatation <span className="text-red-500">*</span>
-                            </label>
-                            <div className="relative">
-                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                <input
-                                    type="datetime-local"
-                                    required
-                                    value={formData.date_constatation ? formData.date_constatation.slice(0, 16) : ''}
-                                    className="w-full pl-10 pr-4 py-2.5 rounded-lg border-gray-300 border focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
-                                    onChange={e => setFormData({
-                                        ...formData,
-                                        date_constatation: e.target.value ? new Date(e.target.value).toISOString() : undefined
-                                    })}
-                                />
-                            </div>
-                            <p className="text-xs text-gray-500 mt-1">Date et heure où le problème a été constaté</p>
-                        </div>
-
-                        {/* Photos */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Photos (optionnel)
-                            </label>
-                            <PhotoUpload
-                                photos={photos}
-                                onChange={setPhotos}
-                            />
-                        </div>
+                                {u.niveau_urgence}
+                            </button>
+                        ))}
                     </div>
+                </div>
 
-                    {/* Footer */}
-                    <div className="p-4 border-t border-gray-100 shrink-0 bg-gray-50 flex gap-3">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            disabled={isSubmitting}
-                            className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium disabled:opacity-50"
-                        >
-                            Annuler
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={isSubmitting || isDetectingSite || !!siteDetectionError}
-                            className="flex-1 px-4 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                            title={siteDetectionError ? "Impossible de créer sans site détecté" : undefined}
-                        >
-                            {isSubmitting ? (
-                                <>
-                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    Création...
-                                </>
-                            ) : siteDetectionError ? (
-                                'Site requis'
-                            ) : (
-                                'Signaler'
-                            )}
-                        </button>
+                {/* Description */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Description <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                        required
+                        rows={4}
+                        value={formData.description || ''}
+                        className="w-full rounded-lg border-gray-300 border p-3 focus:ring-2 focus:ring-orange-500 outline-none resize-none"
+                        placeholder="Décrivez le problème rencontré..."
+                        onChange={e => setFormData({ ...formData, description: e.target.value })}
+                    />
+                </div>
+
+                {/* Date de constatation */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Date de constatation <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                            type="datetime-local"
+                            required
+                            value={formData.date_constatation ? formData.date_constatation.slice(0, 16) : ''}
+                            className="w-full pl-10 pr-4 py-2.5 rounded-lg border-gray-300 border focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+                            onChange={e => setFormData({
+                                ...formData,
+                                date_constatation: e.target.value ? new Date(e.target.value).toISOString() : undefined
+                            })}
+                        />
                     </div>
-                </form>
+                    <p className="text-xs text-gray-500 mt-1">Date et heure où le problème a été constaté</p>
+                </div>
+
+                {/* Photos */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Photos (optionnel)
+                    </label>
+                    <PhotoUpload
+                        photos={photos}
+                        onChange={setPhotos}
+                    />
+                </div>
             </div>
-        </div>
+        </FormModal>
     );
 };
 

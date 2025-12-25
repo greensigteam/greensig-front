@@ -229,6 +229,36 @@ export interface ParticipationCreate {
 }
 
 // ============================================================================
+// FILTRES PLANNING
+// ============================================================================
+
+export interface PlanningFilters {
+    clientId: number | null;
+    siteId: number | null;
+    equipeId: number | null;
+    statuts: StatutTache[]; // Multi-select
+}
+
+export const EMPTY_PLANNING_FILTERS: PlanningFilters = {
+    clientId: null,
+    siteId: null,
+    equipeId: null,
+    statuts: []
+};
+
+/**
+ * Compte le nombre de filtres actifs
+ */
+export function countActivePlanningFilters(filters: PlanningFilters): number {
+    let count = 0;
+    if (filters.clientId !== null) count++;
+    if (filters.siteId !== null) count++;
+    if (filters.equipeId !== null) count++;
+    if (filters.statuts.length > 0) count++;
+    return count;
+}
+
+// ============================================================================
 // COULEURS UI
 // ============================================================================
 
