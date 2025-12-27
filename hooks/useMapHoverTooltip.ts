@@ -6,6 +6,7 @@ import type Map from 'ol/Map';
 import { Feature } from 'ol';
 import type { MapBrowserEvent } from '../types';
 import { useSelection } from '../contexts/SelectionContext';
+import { VEG_LEGEND, HYDRO_LEGEND } from '../constants';
 
 export interface UseMapHoverTooltipOptions {
   mapInstance: React.RefObject<Map | null>;
@@ -211,13 +212,14 @@ export function useMapHoverTooltip(options: UseMapHoverTooltipOptions): UseMapHo
           const debit = currentHoveredFeature.get('debit');
           const siteName = currentHoveredFeature.get('site_nom');
 
-          // Object type colors
-          const objectColors: Record<string, string> = {
-            'Arbre': '#22c55e', 'Gazon': '#84cc16', 'Palmier': '#16a34a', 'Arbuste': '#65a30d',
-            'Vivace': '#a3e635', 'Cactus': '#4d7c0f', 'Graminee': '#bef264',
-            'Puit': '#0ea5e9', 'Pompe': '#06b6d4', 'Vanne': '#14b8a6', 'Clapet': '#0891b2',
-            'Canalisation': '#0284c7', 'Aspersion': '#38bdf8', 'Goutte': '#7dd3fc', 'Ballon': '#0369a1'
-          };
+          // Object type colors - Built from VEG_LEGEND and HYDRO_LEGEND constants
+          const objectColors: Record<string, string> = {};
+          VEG_LEGEND.forEach(item => {
+            objectColors[item.type] = item.color;
+          });
+          HYDRO_LEGEND.forEach(item => {
+            objectColors[item.type] = item.color;
+          });
           const color = objectColors[objectType] || '#10b981';
 
           // Get additional properties

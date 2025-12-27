@@ -5,6 +5,7 @@ import {
     TypeTache, ParticipationCreate, ParticipationTache,
     RatioProductivite, RatioProductiviteCreate
 } from '../types/planning';
+import { db, cacheKeys, cacheTTL } from './db';
 
 const BASE_URL = '/api/planification';
 
@@ -54,7 +55,11 @@ export const planningService = {
             console.error('Task creation error response:', error);
             throw new Error(error.detail || JSON.stringify(error) || 'Erreur lors de la création de la tâche');
         }
-        return response.json();
+        const result = await response.json();
+
+        // Invalider le cache des tâches
+        await db.remove(cacheKeys.taches());
+        return result;
     },
 
     async updateTache(id: number, data: TacheUpdate): Promise<Tache> {
@@ -64,7 +69,12 @@ export const planningService = {
             body: JSON.stringify(data)
         });
         if (!response.ok) throw new Error('Erreur modification tâche');
-        return response.json();
+        const result = await response.json();
+
+        // Invalider le cache des tâches
+        await db.remove(cacheKeys.taches());
+        await db.remove(cacheKeys.tache(id));
+        return result;
     },
 
     async deleteTache(id: number): Promise<void> {
@@ -72,21 +82,33 @@ export const planningService = {
             method: 'DELETE'
         });
         if (!response.ok) throw new Error('Erreur suppression tâche');
+
+        // Invalider le cache des tâches
+        await db.remove(cacheKeys.taches());
+        await db.remove(cacheKeys.tache(id));
     },
 
     // --- TYPES DE TACHES ---
 
     async getTypesTaches(): Promise<TypeTache[]> {
-        // Pagination est possible, mais souvent on veut une liste complète pour les selects.
-        // Si l'API pagine, on devrait gérer ça. Pour l'instant supposons une liste simple ou paginée.
-        // Le backend ViewSet est paginé par défaut. On va demander une grosse page si besoin.
+        // Essayer le cache d'abord (données statiques - 60 min)
+        const cached = await db.get<TypeTache[]>(cacheKeys.typesTaches());
+        if (cached) {
+            console.log('[Cache HIT] Types de tâches');
+            return cached;
+        }
+
+        console.log('[Cache MISS] Types de tâches - Appel API');
         const response = await apiFetch(`${BASE_URL}/types-taches/?page_size=100`);
         if (!response.ok) throw new Error('Erreur chargement types tâches');
 
         const data = await response.json();
         // Gestion souple : si array direct ou si format paginé
-        if (Array.isArray(data)) return data;
-        return data.results || [];
+        const result = Array.isArray(data) ? data : (data.results || []);
+
+        // Mettre en cache pour 60 minutes (données statiques)
+        await db.set(cacheKeys.typesTaches(), result, cacheTTL.static);
+        return result;
     },
 
     /**
@@ -118,6 +140,25 @@ export const planningService = {
         return response.json();
     },
 
+    /**
+     * Récupère les types d'objets compatibles avec un type de tâche.
+     * Un type d'objet est compatible s'il existe un RatioProductivite actif.
+     *
+     * @param typeTacheId - ID du type de tâche
+     * @returns Liste des types d'objets compatibles
+     */
+    async getCompatibleObjectTypes(typeTacheId: number): Promise<{
+        type_tache_id: number;
+        type_tache_nom: string;
+        nombre_types_objets: number;
+        types_objets_compatibles: string[];
+    }> {
+        const response = await apiFetch(`${BASE_URL}/types-taches/${typeTacheId}/objets_compatibles/`);
+
+        if (!response.ok) throw new Error('Erreur chargement types objets compatibles');
+        return response.json();
+    },
+
     async createTypeTache(data: { nom_tache: string; description?: string }): Promise<TypeTache> {
         const response = await apiFetch(`${BASE_URL}/types-taches/`, {
             method: 'POST',
@@ -128,7 +169,11 @@ export const planningService = {
             const error = await response.json();
             throw new Error(error.nom_tache?.[0] || error.detail || 'Erreur lors de la création du type de tâche');
         }
-        return response.json();
+        const result = await response.json();
+
+        // Invalider le cache des types de tâches
+        await db.remove(cacheKeys.typesTaches());
+        return result;
     },
 
     // --- PARTICIPATION ---
@@ -140,7 +185,12 @@ export const planningService = {
             body: JSON.stringify(data)
         });
         if (!response.ok) throw new Error('Erreur ajout participation');
-        return response.json();
+        const result = await response.json();
+
+        // Invalider le cache des tâches
+        await db.remove(cacheKeys.taches());
+        await db.remove(cacheKeys.tache(tacheId));
+        return result;
     },
 
     // --- CHANGEMENT DE STATUT ---
@@ -170,7 +220,12 @@ export const planningService = {
             const error = await response.json();
             throw new Error(error.detail || 'Erreur lors du changement de statut');
         }
-        return response.json();
+        const result = await response.json();
+
+        // Invalider le cache des tâches
+        await db.remove(cacheKeys.taches());
+        await db.remove(cacheKeys.tache(tacheId));
+        return result;
     },
 
     // --- VALIDATION ADMIN ---
@@ -189,7 +244,12 @@ export const planningService = {
             const error = await response.json();
             throw new Error(error.error || 'Erreur lors de la validation');
         }
-        return response.json();
+        const result = await response.json();
+
+        // Invalider le cache des tâches
+        await db.remove(cacheKeys.taches());
+        await db.remove(cacheKeys.tache(tacheId));
+        return result;
     },
 
     // --- CHARGE ESTIMEE ---
@@ -199,7 +259,12 @@ export const planningService = {
             method: 'POST'
         });
         if (!response.ok) throw new Error('Erreur lors du recalcul de la charge');
-        return response.json();
+        const result = await response.json();
+
+        // Invalider le cache des tâches
+        await db.remove(cacheKeys.taches());
+        await db.remove(cacheKeys.tache(tacheId));
+        return result;
     },
 
     // --- RATIOS DE PRODUCTIVITE ---
@@ -234,7 +299,11 @@ export const planningService = {
             const error = await response.json();
             throw new Error(error.detail || error.non_field_errors?.[0] || 'Erreur lors de la création du ratio');
         }
-        return response.json();
+        const result = await response.json();
+
+        // Invalider le cache des ratios
+        await db.remove(cacheKeys.ratios());
+        return result;
     },
 
     async updateRatio(id: number, data: Partial<RatioProductiviteCreate>): Promise<RatioProductivite> {
@@ -244,7 +313,12 @@ export const planningService = {
             body: JSON.stringify(data)
         });
         if (!response.ok) throw new Error('Erreur modification ratio');
-        return response.json();
+        const result = await response.json();
+
+        // Invalider le cache des ratios
+        await db.remove(cacheKeys.ratios());
+        await db.remove(cacheKeys.ratio(id));
+        return result;
     },
 
     async deleteRatio(id: number): Promise<void> {
@@ -252,5 +326,9 @@ export const planningService = {
             method: 'DELETE'
         });
         if (!response.ok) throw new Error('Erreur suppression ratio');
+
+        // Invalider le cache des ratios
+        await db.remove(cacheKeys.ratios());
+        await db.remove(cacheKeys.ratio(id));
     }
 };

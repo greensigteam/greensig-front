@@ -74,33 +74,6 @@ export interface Team {
   active: boolean;
 }
 
-export interface Claim {
-  id: string;
-  number: string; // e.g., "REC-2024-001"
-  clientName: string;
-  siteId: string;
-  zone: string;
-  type: 'qualite' | 'securite' | 'esthetique' | 'equipement';
-  urgency: 'basse' | 'moyenne' | 'haute';
-  status: 'nouvelle' | 'assignee' | 'en_cours' | 'resolue' | 'cloturee';
-  description: string;
-  coordinates: Coordinates;
-  photos: string[];
-  createdAt: string; // ISO datetime
-  assignedTeamId?: string;
-  resolvedAt?: string;
-  closedAt?: string;
-  timeline: ClaimTimelineEvent[];
-  satisfaction?: number; // 1-5
-}
-
-export interface ClaimTimelineEvent {
-  date: string; // ISO datetime
-  status: Claim['status'];
-  actor: string;
-  comment?: string;
-}
-
 // ============================================================================
 // MOCK DATA
 // ============================================================================
@@ -303,81 +276,6 @@ export const MOCK_INTERVENTIONS: Intervention[] = [
   }
 ];
 
-export const MOCK_CLAIMS: Claim[] = [
-  {
-    id: 'claim-1',
-    number: 'REC-2024-001',
-    clientName: 'M. Ahmed Benali',
-    siteId: 'site-1',
-    zone: 'Jardin principal',
-    type: 'qualite',
-    urgency: 'haute',
-    status: 'assignee',
-    description: 'Pelouse jaunie dans la zone près de la piscine',
-    coordinates: { lat: 33.9719, lng: -6.8501 },
-    photos: ['https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400'],
-    createdAt: '2024-11-28T10:30:00Z',
-    assignedTeamId: 'team-1',
-    timeline: [
-      {
-        date: '2024-11-28T10:30:00Z',
-        status: 'nouvelle',
-        actor: 'M. Ahmed Benali',
-        comment: 'Réclamation créée'
-      },
-      {
-        date: '2024-11-28T14:00:00Z',
-        status: 'assignee',
-        actor: 'Admin',
-        comment: 'Assignée à l\'Équipe A'
-      }
-    ]
-  },
-  {
-    id: 'claim-2',
-    number: 'REC-2024-002',
-    clientName: 'Mme. Fatima Alaoui',
-    siteId: 'site-2',
-    zone: 'Allée principale',
-    type: 'securite',
-    urgency: 'haute',
-    status: 'resolue',
-    description: 'Branche d\'olivier cassée risque de tomber',
-    coordinates: { lat: 33.9857, lng: -6.8633 },
-    photos: [],
-    createdAt: '2024-11-25T09:00:00Z',
-    assignedTeamId: 'team-2',
-    resolvedAt: '2024-11-26T16:00:00Z',
-    timeline: [
-      {
-        date: '2024-11-25T09:00:00Z',
-        status: 'nouvelle',
-        actor: 'Mme. Fatima Alaoui',
-        comment: 'Réclamation créée'
-      },
-      {
-        date: '2024-11-25T10:00:00Z',
-        status: 'assignee',
-        actor: 'Admin',
-        comment: 'Assignée à l\'Équipe B - Urgence haute'
-      },
-      {
-        date: '2024-11-26T08:00:00Z',
-        status: 'en_cours',
-        actor: 'Omar Tazi',
-        comment: 'Intervention démarrée'
-      },
-      {
-        date: '2024-11-26T16:00:00Z',
-        status: 'resolue',
-        actor: 'Omar Tazi',
-        comment: 'Branche coupée et évacuée'
-      }
-    ],
-    satisfaction: 5
-  }
-];
-
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -411,12 +309,4 @@ export const getTeamMembers = (teamId: string): TeamMember[] => {
   const team = getTeamById(teamId);
   if (!team) return [];
   return MOCK_TEAM_MEMBERS.filter(member => team.members.includes(member.id));
-};
-
-export const getClaimsBySite = (siteId: string): Claim[] => {
-  return MOCK_CLAIMS.filter(claim => claim.siteId === siteId);
-};
-
-export const getClaimsByStatus = (status: Claim['status']): Claim[] => {
-  return MOCK_CLAIMS.filter(claim => claim.status === status);
 };

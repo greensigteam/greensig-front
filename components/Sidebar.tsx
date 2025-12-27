@@ -21,6 +21,7 @@ const viewToPath: Record<string, string> = {
   MAP: '/map',
   INVENTORY: '/inventory',
   SITES: '/sites',
+  CLIENTS: '/clients',
   PRODUCTS: '/products',
   PLANNING: '/planning',
   RATIOS: '/ratios',
@@ -30,6 +31,7 @@ const viewToPath: Record<string, string> = {
   REPORTING: '/reporting',
   CLIENT_PORTAL: '/client',
   USERS: '/users',
+  PARAMETRES: '/parametres',
   // Client specific routes
   CLIENT_MAP: '/client/map',
   CLIENT_CLAIMS: '/reclamations',
@@ -65,7 +67,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onToggle
 }) => {
   const location = useLocation();
-  const [openGroups, setOpenGroups] = useState<string[]>(['PARAMETRES']);
+  const [openGroups, setOpenGroups] = useState<string[]>([]);
 
   const toggleGroup = (groupId: string) => {
     setOpenGroups(prev =>
@@ -77,30 +79,23 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   // User Roles Configuration
   const menuEntries: MenuEntry[] = [
-    { id: 'DASHBOARD', label: 'Tableau de bord', icon: LayoutDashboard, roles: ['ADMIN', 'OPERATEUR', 'CHEF_EQUIPE'] },
-    { id: 'MAP', label: 'Cartographie', icon: MapIcon, roles: ['ADMIN', 'OPERATEUR', 'CHEF_EQUIPE'] },
-    { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['ADMIN', 'OPERATEUR', 'CHEF_EQUIPE'] },
+    { id: 'DASHBOARD', label: 'Tableau de bord', icon: LayoutDashboard, roles: ['ADMIN', 'SUPERVISEUR'] },
+    { id: 'MAP', label: 'Cartographie', icon: MapIcon, roles: ['ADMIN', 'SUPERVISEUR'] },
+    { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'SITES', label: 'Gestion des sites', icon: MapPin, roles: ['ADMIN'] },
+    { id: 'CLIENTS', label: 'Clients', icon: Users, roles: ['ADMIN'] },
     { id: 'PRODUCTS', label: 'Gestion de produits', icon: Package, roles: ['ADMIN'] },
-    { id: 'PLANNING', label: 'Planification', icon: Calendar, roles: ['ADMIN', 'CHEF_EQUIPE'] },
-    { id: 'INTERVENTIONS', label: 'Réclamations', icon: AlertCircle, roles: ['ADMIN', 'OPERATEUR', 'CHEF_EQUIPE'] },
-    { id: 'CLAIMS', label: 'Suivi des Tâches', icon: ClipboardList, roles: ['ADMIN', 'OPERATEUR', 'CHEF_EQUIPE'] },
-    { id: 'TEAMS', label: 'Équipes', icon: Users, roles: ['ADMIN', 'CHEF_EQUIPE'] },
+    { id: 'PLANNING', label: 'Planification', icon: Calendar, roles: ['ADMIN', 'SUPERVISEUR'] },
+    { id: 'INTERVENTIONS', label: 'Réclamations', icon: AlertCircle, roles: ['ADMIN', 'SUPERVISEUR'] },
+    { id: 'CLAIMS', label: 'Suivi des Tâches', icon: ClipboardList, roles: ['ADMIN', 'SUPERVISEUR'] },
+    { id: 'TEAMS', label: 'RH', icon: Users, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'REPORTING', label: 'Rapports', icon: BarChart3, roles: ['ADMIN'] },
-    // Paramètres dropdown group
-    {
-      id: 'PARAMETRES',
-      label: 'Paramètres',
-      icon: Settings,
-      roles: ['ADMIN'],
-      children: [
-        { id: 'USERS', label: 'Utilisateurs', icon: UserCog, roles: ['ADMIN'] },
-        { id: 'RATIOS', label: 'Ratios de productivité', icon: Gauge, roles: ['ADMIN'] },
-      ]
-    },
+    { id: 'PARAMETRES', label: 'Paramètres', icon: Settings, roles: ['ADMIN'] },
     // Client specific menu items
     { id: 'CLIENT_MAP', label: 'Carte', icon: MapIcon, roles: ['CLIENT'] },
-    { id: 'CLIENT_CLAIMS', label: 'Réclamations', icon: MessageSquare, roles: ['CLIENT'] },
+    { id: 'SITES', label: 'Mes sites', icon: MapPin, roles: ['CLIENT'] },
+    { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['CLIENT'] },
+    { id: 'CLIENT_CLAIMS', label: 'Réclamations', icon: AlertCircle, roles: ['CLIENT'] },
     { id: 'CLIENT_PLANNING', label: 'Planning', icon: Calendar, roles: ['CLIENT'] },
     { id: 'CLIENT_INTERVENTIONS', label: 'Interventions', icon: ClipboardList, roles: ['CLIENT'] },
   ];

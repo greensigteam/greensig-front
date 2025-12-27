@@ -1,23 +1,102 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
-    MapPin, Search, RefreshCw, Edit2, Trash2, ToggleLeft, ToggleRight,
-    ChevronLeft, ChevronRight, AlertCircle, CheckCircle, Loader2, Plus
+    MapPin, RefreshCw, Edit2, Trash2,
+    ChevronLeft, ChevronRight, AlertCircle, CheckCircle, Loader2, Plus,
+    Settings, MoreVertical, Users, Filter
 } from 'lucide-react';
 import { fetchAllSites, updateSite, deleteSite, SiteFrontend } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
+import { useSearch } from '../contexts/SearchContext';
 import SiteEditModal from '../components/sites/SiteEditModal';
+
+// Composant Dropdown pour les actions
+const ActionDropdown = ({ 
+    onEdit, 
+    onDelete, 
+    onToggleActive, 
+    isActive 
+}: { 
+    onEdit: () => void, 
+    onDelete: () => void, 
+    onToggleActive: () => void,
+    isActive: boolean 
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    return (
+        <div className="relative" ref={dropdownRef}>
+            <button 
+                onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+            >
+                <MoreVertical className="w-5 h-5" />
+            </button>
+            
+            {isOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 z-50 py-1 animate-in fade-in zoom-in-95 duration-100">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onEdit(); setIsOpen(false); }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    >
+                        <Edit2 className="w-4 h-4" />
+                        Modifier
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onToggleActive(); setIsOpen(false); }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    >
+                        {isActive ? (
+                            <>
+                                <AlertCircle className="w-4 h-4 text-orange-500" />
+                                Désactiver
+                            </>
+                        ) : (
+                            <>
+                                <CheckCircle className="w-4 h-4 text-emerald-500" />
+                                Activer
+                            </>
+                        )}
+                    </button>
+                    <div className="border-t border-gray-100 my-1"></div>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onDelete(); setIsOpen(false); }}
+                        className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                        Supprimer
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+};
 
 export default function Sites() {
     const { showToast } = useToast();
+    const navigate = useNavigate();
+    const { searchQuery, setPlaceholder } = useSearch();
     const [sites, setSites] = useState<SiteFrontend[]>([]);
     const [filteredSites, setFilteredSites] = useState<SiteFrontend[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [showInactive, setShowInactive] = useState(false);
+    
+    // Filtre statut: 'all', 'active', 'inactive'
+    const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('active');
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     // Edit modal
     const [editingSite, setEditingSite] = useState<SiteFrontend | null>(null);
@@ -25,6 +104,11 @@ export default function Sites() {
     // Delete confirmation
     const [deletingSite, setDeletingSite] = useState<SiteFrontend | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // Set search placeholder
+    useEffect(() => {
+        setPlaceholder('Rechercher un site par nom, code, adresse ou propriétaire...');
+    }, [setPlaceholder]);
 
     // Load sites
     const loadSites = useCallback(async () => {
@@ -47,24 +131,27 @@ export default function Sites() {
     useEffect(() => {
         let filtered = sites;
 
-        // Filter by search
+        // Filter by search (from global context)
         if (searchQuery) {
             const query = searchQuery.toLowerCase();
             filtered = filtered.filter(site =>
                 site.name?.toLowerCase().includes(query) ||
                 site.code_site?.toLowerCase().includes(query) ||
-                site.adresse?.toLowerCase().includes(query)
+                site.adresse?.toLowerCase().includes(query) ||
+                site.client_nom?.toLowerCase().includes(query)
             );
         }
 
-        // Filter by active status
-        if (!showInactive) {
+        // Filter by status
+        if (statusFilter === 'active') {
             filtered = filtered.filter(site => site.actif !== false);
+        } else if (statusFilter === 'inactive') {
+            filtered = filtered.filter(site => site.actif === false);
         }
 
         setFilteredSites(filtered);
         setCurrentPage(1);
-    }, [sites, searchQuery, showInactive]);
+    }, [sites, searchQuery, statusFilter]);
 
     // Pagination calculations
     const totalPages = Math.ceil(filteredSites.length / itemsPerPage);
@@ -104,62 +191,79 @@ export default function Sites() {
         }
     };
 
+    const handleCreateSite = () => {
+        showToast("Pour créer un site, veuillez le dessiner sur la carte.", "info");
+        navigate('/map');
+    };
+
     return (
         <div className="p-6 space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Gestion des Sites</h1>
-                    <p className="text-sm text-gray-500 mt-1">
+            {/* Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                
+                {/* Left: Status Filters */}
+                <div className="flex items-center bg-gray-100 p-1 rounded-lg">
+                    <button
+                        onClick={() => setStatusFilter('all')}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                            statusFilter === 'all' 
+                                ? 'bg-white text-gray-900 shadow-sm' 
+                                : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                    >
+                        Tous
+                    </button>
+                    <button
+                        onClick={() => setStatusFilter('active')}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                            statusFilter === 'active' 
+                                ? 'bg-white text-emerald-700 shadow-sm' 
+                                : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                    >
+                        Actifs
+                    </button>
+                    <button
+                        onClick={() => setStatusFilter('inactive')}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                            statusFilter === 'inactive' 
+                                ? 'bg-white text-gray-900 shadow-sm' 
+                                : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                    >
+                        Inactifs
+                    </button>
+                </div>
+
+                {/* Right: Actions */}
+                <div className="flex items-center gap-3">
+                    <span className="text-sm text-gray-500 hidden sm:inline-block mr-2">
                         {filteredSites.length} site{filteredSites.length > 1 ? 's' : ''}
-                        {!showInactive && sites.filter(s => s.actif === false).length > 0 &&
-                            ` (${sites.filter(s => s.actif === false).length} inactif${sites.filter(s => s.actif === false).length > 1 ? 's' : ''} masqué${sites.filter(s => s.actif === false).length > 1 ? 's' : ''})`
-                        }
-                    </p>
-                </div>
-                <button
-                    onClick={loadSites}
-                    disabled={isLoading}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                >
-                    <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                    Actualiser
-                </button>
-            </div>
+                    </span>
+                    
+                    <div className="h-6 w-px bg-gray-200 hidden sm:block"></div>
 
-            {/* Filters */}
-            <div className="flex flex-wrap items-center gap-4 bg-white p-4 rounded-xl shadow-sm border">
-                {/* Search */}
-                <div className="flex-1 min-w-[250px]">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Rechercher par nom, code ou adresse..."
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        />
-                    </div>
-                </div>
+                    <button
+                        onClick={loadSites}
+                        disabled={isLoading}
+                        className="p-2 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50"
+                        title="Actualiser"
+                    >
+                        <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
+                    </button>
 
-                {/* Show inactive toggle */}
-                <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                        type="checkbox"
-                        checked={showInactive}
-                        onChange={(e) => setShowInactive(e.target.checked)}
-                        className="sr-only"
-                    />
-                    <div className={`w-10 h-6 rounded-full transition-colors ${showInactive ? 'bg-emerald-600' : 'bg-gray-300'}`}>
-                        <div className={`w-4 h-4 mt-1 ml-1 bg-white rounded-full transition-transform ${showInactive ? 'translate-x-4' : ''}`} />
-                    </div>
-                    <span className="text-sm text-gray-700">Afficher les inactifs</span>
-                </label>
+                    <button
+                        onClick={handleCreateSite}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-sm"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Nouveau Site
+                    </button>
+                </div>
             </div>
 
             {/* Sites Table */}
-            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 {isLoading ? (
                     <div className="flex items-center justify-center py-12">
                         <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
@@ -169,105 +273,87 @@ export default function Sites() {
                         <MapPin className="w-12 h-12 mb-4 text-gray-300" />
                         <p className="text-lg font-medium">Aucun site trouvé</p>
                         <p className="text-sm">
-                            {searchQuery ? 'Essayez avec d\'autres termes de recherche' : 'Importez des sites pour commencer'}
+                            {searchQuery ? 'Essayez avec d\'autres termes de recherche' : 'Aucun site ne correspond aux filtres'}
                         </p>
                     </div>
                 ) : (
                     <>
                         <table className="w-full">
-                            <thead className="bg-gray-50 border-b">
+                            <thead className="bg-gray-50 border-b border-gray-100">
                                 <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-[25%]">
                                         Site
                                     </th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                        Code
+                                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-[20%]">
+                                        Propriétaire
                                     </th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-[25%]">
                                         Adresse
                                     </th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-[15%]">
                                         Superficie
                                     </th>
-                                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-[10%]">
                                         Statut
                                     </th>
-                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                        Actions
+                                    <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider w-[5%]">
+                                        <Settings className="w-4 h-4 ml-auto text-gray-400" />
                                     </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {paginatedSites.map((site) => (
-                                    <tr key={site.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                                    <tr key={site.id} className="hover:bg-gray-50 transition-colors group">
+                                        <td className="px-6 py-4">
+                                            <Link to={`/sites/${site.id}`} className="flex items-center gap-3 group-hover:text-emerald-600 transition-colors">
+                                                <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center group-hover:bg-emerald-200 transition-colors flex-shrink-0">
                                                     <MapPin className="w-5 h-5 text-emerald-600" />
                                                 </div>
-                                                <div>
-                                                    <p className="font-medium text-gray-900">{site.name}</p>
-                                                    <p className="text-xs text-gray-500">ID: {site.id}</p>
-                                                </div>
+                                                <span className="font-medium text-gray-900 group-hover:text-emerald-700 truncate">
+                                                    {site.name}
+                                                </span>
+                                            </Link>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-2 text-gray-600">
+                                                <Users className="w-4 h-4 text-gray-400" />
+                                                <span className="text-sm truncate max-w-[200px]" title={site.client_nom || 'Non assigné'}>
+                                                    {site.client_nom || <span className="text-gray-400 italic">Non assigné</span>}
+                                                </span>
                                             </div>
                                         </td>
-                                        <td className="px-4 py-3">
-                                            <span className="text-sm font-mono text-gray-600">
-                                                {site.code_site || '-'}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <span className="text-sm text-gray-600 line-clamp-2">
+                                        <td className="px-6 py-4">
+                                            <span className="text-sm text-gray-600 line-clamp-1" title={site.adresse}>
                                                 {site.adresse || '-'}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3">
-                                            <span className="text-sm text-gray-600">
-                                                {site.superficie_totale
-                                                    ? `${site.superficie_totale.toLocaleString()} m²`
+                                        <td className="px-6 py-4">
+                                            <span className="text-sm text-gray-600 font-mono font-medium bg-gray-50 px-2 py-1 rounded border border-gray-100">
+                                                {site.superficie_calculee || site.superficie_totale
+                                                    ? `${(site.superficie_calculee || site.superficie_totale)!.toLocaleString()} m²`
                                                     : '-'
                                                 }
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 text-center">
-                                            <button
-                                                onClick={() => handleToggleActive(site)}
-                                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+                                        <td className="px-6 py-4 text-center">
+                                            <span
+                                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
                                                     site.actif !== false
-                                                        ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                                        : 'bg-gray-100 text-gray-600 border border-gray-200'
                                                 }`}
                                             >
-                                                {site.actif !== false ? (
-                                                    <>
-                                                        <CheckCircle className="w-3 h-3" />
-                                                        Actif
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <AlertCircle className="w-3 h-3" />
-                                                        Inactif
-                                                    </>
-                                                )}
-                                            </button>
+                                                <div className={`w-1.5 h-1.5 rounded-full ${site.actif !== false ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                                                {site.actif !== false ? 'Actif' : 'Inactif'}
+                                            </span>
                                         </td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <button
-                                                    onClick={() => setEditingSite(site)}
-                                                    className="p-2 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                                                    title="Modifier"
-                                                >
-                                                    <Edit2 className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => setDeletingSite(site)}
-                                                    className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                    title="Supprimer"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
+                                        <td className="px-6 py-4 text-right">
+                                            <ActionDropdown 
+                                                onEdit={() => setEditingSite(site)}
+                                                onDelete={() => setDeletingSite(site)}
+                                                onToggleActive={() => handleToggleActive(site)}
+                                                isActive={site.actif !== false}
+                                            />
                                         </td>
                                     </tr>
                                 ))}
@@ -275,32 +361,46 @@ export default function Sites() {
                         </table>
 
                         {/* Pagination */}
-                        {totalPages > 1 && (
-                            <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
-                                <p className="text-sm text-gray-600">
-                                    {startIndex + 1} - {Math.min(startIndex + itemsPerPage, filteredSites.length)} sur {filteredSites.length}
-                                </p>
-                                <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-between px-6 py-4 border-t bg-gray-50">
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-600">Afficher</span>
+                                <select
+                                    value={itemsPerPage}
+                                    onChange={(e) => {
+                                        setItemsPerPage(Number(e.target.value));
+                                        setCurrentPage(1);
+                                    }}
+                                    className="border border-gray-300 rounded-md text-sm py-1 px-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                                >
+                                    <option value={10}>10</option>
+                                    <option value={20}>20</option>
+                                    <option value={50}>50</option>
+                                </select>
+                                <span className="text-sm text-gray-600">par page</span>
+                            </div>
+
+                            <div className="flex items-center gap-4">
+                                <span className="text-sm text-gray-600">
+                                    {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredSites.length)} sur {filteredSites.length}
+                                </span>
+                                <div className="flex items-center gap-1">
                                     <button
                                         onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                         disabled={currentPage === 1}
-                                        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                                     >
-                                        <ChevronLeft className="w-4 h-4" />
+                                        <ChevronLeft className="w-5 h-5" />
                                     </button>
-                                    <span className="text-sm text-gray-600">
-                                        Page {currentPage} / {totalPages}
-                                    </span>
                                     <button
                                         onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                                         disabled={currentPage === totalPages}
-                                        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                                     >
-                                        <ChevronRight className="w-4 h-4" />
+                                        <ChevronRight className="w-5 h-5" />
                                     </button>
                                 </div>
                             </div>
-                        )}
+                        </div>
                     </>
                 )}
             </div>

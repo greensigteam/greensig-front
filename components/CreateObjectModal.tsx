@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
-    X,
     Check,
     Loader2,
     MapPin,
     Building2,
     Ruler,
     Route,
-    AlertCircle,
     AlertTriangle,
     TreeDeciduous,
     Droplets,
@@ -16,6 +14,7 @@ import { useDrawing, getObjectTypeById } from '../contexts/DrawingContext';
 import { GeoJSONGeometry, GeometryMetrics, ObjectFieldConfig } from '../types';
 import { createInventoryItem, detectSiteFromGeometry, DetectedSiteResult } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
+import { FormModal } from './FormModal';
 
 interface CreateObjectModalProps {
     isOpen: boolean;
@@ -192,8 +191,9 @@ export default function CreateObjectModal({
         const value = formData[field.name] || '';
         const error = errors[field.name];
 
-        const baseInputClass = `w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors ${error ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
-            }`;
+        const baseInputClass = `w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors ${
+            error ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
+        }`;
 
         switch (field.type) {
             case 'select':
@@ -233,7 +233,7 @@ export default function CreateObjectModal({
                         onChange={e => handleFieldChange(field.name, e.target.value)}
                         placeholder={field.placeholder}
                         rows={3}
-                        className={baseInputClass}
+                        className={`${baseInputClass} resize-none`}
                     />
                 );
 
@@ -252,6 +252,145 @@ export default function CreateObjectModal({
 
     if (!isOpen) return null;
 
+    // Custom header with theme color
+    const customHeader = (
+        <div
+            className="flex items-center justify-between px-6 py-4 border-b"
+            style={{ backgroundColor: `${themeColor}10` }}
+        >
+            <div className="flex items-center gap-3">
+                <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center"
+                    style={{ backgroundColor: themeColor }}
+                >
+                    <CategoryIcon className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                    <h2 className="text-lg font-semibold text-gray-900">
+                        Nouveau {typeInfo?.name?.toLowerCase() || 'objet'}
+                    </h2>
+                    <p className="text-sm text-gray-500">
+                        Renseignez les informations de l'objet
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+
+    // Content with site detection status
+    const modalContent = (
+        <>
+            {/* Geometry Info */}
+            {metrics && (
+                <div
+                    className="px-4 py-3 border-b flex items-center gap-4 text-sm -mt-2 mb-4"
+                    style={{
+                        backgroundColor: `${themeColor}08`,
+                        color: themeColor
+                    }}
+                >
+                    {metrics.area_m2 !== undefined && (
+                        <span className="flex items-center gap-1.5">
+                            <Ruler className="w-4 h-4" />
+                            {metrics.area_m2 > 10000
+                                ? `${metrics.area_hectares?.toFixed(2)} ha`
+                                : `${metrics.area_m2.toFixed(1)} m²`}
+                        </span>
+                    )}
+                    {metrics.length_m !== undefined && (
+                        <span className="flex items-center gap-1.5">
+                            <Route className="w-4 h-4" />
+                            {metrics.length_m > 1000
+                                ? `${metrics.length_km?.toFixed(2)} km`
+                                : `${metrics.length_m.toFixed(1)} m`}
+                        </span>
+                    )}
+                    {metrics.perimeter_m !== undefined && (
+                        <span className="flex items-center gap-1.5">
+                            <MapPin className="w-4 h-4" />
+                            {metrics.perimeter_m.toFixed(1)} m périmètre
+                        </span>
+                    )}
+                </div>
+            )}
+
+            {/* Error state - Object is outside all sites */}
+            {siteError ? (
+                <div className="p-6">
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                                <AlertTriangle className="w-5 h-5 text-red-600" />
+                            </div>
+                            <div>
+                                <h3 className="font-medium text-red-800">
+                                    Position invalide
+                                </h3>
+                                <p className="text-sm text-red-600 mt-1">
+                                    {siteError}
+                                </p>
+                                <p className="text-sm text-red-600 mt-2">
+                                    Veuillez dessiner l'objet à l'intérieur d'un site existant.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {/* Auto-detected Site */}
+                    <div>
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
+                            <Building2 className="w-4 h-4 text-gray-400" />
+                            Site (détecté automatiquement)
+                        </label>
+                        {isDetectingSite ? (
+                            <div className="flex items-center gap-2 text-gray-500 py-2">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span className="text-sm">Détection du site...</span>
+                            </div>
+                        ) : detectedSite ? (
+                            <div className="w-full px-3 py-2.5 border rounded-lg bg-emerald-50 border-emerald-200">
+                                <div className="flex items-center gap-2">
+                                    <Check className="w-4 h-4 text-emerald-600" />
+                                    <span className="font-medium text-emerald-800">
+                                        {detectedSite.site.nom_site}
+                                    </span>
+                                    <span className="text-xs text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded">
+                                        {detectedSite.site.code_site}
+                                    </span>
+                                </div>
+                                {detectedSite.sous_site && (
+                                    <div className="text-sm text-emerald-600 mt-1 ml-6">
+                                        Sous-site: {detectedSite.sous_site.nom}
+                                    </div>
+                                )}
+                            </div>
+                        ) : null}
+                    </div>
+
+                    {/* Dynamic Fields */}
+                    {typeInfo?.fields.map(field => (
+                        <div key={field.name}>
+                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
+                                <MapPin className="w-4 h-4 text-gray-400" />
+                                {field.label}
+                                {field.required && <span className="text-red-500">*</span>}
+                            </label>
+                            {renderField(field)}
+                            {errors[field.name] && (
+                                <p className="mt-1.5 text-sm text-red-500 flex items-center gap-1">
+                                    <AlertTriangle className="w-4 h-4" />
+                                    {errors[field.name]}
+                                </p>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </>
+    );
+
     return (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center pointer-events-auto">
             {/* Backdrop */}
@@ -261,157 +400,17 @@ export default function CreateObjectModal({
             />
 
             {/* Modal */}
-            <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
-                {/* Header */}
-                <div
-                    className="flex items-center justify-between px-6 py-4 border-b"
-                    style={{ backgroundColor: `${themeColor}10` }}
-                >
-                    <div className="flex items-center gap-3">
-                        <div
-                            className="w-10 h-10 rounded-lg flex items-center justify-center"
-                            style={{ backgroundColor: themeColor }}
-                        >
-                            <CategoryIcon className="w-5 h-5 text-white" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-semibold text-gray-900">
-                                Nouveau {typeInfo?.name?.toLowerCase() || 'objet'}
-                            </h2>
-                            <p className="text-sm text-gray-500">
-                                Renseignez les informations de l'objet
-                            </p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={handleClose}
-                        className="p-2 rounded-full transition-colors"
-                        style={{
-                            backgroundColor: 'transparent',
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = `${themeColor}20`}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                    >
-                        <X className="w-5 h-5 text-gray-500" />
-                    </button>
+            <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden flex flex-col max-h-[90vh]">
+                {/* Custom Header */}
+                {customHeader}
+
+                {/* Body with scroll */}
+                <div className="flex-1 overflow-y-auto p-6">
+                    {modalContent}
                 </div>
 
-                {/* Geometry Info */}
-                {metrics && (
-                    <div
-                        className="px-6 py-3 border-b flex items-center gap-4 text-sm"
-                        style={{
-                            backgroundColor: `${themeColor}08`,
-                            color: themeColor
-                        }}
-                    >
-                        {metrics.area_m2 !== undefined && (
-                            <span className="flex items-center gap-1.5">
-                                <Ruler className="w-4 h-4" />
-                                {metrics.area_m2 > 10000
-                                    ? `${metrics.area_hectares?.toFixed(2)} ha`
-                                    : `${metrics.area_m2.toFixed(1)} m²`}
-                            </span>
-                        )}
-                        {metrics.length_m !== undefined && (
-                            <span className="flex items-center gap-1.5">
-                                <Route className="w-4 h-4" />
-                                {metrics.length_m > 1000
-                                    ? `${metrics.length_km?.toFixed(2)} km`
-                                    : `${metrics.length_m.toFixed(1)} m`}
-                            </span>
-                        )}
-                        {metrics.perimeter_m !== undefined && (
-                            <span className="flex items-center gap-1.5">
-                                <MapPin className="w-4 h-4" />
-                                {metrics.perimeter_m.toFixed(1)} m périmètre
-                            </span>
-                        )}
-                    </div>
-                )}
-
-                {/* Content */}
-                {siteError ? (
-                    /* Error state - Object is outside all sites */
-                    <div className="p-6">
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                            <div className="flex items-start gap-3">
-                                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                                    <AlertTriangle className="w-5 h-5 text-red-600" />
-                                </div>
-                                <div>
-                                    <h3 className="font-medium text-red-800">
-                                        Position invalide
-                                    </h3>
-                                    <p className="text-sm text-red-600 mt-1">
-                                        {siteError}
-                                    </p>
-                                    <p className="text-sm text-red-600 mt-2">
-                                        Veuillez dessiner l'objet à l'intérieur d'un site existant.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    <form onSubmit={handleSubmit} className="max-h-[60vh] overflow-y-auto">
-                        <div className="p-6 space-y-4">
-                            {/* Auto-detected Site */}
-                            <div>
-                                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
-                                    <Building2 className="w-4 h-4 text-gray-400" />
-                                    Site (détecté automatiquement)
-                                </label>
-                                {isDetectingSite ? (
-                                    <div className="flex items-center gap-2 text-gray-500 py-2">
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                        <span className="text-sm">Détection du site...</span>
-                                    </div>
-                                ) : detectedSite ? (
-                                    <div
-                                        className="w-full px-3 py-2.5 border rounded-lg bg-emerald-50 border-emerald-200"
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            <Check className="w-4 h-4 text-emerald-600" />
-                                            <span className="font-medium text-emerald-800">
-                                                {detectedSite.site.nom_site}
-                                            </span>
-                                            <span className="text-xs text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded">
-                                                {detectedSite.site.code_site}
-                                            </span>
-                                        </div>
-                                        {detectedSite.sous_site && (
-                                            <div className="text-sm text-emerald-600 mt-1 ml-6">
-                                                Sous-site: {detectedSite.sous_site.nom}
-                                            </div>
-                                        )}
-                                    </div>
-                                ) : null}
-                            </div>
-
-                            {/* Dynamic Fields */}
-                            {typeInfo?.fields.map(field => (
-                                <div key={field.name}>
-                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
-                                        <MapPin className="w-4 h-4 text-gray-400" />
-                                        {field.label}
-                                        {field.required && <span className="text-red-500">*</span>}
-                                    </label>
-                                    {renderField(field)}
-                                    {errors[field.name] && (
-                                        <p className="mt-1.5 text-sm text-red-500 flex items-center gap-1">
-                                            <AlertCircle className="w-4 h-4" />
-                                            {errors[field.name]}
-                                        </p>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </form>
-                )}
-
                 {/* Footer */}
-                <div className="flex items-center justify-end gap-3 px-6 py-4 border-t bg-gray-50">
+                <div className="flex items-center justify-end gap-3 px-6 py-4 border-t bg-gray-50 shrink-0">
                     <button
                         type="button"
                         onClick={handleClose}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { Edit2 } from 'lucide-react';
 import { updateInventoryItem, ApiError } from '../services/api';
+import { FormModal } from './FormModal';
 
 interface EditObjectModalProps {
     isOpen: boolean;
@@ -70,7 +71,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                         type="text"
                         value={getValue('nom')}
                         onChange={(e) => handleChange('nom', e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring=2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                     />
                 </div>
             );
@@ -84,7 +85,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                         type="text"
                         value={getValue('marque')}
                         onChange={(e) => handleChange('marque', e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                     />
                 </div>
             );
@@ -97,7 +98,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                 <select
                     value={getValue('etat')}
                     onChange={(e) => handleChange('etat', e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                 >
                     <option value="bon">Bon</option>
                     <option value="moyen">Moyen</option>
@@ -116,7 +117,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                         type="text"
                         value={getValue('famille')}
                         onChange={(e) => handleChange('famille', e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                     />
                 </div>
             );
@@ -129,7 +130,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                     <select
                         value={getValue('taille')}
                         onChange={(e) => handleChange('taille', e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                     >
                         <option value="">-</option>
                         <option value="Petit">Petit</option>
@@ -149,7 +150,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                         step="0.01"
                         value={getValue('area_sqm')}
                         onChange={(e) => handleChange('area_sqm', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                     />
                 </div>
             );
@@ -164,7 +165,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                         step="0.01"
                         value={getValue('densite')}
                         onChange={(e) => handleChange('densite', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                     />
                 </div>
             );
@@ -180,7 +181,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                         step="0.01"
                         value={getValue('profondeur')}
                         onChange={(e) => handleChange('profondeur', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                     />
                 </div>,
                 <div key="diametre_puit">
@@ -190,7 +191,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                         step="0.01"
                         value={getValue('diametre')}
                         onChange={(e) => handleChange('diametre', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                     />
                 </div>,
                 <div key="niveau_statique">
@@ -200,7 +201,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                         step="0.01"
                         value={getValue('niveau_statique')}
                         onChange={(e) => handleChange('niveau_statique', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                     />
                 </div>,
                 <div key="niveau_dynamique">
@@ -210,7 +211,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                         step="0.01"
                         value={getValue('niveau_dynamique')}
                         onChange={(e) => handleChange('niveau_dynamique', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                     />
                 </div>
             );
@@ -224,7 +225,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                         type="text"
                         value={getValue('type')}
                         onChange={(e) => handleChange('type', e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                     />
                 </div>,
                 <div key="diametre_pompe">
@@ -234,7 +235,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                         step="0.01"
                         value={getValue('diametre')}
                         onChange={(e) => handleChange('diametre', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                     />
                 </div>,
                 <div key="puissance">
@@ -244,7 +245,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                         step="0.01"
                         value={getValue('puissance')}
                         onChange={(e) => handleChange('puissance', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                     />
                 </div>,
                 <div key="debit">
@@ -254,7 +255,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                         step="0.01"
                         value={getValue('debit')}
                         onChange={(e) => handleChange('debit', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                     />
                 </div>
             );
@@ -268,7 +269,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                         type="text"
                         value={getValue('type')}
                         onChange={(e) => handleChange('type', e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                     />
                 </div>,
                 <div key={`diametre_${type}`}>
@@ -278,7 +279,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                         step="0.01"
                         value={getValue('diametre')}
                         onChange={(e) => handleChange('diametre', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                     />
                 </div>,
                 <div key="materiau">
@@ -287,7 +288,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                         type="text"
                         value={getValue('materiau')}
                         onChange={(e) => handleChange('materiau', e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                     />
                 </div>,
                 <div key="pression">
@@ -297,7 +298,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                         step="0.01"
                         value={getValue('pression')}
                         onChange={(e) => handleChange('pression', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                     />
                 </div>
             );
@@ -312,7 +313,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                         step="0.01"
                         value={getValue('volume')}
                         onChange={(e) => handleChange('volume', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                     />
                 </div>
             );
@@ -327,7 +328,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                         type="date"
                         value={getValue('last_intervention_date')}
                         onChange={(e) => handleChange('last_intervention_date', e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
                     />
                 </div>
             );
@@ -341,7 +342,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
                     value={getValue('observation')}
                     onChange={(e) => handleChange('observation', e.target.value)}
                     rows={3}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors resize-none"
                 />
             </div>
         );
@@ -350,54 +351,21 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-                {/* Header */}
-                <div className="flex justify-between items-center p-6 border-b">
-                    <h2 className="text-xl font-bold text-gray-900">
-                        Modifier {objectType}
-                    </h2>
-                    <button
-                        onClick={onClose}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
-
-                {/* Form */}
-                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
-                    {error && (
-                        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                            {error}
-                        </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-4">
-                        {renderFields()}
-                    </div>
-                </form>
-
-                {/* Footer */}
-                <div className="flex justify-end gap-3 p-6 border-t bg-gray-50">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="px-4 py-2 border rounded-lg hover:bg-gray-100 transition-colors"
-                        disabled={isSubmitting}
-                    >
-                        Annuler
-                    </button>
-                    <button
-                        type="submit"
-                        onClick={handleSubmit}
-                        disabled={isSubmitting}
-                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
-                    >
-                        {isSubmitting ? 'Enregistrement...' : 'Enregistrer'}
-                    </button>
-                </div>
+        <FormModal
+            isOpen={isOpen}
+            onClose={onClose}
+            onSubmit={handleSubmit}
+            title={`Modifier ${objectType}`}
+            icon={<Edit2 className="w-5 h-5" />}
+            size="2xl"
+            loading={isSubmitting}
+            error={error}
+            submitLabel={isSubmitting ? 'Enregistrement...' : 'Enregistrer'}
+            cancelLabel="Annuler"
+        >
+            <div className="grid grid-cols-2 gap-4">
+                {renderFields()}
             </div>
-        </div>
+        </FormModal>
     );
 };

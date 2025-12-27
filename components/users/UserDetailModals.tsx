@@ -596,7 +596,7 @@ export const ChefEquipeDetailModal: React.FC<ChefEquipeDetailModalProps> = ({
                       key={role}
                       className="px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded-full text-sm font-medium flex items-center gap-1"
                     >
-                      {role === 'CHEF_EQUIPE' ? <Award className="w-3 h-3" /> : <UserCheck className="w-3 h-3" />}
+                      {role === 'SUPERVISEUR' ? <Award className="w-3 h-3" /> : <UserCheck className="w-3 h-3" />}
                       {NOM_ROLE_LABELS[role]}
                     </span>
                   ))}
@@ -859,7 +859,7 @@ export const OperateurDetailModal: React.FC<OperateurDetailModalProps> = ({
                       key={role}
                       className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm font-medium flex items-center gap-1"
                     >
-                      {role === 'OPERATEUR' ? <UserCheck className="w-3 h-3" /> : <Award className="w-3 h-3" />}
+                      {role === 'SUPERVISEUR' ? <UserCheck className="w-3 h-3" /> : <Award className="w-3 h-3" />}
                       {NOM_ROLE_LABELS[role]}
                     </span>
                   ))}
@@ -923,7 +923,7 @@ export const UserDetailModalSelector: React.FC<UserDetailModalSelectorProps> = (
   onToggleActive
 }) => {
   // Déterminer le type principal de l'utilisateur
-  // Priorité: ADMIN > CHEF_EQUIPE > OPERATEUR > CLIENT
+  // Priorité: ADMIN > SUPERVISEUR > SUPERVISEUR > CLIENT
   if (user.roles.includes('ADMIN')) {
     return (
       <AdminDetailModal
@@ -935,7 +935,7 @@ export const UserDetailModalSelector: React.FC<UserDetailModalSelectorProps> = (
     );
   }
 
-  if (user.roles.includes('CHEF_EQUIPE')) {
+  if (user.roles.includes('SUPERVISEUR')) {
     return (
       <ChefEquipeDetailModal
         user={user}
@@ -947,7 +947,7 @@ export const UserDetailModalSelector: React.FC<UserDetailModalSelectorProps> = (
     );
   }
 
-  if (user.roles.includes('OPERATEUR')) {
+  if (user.roles.includes('SUPERVISEUR')) {
     return (
       <OperateurDetailModal
         user={user}

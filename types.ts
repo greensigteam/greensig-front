@@ -1,6 +1,6 @@
 
-export type Role = 'ADMIN' | 'OPERATEUR' | 'CLIENT' | 'CHEF_EQUIPE';
-export type ViewState = 'LOGIN' | 'DASHBOARD' | 'MAP' | 'INVENTORY' | 'PLANNING' | 'INTERVENTIONS' | 'CLAIMS' | 'TEAMS' | 'USERS' | 'REPORTING' | 'CLIENT_PORTAL' | 'PRODUCTS';
+export type Role = 'ADMIN' | 'SUPERVISEUR' | 'CLIENT';
+export type ViewState = 'LOGIN' | 'DASHBOARD' | 'MAP' | 'INVENTORY' | 'PLANNING' | 'INTERVENTIONS' | 'CLAIMS' | 'TEAMS' | 'USERS' | 'REPORTING' | 'CLIENT_PORTAL' | 'PRODUCTS' | 'SITES';
 
 export interface User {
   id: string;
@@ -39,19 +39,6 @@ export interface Task {
   recurrence?: string; // e.g., "1x/semaine"
   duration?: string; // Added for User 3.3.2
   zone?: string; // Added for User 3.3.1
-}
-
-export interface Claim {
-  id: string;
-  title: string;
-  status: 'NOUVEAU' | 'EN_COURS' | 'RESOLU' | 'EN_RETARD';
-  priority: 'HAUTE' | 'MOYENNE' | 'BASSE';
-  source: 'CLIENT' | 'INTERNE';
-  author: string;
-  date: string;
-  deadline?: string;
-  autoRating?: number; // 5/5 if auto-closed
-  location?: string;
 }
 
 export type HRStatus = 'DISPONIBLE' | 'OCCUPE' | 'MALADIE' | 'CONGE' | 'ACCIDENT' | 'ABSENT';

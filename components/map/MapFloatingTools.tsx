@@ -233,11 +233,7 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
 
         <div className="h-px bg-slate-100 w-full" />
 
-        {/*
-         * DÉSACTIVÉ par demande du Product Owner (20/12/2024)
-         * Outils de dessin retirés temporairement.
-         * Pour réactiver : décommenter le bloc ci-dessous.
-         *
+        {/* Drawing Tools Toggle */}
         <button
           onClick={toggleDrawingTools}
           className={`p-3 transition-colors ${showDrawingTools || isDrawingActive ? 'bg-emerald-600 text-white' : 'hover:bg-slate-50 text-slate-600'}`}
@@ -247,7 +243,6 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
         </button>
 
         <div className="h-px bg-slate-100 w-full" />
-        */}
 
         {/* Measurement Toggle */}
         <button
@@ -296,7 +291,7 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
             <button
               onClick={onReportProblem}
               className={`p-3 transition-colors ${isReportingProblem ? 'bg-orange-500 text-white' : 'hover:bg-slate-50 text-orange-500 hover:text-orange-600'}`}
-              title="Signaler un problème"
+              title="Signaler une réclamation"
             >
               <AlertTriangle className="w-5 h-5" />
             </button>
@@ -310,7 +305,7 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-semibold text-slate-700 text-sm flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-orange-500" />
-              Signaler un problème
+              Signaler une réclamation
             </h4>
             <button onClick={onCancelReporting} className="text-slate-400 hover:text-slate-600">
               <X className="w-4 h-4" />
@@ -370,11 +365,7 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
         </div>
       )}
 
-      {/*
-       * DÉSACTIVÉ par demande du Product Owner (20/12/2024)
-       * Panneau d'outils de dessin retiré temporairement.
-       * Pour réactiver : décommenter le bloc ci-dessous.
-       *
+      {/* ===== DRAWING TOOLS PANEL ===== */}
       {(showDrawingTools || isDrawingActive) && (
         <div className="bg-white/95 backdrop-blur-md shadow-xl rounded-xl border border-white/20 p-3 ring-1 ring-black/5 w-64 animate-in slide-in-from-right-2 duration-200">
           <div className="flex items-center justify-between mb-3">
@@ -560,7 +551,6 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
           )}
         </div>
       )}
-      */}
 
       {/* ===== MEASUREMENT TOOLS PANEL ===== */}
       {(showMeasureTools || isMeasuring) && (

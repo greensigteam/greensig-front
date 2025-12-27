@@ -79,40 +79,24 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchReturn {
       try {
         const suggestions: SearchSuggestion[] = [];
 
-        // 1. Search in local sites (instant, no network)
-        const normalizedQuery = searchQuery.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const matchedSites = sites.filter(s => {
-          const name = s.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-          const code = (s.code_site || '').toLowerCase();
-          return name.includes(normalizedQuery) || code.includes(normalizedQuery);
-        }).slice(0, 3);
+        // Single source of truth: Django API backend
+        // Returns all objects (Sites, Vegetation, Hydraulic) filtered by user permissions
+        try {
+          const apiResults = await searchObjects(searchQuery);
 
-        matchedSites.forEach(site => {
-          suggestions.push({
-            id: `site-${site.id}`,
-            name: site.name,
-            type: 'Site',
-            coordinates: site.coordinates
+          // Convert API results to suggestions (limit to maxSuggestions)
+          apiResults.slice(0, maxSuggestions).forEach(result => {
+            if (result.location) {
+              suggestions.push({
+                id: result.id,
+                name: result.name,
+                type: result.type,
+                coordinates: geoJSONToLatLng(result.location.coordinates)
+              });
+            }
           });
-        });
-
-        // 2. Search Django API backend (if we need more suggestions)
-        if (suggestions.length < maxSuggestions) {
-          try {
-            const apiResults = await searchObjects(searchQuery);
-            apiResults.slice(0, maxSuggestions - suggestions.length).forEach(result => {
-              if (result.location) {
-                suggestions.push({
-                  id: result.id,
-                  name: result.name,
-                  type: result.type,
-                  coordinates: geoJSONToLatLng(result.location.coordinates)
-                });
-              }
-            });
-          } catch (error) {
-            logger.error('API search error:', error);
-          }
+        } catch (error) {
+          logger.error('API search error:', error);
         }
 
         setSearchSuggestions(suggestions);

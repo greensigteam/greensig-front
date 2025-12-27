@@ -44,13 +44,13 @@ export const MOCK_ROLES: Role[] = [
   },
   {
     id: 3,
-    nomRole: 'CHEF_EQUIPE',
+    nomRole: 'SUPERVISEUR',
     nomDisplay: "Chef d'equipe",
     description: "Chef d'equipe responsable d'operateurs"
   },
   {
     id: 4,
-    nomRole: 'OPERATEUR',
+    nomRole: 'SUPERVISEUR',
     nomDisplay: 'Operateur',
     description: 'Operateur terrain (jardinier)'
   }
@@ -76,7 +76,7 @@ export const MOCK_COMPETENCES: Competence[] = [
     categorie: 'TECHNIQUE',
     categorieDisplay: 'Techniques et operationnelles',
     description: "Maitrise de l'utilisation des debroussailleuses",
-      roles: ['OPERATEUR', 'CHEF_EQUIPE'],
+      roles: ['SUPERVISEUR', 'SUPERVISEUR'],
   },
   {
     id: 3,
@@ -88,7 +88,7 @@ export const MOCK_COMPETENCES: Competence[] = [
   },
   {
     id: 4,
-      roles: ['OPERATEUR'],
+      roles: ['SUPERVISEUR'],
     categorie: 'TECHNIQUE',
     categorieDisplay: 'Techniques et operationnelles',
     description: "Techniques de desherbage manuel et utilisation d'outils mecaniques",
@@ -100,7 +100,7 @@ export const MOCK_COMPETENCES: Competence[] = [
     categorie: 'TECHNIQUE',
     categorieDisplay: 'Techniques et operationnelles',
     description: "Techniques de binage pour l'aeration des sols",
-      roles: ['OPERATEUR'],
+      roles: ['SUPERVISEUR'],
   },
   {
     id: 6,
@@ -112,7 +112,7 @@ export const MOCK_COMPETENCES: Competence[] = [
   },
   {
     id: 7,
-      roles: ['OPERATEUR', 'CHEF_EQUIPE'],
+      roles: ['SUPERVISEUR', 'SUPERVISEUR'],
     categorie: 'TECHNIQUE',
     categorieDisplay: 'Techniques et operationnelles',
     description: "Taille d'entretien et de nettoyage des vegetaux",
@@ -124,7 +124,7 @@ export const MOCK_COMPETENCES: Competence[] = [
     categorie: 'TECHNIQUE',
     categorieDisplay: 'Techniques et operationnelles',
     description: 'Taille ornementale et art topiaire',
-      roles: ['OPERATEUR'],
+      roles: ['SUPERVISEUR'],
   },
   {
     id: 9,
@@ -148,7 +148,7 @@ export const MOCK_COMPETENCES: Competence[] = [
     categorie: 'TECHNIQUE',
     categorieDisplay: 'Techniques et operationnelles',
     description: "Nettoyage general des espaces verts et sites d'intervention",
-      roles: ['OPERATEUR'],
+      roles: ['SUPERVISEUR'],
   },
   // Organisationnelles et humaines
   {
@@ -208,11 +208,11 @@ export const MOCK_UTILISATEURS: Utilisateur[] = [
     nom: 'Idrissi',
     prenom: 'Hassan',
     fullName: 'Hassan Idrissi',
-    typeUtilisateur: 'OPERATEUR',
+    typeUtilisateur: 'SUPERVISEUR',
     dateCreation: '2024-02-01T09:00:00Z',
     actif: true,
     derniereConnexion: '2024-12-10T07:00:00Z',
-    roles: ['OPERATEUR', 'CHEF_EQUIPE']
+    roles: ['SUPERVISEUR', 'SUPERVISEUR']
   },
   {
     id: 3,
@@ -220,11 +220,11 @@ export const MOCK_UTILISATEURS: Utilisateur[] = [
     nom: 'Amrani',
     prenom: 'Youssef',
     fullName: 'Youssef Amrani',
-    typeUtilisateur: 'OPERATEUR',
+    typeUtilisateur: 'SUPERVISEUR',
     dateCreation: '2024-03-15T09:00:00Z',
     actif: true,
     derniereConnexion: '2024-12-10T07:15:00Z',
-    roles: ['OPERATEUR']
+    roles: ['SUPERVISEUR']
   },
   {
     id: 4,
@@ -232,11 +232,11 @@ export const MOCK_UTILISATEURS: Utilisateur[] = [
     nom: 'Benjelloun',
     prenom: 'Karim',
     fullName: 'Karim Benjelloun',
-    typeUtilisateur: 'OPERATEUR',
+    typeUtilisateur: 'SUPERVISEUR',
     dateCreation: '2024-04-01T09:00:00Z',
     actif: true,
     derniereConnexion: '2024-12-05T16:00:00Z',
-    roles: ['OPERATEUR']
+    roles: ['SUPERVISEUR']
   },
   {
     id: 5,
@@ -244,11 +244,11 @@ export const MOCK_UTILISATEURS: Utilisateur[] = [
     nom: 'Tazi',
     prenom: 'Omar',
     fullName: 'Omar Tazi',
-    typeUtilisateur: 'OPERATEUR',
+    typeUtilisateur: 'SUPERVISEUR',
     dateCreation: '2024-02-15T09:00:00Z',
     actif: true,
     derniereConnexion: '2024-12-10T07:30:00Z',
-    roles: ['OPERATEUR', 'CHEF_EQUIPE']
+    roles: ['SUPERVISEUR', 'SUPERVISEUR']
   },
   {
     id: 6,
@@ -256,11 +256,11 @@ export const MOCK_UTILISATEURS: Utilisateur[] = [
     nom: 'Alaoui',
     prenom: 'Fatima',
     fullName: 'Fatima Alaoui',
-    typeUtilisateur: 'OPERATEUR',
+    typeUtilisateur: 'SUPERVISEUR',
     dateCreation: '2024-05-01T09:00:00Z',
     actif: true,
     derniereConnexion: '2024-12-09T17:00:00Z',
-    roles: ['OPERATEUR']
+    roles: ['SUPERVISEUR']
   },
   {
     id: 7,
@@ -280,11 +280,11 @@ export const MOCK_UTILISATEURS: Utilisateur[] = [
     nom: 'Mokhtar',
     prenom: 'Said',
     fullName: 'Said Mokhtar',
-    typeUtilisateur: 'OPERATEUR',
+    typeUtilisateur: 'SUPERVISEUR',
     dateCreation: '2024-06-01T09:00:00Z',
     actif: true,
     derniereConnexion: '2024-12-10T07:45:00Z',
-    roles: ['OPERATEUR']
+    roles: ['SUPERVISEUR']
   }
 ];
 
@@ -309,10 +309,10 @@ export const MOCK_CLIENTS: Client[] = [
 ];
 
 // ============================================================================
-// OPERATEURS
+// SUPERVISEURS
 // ============================================================================
 
-export const MOCK_OPERATEURS: OperateurList[] = [
+export const MOCK_SUPERVISEURS: OperateurList[] = [
   {
     utilisateur: 2,
     email: 'hassan.idrissi@greensig.ma',
@@ -418,10 +418,10 @@ export const MOCK_OPERATEURS: OperateurList[] = [
 ];
 
 // ============================================================================
-// COMPETENCES OPERATEURS
+// COMPETENCES SUPERVISEURS
 // ============================================================================
 
-export const MOCK_COMPETENCES_OPERATEURS: CompetenceOperateur[] = [
+export const MOCK_COMPETENCES_SUPERVISEURS: CompetenceOperateur[] = [
   // Hassan Idrissi (Chef equipe)
   { id: 1, operateur: 2, operateurNom: 'Hassan Idrissi', competence: 1, niveau: 'EXPERT', niveauDisplay: 'Expert', dateAcquisition: '2024-02-15', dateModification: '2024-11-01T10:00:00Z' },
   { id: 2, operateur: 2, operateurNom: 'Hassan Idrissi', competence: 7, niveau: 'EXPERT', niveauDisplay: 'Expert', dateAcquisition: '2024-02-15', dateModification: '2024-11-01T10:00:00Z' },
@@ -615,7 +615,7 @@ export const MOCK_STATISTIQUES: StatistiquesUtilisateurs = {
     actifs: 8,
     parType: {
       ADMIN: 1,
-      OPERATEUR: 6,
+      SUPERVISEUR: 6,
       CLIENT: 1
     }
   },
@@ -660,7 +660,7 @@ export const getUtilisateurById = (id: number): Utilisateur | undefined => {
 };
 
 export const getOperateurById = (utilisateurId: number): OperateurList | undefined => {
-  return MOCK_OPERATEURS.find(o => o.utilisateur === utilisateurId);
+  return MOCK_SUPERVISEURS.find(o => o.utilisateur === utilisateurId);
 };
 
 export const getEquipeById = (id: number): EquipeList | undefined => {
@@ -672,11 +672,11 @@ export const getCompetenceById = (id: number): Competence | undefined => {
 };
 
 export const getOperateursByEquipe = (equipeId: number): OperateurList[] => {
-  return MOCK_OPERATEURS.filter(o => o.equipe === equipeId);
+  return MOCK_SUPERVISEURS.filter(o => o.equipe === equipeId);
 };
 
 export const getCompetencesOperateur = (operateurId: number): CompetenceOperateur[] => {
-  return MOCK_COMPETENCES_OPERATEURS.filter(co => co.operateur === operateurId);
+  return MOCK_COMPETENCES_SUPERVISEURS.filter(co => co.operateur === operateurId);
 };
 
 export const getAbsencesByOperateur = (operateurId: number): Absence[] => {
@@ -697,19 +697,19 @@ export const getAbsencesAValider = (): Absence[] => {
 };
 
 export const getOperateursDisponibles = (): OperateurList[] => {
-  return MOCK_OPERATEURS.filter(o => o.estDisponible && o.actif);
+  return MOCK_SUPERVISEURS.filter(o => o.estDisponible && o.actif);
 };
 
 export const getChefsPotentiels = (): OperateurList[] => {
   // Operateurs avec competence "Gestion d'equipe" niveau >= INTERMEDIAIRE
-  const operateursAvecGestion = MOCK_COMPETENCES_OPERATEURS
+  const operateursAvecGestion = MOCK_COMPETENCES_SUPERVISEURS
     .filter(co =>
       co.competence === 12 &&
       ['INTERMEDIAIRE', 'EXPERT', 'AUTORISE'].includes(co.niveau)
     )
     .map(co => co.operateur);
 
-  return MOCK_OPERATEURS.filter(o =>
+  return MOCK_SUPERVISEURS.filter(o =>
     operateursAvecGestion.includes(o.utilisateur) && o.actif
   );
 };
@@ -718,8 +718,8 @@ export const getEquipeDetail = (equipeId: number): EquipeDetail | undefined => {
   const equipe = MOCK_EQUIPES.find(e => e.id === equipeId);
   if (!equipe) return undefined;
 
-  const chef = MOCK_OPERATEURS.find(o => o.utilisateur === equipe.chefEquipe);
-  const membres = MOCK_OPERATEURS.filter(o => o.equipe === equipeId);
+  const chef = MOCK_SUPERVISEURS.find(o => o.utilisateur === equipe.chefEquipe);
+  const membres = MOCK_SUPERVISEURS.filter(o => o.equipe === equipeId);
 
   return {
     ...equipe,
@@ -729,7 +729,7 @@ export const getEquipeDetail = (equipeId: number): EquipeDetail | undefined => {
 };
 
 export const getOperateurDetail = (utilisateurId: number): OperateurDetail | undefined => {
-  const operateur = MOCK_OPERATEURS.find(o => o.utilisateur === utilisateurId);
+  const operateur = MOCK_SUPERVISEURS.find(o => o.utilisateur === utilisateurId);
   if (!operateur) return undefined;
 
   const utilisateur = MOCK_UTILISATEURS.find(u => u.id === utilisateurId);

@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
-    X,
     MapPin,
     Navigation,
     Crosshair,
@@ -9,6 +8,7 @@ import {
     Check,
 } from 'lucide-react';
 import { Coordinates } from '../../types';
+import { BaseModal, ModalHeader, ModalBody, ModalFooter } from '../BaseModal';
 
 interface GPSInputModalProps {
     isOpen: boolean;
@@ -226,35 +226,15 @@ export default function GPSInputModal({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-            {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+        <BaseModal isOpen={isOpen} onClose={onClose} size="md">
+            <ModalHeader
+                title={title}
+                subtitle="Entrez les coordonnées GPS manuellement"
+                icon={<MapPin className="w-5 h-5 text-green-600" />}
+            />
 
-            {/* Modal */}
-            <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-                            <MapPin className="w-5 h-5 text-green-600" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-                            <p className="text-sm text-gray-500">
-                                Entrez les coordonnées GPS manuellement
-                            </p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                    >
-                        <X className="w-5 h-5 text-gray-500" />
-                    </button>
-                </div>
-
-                {/* Content */}
-                <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            <ModalBody>
+                <form onSubmit={handleSubmit} className="space-y-6" id="gps-form">
                     {/* Format Selector */}
                     <div className="flex gap-2">
                         <button
@@ -468,9 +448,10 @@ export default function GPSInputModal({
                         </button>
                     </div>
                 </form>
+            </ModalBody>
 
-                {/* Footer */}
-                <div className="flex items-center justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-xl">
+            <ModalFooter>
+                <div className="flex items-center justify-end gap-3 w-full">
                     <button
                         type="button"
                         onClick={onClose}
@@ -479,14 +460,15 @@ export default function GPSInputModal({
                         Annuler
                     </button>
                     <button
-                        onClick={handleSubmit}
+                        type="submit"
+                        form="gps-form"
                         className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
                     >
                         <Crosshair className="w-4 h-4" />
                         Placer sur la carte
                     </button>
                 </div>
-            </div>
-        </div>
+            </ModalFooter>
+        </BaseModal>
     );
 }

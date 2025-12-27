@@ -33,8 +33,10 @@ interface MapSearchBarProps {
  * - Suggestions dropdown
  * - Geolocation button
  * - Search result display
+ *
+ * ✅ Memoized to prevent focus loss on parent re-renders
  */
-export const MapSearchBar: React.FC<MapSearchBarProps> = ({
+const MapSearchBarComponent: React.FC<MapSearchBarProps> = ({
   searchQuery,
   setSearchQuery,
   onSearch,
@@ -172,3 +174,6 @@ export const MapSearchBar: React.FC<MapSearchBarProps> = ({
     </div>
   );
 };
+
+// ✅ Memoize component to prevent unnecessary re-renders and maintain input focus
+export const MapSearchBar = React.memo(MapSearchBarComponent);

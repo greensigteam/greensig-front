@@ -429,31 +429,22 @@ const SuiviTaches: React.FC = () => {
                                                 </button>
                                             )}
 
-                                            {/* Bouton Terminer - visible si EN_COURS, désactivé si pas de photo APRES */}
-                                            {selectedTache.statut === 'EN_COURS' && (() => {
-                                                const hasPhotosApres = photos.some(p => p.type_photo === 'APRES');
-                                                return (
-                                                    <button
-                                                        onClick={() => openConfirmModal('complete')}
-                                                        disabled={changingStatut || !hasPhotosApres}
-                                                        title={!hasPhotosApres ? "Ajoutez au moins une photo après intervention pour terminer" : "Terminer la tâche"}
-                                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors disabled:opacity-50 ${hasPhotosApres
-                                                            ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                                            }`}
-                                                    >
-                                                        {changingStatut ? (
-                                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                                        ) : (
-                                                            <CheckCircle className="w-4 h-4" />
-                                                        )}
-                                                        Terminer
-                                                        {!hasPhotosApres && (
-                                                            <Camera className="w-4 h-4 ml-1" />
-                                                        )}
-                                                    </button>
-                                                );
-                                            })()}
+                                            {/* Bouton Terminer - visible si EN_COURS */}
+                                            {selectedTache.statut === 'EN_COURS' && (
+                                                <button
+                                                    onClick={() => openConfirmModal('complete')}
+                                                    disabled={changingStatut}
+                                                    title="Terminer la tâche"
+                                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                                                >
+                                                    {changingStatut ? (
+                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                    ) : (
+                                                        <CheckCircle className="w-4 h-4" />
+                                                    )}
+                                                    Terminer
+                                                </button>
+                                            )}
 
                                             {/* Bouton Annuler - visible si pas encore TERMINEE ou ANNULEE */}
                                             {selectedTache.statut !== 'TERMINEE' && selectedTache.statut !== 'ANNULEE' && (

@@ -1,21 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import {
-  X,
   Check,
-  Loader2,
   Calendar,
   Building2,
   FileText,
   Ruler,
-  MapPin,
   Users,
 } from 'lucide-react';
 import { createSite, CreateSiteData, SiteFrontend } from '../../services/api';
 import { fetchClients } from '../../services/usersApi';
 import { Client } from '../../types/users';
 import { useToast } from '../../contexts/ToastContext';
-
 import { GeometryMetrics } from '../../types';
+import { FormModal } from '../FormModal';
 
 interface CreateSiteModalProps {
   isOpen: boolean;
@@ -34,6 +31,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
 }) => {
   const { showToast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Clients state
   const [clients, setClients] = useState<Client[]>([]);
@@ -79,6 +77,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
       setDateDebutContrat('');
       setDateFinContrat('');
       setActif(true);
+      setError(null);
     }
   }, [isOpen]);
 
@@ -95,21 +94,22 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
     e.preventDefault();
 
     if (!geometry || geometry.type !== 'Polygon') {
-      showToast('Erreur: géométrie invalide', 'error');
+      setError('Erreur: géométrie invalide');
       return;
     }
 
     if (!nomSite.trim()) {
-      showToast('Le nom du site est obligatoire', 'error');
+      setError('Le nom du site est obligatoire');
       return;
     }
 
     if (!clientId) {
-      showToast('Le client est obligatoire', 'error');
+      setError('Le client est obligatoire');
       return;
     }
 
     setIsSubmitting(true);
+    setError(null);
 
     try {
       const siteData: CreateSiteData = {
@@ -127,9 +127,10 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
       const newSite = await createSite(siteData);
       showToast(`Site "${nomSite}" créé avec succès!`, 'success');
       onSuccess(newSite);
+      onClose();
     } catch (error: any) {
       console.error('Erreur création site:', error);
-      showToast(error.message || 'Erreur lors de la création du site', 'error');
+      setError(error.message || 'Erreur lors de la création du site');
     } finally {
       setIsSubmitting(false);
     }
@@ -138,197 +139,166 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center pointer-events-auto">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-
-      {/* Modal */}
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b bg-emerald-50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-emerald-600 flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                Nouveau site
-              </h2>
-              <p className="text-sm text-gray-500">
-                Renseignez les informations du site
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-emerald-100 rounded-full transition-colors"
-          >
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
+    <FormModal
+      isOpen={isOpen}
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      title="Nouveau site"
+      subtitle="Renseignez les informations du site"
+      icon={<Building2 className="w-5 h-5" />}
+      size="lg"
+      loading={isSubmitting}
+      error={error}
+      submitLabel={isSubmitting ? 'Création...' : 'Créer le site'}
+      submitVariant="primary"
+      cancelLabel="Annuler"
+    >
+      {/* Geometry Info */}
+      {metrics && (
+        <div className="px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-4 text-sm text-emerald-700 -mt-2 mb-4">
+          <span className="flex items-center gap-1.5">
+            <Ruler className="w-4 h-4" />
+            {(metrics.area_m2! / 10000).toFixed(2)} ha
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Ruler className="w-4 h-4" />
+            {(metrics.perimeter_m! / 1000).toFixed(2)} km de périmètre
+          </span>
         </div>
+      )}
 
-        {/* Geometry Info */}
-        {metrics && (
-          <div className="px-6 py-3 bg-emerald-50/50 border-b flex items-center gap-4 text-sm text-emerald-700">
-            <span className="flex items-center gap-1.5">
-              <Ruler className="w-4 h-4" />
-              {(metrics.area_m2! / 10000).toFixed(2)} ha
-            </span>
-            <span className="flex items-center gap-1.5">
-              <MapPin className="w-4 h-4" />
-              {(metrics.perimeter_m! / 1000).toFixed(2)} km de périmètre
-            </span>
-          </div>
-        )}
-
-        {/* Content */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Client (Required) */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
+      <div className="space-y-4">
+        {/* Client (Required) */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <div className="flex items-center gap-2">
               <Users className="w-4 h-4 text-gray-400" />
               Client <span className="text-red-500">*</span>
-            </label>
-            {isLoadingClients ? (
-              <div className="flex items-center gap-2 text-gray-500">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Chargement des clients...
-              </div>
-            ) : (
-              <select
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value ? parseInt(e.target.value) : '')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                required
-              >
-                <option value="">-- Sélectionner un client --</option>
-                {clients.map((client) => (
-                  <option key={client.utilisateur} value={client.utilisateur}>
-                    {client.nomStructure} ({client.nom} {client.prenom})
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
+            </div>
+          </label>
+          {isLoadingClients ? (
+            <div className="flex items-center gap-2 text-gray-500 text-sm py-2">
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-emerald-600 rounded-full animate-spin" />
+              Chargement des clients...
+            </div>
+          ) : (
+            <select
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value ? parseInt(e.target.value) : '')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors"
+              required
+            >
+              <option value="">-- Sélectionner un client --</option>
+              {clients.map((client) => (
+                <option key={client.utilisateur} value={client.utilisateur}>
+                  {client.nomStructure} ({client.nom} {client.prenom})
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
 
-          {/* Nom du site */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
+        {/* Nom du site */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <div className="flex items-center gap-2">
               <Building2 className="w-4 h-4 text-gray-400" />
               Nom du site <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={nomSite}
-              onChange={(e) => setNomSite(e.target.value)}
-              placeholder="Ex: Hilton Garden Inn"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-            />
-          </div>
+            </div>
+          </label>
+          <input
+            type="text"
+            value={nomSite}
+            onChange={(e) => setNomSite(e.target.value)}
+            placeholder="Ex: Hilton Garden Inn"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors"
+            required
+          />
+        </div>
 
-          {/* Adresse */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
+        {/* Adresse */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-gray-400" />
               Adresse
-            </label>
-            <input
-              type="text"
-              value={adresse}
-              onChange={(e) => setAdresse(e.target.value)}
-              placeholder="Ex: 123 Avenue Mohammed V, Casablanca"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-            />
-          </div>
+            </div>
+          </label>
+          <input
+            type="text"
+            value={adresse}
+            onChange={(e) => setAdresse(e.target.value)}
+            placeholder="Ex: 123 Avenue Mohammed V, Casablanca"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors"
+          />
+        </div>
 
-          {/* Superficie */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
+        {/* Superficie */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <div className="flex items-center gap-2">
               <Ruler className="w-4 h-4 text-gray-400" />
               Superficie (ha)
-            </label>
-            <input
-              type="number"
-              step="0.0001"
-              value={superficieTotale}
-              onChange={(e) => setSuperficieTotale(e.target.value)}
-              placeholder="Calculée automatiquement"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50"
-              readOnly
-            />
-          </div>
+            </div>
+          </label>
+          <input
+            type="number"
+            step="0.0001"
+            value={superficieTotale}
+            onChange={(e) => setSuperficieTotale(e.target.value)}
+            placeholder="Calculée automatiquement"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50 transition-colors"
+            readOnly
+          />
+        </div>
 
-          {/* Dates */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
+        {/* Dates */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-gray-400" />
                 Début contrat
-              </label>
-              <input
-                type="date"
-                value={dateDebutContrat}
-                onChange={(e) => setDateDebutContrat(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
+              </div>
+            </label>
+            <input
+              type="date"
+              value={dateDebutContrat}
+              onChange={(e) => setDateDebutContrat(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-gray-400" />
                 Fin contrat
-              </label>
-              <input
-                type="date"
-                value={dateFinContrat}
-                onChange={(e) => setDateFinContrat(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          {/* Actif */}
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              id="actif"
-              checked={actif}
-              onChange={(e) => setActif(e.target.checked)}
-              className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-            />
-            <label htmlFor="actif" className="text-sm text-gray-700">
-              Site actif
+              </div>
             </label>
+            <input
+              type="date"
+              value={dateFinContrat}
+              onChange={(e) => setDateFinContrat(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors"
+            />
           </div>
-        </form>
+        </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t bg-gray-50">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            Annuler
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting || !nomSite.trim() || !clientId}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Création...
-              </>
-            ) : (
-              <>
-                <Check className="w-4 h-4" />
-                Créer le site
-              </>
-            )}
-          </button>
+        {/* Actif */}
+        <div className="flex items-center gap-3 pt-2">
+          <input
+            type="checkbox"
+            id="actif"
+            checked={actif}
+            onChange={(e) => setActif(e.target.checked)}
+            className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+          />
+          <label htmlFor="actif" className="text-sm text-gray-700 font-medium">
+            Site actif
+          </label>
         </div>
       </div>
-    </div>
+    </FormModal>
   );
 };
 

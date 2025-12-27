@@ -165,7 +165,7 @@ export const CACHE_KEYS = {
   EQUIPES: 'equipes',
   CLIENTS: 'clients',
   TYPES_TACHES: 'types-taches',
-  OPERATEURS: 'operateurs',
+  SUPERVISEURS: 'operateurs',
   COMPETENCES: 'competences',
   SITES: 'sites',
 } as const;

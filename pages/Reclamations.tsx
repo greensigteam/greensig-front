@@ -13,6 +13,7 @@ import {
     uploadPhoto,
     assignReclamation,
     cloturerReclamation,
+    validerCloture,
     createSatisfaction
 } from '../services/reclamationsApi';
 import { planningService } from '../services/planningService';
@@ -22,6 +23,7 @@ import { EquipeList, Utilisateur } from '../types/users';
 import { PhotoUpload } from '../components/shared/PhotoUpload';
 import { SatisfactionForm } from '../components/SatisfactionForm';
 import TaskFormModal from '../components/planning/TaskFormModal';
+import { utcToLocalInput, localInputToUTC, formatLocalDate } from '../utils/dateHelpers';
 
 import ConfirmModal from '../components/ConfirmModal';
 import { ReclamationTimeline } from '../components/ReclamationTimeline';
@@ -40,7 +42,7 @@ const Reclamations: React.FC = () => {
     // Helpers rôles
     const isAdmin = !!currentUser?.roles?.includes('ADMIN');
     const isClient = !!currentUser?.roles?.includes('CLIENT');
-    const isChefEquipe = !!currentUser?.roles?.includes('CHEF_EQUIPE');
+    const isChefEquipe = !!currentUser?.roles?.includes('SUPERVISEUR');
 
     // UI State
     const [activeTab, setActiveTab] = useState<'reclamations' | 'taches'>('reclamations');
@@ -97,6 +99,16 @@ const Reclamations: React.FC = () => {
         }, 300);
         return () => clearTimeout(timer);
     }, [searchTerm]);
+
+    // Initialiser date_constatation avec la date actuelle lors de l'ouverture du modal en mode création
+    useEffect(() => {
+        if (isCreateModalOpen && !editingId && !formData.date_constatation) {
+            setFormData(prev => ({
+                ...prev,
+                date_constatation: new Date().toISOString()
+            }));
+        }
+    }, [isCreateModalOpen, editingId]);
 
     useEffect(() => {
         loadData();
@@ -331,7 +343,7 @@ const Reclamations: React.FC = () => {
         }
     };
 
-    // User 6.6.12 - Clôture
+    // User 6.6.12 - Clôture (Admin/Superviseur propose la clôture)
     const handleCloturer = async () => {
         if (!selectedReclamation) return;
 
@@ -340,8 +352,8 @@ const Reclamations: React.FC = () => {
         if (hasUnfinishedTasks) {
             setModalConfig({
                 isOpen: true,
-                title: 'Impossible de clôturer',
-                message: 'Toutes les tâches associées doivent être terminées pour clôturer la réclamation.',
+                title: 'Impossible de proposer la clôture',
+                message: 'Toutes les tâches associées doivent être terminées avant de proposer la clôture.',
                 variant: 'danger'
             });
             return;
@@ -354,13 +366,10 @@ const Reclamations: React.FC = () => {
             setSelectedReclamation(updatedRec);
             setReclamations(prev => prev.map(r => r.id === updatedRec.id ? updatedRec : r));
 
-            // Rafraîchir les réclamations sur la carte (la réclamation clôturée disparaîtra)
-            window.dispatchEvent(new Event('refresh-reclamations'));
-
             setModalConfig({
                 isOpen: true,
                 title: 'Succès',
-                message: 'Réclamation clôturée avec succès.',
+                message: 'Clôture proposée avec succès. En attente de validation par le créateur.',
                 variant: 'success'
             });
         } catch (error: any) {
@@ -368,7 +377,38 @@ const Reclamations: React.FC = () => {
             setModalConfig({
                 isOpen: true,
                 title: 'Erreur',
-                message: error.message || 'Erreur lors de la clôture.',
+                message: error.message || 'Erreur lors de la proposition de clôture.',
+                variant: 'danger'
+            });
+        }
+    };
+
+    // User 6.6.12bis - Validation de clôture par le créateur
+    const handleValiderCloture = async () => {
+        if (!selectedReclamation) return;
+
+        try {
+            const updatedRec = await validerCloture(selectedReclamation.id);
+
+            // Update local state
+            setSelectedReclamation(updatedRec);
+            setReclamations(prev => prev.map(r => r.id === updatedRec.id ? updatedRec : r));
+
+            // Rafraîchir les réclamations sur la carte (la réclamation clôturée disparaîtra)
+            window.dispatchEvent(new Event('refresh-reclamations'));
+
+            setModalConfig({
+                isOpen: true,
+                title: 'Succès',
+                message: 'Clôture validée avec succès. La réclamation est définitivement clôturée.',
+                variant: 'success'
+            });
+        } catch (error: any) {
+            console.error(error);
+            setModalConfig({
+                isOpen: true,
+                title: 'Erreur',
+                message: error.message || 'Erreur lors de la validation de la clôture.',
                 variant: 'danger'
             });
         }
@@ -608,10 +648,11 @@ const Reclamations: React.FC = () => {
                                                 ${rec.statut === 'NOUVELLE' ? 'bg-blue-100 text-blue-800' :
                                                         rec.statut === 'RESOLUE' ? 'bg-green-100 text-green-800' :
                                                             rec.statut === 'EN_COURS' ? 'bg-yellow-100 text-yellow-800' :
-                                                                rec.statut === 'CLOTUREE' ? 'bg-purple-100 text-purple-800' :
-                                                                    'bg-gray-100 text-gray-800'}
+                                                                rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'bg-orange-100 text-orange-800' :
+                                                                    rec.statut === 'CLOTUREE' ? 'bg-purple-100 text-purple-800' :
+                                                                        'bg-gray-100 text-gray-800'}
                                             `}>
-                                                    {rec.statut.toLowerCase().replace('_', ' ')}
+                                                    {rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'En attente validation' : rec.statut.toLowerCase().replace('_', ' ')}
                                                 </span>
                                             </td>
                                             <td className="p-4">
@@ -772,7 +813,7 @@ const Reclamations: React.FC = () => {
                                     </div>
                                 )}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Type de problème <span className="text-red-500">*</span></label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Type de réclamation <span className="text-red-500">*</span></label>
                                     <select
                                         required
                                         value={formData.type_reclamation || ''}
@@ -826,9 +867,20 @@ const Reclamations: React.FC = () => {
                                         <input
                                             type="datetime-local"
                                             required
-                                            value={formData.date_constatation ? formData.date_constatation.slice(0, 16) : ''}
+                                            value={utcToLocalInput(formData.date_constatation)}
                                             className="w-full pl-10 pr-4 py-2.5 rounded-lg border-gray-300 border focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
-                                            onChange={e => setFormData({ ...formData, date_constatation: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
+                                            onChange={e => {
+                                                const utcValue = localInputToUTC(e.target.value);
+                                                setFormData({ ...formData, date_constatation: utcValue || undefined });
+                                            }}
+                                            onBlur={e => {
+                                                // Forcer la mise à jour au cas où le changement n'a pas été capturé
+                                                if (e.target.value && !formData.date_constatation) {
+                                                    const utcValue = localInputToUTC(e.target.value);
+                                                    setFormData({ ...formData, date_constatation: utcValue || undefined });
+                                                }
+                                            }}
+                                            step="60"
                                         />
                                     </div>
                                     <p className="text-xs text-gray-500 mt-1">Date et heure où le problème a été constaté</p>
@@ -941,15 +993,13 @@ const Reclamations: React.FC = () => {
                                     <h4 className="text-xs font-semibold uppercase text-gray-500 mb-1">Date de constatation</h4>
                                     <p className="font-medium text-gray-900 flex items-center gap-2">
                                         <Calendar className="w-4 h-4 text-orange-500" />
-                                        {selectedReclamation.date_constatation
-                                            ? new Date(selectedReclamation.date_constatation).toLocaleDateString('fr-FR', {
-                                                day: 'numeric',
-                                                month: 'long',
-                                                year: 'numeric',
-                                                hour: '2-digit',
-                                                minute: '2-digit'
-                                            })
-                                            : '-'}
+                                        {formatLocalDate(selectedReclamation.date_constatation, {
+                                            day: 'numeric',
+                                            month: 'long',
+                                            year: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        })}
                                     </p>
                                 </div>
                                 {selectedReclamation.justification_rejet && (
@@ -1121,9 +1171,8 @@ const Reclamations: React.FC = () => {
                                         Créer une tâche
                                     </button>
                                 )}
-                                {/* User 6.6.12.3 - Bouton Clôturer (visible uniquement si RESOLUE et non client) */}
-                                {selectedReclamation.statut !== 'CLOTUREE' && selectedReclamation.statut !== 'REJETEE' && !isClient && (
-
+                                {/* User 6.6.12.3 - Bouton Proposer clôture (Admin/Superviseur uniquement) */}
+                                {selectedReclamation.statut !== 'CLOTUREE' && selectedReclamation.statut !== 'REJETEE' && selectedReclamation.statut !== 'EN_ATTENTE_VALIDATION_CLOTURE' && !isClient && (
                                     <button
                                         onClick={handleCloturer}
                                         disabled={selectedReclamation.taches_liees_details?.some((t: any) => t.statut !== 'TERMINEE')}
@@ -1133,14 +1182,24 @@ const Reclamations: React.FC = () => {
                                             }`}
                                         title={selectedReclamation.taches_liees_details?.some((t: any) => t.statut !== 'TERMINEE')
                                             ? "Certaines tâches ne sont pas terminées"
-                                            : "Clôturer la réclamation"}
+                                            : "Proposer la clôture de la réclamation"}
                                     >
                                         <Clock className="w-4 h-4" />
-                                        Clôturer
+                                        Proposer clôture
+                                    </button>
+                                )}
+                                {/* User 6.6.12bis - Bouton Valider clôture (créateur uniquement) */}
+                                {selectedReclamation.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' && currentUser && selectedReclamation.createur === currentUser.id && (
+                                    <button
+                                        onClick={handleValiderCloture}
+                                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-2 shadow-md hover:shadow-lg animate-pulse"
+                                    >
+                                        <Star className="w-4 h-4" />
+                                        Valider clôture
                                     </button>
                                 )}
                                 {/* User 6.6.13 - Bouton Évaluer (visible uniquement si CLOTUREE) */}
-                                {selectedReclamation.statut === 'CLOTUREE' && (
+                                {selectedReclamation.statut === 'CLOTUREE' && !selectedReclamation.satisfaction && (
                                     <button
                                         onClick={() => setShowSatisfactionForm(true)}
                                         className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 font-medium flex items-center gap-2"

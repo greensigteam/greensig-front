@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { X, AlertTriangle } from 'lucide-react';
 import { VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND } from '../constants';
-import { MapLayerType, Coordinates, OverlayState, MapObjectDetail, Measurement, MeasurementType } from '../types';
+import { MapLayerType, Coordinates, OverlayState, MapObjectDetail, Measurement, MeasurementType, SearchSuggestion } from '../types';
 import { MOCK_SITES } from '../services/mockData';
 import { searchObjects, geoJSONToLatLng, fetchAllSites, SiteFrontend, exportPDF, downloadBlob, deleteInventoryItem, ImportExecuteResponse } from '../services/api';
-import { useSearch } from '../hooks/useSearch';
+import { useSearch } from '../contexts/SearchContext';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useMapContext } from '../contexts/MapContext';
 import { useToast } from '../contexts/ToastContext';
@@ -171,11 +171,38 @@ export const MapPage: React.FC<MapPageProps> = ({
     cancelDrawing,
   } = useDrawing();
 
+  // ✅ USE SEARCH CONTEXT
+  const { 
+    searchQuery, 
+    setSearchQuery, 
+    searchSuggestions, 
+    showSuggestions, 
+    setShowSuggestions, 
+    isSearching, 
+    setIsSearching, 
+    searchResult, 
+    setSearchResult: setGlobalSearchResult, 
+    searchContainerRef, 
+    handleSuggestionClick: hookHandleSuggestionClick, 
+    setPlaceholder,
+    selectedSuggestion,
+    setSelectedSuggestion,
+    setSearchSuggestions
+  } = useSearch();
+
+  // Override hook's handleSuggestionClick to also update targetLocation
+  // ✅ Memoize to prevent MapSearchBar re-renders
+  const handleSuggestionClick = useCallback((suggestion: typeof searchSuggestions[0]) => {
+    hookHandleSuggestionClick(suggestion);
+    // La navigation est maintenant gérée par l'effet sur selectedSuggestion
+  }, [hookHandleSuggestionClick]);
+
   // ✅ Clear persistent drawing state on mount to prevent "white page" issues
   useEffect(() => {
     clearDrawnGeometry();
     setDrawingMode('none');
     setPendingObjectType(null);
+    setPlaceholder('Rechercher un lieu, un site, un équipement...');
   }, []);
 
   // ========== STATE MANAGEMENT ==========
@@ -384,7 +411,7 @@ export const MapPage: React.FC<MapPageProps> = ({
     }
   };
 
-  // Handle clicking "Signaler un problème" button
+  // Handle clicking "Signaler une réclamation" button
   const handleReportProblem = async () => {
     // Load reference data if needed
     if (typesReclamation.length === 0) {
@@ -436,34 +463,6 @@ export const MapPage: React.FC<MapPageProps> = ({
     }
   }, [isReportingProblem, drawnGeometry, reportDrawingMode, showReclamationModal]);
 
-  // ========== SEARCH HOOK ==========
-  const {
-    searchQuery,
-    setSearchQuery,
-    searchSuggestions,
-    showSuggestions,
-    setShowSuggestions,
-    isSearching,
-    setIsSearching,
-    searchResult,
-    setSearchResult,
-    searchContainerRef,
-    handleSuggestionClick: hookHandleSuggestionClick
-  } = useSearch({
-    sites: mappedSites,
-    debounceMs: 300,
-    maxSuggestions: 5,
-    minQueryLength: 2
-  });
-
-  // Override hook's handleSuggestionClick to also update targetLocation
-  const handleSuggestionClick = (suggestion: typeof searchSuggestions[0]) => {
-    hookHandleSuggestionClick(suggestion);
-    if (suggestion.coordinates) {
-      setTargetLocation({ coordinates: suggestion.coordinates, zoom: 18 });
-    }
-  };
-
   // ========== GEOLOCATION HOOK ==========
   const {
     requestGeolocation
@@ -472,7 +471,7 @@ export const MapPage: React.FC<MapPageProps> = ({
     timeout: 15000,
     maximumAge: 0,
     onSuccess: (result) => {
-      setSearchResult({
+      setGlobalSearchResult({
         name: "Ma position",
         description: `Localisation GPS (précision: ${result.accuracy.toFixed(0)}m)`,
         coordinates: result.coordinates,
@@ -491,112 +490,112 @@ export const MapPage: React.FC<MapPageProps> = ({
   });
 
   // ========== HANDLERS ==========
-  const handleGeolocation = () => {
+  // ✅ Memoize to prevent MapSearchBar re-renders
+  const handleGeolocation = useCallback(() => {
     setIsSearching(true);
     requestGeolocation();
-  };
+  }, [requestGeolocation, setIsSearching]);
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
-
+  // ========== SEARCH HANDLER ==========
+  
+  // ✅ Memoize to prevent MapSearchBar re-renders
+  const handleSearch = useCallback(async () => {
+    if (!searchQuery || searchQuery.trim().length < 2) return;
     setIsSearching(true);
-    setSearchResult(null);
+  }, [searchQuery, setIsSearching]);
 
-    try {
-      const query = searchQuery.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-      // 1. Recherche dans les sites API
-      const matchedSite = sites.find(s => {
-        const name = s.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const desc = s.description.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const code = (s.code_site || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const cat = s.category.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        return name.includes(query) || desc.includes(query) || code.includes(query) || cat.includes(query);
+  // Effect to handle selection from suggestions (click in list)
+  useEffect(() => {
+    if (selectedSuggestion && selectedSuggestion.coordinates) {
+      // 1. Zoom to location
+      setTargetLocation({ coordinates: selectedSuggestion.coordinates, zoom: 18 });
+      
+      // 2. Set search result for highlighting
+      setGlobalSearchResult({
+        name: selectedSuggestion.name,
+        description: `${selectedSuggestion.type} - ID: ${selectedSuggestion.id}`,
+        coordinates: selectedSuggestion.coordinates,
+        zoom: 18,
+        objectId: selectedSuggestion.id,
+        objectType: selectedSuggestion.type
       });
 
-      if (matchedSite) {
-        setSearchResult({
-          name: matchedSite.name,
-          description: `${matchedSite.category} - ${matchedSite.description}`,
-          coordinates: matchedSite.coordinates,
-          zoom: 18,
-          objectId: matchedSite.id?.toString() || `site-${matchedSite.name}`,
-          objectType: 'Site'
-        });
-        setTargetLocation({ coordinates: matchedSite.coordinates, zoom: 18 });
-        setIsSearching(false);
+      // 3. Reset selection to allow re-selecting same item later
+      setSelectedSuggestion(null);
+    }
+  }, [selectedSuggestion]);
+
+  // Effect to trigger search when searchQuery changes in context (typing)
+  useEffect(() => {
+    const performSearch = async () => {
+      if (!searchQuery || searchQuery.trim().length < 2) {
+        setSearchSuggestions([]);
+        setShowSuggestions(false);
         return;
       }
 
-      // 2. Recherche API Django
-      try {
-        const apiResults = await searchObjects(searchQuery);
-        if (apiResults && apiResults.length > 0) {
-          const firstResult = apiResults[0];
-          if (!firstResult) return; // TypeScript null safety
+      setIsSearching(true);
 
-          if (firstResult.location) {
-            const coords = geoJSONToLatLng(firstResult.location.coordinates);
-            setSearchResult({
-              name: firstResult.name,
-              description: `${firstResult.type} (API)`,
-              coordinates: coords,
-              zoom: 18,
-              objectId: firstResult.id?.toString() || `object-${firstResult.name}`,
-              objectType: firstResult.type
+      try {
+        const suggestions: SearchSuggestion[] = [];
+
+        // Single source of truth: Django API backend
+        // Returns all objects (Sites, Vegetation, Hydraulic) filtered by user permissions
+        try {
+          const apiResults = await searchObjects(searchQuery);
+          if (apiResults && apiResults.length > 0) {
+            apiResults.slice(0, 8).forEach(result => {
+              if (result.location) {
+                const coords = geoJSONToLatLng(result.location.coordinates);
+                suggestions.push({
+                  id: result.id.toString(),
+                  name: result.name,
+                  type: result.type,
+                  coordinates: coords
+                });
+              }
             });
-            setTargetLocation({ coordinates: coords, zoom: 18 });
-            setIsSearching(false);
-            return;
+          }
+        } catch (error) {
+          logger.error('Erreur recherche API Django:', error);
+        }
+
+        // Fallback: Nominatim ONLY if no API results
+        if (suggestions.length === 0) {
+          try {
+            const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=3`);
+            if (response.ok) {
+              const data = await response.json();
+              data.forEach((result: any) => {
+                suggestions.push({
+                  id: `nominatim-${result.place_id}`,
+                  name: result.display_name,
+                  type: 'Lieu',
+                  coordinates: { lat: parseFloat(result.lat), lng: parseFloat(result.lon) }
+                });
+              });
+            }
+          } catch (error) {
+            logger.error("Error during Nominatim search:", error);
           }
         }
-      } catch (error) {
-        logger.error('Erreur recherche API Django:', error);
-      }
 
-      // 3. Fallback: données mock
-      const mockSite = MOCK_SITES.find(s => s.name.toLowerCase().includes(query));
-      if (mockSite) {
-        setSearchResult({
-          name: mockSite.name,
-          description: `Site - ${mockSite.address}`,
-          coordinates: mockSite.coordinates,
-          zoom: 18,
-          objectId: `mock-${mockSite.name}`,
-          objectType: 'Site'
-        });
-        setTargetLocation({ coordinates: mockSite.coordinates, zoom: 18 });
+        // Update suggestions in context
+        setSearchSuggestions(suggestions);
+        setShowSuggestions(suggestions.length > 0);
+
+      } finally {
         setIsSearching(false);
-        return;
       }
+    };
 
-      // 4. Fallback: Nominatim
-      try {
-        const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const data = await response.json();
+    // Debounce search execution
+    const timeoutId = setTimeout(() => {
+      if (searchQuery) performSearch();
+    }, 500);
 
-        if (data && data.length > 0) {
-          const result = data[0];
-          const coords = { lat: parseFloat(result.lat), lng: parseFloat(result.lon) };
-          setSearchResult({
-            name: result.display_name,
-            description: `Résultat externe (${result.type})`,
-            coordinates: coords,
-            zoom: 16
-          });
-          setTargetLocation({ coordinates: coords, zoom: 16 });
-        } else {
-          alert("Aucun résultat trouvé pour cette recherche.");
-        }
-      } catch (error) {
-        logger.error("Error during Nominatim search:", error);
-        alert("Une erreur est survenue lors de la recherche externe. Vérifiez votre connexion internet.");
-      }
-    } finally {
-      setIsSearching(false);
-    }
-  };
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, sites]);
 
   const handleZoomOutClick = () => {
     const currentZoom = getCurrentZoom();
@@ -802,7 +801,7 @@ export const MapPage: React.FC<MapPageProps> = ({
   // ========== RENDER ==========
   return (
     <>
-      {/* 1. Search Bar Component */}
+      {/* 1. Search Bar Component - RE-ENABLED for Map View */}
       <MapSearchBar
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
@@ -815,7 +814,7 @@ export const MapPage: React.FC<MapPageProps> = ({
         onGeolocation={handleGeolocation}
         searchContainerRef={searchContainerRef}
         searchResult={searchResult}
-        setSearchResult={setSearchResult}
+        setSearchResult={setGlobalSearchResult}
         isSidebarCollapsed={isSidebarCollapsed}
       />
 

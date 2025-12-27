@@ -16,7 +16,7 @@ import {
   CreateOperateurModal,
   UserTypeMenu
 } from '../components/users/CreateUserModals';
-import { UserDetailModalSelector } from '../components/users/UserDetailModals';
+import { AdminDetailModal } from '../components/users/UserDetailModals';
 import React, { useState, useEffect } from 'react';
 import {
   Users as UsersIcon,
@@ -35,6 +35,8 @@ import {
   Save
 } from 'lucide-react';
 import { DataTable } from '../components/DataTable';
+import { StatusBadge } from '../components/StatusBadge';
+import { useNavigate } from 'react-router-dom';
 
 // ...existing code...
 
@@ -52,25 +54,6 @@ import {
   attribuerRole,
   retirerRole
 } from '../services/usersApi';
-
-// ============================================================================
-// COMPONENT - Role Badge
-const RoleBadge: React.FC<{ role: NomRole }> = ({ role }) => {
-  const colors: Record<NomRole, { bg: string; text: string }> = {
-    ADMIN: { bg: 'bg-purple-100', text: 'text-purple-800' },
-    OPERATEUR: { bg: 'bg-blue-100', text: 'text-blue-800' },
-    CLIENT: { bg: 'bg-green-100', text: 'text-green-800' },
-    CHEF_EQUIPE: { bg: 'bg-yellow-100', text: 'text-yellow-800' }
-  };
-  const c = colors[role] || { bg: 'bg-gray-100', text: 'text-gray-800' };
-  return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${c.bg} ${c.text}`}>
-      {NOM_ROLE_LABELS[role] || role}
-    </span>
-  );
-};
-
-
 
 // ============================================================================
 // MODAL - Editer un utilisateur
@@ -178,7 +161,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
           emailFacturation: clientFields.emailFacturation
         };
         await updateClient(clientData.utilisateur, clientUpdate);
-      } else if (user.roles && user.roles.includes('OPERATEUR') && operateurData) {
+      } else if (user.roles && user.roles.includes('SUPERVISEUR') && operateurData) {
         const operateurUpdate: OperateurUpdate = {
           nom: formData.nom,
           prenom: formData.prenom,
@@ -204,13 +187,13 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
         <div className="p-6 border-b border-gray-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className={`p-3 rounded-full ${user.roles.includes('ADMIN') ? 'bg-purple-100' :
-              user.roles.includes('OPERATEUR') ? 'bg-blue-100' :
-                user.roles.includes('CHEF_EQUIPE') ? 'bg-yellow-100' :
+              user.roles.includes('SUPERVISEUR') ? 'bg-blue-100' :
+                user.roles.includes('SUPERVISEUR') ? 'bg-yellow-100' :
                   user.roles.includes('CLIENT') ? 'bg-green-100' : 'bg-gray-100'
               }`}>
               <Edit2 className={`w-5 h-5 ${user.roles.includes('ADMIN') ? 'text-purple-600' :
-                user.roles.includes('OPERATEUR') ? 'text-blue-600' :
-                  user.roles.includes('CHEF_EQUIPE') ? 'text-yellow-600' :
+                user.roles.includes('SUPERVISEUR') ? 'text-blue-600' :
+                  user.roles.includes('SUPERVISEUR') ? 'text-yellow-600' :
                     user.roles.includes('CLIENT') ? 'text-green-600' : 'text-gray-600'
                 }`} />
             </div>
@@ -238,7 +221,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
                 <div className="mb-4">
                   <p className="text-xs text-gray-500 mb-2">Rôles attribués automatiquement :</p>
                   <div className="flex flex-wrap gap-2">
-                    {['CLIENT', 'OPERATEUR', 'CHEF_EQUIPE'].map((roleName) => {
+                    {['CLIENT', 'SUPERVISEUR', 'SUPERVISEUR'].map((roleName) => {
                       const hasRole = userRoles.includes(roleName as NomRole);
                       if (!hasRole) return null;
                       return (
@@ -250,7 +233,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
                         </div>
                       );
                     })}
-                    {!userRoles.some(r => ['CLIENT', 'OPERATEUR', 'CHEF_EQUIPE'].includes(r)) && (
+                    {!userRoles.some(r => ['CLIENT', 'SUPERVISEUR', 'SUPERVISEUR'].includes(r)) && (
                       <span className="text-xs text-gray-500 italic">Aucun rôle automatique</span>
                     )}
                   </div>
@@ -440,7 +423,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
             )}
 
             {/* Champs specifiques Operateur */}
-            {user.roles.includes('OPERATEUR') && (
+            {user.roles.includes('SUPERVISEUR') && (
               <>
                 <hr className="my-4" />
                 <h3 className="font-medium text-gray-900 flex items-center gap-2">
@@ -533,6 +516,8 @@ const StatCard: React.FC<StatCardProps> = ({ icon, label, value, color }) => (
 type TabType = 'tous' | 'admins' | 'operateurs' | 'clients' | 'chefs';
 
 const Users: React.FC = () => {
+  const navigate = useNavigate();
+
   // State
   const [activeTab, setActiveTab] = useState<TabType>('tous');
   const [loading, setLoading] = useState(true);
@@ -557,7 +542,7 @@ const Users: React.FC = () => {
   const [showCreateClient, setShowCreateClient] = useState(false);
   const [showCreateChefEquipe, setShowCreateChefEquipe] = useState(false);
   const [showCreateOperateur, setShowCreateOperateur] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<Utilisateur | null>(null);
+  const [selectedAdminUser, setSelectedAdminUser] = useState<Utilisateur | null>(null);
   const [editingUser, setEditingUser] = useState<Utilisateur | null>(null);
 
   // Handler pour la sélection du type d'utilisateur
@@ -570,10 +555,10 @@ const Users: React.FC = () => {
       case 'CLIENT':
         setShowCreateClient(true);
         break;
-      case 'CHEF_EQUIPE':
+      case 'SUPERVISEUR':
         setShowCreateChefEquipe(true);
         break;
-      case 'OPERATEUR':
+      case 'SUPERVISEUR':
         setShowCreateOperateur(true);
         break;
     }
@@ -613,9 +598,9 @@ const Users: React.FC = () => {
         total,
         actifs,
         admins: parRoleCounts['ADMIN'] || 0,
-        operateurs: parRoleCounts['OPERATEUR'] || 0,
+        operateurs: parRoleCounts['SUPERVISEUR'] || 0,
         clients: parRoleCounts['CLIENT'] || 0,
-        chefsEquipe: parRoleCounts['CHEF_EQUIPE'] || 0
+        chefsEquipe: parRoleCounts['SUPERVISEUR'] || 0
       });
     } catch (error) {
       console.error('Erreur chargement donnees:', error);
@@ -633,9 +618,29 @@ const Users: React.FC = () => {
         await deleteUtilisateur(id);
       }
       loadData();
-      setSelectedUser(null);
+      setSelectedAdminUser(null);
     } catch (error) {
       console.error('Erreur modification statut:', error);
+    }
+  };
+
+  const handleRowClick = (user: Utilisateur) => {
+    // Navigate to appropriate detail page based on role
+    if (user.roles.includes('CLIENT')) {
+      // Find the client record to get the correct ID
+      const clientData = clients.find(c => c.utilisateur === user.id);
+      if (clientData) {
+        navigate(`/clients/${clientData.utilisateur}`);
+      }
+    } else if (user.roles.includes('SUPERVISEUR')) {
+      // SUPERVISEUR users: For now, show modal (could create a SuperviseurDetailPage later)
+      setSelectedAdminUser(user);
+    } else if (user.roles.includes('ADMIN')) {
+      // Show modal for admins
+      setSelectedAdminUser(user);
+    } else {
+      // Fallback: show admin modal
+      setSelectedAdminUser(user);
     }
   };
 
@@ -644,9 +649,9 @@ const Users: React.FC = () => {
   const filteredUsers = utilisateurs.filter(u => {
     // Filter by tab
     if (activeTab === 'admins' && !(u.roles && u.roles.includes('ADMIN'))) return false;
-    if (activeTab === 'operateurs' && !(u.roles && u.roles.includes('OPERATEUR'))) return false;
+    if (activeTab === 'operateurs' && !(u.roles && u.roles.includes('SUPERVISEUR'))) return false;
     if (activeTab === 'clients' && !(u.roles && u.roles.includes('CLIENT'))) return false;
-    if (activeTab === 'chefs' && !(u.roles && u.roles.includes('CHEF_EQUIPE'))) return false;
+    if (activeTab === 'chefs' && !(u.roles && u.roles.includes('SUPERVISEUR'))) return false;
 
     // Filter by role (dropdown)
     if (roleFilter && !(u.roles && u.roles.includes(roleFilter as any))) return false;
@@ -672,15 +677,15 @@ const Users: React.FC = () => {
       render: (u: Utilisateur) => (
         <div className="flex items-center gap-3">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${u.roles.includes('ADMIN') ? 'bg-purple-100' :
-            u.roles.includes('OPERATEUR') ? 'bg-blue-100' :
-              u.roles.includes('CHEF_EQUIPE') ? 'bg-yellow-100' :
+            u.roles.includes('SUPERVISEUR') ? 'bg-blue-100' :
+              u.roles.includes('SUPERVISEUR') ? 'bg-yellow-100' :
                 u.roles.includes('CLIENT') ? 'bg-green-100' : 'bg-gray-100'
             }`}>
             {u.roles.includes('ADMIN') ? (
               <Shield className="w-4 h-4 text-purple-600" />
-            ) : u.roles.includes('OPERATEUR') ? (
+            ) : u.roles.includes('SUPERVISEUR') ? (
               <UserCheck className="w-4 h-4 text-blue-600" />
-            ) : u.roles.includes('CHEF_EQUIPE') ? (
+            ) : u.roles.includes('SUPERVISEUR') ? (
               <Award className="w-4 h-4 text-yellow-600" />
             ) : (
               <Building2 className="w-4 h-4 text-green-600" />
@@ -699,7 +704,7 @@ const Users: React.FC = () => {
       render: (u: Utilisateur) => u.roles.length > 0 ? (
         <div className="flex flex-wrap gap-1">
           {u.roles.slice(0, 5).map((role: NomRole) => (
-            <RoleBadge key={role} role={role} />
+            <StatusBadge key={role} variant="role" value={role} />
           ))}
           {u.roles.length > 5 && (
             <span className="text-xs text-gray-500">+{u.roles.length - 5}</span>
@@ -717,11 +722,7 @@ const Users: React.FC = () => {
       key: 'actif',
       label: 'Statut',
       render: (u: Utilisateur) => (
-        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${u.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-          }`}>
-          {u.actif ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-          {u.actif ? 'Actif' : 'Inactif'}
-        </span>
+        <StatusBadge variant="boolean" value={u.actif} labels={{ true: 'Actif', false: 'Inactif' }} />
       ),
       sortable: false
     }
@@ -826,7 +827,7 @@ const Users: React.FC = () => {
         >
           <span className="flex items-center gap-2">
             <UserCheck className="w-4 h-4" />
-            Operateurs ({utilisateurs.filter(u => u.roles && u.roles.includes('OPERATEUR')).length})
+            Operateurs ({utilisateurs.filter(u => u.roles && u.roles.includes('SUPERVISEUR')).length})
           </span>
         </button>
         <button
@@ -838,7 +839,7 @@ const Users: React.FC = () => {
         >
           <span className="flex items-center gap-2">
             <Award className="w-4 h-4" />
-            Chefs d'équipe ({utilisateurs.filter(u => u.roles && u.roles.includes('CHEF_EQUIPE')).length})
+            Chefs d'équipe ({utilisateurs.filter(u => u.roles && u.roles.includes('SUPERVISEUR')).length})
           </span>
         </button>
         <button
@@ -875,8 +876,8 @@ const Users: React.FC = () => {
           >
             <option value="">Tous les rôles</option>
             <option value="ADMIN">Admin</option>
-            <option value="OPERATEUR">Opérateur</option>
-            <option value="CHEF_EQUIPE">Chef d'équipe</option>
+            <option value="SUPERVISEUR">Opérateur</option>
+            <option value="SUPERVISEUR">Chef d'équipe</option>
             <option value="CLIENT">Client</option>
           </select>
         </div>
@@ -922,7 +923,7 @@ const Users: React.FC = () => {
             }
           ]}
           itemsPerPage={10}
-          onRowClick={(user) => setSelectedUser({ ...user, id: Number(user.id) })}
+          onRowClick={handleRowClick}
         />
       </div>
 
@@ -962,14 +963,12 @@ const Users: React.FC = () => {
         />
       )}
 
-      {selectedUser && (
-        <UserDetailModalSelector
-          user={selectedUser}
-          clients={clients}
-          operateurs={operateurs}
-          onClose={() => setSelectedUser(null)}
+      {selectedAdminUser && (
+        <AdminDetailModal
+          user={selectedAdminUser}
+          onClose={() => setSelectedAdminUser(null)}
           onEdit={(user) => {
-            setSelectedUser(null);
+            setSelectedAdminUser(null);
             setEditingUser(user);
           }}
           onToggleActive={handleToggleActive}

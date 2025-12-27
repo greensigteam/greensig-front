@@ -3,58 +3,70 @@ import {
   Plus,
   Users,
   UserCheck,
-  UserX,
   Calendar,
   Award,
-  AlertCircle,
   Search,
-  X,
   Check,
   Clock,
   Edit2,
   Trash2,
   Eye,
-  Building2
+  X,
+  RefreshCw,
+  Edit3,
+  LayoutGrid,
+  Table,
+  Filter,
+  BarChart3,
+  Ban,
+  Star,
+  TrendingUp,
+  CheckCircle,
+  FolderOpen,
+  ChevronDown,
+  Umbrella,
+  HeartPulse,
+  GraduationCap,
+  MoreHorizontal,
+  CheckCircle2,
+  XCircle,
+  CalendarClock,
+  CalendarCheck
 } from 'lucide-react';
+import { Listbox, Transition } from '@headlessui/react';
 import { DataTable, Column } from '../components/DataTable';
+import { StatusBadge } from '../components/StatusBadge';
+import { useSearch } from '../contexts/SearchContext';
+import { useToast } from '../contexts/ToastContext';
 
 import EditEquipeModal from './EditEquipeModal';
 import CreateAbsenceModal from './CreateAbsenceModal';
 import AbsenceDetailModal from './AbsenceDetailModal';
 import EditAbsenceModal from './EditAbsenceModal';
-import CompetenceMatrix from '../components/CompetenceMatrix';
-import HistoriqueRHPanel from '../components/HistoriqueRHPanel';
+import CompetenceMatrix, { ViewMode } from '../components/CompetenceMatrix';
+
+// Modales extraites
+import CreateTeamModal from '../components/modals/CreateTeamModal';
+import EquipeDetailModal from '../components/modals/EquipeDetailModal';
+import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
+import { useNavigate } from 'react-router-dom';
 
 // Types
 import {
   OperateurList,
-  OperateurDetail,
   EquipeList,
   EquipeDetail,
   Absence,
   Competence,
-  CategorieCompetence,
-
   StatutOperateur,
   StatutEquipe,
   StatutAbsence,
-  NiveauCompetence,
-  STATUT_OPERATEUR_LABELS,
-  STATUT_OPERATEUR_COLORS,
-  STATUT_EQUIPE_LABELS,
-  STATUT_EQUIPE_COLORS,
   STATUT_ABSENCE_LABELS,
-  STATUT_ABSENCE_COLORS,
-  NIVEAU_COMPETENCE_LABELS,
-  NIVEAU_COMPETENCE_COLORS,
-  CATEGORIE_COMPETENCE_LABELS,
   TYPE_ABSENCE_LABELS,
-  TYPE_ABSENCE_COLORS,
-  getBadgeColors,
-
   NOM_ROLE_LABELS,
   Utilisateur,
-  Client
+  Client,
+  NiveauCompetence
 } from '../types/users';
 
 import EditUserModal from '../components/EditUserModal';
@@ -62,18 +74,12 @@ import EditUserModal from '../components/EditUserModal';
 // API
 import {
   fetchOperateurs,
-  fetchOperateurById,
   fetchEquipes,
   fetchEquipeById,
   fetchAbsences,
   fetchAbsencesAValider,
   fetchCompetences,
   fetchChefsPotentiels,
-  createCompetence,
-  updateCompetence,
-  deleteCompetence,
-  createEquipe,
-  affecterMembres,
   validerAbsence,
   refuserAbsence,
   annulerAbsence,
@@ -86,648 +92,24 @@ import {
 } from '../services/usersApi';
 
 // ============================================================================
-// COMPONENTS - Badges
+// COMPOSANT - Carte Statistiques Moderne
 // ============================================================================
 
-const StatutOperateurBadge: React.FC<{ statut?: StatutOperateur | null }> = ({ statut }) => {
-  const safe = getBadgeColors(STATUT_OPERATEUR_COLORS, statut);
-  const label = statut ? STATUT_OPERATEUR_LABELS[statut] : 'Non renseigné';
-  return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${safe.bg} ${safe.text}`}>
-      {label}
-    </span>
-  );
-};
-
-const StatutEquipeBadge: React.FC<{ statut?: StatutEquipe | null }> = ({ statut }) => {
-  const safe = getBadgeColors(STATUT_EQUIPE_COLORS, statut);
-  const label = statut ? STATUT_EQUIPE_LABELS[statut] : 'Non renseigné';
-  return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${safe.bg} ${safe.text}`}>
-      {label}
-    </span>
-  );
-};
-
-const StatutAbsenceBadge: React.FC<{ statut?: StatutAbsence | null }> = ({ statut }) => {
-  const safe = getBadgeColors(STATUT_ABSENCE_COLORS, statut);
-  const label = statut ? STATUT_ABSENCE_LABELS[statut] : 'Non renseigné';
-  return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${safe.bg} ${safe.text}`}>
-      {label}
-    </span>
-  );
-};
-
-const NiveauCompetenceBadge: React.FC<{ niveau?: NiveauCompetence | null }> = ({ niveau }) => {
-  const safe = getBadgeColors(NIVEAU_COMPETENCE_COLORS, niveau);
-  const label = niveau ? NIVEAU_COMPETENCE_LABELS[niveau] : 'Non renseigné';
-  return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${safe.bg} ${safe.text}`}>
-      {label}
-    </span>
-  );
-};
-
-// ============================================================================
-// MODAL - Creer une equipe
-// ============================================================================
-
-interface CreateTeamModalProps {
-  onClose: () => void;
-  onCreated: () => void;
-  chefsPotentiels: OperateurList[];
-  operateursSansEquipe: OperateurList[];
-}
-
-const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
-  onClose,
-  onCreated,
-  chefsPotentiels,
-  operateursSansEquipe
-}) => {
-  const [formData, setFormData] = useState({
-    nomEquipe: '',
-    chefEquipe: 0,
-    membres: [] as number[]
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    if (!formData.nomEquipe.trim()) {
-      setError("Le nom de l'equipe est requis");
-      return;
-    }
-    // chefEquipe is optional: allow creating team without chef
-
-    setLoading(true);
-    try {
-      const equipe = await createEquipe({
-        nomEquipe: formData.nomEquipe,
-        chefEquipe: formData.chefEquipe && formData.chefEquipe !== 0 ? formData.chefEquipe : undefined,
-        membres: formData.membres.length > 0 ? formData.membres : undefined
-      });
-
-      if (formData.membres.length > 0) {
-        await affecterMembres(equipe.id, { operateurs: formData.membres });
-      }
-
-      onCreated();
-      onClose();
-    } catch (error: any) {
-      console.error('Erreur creation equipe:', error);
-      // Extraire le message d'erreur du backend
-      if (error.data) {
-        // Erreur du backend avec details
-        const messages: string[] = [];
-        for (const [field, value] of Object.entries(error.data)) {
-          if (Array.isArray(value)) {
-            messages.push(`${field}: ${value.join(', ')}`);
-          } else if (typeof value === 'string') {
-            messages.push(value);
-          }
-        }
-        setError(messages.length > 0 ? messages.join('\n') : error.message || 'Erreur lors de la creation');
-      } else {
-        setError(error.message || 'Erreur lors de la creation de l\'equipe');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900">Nouvelle equipe</h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-          <div className="p-6 space-y-4">
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm whitespace-pre-line">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                  <span>{error}</span>
-                </div>
-              </div>
-            )}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nom de l'equipe <span className="text-red-500">*</span>
-              </label>
-              <input
-                required
-                type="text"
-                value={formData.nomEquipe}
-                onChange={(e) => setFormData({ ...formData, nomEquipe: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                placeholder="Ex: Equipe C - Irrigation"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Chef d'equipe (optionnel)
-              </label>
-              <select
-                required
-                value={formData.chefEquipe}
-                onChange={(e) => setFormData({ ...formData, chefEquipe: Number(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-              >
-                <option value={0}>Selectionner un chef</option>
-                {chefsPotentiels.map((op) => (
-                  <option key={op.utilisateur} value={op.utilisateur}>
-                    {op.fullName} ({op.numeroImmatriculation})
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1 text-xs text-gray-500">
-                Seuls les operateurs avec la competence "Gestion d'equipe" sont affiches
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Membres a affecter
-              </label>
-              <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2">
-                {operateursSansEquipe.length === 0 ? (
-                  <p className="text-sm text-gray-500 p-2">Aucun operateur disponible</p>
-                ) : (
-                  operateursSansEquipe.map((op) => (
-                    <label
-                      key={op.utilisateur}
-                      className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={formData.membres.includes(op.utilisateur)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFormData({ ...formData, membres: [...formData.membres, op.utilisateur] });
-                          } else {
-                            setFormData({
-                              ...formData,
-                              membres: formData.membres.filter(id => id !== op.utilisateur)
-                            });
-                          }
-                        }}
-                        className="w-4 h-4 text-emerald-600 rounded"
-                      />
-                      <span className="text-sm">
-                        {op.fullName}
-                        <span className="text-gray-500 ml-1">({op.numeroImmatriculation})</span>
-                      </span>
-                    </label>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="p-6 border-t border-gray-200 flex gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-              >
-                Annuler
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {loading ? 'Creation...' : 'Creer'}
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-// ============================================================================
-// MODAL - Creer / Editer une competence
-// ============================================================================
-
-interface CompetenceModalProps {
-  initial?: Competence | null;
-  onClose: () => void;
-  onSaved: () => void;
-}
-
-const CompetenceModal: React.FC<CompetenceModalProps> = ({ initial = null, onClose, onSaved }) => {
-  const [form, setForm] = useState<{
-    nomCompetence: string;
-    categorie: CategorieCompetence;
-    description: string;
-    ordreAffichage: number;
-  }>({
-    nomCompetence: initial?.nomCompetence || '',
-    categorie: (initial?.categorie as CategorieCompetence) || 'TECHNIQUE',
-    description: initial?.description || '',
-    ordreAffichage: initial?.ordreAffichage || 0
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    if (!form.nomCompetence.trim()) return setError('Le nom est requis');
-    if (!form.categorie) return setError('La categorie est requise');
-
-    setLoading(true);
-    try {
-      if (initial && initial.id) {
-        await updateCompetence(initial.id, form);
-      } else {
-        await createCompetence(form);
-      }
-      onSaved();
-      onClose();
-    } catch (err: any) {
-      console.error('Erreur competence:', err);
-      setError(err?.message || 'Erreur');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900">{initial ? 'Editer competence' : 'Nouvelle competence'}</h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-          <div className="p-6 space-y-4">
-            {error && <div className="p-2 bg-red-50 text-red-700 rounded">{error}</div>}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Nom</label>
-              <input
-                value={form.nomCompetence}
-                onChange={(e) => setForm({ ...form, nomCompetence: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Categorie</label>
-              <select
-                value={form.categorie}
-                onChange={(e) => setForm({ ...form, categorie: e.target.value as CategorieCompetence })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              >
-                {Object.entries(CATEGORIE_COMPETENCE_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-              <textarea
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Ordre</label>
-              <input
-                type="number"
-                value={form.ordreAffichage}
-                onChange={(e) => setForm({ ...form, ordreAffichage: Number(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-          </div>
-          <div className="p-6 border-t border-gray-200 flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-gray-100 rounded-lg">Annuler</button>
-            <button type="submit" disabled={loading} className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg">{loading ? 'En cours...' : 'Enregistrer'}</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-// ============================================================================
-// MODAL - Detail Operateur
-// ============================================================================
-
-interface OperateurDetailModalProps {
-  operateur: OperateurDetail;
-  onClose: () => void;
-}
-
-const OperateurDetailModal: React.FC<OperateurDetailModalProps> = ({ operateur, onClose }) => {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {operateur.photo ? (
-              <img
-                src={operateur.photo}
-                alt={operateur.fullName}
-                className="w-16 h-16 rounded-full object-cover border-2 border-emerald-200"
-              />
-            ) : (
-              <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center">
-                <Users className="w-8 h-8 text-emerald-600" />
-              </div>
-            )}
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">{operateur.fullName}</h2>
-              <p className="text-sm text-gray-500">{operateur.numeroImmatriculation}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Informations generales */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium text-gray-500">Nom</label>
-              <p className="text-gray-900">{operateur.nom}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-500">Prénom</label>
-              <p className="text-gray-900">{operateur.prenom}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-500">Email</label>
-              <p className="text-gray-900">{operateur.email}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-500">Téléphone</label>
-              <p className="text-gray-900">{operateur.telephone || '-'}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-500">Date d'embauche</label>
-              <p className="text-gray-900">
-                {new Date(operateur.dateEmbauche).toLocaleDateString('fr-FR')}
-              </p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-500">Statut compte</label>
-              <div className="mt-1">
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${operateur.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
-                  {operateur.actif ? 'Actif' : 'Inactif'}
-                </span>
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-500">Statut opérateur</label>
-              <div className="mt-1">
-                <StatutOperateurBadge statut={operateur.statut} />
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-500">Equipe</label>
-              <p className="text-gray-900">{operateur.equipeNom || 'Non affecté'}</p>
-            </div>
-            <div className="col-span-2">
-              <label className="text-sm font-medium text-gray-500">Rôle(s)</label>
-              <div className="flex items-center gap-2 mt-1">
-                {operateur.utilisateurDetail?.roles && operateur.utilisateurDetail.roles.length > 0 ? (
-                  operateur.utilisateurDetail.roles.map((r) => (
-                    <span key={r} className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      {NOM_ROLE_LABELS[r as keyof typeof NOM_ROLE_LABELS] || r}
-                    </span>
-                  ))
-                ) : (
-                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                    {operateur.estChefEquipe ? "Chef d'équipe" : 'Opérateur'}
-                  </span>
-                )}
-
-                {operateur.estChefEquipe && (
-                  <span className="text-sm text-gray-500 ml-1">
-                    ({operateur.equipesDirigeesCount} équipe{operateur.equipesDirigeesCount > 1 ? 's' : ''})
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Disponibilite */}
-          <div>
-            <label className="text-sm font-medium text-gray-500 mb-2 block">Disponibilite</label>
-            <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg ${operateur.estDisponible
-              ? 'bg-green-100 text-green-800'
-              : 'bg-red-100 text-red-800'
-              }`}>
-              {operateur.estDisponible ? (
-                <UserCheck className="w-4 h-4" />
-              ) : (
-                <UserX className="w-4 h-4" />
-              )}
-              <span className="font-medium">
-                {operateur.estDisponible ? 'Disponible' : 'Indisponible'}
-              </span>
-            </div>
-          </div>
-
-          {/* Competences */}
-          <div>
-            <label className="text-sm font-medium text-gray-500 mb-3 block flex items-center gap-2">
-              <Award className="w-4 h-4" />
-              Competences ({operateur.competencesDetail.length})
-            </label>
-            {operateur.competencesDetail.length === 0 ? (
-              <p className="text-gray-500 text-sm">Aucune competence enregistree</p>
-            ) : (
-              <div className="grid grid-cols-1 gap-2">
-                {operateur.competencesDetail.map((comp) => (
-                  <div
-                    key={comp.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                  >
-                    <div>
-                      <p className="font-medium text-gray-900">
-                        {comp.competenceDetail?.nomCompetence || `Competence #${comp.competence}`}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {comp.competenceDetail?.categorieDisplay}
-                      </p>
-                    </div>
-                    <NiveauCompetenceBadge niveau={comp.niveau} />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="p-6 border-t border-gray-200">
-          <button
-            onClick={onClose}
-            className="w-full px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200"
-          >
-            Fermer
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ============================================================================
-// MODAL - Detail Equipe
-// ============================================================================
-
-interface EquipeDetailModalProps {
-  equipe: EquipeDetail;
-  onClose: () => void;
-}
-
-const EquipeDetailModal: React.FC<EquipeDetailModalProps> = ({ equipe, onClose }) => {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">{equipe.nomEquipe}</h2>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Statut */}
-          <div className="flex items-center gap-4">
-            <div>
-              <label className="text-sm font-medium text-gray-500">Statut</label>
-              <div className="mt-1">
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${equipe.actif ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
-                  {equipe.actif ? 'Active' : 'Inactive'}
-                </span>
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-500">Statut operationnel</label>
-              <div className="mt-1">
-                <StatutEquipeBadge statut={equipe.statutOperationnel} />
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-500">Creee le</label>
-              <p className="text-gray-900">
-                {new Date(equipe.dateCreation).toLocaleDateString('fr-FR')}
-              </p>
-            </div>
-          </div>
-
-          {/* Chef d'equipe */}
-          <div>
-            <label className="text-sm font-medium text-gray-500 mb-2 block">Chef d'equipe</label>
-            <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-              <div className="w-10 h-10 bg-emerald-200 rounded-full flex items-center justify-center">
-                <UserCheck className="w-5 h-5 text-emerald-700" />
-              </div>
-              <div>
-                <p className="font-semibold text-gray-900">{equipe.chefEquipeNom}</p>
-                <p className="text-sm text-gray-500">
-                  {equipe.chefEquipeDetail?.numeroImmatriculation}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Membres */}
-          <div>
-            <label className="text-sm font-medium text-gray-500 mb-3 block flex items-center gap-2">
-              <Users className="w-4 h-4" />
-              Membres ({equipe.nombreMembres})
-            </label>
-            <div className="space-y-2">
-              {equipe.membres.map((membre) => (
-                <div
-                  key={membre.utilisateur}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                      <Users className="w-4 h-4 text-gray-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{membre.fullName}</p>
-                      <p className="text-xs text-gray-500">{membre.numeroImmatriculation}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <StatutOperateurBadge statut={membre.statut} />
-                    {membre.estChefEquipe && (
-                      <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
-                        Chef
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 border-t border-gray-200">
-          <button
-            onClick={onClose}
-            className="w-full px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200"
-          >
-            Fermer
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// EditUserModalSimple removed — using shared EditUserModal component instead
-
-// ============================================================================
-// COMPOSANT - Carte Statistiques
-// ============================================================================
-
-interface StatCardProps {
+interface StatCardCompactProps {
   icon: React.ReactNode;
   label: string;
   value: number | string;
   color: string;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ icon, label, value, color }) => (
-  <div className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-sm transition-shadow">
-    <div className="flex items-center gap-2">
-      <div className={`p-2 rounded-lg ${color} flex-shrink-0`}>
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <p className="text-xs text-gray-500 truncate">{label}</p>
-        <p className="text-xl font-bold text-gray-900">{value}</p>
-      </div>
+const StatCardCompact: React.FC<StatCardCompactProps> = ({ icon, label, value, color }) => (
+  <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+    <div className="text-sm font-medium text-slate-500 mb-1">{label}</div>
+    <div className="flex items-end justify-between relative z-10">
+      <div className="text-3xl font-bold text-slate-800">{value}</div>
+    </div>
+    <div className="absolute top-4 right-4 p-2 bg-slate-50 rounded-lg">
+      {icon}
     </div>
   </div>
 );
@@ -736,13 +118,16 @@ const StatCard: React.FC<StatCardProps> = ({ icon, label, value, color }) => (
 // COMPOSANT PRINCIPAL - Teams
 // ============================================================================
 
-type TabType = 'equipes' | 'operateurs' | 'absences' | 'competences' | 'historique';
+type TabType = 'equipes' | 'operateurs' | 'absences' | 'competences';
 
 const Teams: React.FC = () => {
+  // Search context from Header
+  const { searchQuery, setPlaceholder } = useSearch();
+  const { showToast } = useToast();
+
   // State
   const [activeTab, setActiveTab] = useState<TabType>('equipes');
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
 
   // Data
@@ -754,31 +139,33 @@ const Teams: React.FC = () => {
   const [absencesAValider, setAbsencesAValider] = useState<Absence[]>([]);
   const [chefsPotentiels, setChefsPotentiels] = useState<OperateurList[]>([]);
   const [competences, setCompetences] = useState<Competence[]>([]);
+
+  // Pagination states
+  const [equipesPage, setEquipesPage] = useState(1);
+  const [equipesTotal, setEquipesTotal] = useState(0);
+  const [operateursPage, setOperateursPage] = useState(1);
+  const [operateursTotal, setOperateursTotal] = useState(0);
+  const [absencesPage, setAbsencesPage] = useState(1);
+  const [absencesTotal, setAbsencesTotal] = useState(0);
+
+  // Stats (pour barre KPI compacte)
   const [stats, setStats] = useState<{
     totalOperateurs: number;
     disponibles: number;
-    chefsEquipe: number;
     totalEquipes: number;
-    equipesCompletes: number;
     absencesEnAttente: number;
   } | null>(null);
 
+  const navigate = useNavigate();
+
   // Modals
   const [showCreateTeam, setShowCreateTeam] = useState(false);
-  const [selectedOperateur, setSelectedOperateur] = useState<OperateurDetail | null>(null);
   const [selectedEquipe, setSelectedEquipe] = useState<EquipeDetail | null>(null);
   const [editingUser, setEditingUser] = useState<Utilisateur | null>(null);
-  const [showCompetenceModal, setShowCompetenceModal] = useState(false);
-  const [editingCompetence, setEditingCompetence] = useState<Competence | null>(null);
-  const [deleteCompetenceId, setDeleteCompetenceId] = useState<number | null>(null);
   const [showCreateAbsence, setShowCreateAbsence] = useState(false);
   const [selectedAbsence, setSelectedAbsence] = useState<Absence | null>(null);
   const [editingAbsence, setEditingAbsence] = useState<Absence | null>(null);
   const [deleteAbsenceId, setDeleteAbsenceId] = useState<number | null>(null);
-  const [competenceSubTab, setCompetenceSubTab] = useState<'list' | 'matrix'>('list');
-
-  // Filtre competences
-  const [competenceFilter, setCompetenceFilter] = useState<string>('');
 
   // Filtres absences
   const [absenceFilters, setAbsenceFilters] = useState<{
@@ -795,9 +182,19 @@ const Teams: React.FC = () => {
 
   const [currentUser, setCurrentUser] = useState<Utilisateur | null>(null);
 
+  // Matrice compétences states
+  const [matrixViewMode, setMatrixViewMode] = useState<ViewMode>('cards');
+  const [matrixEditMode, setMatrixEditMode] = useState(false);
+  const [matrixNiveauFilter, setMatrixNiveauFilter] = useState<NiveauCompetence | ''>('');
+  const [matrixCategorieFilter, setMatrixCategorieFilter] = useState('');
+  const [matrixShowFilters, setMatrixShowFilters] = useState(false);
+
+  // Absences filters toggle
+  const [showAbsenceFilters, setShowAbsenceFilters] = useState(false);
+
   // Helpers rôles
   const isAdmin = !!currentUser?.roles?.includes('ADMIN');
-  const isChefEquipe = !!currentUser?.roles?.includes('CHEF_EQUIPE');
+  const isChefEquipe = !!currentUser?.roles?.includes('SUPERVISEUR');
   const isChefEquipeOnly = isChefEquipe && !isAdmin;
 
   // Debounce search query (300ms delay)
@@ -808,95 +205,152 @@ const Teams: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Load stable data once (currentUser - doesn't change during session)
+  // Update search placeholder based on active tab
   useEffect(() => {
-    loadStableData();
-    loadData();
+    const placeholders: Record<TabType, string> = {
+      equipes: 'Rechercher une équipe...',
+      operateurs: 'Rechercher un opérateur (nom, matricule)...',
+      competences: 'Voir la matrice de compétences...',
+      absences: 'Rechercher une absence (opérateur, motif, type)...'
+    };
+    setPlaceholder(placeholders[activeTab]);
+  }, [activeTab, setPlaceholder]);
+
+  // Load stable data once (currentUser + stats - doesn't change during session)
+  useEffect(() => {
+    const initializeData = async () => {
+      setLoading(true);
+      try {
+        // Load stable data first
+        await loadStableData();
+        // Then load initial tab data
+        await loadTabData(activeTab);
+      } catch (error) {
+        console.error('Erreur initialisation:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    initializeData();
   }, []);
+
+  // Lazy load data when tab changes
+  useEffect(() => {
+    if (stats) { // Only load if already initialized
+      loadTabData(activeTab);
+    }
+  }, [activeTab]);
 
   const loadStableData = async () => {
     try {
-      const currentUserRes = await fetchCurrentUser();
-      setCurrentUser(currentUserRes);
-    } catch (error) {
-      console.error('Erreur chargement user:', error);
-    }
-  };
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [
-        equipesRes,
-        operateursRes,
-        absencesRes,
-        absencesAValiderRes,
-        chefsPotentielsRes,
-        competencesRes,
-        statsRes,
-        utilisateursRes,
-        clientsRes
-      ] = await Promise.all([
-        fetchEquipes(),
-        fetchOperateurs(),
-        fetchAbsences(),
-        fetchAbsencesAValider(),
-        fetchChefsPotentiels(),
-        fetchCompetences(),
-        fetchStatistiquesUtilisateurs(),
-        fetchUtilisateurs(),
-        fetchClients()
+      const [currentUserRes, statsRes] = await Promise.all([
+        fetchCurrentUser(),
+        fetchStatistiquesUtilisateurs()
       ]);
-
-      setEquipes(equipesRes.results);
-      setOperateurs(operateursRes.results);
-      setAbsences(absencesRes.results);
-      setAbsencesAValider(absencesAValiderRes);
-      setChefsPotentiels(chefsPotentielsRes);
-      setCompetences(competencesRes);
-      setUtilisateurs(utilisateursRes.results);
-      setClients(clientsRes.results);
-      // Calculer chefs d'equipe à partir des rôles utilisateurs (un utilisateur peut être chef sans profil Operateur)
-      const users = (utilisateursRes && utilisateursRes.results) || [];
-      const parRoleCounts: Record<string, number> = {};
-      Object.keys(NOM_ROLE_LABELS).forEach(r => { parRoleCounts[r] = 0; });
-      users.forEach(u => {
-        (u.roles || []).forEach((r) => {
-          parRoleCounts[r] = (parRoleCounts[r] || 0) + 1;
-        });
-      });
-
+      setCurrentUser(currentUserRes);
       setStats({
         totalOperateurs: statsRes.operateurs.total,
         disponibles: statsRes.operateurs.disponiblesAujourdhui,
-        chefsEquipe: parRoleCounts['CHEF_EQUIPE'] || statsRes.operateurs.chefsEquipe || 0,
         totalEquipes: statsRes.equipes.total,
-        equipesCompletes: statsRes.equipes.statutsOperationnels.completes,
         absencesEnAttente: statsRes.absences.enAttente
       });
     } catch (error) {
-      console.error('Erreur chargement donnees:', error);
-    } finally {
-      setLoading(false);
+      console.error('Erreur chargement données stables:', error);
+    }
+  };
+
+  const loadTabData = async (tab: TabType) => {
+    try {
+      switch (tab) {
+        case 'equipes':
+          await loadEquipesData();
+          break;
+        case 'operateurs':
+          await loadOperateursData();
+          break;
+        case 'competences':
+          await loadCompetencesData();
+          break;
+        case 'absences':
+          await loadAbsencesData();
+          break;
+      }
+    } catch (error) {
+      console.error('Erreur chargement données:', error);
+      showToast('Erreur lors du chargement des données', 'error');
+    }
+  };
+
+  const loadEquipesData = async (page: number = equipesPage) => {
+    const [equipesRes, chefsPotentielsRes] = await Promise.all([
+      fetchEquipes({ page, pageSize: 50 }),
+      chefsPotentiels.length === 0 ? fetchChefsPotentiels() : Promise.resolve(chefsPotentiels)
+    ]);
+    setEquipes(equipesRes.results);
+    setEquipesTotal(equipesRes.count || 0);
+    if (chefsPotentiels.length === 0) {
+      setChefsPotentiels(chefsPotentielsRes);
+    }
+  };
+
+  const loadOperateursData = async (page: number = operateursPage) => {
+    // Only load what's needed - removed heavy utilisateurs and clients loading
+    const operateursRes = await fetchOperateurs({ page, pageSize: 50 });
+    setOperateurs(operateursRes.results);
+    setOperateursTotal(operateursRes.count || 0);
+  };
+
+  const loadCompetencesData = async () => {
+    if (competences.length > 0 && operateurs.length > 0) return; // Already loaded
+    const [competencesRes, operateursRes] = await Promise.all([
+      competences.length === 0 ? fetchCompetences() : Promise.resolve(competences),
+      // Reduced from 1000 to 200 - only load what's needed for competence matrix
+      operateurs.length === 0 ? fetchOperateurs({ pageSize: 200 }) : Promise.resolve({ results: operateurs })
+    ]);
+    if (competences.length === 0) {
+      setCompetences(competencesRes);
+    }
+    if (operateurs.length === 0) {
+      setOperateurs(operateursRes.results);
+    }
+  };
+
+  const loadAbsencesData = async (page: number = absencesPage) => {
+    const [absencesRes, absencesAValiderRes, operateursRes] = await Promise.all([
+      fetchAbsences({ page, pageSize: 50 }),
+      fetchAbsencesAValider(),
+      // Reduced from 1000 to 100 - only load what's visible
+      operateurs.length === 0 ? fetchOperateurs({ page: 1, pageSize: 100 }) : Promise.resolve({ results: operateurs })
+    ]);
+    setAbsences(absencesRes.results);
+    setAbsencesTotal(absencesRes.count || 0);
+    setAbsencesAValider(absencesAValiderRes);
+    if (operateurs.length === 0) {
+      setOperateurs(operateursRes.results);
+    }
+  };
+
+  // Refresh all data (called after create/update/delete)
+  const loadData = async () => {
+    await loadTabData(activeTab);
+    // Refresh stats bar
+    try {
+      const statsRes = await fetchStatistiquesUtilisateurs();
+      setStats({
+        totalOperateurs: statsRes.operateurs.total,
+        disponibles: statsRes.operateurs.disponiblesAujourdhui,
+        totalEquipes: statsRes.equipes.total,
+        absencesEnAttente: statsRes.absences.enAttente
+      });
+    } catch (error) {
+      console.error('Erreur refresh stats:', error);
     }
   };
 
   // Handlers
   const handleViewOperateur = async (operateurId: number) => {
-    try {
-      const detail = await fetchOperateurById(operateurId);
-      // Enrich with competence details
-      const enriched = {
-        ...detail,
-        competencesDetail: detail.competencesDetail.map(comp => ({
-          ...comp,
-          competenceDetail: competences.find(c => c.id === comp.competence)
-        }))
-      };
-      setSelectedOperateur(enriched);
-    } catch (error) {
-      console.error('Erreur chargement operateur:', error);
-    }
+    // Navigate to operateur detail page instead of opening modal
+    navigate(`/operateurs/${operateurId}`);
   };
 
   const handleViewEquipe = async (equipeId: number) => {
@@ -935,8 +389,8 @@ const Teams: React.FC = () => {
     ), [equipes, debouncedSearchQuery]);
 
   const filteredOperateurs = useMemo(() => operateurs.filter(o =>
-    o.fullName.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-    o.numeroImmatriculation.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+    (o.fullName || '').toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+    (o.numeroImmatriculation || '').toLowerCase().includes(debouncedSearchQuery.toLowerCase())
   ), [operateurs, debouncedSearchQuery]);
 
   const filteredAbsences = useMemo(() => absences.filter(a => {
@@ -972,35 +426,26 @@ const Teams: React.FC = () => {
 
   const operateursSansEquipe = operateurs.filter(o => o.equipe === null && o.actif);
 
-  // Filtrage des competences
-  const filteredCompetences = useMemo(() => competences.filter(c => {
-    // Filtre par recherche
-    if (debouncedSearchQuery) {
-      const query = debouncedSearchQuery.toLowerCase();
-      const matchNom = c.nomCompetence.toLowerCase().includes(query);
-      const matchDescription = c.description?.toLowerCase().includes(query);
-      const matchCategorie = CATEGORIE_COMPETENCE_LABELS[c.categorie]?.toLowerCase().includes(query);
-      if (!matchNom && !matchDescription && !matchCategorie) {
-        return false;
+  // Get unique categories from competences
+  const competenceCategories = useMemo(() => {
+    const cats = new Set<string>();
+    competences.forEach(c => {
+      if (c.categorieDisplay || c.categorie) {
+        cats.add(c.categorieDisplay || c.categorie);
       }
-    }
-    // Filtre par categorie
-    if (competenceFilter && c.categorie !== competenceFilter) {
-      return false;
-    }
-    return true;
-  }).sort((a, b) => (a.ordreAffichage || 0) - (b.ordreAffichage || 0)), [competences, debouncedSearchQuery, competenceFilter]);
-
+    });
+    return Array.from(cats);
+  }, [competences]);
 
   // Columns
   const [editEquipe, setEditEquipe] = useState<EquipeList | null>(null);
   const [deleteEquipeId, setDeleteEquipeId] = useState<number | null>(null);
   const [deleteOperateurId, setDeleteOperateurId] = useState<number | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
 
   const equipesColumns: Column<EquipeList>[] = [
     { key: 'nomEquipe', label: 'Nom' },
-    { key: 'chefEquipeNom', label: "Chef d'equipe" },
+    { key: 'chefEquipeNom', label: "Chef d'équipe", render: (e) => e.chefEquipeNom || '-' },
+    { key: 'superviseurNom', label: 'Superviseur', render: (e) => e.superviseurNom || '-' },
     {
       key: 'nombreMembres',
       label: 'Membres',
@@ -1009,18 +454,7 @@ const Teams: React.FC = () => {
     {
       key: 'statutOperationnel',
       label: 'Statut',
-      render: (e) => <StatutEquipeBadge statut={e.statutOperationnel} />,
-      sortable: false
-    },
-    {
-      key: 'actif',
-      label: 'Actif',
-      render: (e) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${e.actif ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-          }`}>
-          {e.actif ? 'Oui' : 'Non'}
-        </span>
-      ),
+      render: (e) => <StatusBadge variant="status" type="equipe" value={e.statutOperationnel || ''} />,
       sortable: false
     },
     {
@@ -1063,33 +497,13 @@ const Teams: React.FC = () => {
 
   const operateursColumns: Column<OperateurList>[] = [
     { key: 'numeroImmatriculation', label: 'Matricule' },
-    { key: 'fullName', label: 'Nom' },
-    { key: 'equipeNom', label: 'Equipe', render: (o) => o.equipeNom || '-' },
+    { key: 'nom', label: 'Nom' },
+    { key: 'prenom', label: 'Prénom' },
+    { key: 'equipeNom', label: 'Équipe', render: (o) => o.equipeNom || '-' },
     {
       key: 'statut',
       label: 'Statut',
-      render: (o) => <StatutOperateurBadge statut={o.statut} />,
-      sortable: false
-    },
-    {
-      key: 'estChefEquipe',
-      label: "Chef d'equipe",
-      render: (o) => o.estChefEquipe ? (
-        <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
-          Oui
-        </span>
-      ) : '-',
-      sortable: false
-    },
-    {
-      key: 'estDisponible',
-      label: 'Disponible',
-      render: (o) => (
-        <span className={`inline-flex items-center gap-1 ${o.estDisponible ? 'text-green-600' : 'text-red-600'
-          }`}>
-          {o.estDisponible ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
-        </span>
-      ),
+      render: (o) => <StatusBadge variant="status" type="operateur" value={o.statut || ''} />,
       sortable: false
     },
     {
@@ -1102,14 +516,14 @@ const Teams: React.FC = () => {
               <button
                 className="p-1 text-blue-600 hover:bg-blue-100 rounded"
                 title="Modifier"
-                onClick={(ev) => { ev.stopPropagation(); const u = utilisateurs.find(us => us.id === o.utilisateur); if (u) setEditingUser(u); }}
+                onClick={(ev) => { ev.stopPropagation(); const u = utilisateurs.find(us => us.id === o.id); if (u) setEditingUser(u); }}
               >
                 <Edit2 className="w-4 h-4" />
               </button>
               <button
                 className="p-1 text-red-600 hover:bg-red-100 rounded"
                 title="Supprimer"
-                onClick={(ev) => { ev.stopPropagation(); setDeleteOperateurId(o.utilisateur); }}
+                onClick={(ev) => { ev.stopPropagation(); setDeleteOperateurId(o.id); }}
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -1119,7 +533,7 @@ const Teams: React.FC = () => {
             <button
               className="p-1 text-gray-600 hover:bg-gray-100 rounded"
               title="Voir détails"
-              onClick={(ev) => { ev.stopPropagation(); handleViewOperateur(o.utilisateur); }}
+              onClick={(ev) => { ev.stopPropagation(); handleViewOperateur(o.id); }}
             >
               <Eye className="w-4 h-4" />
             </button>
@@ -1131,15 +545,39 @@ const Teams: React.FC = () => {
   ];
 
   const absencesColumns: Column<Absence>[] = [
-    { key: 'operateurNom', label: 'Operateur' },
+    {
+      key: 'operateurNom',
+      label: 'Opérateur',
+      render: (a) => (
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
+            {a.operateurNom?.split(' ').map(n => n[0]).join('').substring(0, 2) || '??'}
+          </div>
+          <span className="font-semibold text-gray-900">{a.operateurNom}</span>
+        </div>
+      )
+    },
     {
       key: 'typeAbsence',
       label: 'Type',
       render: (a) => {
-        const safe = getBadgeColors(TYPE_ABSENCE_COLORS, a.typeAbsence);
+        const typeIcons = {
+          CONGE: <Umbrella className="w-4 h-4" />,
+          MALADIE: <HeartPulse className="w-4 h-4" />,
+          FORMATION: <GraduationCap className="w-4 h-4" />,
+          AUTRE: <MoreHorizontal className="w-4 h-4" />
+        };
+        const typeColors = {
+          CONGE: 'bg-blue-100 text-blue-700 border-blue-300',
+          MALADIE: 'bg-red-100 text-red-700 border-red-300',
+          FORMATION: 'bg-purple-100 text-purple-700 border-purple-300',
+          AUTRE: 'bg-gray-100 text-gray-700 border-gray-300'
+        };
+        const type = a.typeAbsence as keyof typeof typeIcons;
         return (
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${safe.bg} ${safe.text}`}>
-            {TYPE_ABSENCE_LABELS[a.typeAbsence]}
+          <span className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg font-semibold border-2 ${typeColors[type] || typeColors.AUTRE}`}>
+            {typeIcons[type] || typeIcons.AUTRE}
+            <span>{TYPE_ABSENCE_LABELS[type]}</span>
           </span>
         );
       },
@@ -1147,34 +585,73 @@ const Teams: React.FC = () => {
     },
     {
       key: 'dateDebut',
-      label: 'Debut',
-      render: (a) => new Date(a.dateDebut).toLocaleDateString('fr-FR')
+      label: 'Début',
+      render: (a) => (
+        <div className="flex items-center gap-2">
+          <CalendarCheck className="w-4 h-4 text-gray-400" />
+          <span className="text-sm font-medium text-gray-700">
+            {new Date(a.dateDebut).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+          </span>
+        </div>
+      )
     },
     {
       key: 'dateFin',
       label: 'Fin',
-      render: (a) => new Date(a.dateFin).toLocaleDateString('fr-FR')
+      render: (a) => (
+        <div className="flex items-center gap-2">
+          <CalendarClock className="w-4 h-4 text-gray-400" />
+          <span className="text-sm font-medium text-gray-700">
+            {new Date(a.dateFin).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+          </span>
+        </div>
+      )
     },
     {
       key: 'dureeJours',
-      label: 'Duree',
-      render: (a) => `${a.dureeJours} jour${a.dureeJours > 1 ? 's' : ''}`
+      label: 'Durée',
+      render: (a) => (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-semibold border border-emerald-200">
+          <Clock className="w-3.5 h-3.5" />
+          {a.dureeJours} jour{a.dureeJours > 1 ? 's' : ''}
+        </span>
+      )
     },
     {
       key: 'statut',
       label: 'Statut',
-      render: (a) => <StatutAbsenceBadge statut={a.statut} />,
+      render: (a) => {
+        const statutIcons = {
+          DEMANDEE: <Clock className="w-4 h-4" />,
+          VALIDEE: <CheckCircle2 className="w-4 h-4" />,
+          REFUSEE: <XCircle className="w-4 h-4" />,
+          ANNULEE: <Ban className="w-4 h-4" />
+        };
+        const statutColors = {
+          DEMANDEE: 'bg-orange-100 text-orange-700 border-orange-300',
+          VALIDEE: 'bg-green-100 text-green-700 border-green-300',
+          REFUSEE: 'bg-red-100 text-red-700 border-red-300',
+          ANNULEE: 'bg-gray-100 text-gray-700 border-gray-300'
+        };
+        const statut = a.statut as keyof typeof statutIcons;
+        return (
+          <span className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg font-semibold border-2 ${statutColors[statut] || statutColors.DEMANDEE}`}>
+            {statutIcons[statut] || statutIcons.DEMANDEE}
+            <span>{STATUT_ABSENCE_LABELS[statut]}</span>
+          </span>
+        );
+      },
       sortable: false
     },
     {
       key: 'id',
       label: 'Actions',
       render: (a) => (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={(e) => { e.stopPropagation(); setSelectedAbsence(a); }}
-            className="p-1 text-gray-600 hover:bg-gray-100 rounded"
-            title="Voir details"
+            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors shadow-sm border border-gray-200"
+            title="Voir détails"
           >
             <Eye className="w-4 h-4" />
           </button>
@@ -1184,7 +661,7 @@ const Teams: React.FC = () => {
               {(a.statut === 'DEMANDEE' || a.statut === 'VALIDEE') && (
                 <button
                   onClick={(e) => { e.stopPropagation(); setEditingAbsence(a); }}
-                  className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-sm border border-blue-200"
                   title="Modifier"
                 >
                   <Edit2 className="w-4 h-4" />
@@ -1194,14 +671,14 @@ const Teams: React.FC = () => {
                 <>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleValiderAbsence(a.id); }}
-                    className="p-1 text-green-600 hover:bg-green-100 rounded"
+                    className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors shadow-sm border border-green-200"
                     title="Valider"
                   >
                     <Check className="w-4 h-4" />
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleRefuserAbsence(a.id); }}
-                    className="p-1 text-red-600 hover:bg-red-100 rounded"
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors shadow-sm border border-red-200"
                     title="Refuser"
                   >
                     <X className="w-4 h-4" />
@@ -1211,7 +688,7 @@ const Teams: React.FC = () => {
               {(a.statut === 'DEMANDEE' || a.statut === 'VALIDEE') && (
                 <button
                   onClick={(e) => { e.stopPropagation(); setDeleteAbsenceId(a.id); }}
-                  className="p-1 text-red-600 hover:bg-red-100 rounded"
+                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors shadow-sm border border-red-200"
                   title="Supprimer (annuler)"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -1225,650 +702,877 @@ const Teams: React.FC = () => {
     }
   ];
 
-  const competencesColumns: Column<Competence>[] = [
-    { key: 'nomCompetence', label: 'Compétence' },
-    { key: 'categorieDisplay', label: 'Catégorie', render: (c: Competence) => c.categorieDisplay || c.categorie },
-    { key: 'ordreAffichage', label: 'Ordre', render: (c: Competence) => String(c.ordreAffichage || 0) },
-    {
-      key: 'actions',
-      label: 'Actions',
-      render: (c: Competence) => !isChefEquipeOnly ? (
-        <div className="flex items-center gap-2">
-          <button
-            className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-            onClick={() => { setEditingCompetence(c); setShowCompetenceModal(true); }}
-            title="Editer"
-          >
-            <Edit2 className="w-4 h-4" />
-          </button>
-          <button
-            className="p-1 text-red-600 hover:bg-red-100 rounded"
-            onClick={() => setDeleteCompetenceId(c.id)}
-            title="Supprimer"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
-      ) : (
-        <span className="text-gray-400 text-xs">-</span>
-      ),
-      sortable: false
-    }
-  ];
-
-
-
-  if (loading) {
+  if (loading && !stats) {
     return (
-      <div className="p-6 h-full flex items-center justify-center">
+      <div className="p-6 h-full flex flex-col items-center justify-center gap-4">
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-emerald-500 border-t-transparent"></div>
+        <p className="text-sm text-slate-500">Chargement des données...</p>
       </div>
     );
   }
 
   return (
-    <div className="p-4 sm:p-6 h-full flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 flex-shrink-0">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestion RH</h1>
-          <p className="text-gray-500 mt-1">Equipes, operateurs et absences</p>
-        </div>
-        {!isChefEquipeOnly && (
-          <button
-            onClick={() => setShowCreateTeam(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
-          >
-            <Plus className="w-4 h-4" />
-            Nouvelle equipe
-          </button>
-        )}
-      </div>
-
-      {/* Stats Cards */}
+    <div className="p-6 h-full flex flex-col gap-6">
+      {/* Barre KPI Moderne - Toujours visible */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6 flex-shrink-0">
-          <StatCard
-            icon={<Users className="w-5 h-5 text-blue-600" />}
-            label="Operateurs"
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 flex-shrink-0">
+          <StatCardCompact
+            icon={<Users className="w-5 h-5 text-blue-500" />}
+            label="Total Opérateurs"
             value={stats.totalOperateurs}
-            color="bg-blue-100"
+            color="bg-blue-500"
           />
-          <StatCard
-            icon={<Award className="w-5 h-5 text-yellow-600" />}
-            label="Chefs d'equipe"
-            value={stats.chefsEquipe}
-            color="bg-yellow-100"
-          />
-          <StatCard
-            icon={<UserCheck className="w-5 h-5 text-green-600" />}
+          <StatCardCompact
+            icon={<UserCheck className="w-5 h-5 text-emerald-500" />}
             label="Disponibles"
             value={stats.disponibles}
-            color="bg-green-100"
+            color="bg-emerald-500"
           />
-          <StatCard
-            icon={<Users className="w-5 h-5 text-purple-600" />}
-            label="Equipes"
+          <StatCardCompact
+            icon={<Users className="w-5 h-5 text-purple-500" />}
+            label="Équipes"
             value={stats.totalEquipes}
-            color="bg-purple-100"
+            color="bg-purple-500"
           />
-          <StatCard
-            icon={<Check className="w-5 h-5 text-emerald-600" />}
-            label="Completes"
-            value={stats.equipesCompletes}
-            color="bg-emerald-100"
-          />
-          <StatCard
-            icon={<Clock className="w-5 h-5 text-orange-600" />}
+          <StatCardCompact
+            icon={<Clock className="w-5 h-5 text-orange-500" />}
             label="Absences en attente"
             value={stats.absencesEnAttente}
-            color="bg-orange-100"
+            color="bg-orange-500"
           />
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="mb-4 flex border-b border-gray-200 flex-shrink-0">
-        <button
-          onClick={() => setActiveTab('equipes')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'equipes'
-            ? 'border-emerald-500 text-emerald-600'
-            : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-        >
-          <span className="flex items-center gap-2">
+      {/* Toolbar - Tabs et Actions */}
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex-shrink-0">
+        {/* Left: Main Tabs */}
+        <div className="flex items-center bg-gray-100 p-1 rounded-lg">
+          <button
+            onClick={() => setActiveTab('equipes')}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'equipes'
+              ? 'bg-white text-emerald-700 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
+          >
             <Users className="w-4 h-4" />
-            Equipes ({equipes.length})
-          </span>
-        </button>
-        <button
-          onClick={() => setActiveTab('operateurs')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'operateurs'
-            ? 'border-emerald-500 text-emerald-600'
-            : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-        >
-          <span className="flex items-center gap-2">
+            Équipes
+          </button>
+          <button
+            onClick={() => setActiveTab('operateurs')}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'operateurs'
+              ? 'bg-white text-emerald-700 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
+          >
             <UserCheck className="w-4 h-4" />
-            Operateurs ({operateurs.length})
-          </span>
-        </button>
-        <button
-          onClick={() => setActiveTab('competences')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'competences'
-            ? 'border-emerald-500 text-emerald-600'
-            : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-        >
-          <span className="flex items-center gap-2">
-            <Award className="w-4 h-4" />
-            Gestion des compétences ({competences.length})
-          </span>
-        </button>
-        <button
-          onClick={() => setActiveTab('absences')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'absences'
-            ? 'border-emerald-500 text-emerald-600'
-            : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-        >
-          <span className="flex items-center gap-2">
+            Opérateurs
+          </button>
+          <button
+            onClick={() => setActiveTab('absences')}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'absences'
+              ? 'bg-white text-emerald-700 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
+          >
             <Calendar className="w-4 h-4" />
-            Absences ({absences.length})
-            {absencesAValider.length > 0 && (
-              <span className="px-1.5 py-0.5 bg-orange-500 text-white text-xs rounded-full">
-                {absencesAValider.length}
+            <span>Absences</span>
+            {stats && stats.absencesEnAttente > 0 && (
+              <span className="px-1.5 py-0.5 bg-orange-500 text-white text-xs rounded-full font-bold">
+                {stats.absencesEnAttente}
               </span>
             )}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('historique')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'historique'
-            ? 'border-emerald-500 text-emerald-600'
-            : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-        >
-          <span className="flex items-center gap-2">
-            <Clock className="w-4 h-4" />
-            Historique RH
-          </span>
-        </button>
-      </div>
-
-      {/* Search */}
-      <div className="mb-4 flex-shrink-0">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-          />
+          </button>
+          <button
+            onClick={() => setActiveTab('competences')}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'competences'
+              ? 'bg-white text-emerald-700 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
+          >
+            <Award className="w-4 h-4" />
+            Compétences
+          </button>
         </div>
-      </div>
 
-      {/* Content */}
-      <div className="flex-1 min-h-0 bg-white rounded-lg border border-gray-200 overflow-hidden">
-        {activeTab === 'equipes' && (
-          <div className="h-full overflow-auto">
-            <DataTable
-              data={filteredEquipes}
-              columns={equipesColumns}
-              itemsPerPage={10}
-              onRowClick={(equipe) => handleViewEquipe(equipe.id)}
-            />
-          </div>
-        )}
+        {/* Right: Action Buttons */}
+        <div className="flex items-center gap-2.5">
+          {/* Competences Tab Controls */}
+          {activeTab === 'competences' && (
+            <>
+              {/* Edit Mode Toggle - Icon only */}
+              <button
+                onClick={() => setMatrixEditMode(!matrixEditMode)}
+                className={`p-2.5 rounded-lg transition-all duration-200 ${
+                  matrixEditMode
+                    ? 'bg-orange-500 text-white shadow-md hover:bg-orange-600'
+                    : 'bg-blue-500 text-white shadow-md hover:bg-blue-600'
+                }`}
+                title={matrixEditMode ? 'Mode consultation' : 'Mode édition'}
+              >
+                {matrixEditMode ? (
+                  <Eye className="w-4 h-4" />
+                ) : (
+                  <Edit3 className="w-4 h-4" />
+                )}
+              </button>
 
-        {activeTab === 'operateurs' && (
-          <div className="h-full overflow-auto">
-            <DataTable
-              data={filteredOperateurs}
-              columns={operateursColumns}
-              itemsPerPage={10}
-              onRowClick={(op) => handleViewOperateur(op.utilisateur)}
-            />
-          </div>
-        )}
+              {/* Separator */}
+              <div className="h-8 w-px bg-gray-300"></div>
 
-        {activeTab === 'absences' && (
-          <div className="flex flex-col h-full overflow-hidden">
-            {/* Header avec titre et bouton */}
-            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center gap-4">
-                <h2 className="text-lg font-semibold">Gestion des absences</h2>
-                <span className="text-sm text-gray-500">
-                  {filteredAbsences.length} resultat{filteredAbsences.length > 1 ? 's' : ''}
-                  {(searchQuery || absenceFilters.statut || absenceFilters.typeAbsence || absenceFilters.dateDebut || absenceFilters.dateFin) && (
-                    <span className="text-emerald-600 ml-1">(filtres actifs)</span>
-                  )}
-                </span>
-                {searchQuery && (
-                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs flex items-center gap-1">
-                    <Search className="w-3 h-3" />
-                    "{searchQuery}"
+              {/* View Mode Toggle - Icons only */}
+              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setMatrixViewMode('cards')}
+                  className={`p-2 rounded-md transition-all duration-200 ${
+                    matrixViewMode === 'cards'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-gray-600 hover:bg-white hover:text-gray-900'
+                  }`}
+                  title="Vue cartes"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setMatrixViewMode('table')}
+                  className={`p-2 rounded-md transition-all duration-200 ${
+                    matrixViewMode === 'table'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-gray-600 hover:bg-white hover:text-gray-900'
+                  }`}
+                  title="Vue tableau"
+                >
+                  <Table className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Separator */}
+              <div className="h-8 w-px bg-gray-300"></div>
+
+              {/* Filters Toggle - Icon only */}
+              <button
+                onClick={() => setMatrixShowFilters(!matrixShowFilters)}
+                className={`relative p-2.5 rounded-lg transition-all duration-200 ${
+                  matrixShowFilters || matrixNiveauFilter || matrixCategorieFilter
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 shadow-sm'
+                }`}
+                title="Filtres"
+              >
+                <Filter className="w-4 h-4" />
+                {(matrixNiveauFilter || matrixCategorieFilter) && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold shadow">
+                    {(matrixNiveauFilter ? 1 : 0) + (matrixCategorieFilter ? 1 : 0)}
                   </span>
                 )}
-              </div>
-              {!isChefEquipeOnly && (
-                <button
-                  onClick={() => setShowCreateAbsence(true)}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm"
-                >
-                  <Plus className="w-4 h-4" /> Nouvelle absence
-                </button>
-              )}
-            </div>
+              </button>
 
-            {/* Filtres compacts */}
-            <div className="px-4 py-2 border-b border-gray-200 bg-gray-50 flex-shrink-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <select
-                  value={absenceFilters.statut}
-                  onChange={(e) => setAbsenceFilters({ ...absenceFilters, statut: e.target.value })}
-                  className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
-                >
-                  <option value="">Tous statuts</option>
-                  {Object.entries(STATUT_ABSENCE_LABELS).map(([key, label]) => (
-                    <option key={key} value={key}>{label}</option>
-                  ))}
-                </select>
-                <select
-                  value={absenceFilters.typeAbsence}
-                  onChange={(e) => setAbsenceFilters({ ...absenceFilters, typeAbsence: e.target.value })}
-                  className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
-                >
-                  <option value="">Tous types</option>
-                  {Object.entries(TYPE_ABSENCE_LABELS).map(([key, label]) => (
-                    <option key={key} value={key}>{label}</option>
-                  ))}
-                </select>
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-gray-500">Du</span>
+              {/* Inline Filters - Custom selects with icons */}
+              {matrixShowFilters && (
+                <>
+                  {/* Niveau Filter */}
+                  <Listbox value={matrixNiveauFilter} onChange={setMatrixNiveauFilter}>
+                    <div className="relative">
+                      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]">
+                        <BarChart3 className="w-4 h-4 text-gray-500" />
+                        <span className="flex-1 text-left">
+                          {matrixNiveauFilter === '' && 'Niveau'}
+                          {matrixNiveauFilter === 'NON' && 'Aucune'}
+                          {matrixNiveauFilter === 'DEBUTANT' && 'Débutant'}
+                          {matrixNiveauFilter === 'INTERMEDIAIRE' && 'Intermédiaire'}
+                          {matrixNiveauFilter === 'EXPERT' && 'Expert'}
+                        </span>
+                        <ChevronDown className="w-4 h-4 text-gray-400" />
+                      </Listbox.Button>
+                      <Transition
+                        as={React.Fragment}
+                        leave="transition ease-in duration-100"
+                        leaveFrom="opacity-100"
+                        leaveTo="opacity-0"
+                      >
+                        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                          <Listbox.Option
+                            value=""
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 px-3 ${
+                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <BarChart3 className="w-4 h-4 text-gray-500" />
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>
+                                  Niveau
+                                </span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                          <Listbox.Option
+                            value="NON"
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 px-3 ${
+                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <Ban className="w-4 h-4 text-red-500" />
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>
+                                  Aucune
+                                </span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                          <Listbox.Option
+                            value="DEBUTANT"
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 px-3 ${
+                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <Star className="w-4 h-4 text-orange-500" />
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>
+                                  Débutant
+                                </span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                          <Listbox.Option
+                            value="INTERMEDIAIRE"
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 px-3 ${
+                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <TrendingUp className="w-4 h-4 text-blue-500" />
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>
+                                  Intermédiaire
+                                </span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                          <Listbox.Option
+                            value="EXPERT"
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 px-3 ${
+                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <CheckCircle className="w-4 h-4 text-green-500" />
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>
+                                  Expert
+                                </span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                        </Listbox.Options>
+                      </Transition>
+                    </div>
+                  </Listbox>
+
+                  {/* Categorie Filter */}
+                  <Listbox value={matrixCategorieFilter} onChange={setMatrixCategorieFilter}>
+                    <div className="relative">
+                      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]">
+                        <FolderOpen className="w-4 h-4 text-gray-500" />
+                        <span className="flex-1 text-left truncate">
+                          {matrixCategorieFilter || 'Catégorie'}
+                        </span>
+                        <ChevronDown className="w-4 h-4 text-gray-400" />
+                      </Listbox.Button>
+                      <Transition
+                        as={React.Fragment}
+                        leave="transition ease-in duration-100"
+                        leaveFrom="opacity-100"
+                        leaveTo="opacity-0"
+                      >
+                        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                          <Listbox.Option
+                            value=""
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 px-3 ${
+                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <FolderOpen className="w-4 h-4 text-gray-500" />
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>
+                                  Catégorie
+                                </span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                          {competenceCategories.map(cat => (
+                            <Listbox.Option
+                              key={cat}
+                              value={cat}
+                              className={({ active }) =>
+                                `relative cursor-pointer select-none py-2 px-3 ${
+                                  active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                                }`
+                              }
+                            >
+                              {({ selected }) => (
+                                <span className={`block truncate ${selected ? 'font-semibold' : 'font-normal'}`}>
+                                  {cat}
+                                </span>
+                              )}
+                            </Listbox.Option>
+                          ))}
+                        </Listbox.Options>
+                      </Transition>
+                    </div>
+                  </Listbox>
+
+                  {(matrixNiveauFilter || matrixCategorieFilter) && (
+                    <button
+                      onClick={() => {
+                        setMatrixNiveauFilter('');
+                        setMatrixCategorieFilter('');
+                      }}
+                      className="p-2.5 rounded-lg text-red-600 hover:bg-red-50 transition-all duration-200 border border-red-200 hover:border-red-300 shadow-sm"
+                      title="Réinitialiser les filtres"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </>
+              )}
+
+              {/* Separator */}
+              <div className="h-8 w-px bg-gray-300"></div>
+
+              {/* Refresh Button - Icon only */}
+              <button
+                onClick={loadData}
+                className="p-2.5 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 shadow-sm"
+                title="Rafraîchir"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+            </>
+          )}
+
+          {/* Absences Tab Controls */}
+          {activeTab === 'absences' && (
+            <>
+              {/* Filters Toggle - Icon only */}
+              <button
+                onClick={() => setShowAbsenceFilters(!showAbsenceFilters)}
+                className={`relative p-2.5 rounded-lg transition-all duration-200 ${
+                  showAbsenceFilters || absenceFilters.statut || absenceFilters.typeAbsence || absenceFilters.dateDebut || absenceFilters.dateFin
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 shadow-sm'
+                }`}
+                title="Filtres"
+              >
+                <Filter className="w-4 h-4" />
+                {(absenceFilters.statut || absenceFilters.typeAbsence || absenceFilters.dateDebut || absenceFilters.dateFin) && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold shadow">
+                    {(absenceFilters.statut ? 1 : 0) + (absenceFilters.typeAbsence ? 1 : 0) + (absenceFilters.dateDebut ? 1 : 0) + (absenceFilters.dateFin ? 1 : 0)}
+                  </span>
+                )}
+              </button>
+
+              {/* Inline Filters - Custom selects with icons */}
+              {showAbsenceFilters && (
+                <>
+                  {/* Statut Filter */}
+                  <Listbox value={absenceFilters.statut} onChange={(val) => setAbsenceFilters({ ...absenceFilters, statut: val })}>
+                    <div className="relative">
+                      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]">
+                        <CalendarCheck className="w-4 h-4 text-gray-500" />
+                        <span className="flex-1 text-left">
+                          {absenceFilters.statut === '' && 'Statut'}
+                          {absenceFilters.statut === 'DEMANDEE' && 'Demandée'}
+                          {absenceFilters.statut === 'VALIDEE' && 'Validée'}
+                          {absenceFilters.statut === 'REFUSEE' && 'Refusée'}
+                          {absenceFilters.statut === 'ANNULEE' && 'Annulée'}
+                        </span>
+                        <ChevronDown className="w-4 h-4 text-gray-400" />
+                      </Listbox.Button>
+                      <Transition
+                        as={React.Fragment}
+                        leave="transition ease-in duration-100"
+                        leaveFrom="opacity-100"
+                        leaveTo="opacity-0"
+                      >
+                        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                          <Listbox.Option
+                            value=""
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 px-3 ${
+                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <CalendarCheck className="w-4 h-4 text-gray-500" />
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>
+                                  Tous statuts
+                                </span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                          <Listbox.Option
+                            value="DEMANDEE"
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 px-3 ${
+                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <Clock className="w-4 h-4 text-orange-500" />
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>
+                                  Demandée
+                                </span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                          <Listbox.Option
+                            value="VALIDEE"
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 px-3 ${
+                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>
+                                  Validée
+                                </span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                          <Listbox.Option
+                            value="REFUSEE"
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 px-3 ${
+                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <XCircle className="w-4 h-4 text-red-500" />
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>
+                                  Refusée
+                                </span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                          <Listbox.Option
+                            value="ANNULEE"
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 px-3 ${
+                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <Ban className="w-4 h-4 text-gray-500" />
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>
+                                  Annulée
+                                </span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                        </Listbox.Options>
+                      </Transition>
+                    </div>
+                  </Listbox>
+
+                  {/* Type Filter */}
+                  <Listbox value={absenceFilters.typeAbsence} onChange={(val) => setAbsenceFilters({ ...absenceFilters, typeAbsence: val })}>
+                    <div className="relative">
+                      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]">
+                        <CalendarClock className="w-4 h-4 text-gray-500" />
+                        <span className="flex-1 text-left truncate">
+                          {absenceFilters.typeAbsence === '' && 'Type'}
+                          {absenceFilters.typeAbsence === 'CONGE' && 'Congé'}
+                          {absenceFilters.typeAbsence === 'MALADIE' && 'Maladie'}
+                          {absenceFilters.typeAbsence === 'FORMATION' && 'Formation'}
+                          {absenceFilters.typeAbsence === 'AUTRE' && 'Autre'}
+                        </span>
+                        <ChevronDown className="w-4 h-4 text-gray-400" />
+                      </Listbox.Button>
+                      <Transition
+                        as={React.Fragment}
+                        leave="transition ease-in duration-100"
+                        leaveFrom="opacity-100"
+                        leaveTo="opacity-0"
+                      >
+                        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                          <Listbox.Option
+                            value=""
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 px-3 ${
+                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <CalendarClock className="w-4 h-4 text-gray-500" />
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>
+                                  Tous types
+                                </span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                          <Listbox.Option
+                            value="CONGE"
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 px-3 ${
+                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <Umbrella className="w-4 h-4 text-blue-500" />
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>
+                                  Congé
+                                </span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                          <Listbox.Option
+                            value="MALADIE"
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 px-3 ${
+                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <HeartPulse className="w-4 h-4 text-red-500" />
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>
+                                  Maladie
+                                </span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                          <Listbox.Option
+                            value="FORMATION"
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 px-3 ${
+                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <GraduationCap className="w-4 h-4 text-purple-500" />
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>
+                                  Formation
+                                </span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                          <Listbox.Option
+                            value="AUTRE"
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 px-3 ${
+                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <MoreHorizontal className="w-4 h-4 text-gray-500" />
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>
+                                  Autre
+                                </span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                        </Listbox.Options>
+                      </Transition>
+                    </div>
+                  </Listbox>
+
+                  {/* Date Filters */}
                   <input
                     type="date"
                     value={absenceFilters.dateDebut}
                     onChange={(e) => setAbsenceFilters({ ...absenceFilters, dateDebut: e.target.value })}
-                    className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
+                    placeholder="Date début"
+                    className="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all hover:border-gray-300 shadow-sm cursor-pointer"
                   />
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-gray-500">Au</span>
                   <input
                     type="date"
                     value={absenceFilters.dateFin}
                     onChange={(e) => setAbsenceFilters({ ...absenceFilters, dateFin: e.target.value })}
-                    className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
+                    placeholder="Date fin"
+                    className="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all hover:border-gray-300 shadow-sm cursor-pointer"
                   />
-                </div>
-                {(absenceFilters.statut || absenceFilters.typeAbsence || absenceFilters.dateDebut || absenceFilters.dateFin) && (
-                  <button
-                    onClick={() => setAbsenceFilters({ statut: '', typeAbsence: '', dateDebut: '', dateFin: '' })}
-                    className="px-2 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1"
-                  >
-                    <X className="w-3 h-3" /> Effacer
-                  </button>
-                )}
-              </div>
-            </div>
 
-            {/* Tableau */}
-            <div className="flex-1 min-h-0 overflow-auto">
-              <DataTable
-                data={filteredAbsences}
-                columns={absencesColumns}
-                itemsPerPage={10}
-              />
-            </div>
-          </div>
-        )}
-        {activeTab === 'competences' && (
-          <div className="flex flex-col h-full overflow-hidden">
-            {/* Sub-tabs */}
-            <div className="flex border-b border-gray-200 px-4 flex-shrink-0 bg-white">
-              <button
-                onClick={() => setCompetenceSubTab('list')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${competenceSubTab === 'list'
-                  ? 'border-emerald-500 text-emerald-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
-              >
-                Liste des competences
-              </button>
-              <button
-                onClick={() => setCompetenceSubTab('matrix')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${competenceSubTab === 'matrix'
-                  ? 'border-emerald-500 text-emerald-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
-              >
-                Matrice operateurs
-              </button>
-            </div>
-
-            {/* List view */}
-            {competenceSubTab === 'list' && (
-              <div className="flex flex-col h-full overflow-hidden">
-                {/* Header compact avec filtres intégrés */}
-                <div className="px-4 py-2 border-b border-gray-200 flex items-center justify-between flex-shrink-0 bg-gray-50">
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-base font-semibold">Competences</h2>
-                    <span className="text-xs text-gray-500">
-                      {filteredCompetences.length} resultat{filteredCompetences.length > 1 ? 's' : ''}
-                    </span>
-                    {searchQuery && (
-                      <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs flex items-center gap-1">
-                        <Search className="w-3 h-3" />
-                        "{searchQuery}"
-                      </span>
-                    )}
-                    <select
-                      value={competenceFilter}
-                      onChange={(e) => setCompetenceFilter(e.target.value)}
-                      className="px-2 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
-                    >
-                      <option value="">Toutes categories</option>
-                      {Object.entries(CATEGORIE_COMPETENCE_LABELS).map(([key, label]) => (
-                        <option key={key} value={key}>{label}</option>
-                      ))}
-                    </select>
-                    {competenceFilter && (
-                      <button
-                        onClick={() => setCompetenceFilter('')}
-                        className="px-1.5 py-0.5 text-xs text-red-600 hover:bg-red-50 rounded transition-colors flex items-center gap-1"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                  {!isChefEquipeOnly && (
+                  {/* Reset Filters */}
+                  {(absenceFilters.statut || absenceFilters.typeAbsence || absenceFilters.dateDebut || absenceFilters.dateFin) && (
                     <button
-                      onClick={() => { setEditingCompetence(null); setShowCompetenceModal(true); }}
-                      className="flex items-center gap-1 px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors font-medium text-xs"
+                      onClick={() => {
+                        setAbsenceFilters({ statut: '', typeAbsence: '', dateDebut: '', dateFin: '' });
+                      }}
+                      className="p-2.5 rounded-lg text-red-600 hover:bg-red-50 transition-all duration-200 border border-red-200 hover:border-red-300 shadow-sm"
+                      title="Réinitialiser les filtres"
                     >
-                      <Plus className="w-3 h-3" /> Ajouter
+                      <X className="w-4 h-4" />
                     </button>
                   )}
-                </div>
+                </>
+              )}
 
-                {/* Tableau */}
-                <div className="flex-1 min-h-0 overflow-auto">
-                  <DataTable
-                    data={filteredCompetences}
-                    columns={competencesColumns}
-                    itemsPerPage={10}
-                    showExport={false}
-                  />
-                </div>
-              </div>
-            )}
+              {/* Separator */}
+              <div className="h-8 w-px bg-gray-300"></div>
 
-            {/* Matrix view */}
-            {competenceSubTab === 'matrix' && (
-              <div className="flex-1 min-h-0 overflow-hidden">
-                <CompetenceMatrix
-                  operateurs={operateurs}
-                  competences={competences}
-                  onRefresh={loadData}
-                />
-              </div>
-            )}
-          </div>
+              {/* Refresh Button */}
+              <button
+                onClick={loadData}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors font-medium shadow-sm"
+                title="Rafraîchir"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Rafraîchir
+              </button>
+
+              {/* Create Button */}
+              {!isChefEquipeOnly && (
+                <button
+                  onClick={() => setShowCreateAbsence(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  Absence
+                </button>
+              )}
+            </>
+          )}
+
+          {/* Equipes and Operateurs tabs controls */}
+          {(activeTab === 'equipes' || activeTab === 'operateurs') && (
+            <>
+              {/* Refresh Button */}
+              <button
+                onClick={loadData}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors font-medium shadow-sm"
+                title="Rafraîchir"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Rafraîchir
+              </button>
+
+              {/* Create Button - Conditional based on tab */}
+              {activeTab === 'equipes' && !isChefEquipeOnly && (
+                <button
+                  onClick={() => setShowCreateTeam(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  Équipe
+                </button>
+              )}
+              {activeTab === 'operateurs' && !isChefEquipeOnly && (
+                <button
+                  onClick={() => {
+                    // TODO: Ouvrir modal de création d'opérateur
+                    showToast('Fonctionnalité à venir : Créer un nouvel opérateur', 'info');
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  Opérateur
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+
+      {/* Content */}
+      <div className="flex-1 overflow-auto min-h-0">
+        {activeTab === 'equipes' && (
+          <DataTable
+            data={filteredEquipes}
+            columns={equipesColumns}
+            serverSide={true}
+            totalItems={equipesTotal}
+            currentPage={equipesPage}
+            onPageChange={async (page) => {
+              setEquipesPage(page);
+              await loadEquipesData(page);
+            }}
+            itemsPerPage={50}
+            onRowClick={(equipe) => handleViewEquipe(equipe.id)}
+          />
         )}
 
+        {activeTab === 'operateurs' && (
+          <DataTable
+            data={filteredOperateurs}
+            columns={operateursColumns}
+            serverSide={true}
+            totalItems={operateursTotal}
+            currentPage={operateursPage}
+            onPageChange={async (page) => {
+              setOperateursPage(page);
+              await loadOperateursData(page);
+            }}
+            itemsPerPage={50}
+            onRowClick={(op) => handleViewOperateur(op.id)}
+          />
+        )}
 
+        {activeTab === 'absences' && (
+          <DataTable
+            data={filteredAbsences}
+            columns={absencesColumns}
+            serverSide={true}
+            totalItems={absencesTotal}
+            currentPage={absencesPage}
+            onPageChange={async (page) => {
+              setAbsencesPage(page);
+              await loadAbsencesData(page);
+            }}
+            itemsPerPage={50}
+          />
+        )}
 
-        {activeTab === 'historique' && (
-          <HistoriqueRHPanel
+        {activeTab === 'competences' && (
+          <CompetenceMatrix
             operateurs={operateurs}
-            equipes={equipes}
-            chefsPotentiels={chefsPotentiels}
-            searchQuery={searchQuery}
+            competences={competences}
+            searchQuery={debouncedSearchQuery}
+            viewMode={matrixViewMode}
+            isEditMode={matrixEditMode}
+            niveauFilter={matrixNiveauFilter}
+            categorieFilter={matrixCategorieFilter}
+            onViewModeChange={setMatrixViewMode}
+            onEditModeChange={setMatrixEditMode}
+            onNiveauFilterChange={setMatrixNiveauFilter}
+            onCategorieFilterChange={setMatrixCategorieFilter}
           />
         )}
       </div>
 
       {/* Modals */}
-      {
-        showCreateTeam && (
-          <CreateTeamModal
-            onClose={() => setShowCreateTeam(false)}
-            onCreated={loadData}
-            chefsPotentiels={chefsPotentiels}
-            operateursSansEquipe={operateursSansEquipe}
-          />
-        )
-      }
+      {showCreateTeam && (
+        <CreateTeamModal
+          onClose={() => setShowCreateTeam(false)}
+          onCreated={loadData}
+          chefsPotentiels={chefsPotentiels}
+          operateursSansEquipe={operateursSansEquipe}
+        />
+      )}
 
-      {
-        selectedOperateur && (
-          <OperateurDetailModal
-            operateur={selectedOperateur}
-            onClose={() => setSelectedOperateur(null)}
-          />
-        )
-      }
 
-      {
-        selectedEquipe && (
-          <EquipeDetailModal
-            equipe={selectedEquipe}
-            onClose={() => setSelectedEquipe(null)}
-          />
-        )
-      }
+      {selectedEquipe && (
+        <EquipeDetailModal
+          equipe={selectedEquipe}
+          onClose={() => setSelectedEquipe(null)}
+        />
+      )}
 
-      {
-        editingUser && (
-          <EditUserModal
-            user={editingUser}
-            clients={clients}
-            operateurs={operateurs}
-            onClose={() => setEditingUser(null)}
-            onUpdated={loadData}
-          />
-        )
-      }
+      {editingUser && (
+        <EditUserModal
+          user={editingUser}
+          clients={clients}
+          operateurs={operateurs}
+          onClose={() => setEditingUser(null)}
+          onUpdated={loadData}
+        />
+      )}
 
-      {
-        showCompetenceModal && (
-          <CompetenceModal
-            initial={editingCompetence || undefined}
-            onClose={() => { setShowCompetenceModal(false); setEditingCompetence(null); }}
-            onSaved={loadData}
-          />
-        )
-      }
+      {editEquipe && (
+        <EditEquipeModal
+          equipe={editEquipe}
+          onClose={() => setEditEquipe(null)}
+          onSaved={loadData}
+        />
+      )}
 
-      {
-        deleteCompetenceId !== null && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm flex flex-col items-center">
-              <AlertCircle className="w-10 h-10 text-red-500 mb-2" />
-              <h2 className="text-lg font-bold mb-2">Supprimer la compétence ?</h2>
-              <p className="text-gray-600 mb-4">Cette action est irréversible.</p>
-              <div className="flex gap-2">
-                <button
-                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                  onClick={() => setDeleteCompetenceId(null)}
-                >Annuler</button>
-                <button
-                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                  onClick={async () => {
-                    try {
-                      await deleteCompetence(deleteCompetenceId as number);
-                      setDeleteCompetenceId(null);
-                      loadData();
-                    } catch (err) {
-                      alert('Erreur lors de la suppression');
-                    }
-                  }}
-                >Supprimer</button>
-              </div>
-            </div>
-          </div>
-        )
-      }
+      {deleteEquipeId !== null && (
+        <ConfirmDeleteModal
+          title="Supprimer l'équipe ?"
+          message="Cette action est irréversible."
+          onConfirm={async () => {
+            await deleteEquipe(deleteEquipeId);
+            showToast('Équipe supprimée avec succès', 'success');
+            loadData();
+          }}
+          onCancel={() => setDeleteEquipeId(null)}
+        />
+      )}
 
-      {/* Modale édition équipe */}
-      {
-        editEquipe && (
-          <EditEquipeModal
-            equipe={editEquipe}
-            onClose={() => setEditEquipe(null)}
-            onSaved={loadData}
-          />
-        )
-      }
+      {deleteOperateurId !== null && (
+        <ConfirmDeleteModal
+          title="Supprimer l'opérateur ?"
+          message="Cette action est irréversible."
+          onConfirm={async () => {
+            await deleteOperateur(deleteOperateurId);
+            showToast('Opérateur supprimé avec succès', 'success');
+            loadData();
+          }}
+          onCancel={() => setDeleteOperateurId(null)}
+        />
+      )}
 
-      {/* Modale confirmation suppression */}
-      {
-        deleteEquipeId !== null && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm flex flex-col items-center">
-              <AlertCircle className="w-10 h-10 text-red-500 mb-2" />
-              <h2 className="text-lg font-bold mb-2">Supprimer l'équipe ?</h2>
-              <p className="text-gray-600 mb-4">Cette action est irréversible.</p>
-              <div className="flex gap-2">
-                <button
-                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                  onClick={() => setDeleteEquipeId(null)}
-                  disabled={actionLoading}
-                >Annuler</button>
-                <button
-                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                  onClick={async () => {
-                    setActionLoading(true);
-                    try {
-                      await deleteEquipe(deleteEquipeId);
-                      setDeleteEquipeId(null);
-                      loadData();
-                    } catch (err) {
-                      alert('Erreur lors de la suppression');
-                    } finally {
-                      setActionLoading(false);
-                    }
-                  }}
-                  disabled={actionLoading}
-                >Supprimer</button>
-              </div>
-            </div>
-          </div>
-        )
-      }
-      {/* Modale confirmation suppression operateur */}
-      {
-        deleteOperateurId !== null && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm flex flex-col items-center">
-              <AlertCircle className="w-10 h-10 text-red-500 mb-2" />
-              <h2 className="text-lg font-bold mb-2">Supprimer l'opérateur ?</h2>
-              <p className="text-gray-600 mb-4">Cette action est irréversible.</p>
-              <div className="flex gap-2">
-                <button
-                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                  onClick={() => setDeleteOperateurId(null)}
-                  disabled={actionLoading}
-                >Annuler</button>
-                <button
-                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                  onClick={async () => {
-                    setActionLoading(true);
-                    try {
-                      await deleteOperateur(deleteOperateurId as number);
-                      setDeleteOperateurId(null);
-                      loadData();
-                    } catch (err) {
-                      alert('Erreur lors de la suppression');
-                    } finally {
-                      setActionLoading(false);
-                    }
-                  }}
-                  disabled={actionLoading}
-                >Supprimer</button>
-              </div>
-            </div>
-          </div>
-        )
-      }
+      {showCreateAbsence && (
+        <CreateAbsenceModal
+          operateurs={operateurs}
+          onClose={() => setShowCreateAbsence(false)}
+          onCreated={loadData}
+        />
+      )}
 
-      {/* Modale creation absence */}
-      {
-        showCreateAbsence && (
-          <CreateAbsenceModal
-            operateurs={operateurs}
-            onClose={() => setShowCreateAbsence(false)}
-            onCreated={loadData}
-          />
-        )
-      }
+      {selectedAbsence && (
+        <AbsenceDetailModal
+          absence={selectedAbsence}
+          onClose={() => setSelectedAbsence(null)}
+        />
+      )}
 
-      {/* Modale detail absence */}
-      {
-        selectedAbsence && (
-          <AbsenceDetailModal
-            absence={selectedAbsence}
-            onClose={() => setSelectedAbsence(null)}
-          />
-        )
-      }
+      {editingAbsence && (
+        <EditAbsenceModal
+          absence={editingAbsence}
+          onClose={() => setEditingAbsence(null)}
+          onUpdated={loadData}
+        />
+      )}
 
-      {/* Modale edition absence */}
-      {
-        editingAbsence && (
-          <EditAbsenceModal
-            absence={editingAbsence}
-            onClose={() => setEditingAbsence(null)}
-            onUpdated={loadData}
-          />
-        )
-      }
-
-      {/* Modale confirmation suppression absence */}
-      {
-        deleteAbsenceId !== null && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm flex flex-col items-center">
-              <AlertCircle className="w-10 h-10 text-red-500 mb-2" />
-              <h2 className="text-lg font-bold mb-2">Supprimer l'absence ?</h2>
-              <p className="text-gray-600 mb-4 text-center text-sm">
-                L'absence sera marquee comme annulee. Cette action ne peut pas etre annulee.
-              </p>
-              <div className="flex gap-2 w-full">
-                <button
-                  className="flex-1 px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
-                  onClick={() => setDeleteAbsenceId(null)}
-                  disabled={actionLoading}
-                >
-                  Annuler
-                </button>
-                <button
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                  onClick={async () => {
-                    setActionLoading(true);
-                    try {
-                      await annulerAbsence(deleteAbsenceId);
-                      setDeleteAbsenceId(null);
-                      loadData();
-                    } catch (err) {
-                      alert('Erreur lors de la suppression');
-                    } finally {
-                      setActionLoading(false);
-                    }
-                  }}
-                  disabled={actionLoading}
-                >
-                  {actionLoading ? 'Suppression...' : 'Supprimer'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )
-      }
+      {deleteAbsenceId !== null && (
+        <ConfirmDeleteModal
+          title="Annuler l'absence ?"
+          message="L'absence sera marquée comme annulée. Cette action ne peut pas être annulée."
+          onConfirm={async () => {
+            await annulerAbsence(deleteAbsenceId);
+            showToast('Absence annulée avec succès', 'success');
+            loadData();
+          }}
+          onCancel={() => setDeleteAbsenceId(null)}
+          confirmText="Annuler l'absence"
+        />
+      )}
     </div >
   );
 };

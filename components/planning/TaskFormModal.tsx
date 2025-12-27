@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, type FC, type FormEvent } from 'react';
+import { useState, useEffect, useMemo, useRef, type FC, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { addDays, addWeeks, addMonths } from 'date-fns';
 import {
@@ -13,6 +13,8 @@ import {
     RatioProductivite
 } from '../../types/planning';
 import { EquipeList } from '../../types/users';
+import FormModal, { FormField, FormInput, FormTextarea, FormSelect } from '../FormModal';
+import { RecurrenceSelector, type RecurrenceParams } from './RecurrenceSelector';
 
 
 // ============================================================================
@@ -276,7 +278,6 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         charge_estimee_heures: tache?.charge_estimee_heures || null
     });
 
-    const [showRecurrence, setShowRecurrence] = useState(!!tache?.parametres_recurrence);
     const [chargeManuelle, setChargeManuelle] = useState(tache?.charge_manuelle || false);
     const [isResettingCharge, setIsResettingCharge] = useState(false);
 
@@ -300,6 +301,10 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
     const [loadingFilteredTypes, setLoadingFilteredTypes] = useState(false);
     const [incompatibleObjectsError, setIncompatibleObjectsError] = useState<string | null>(null);
 
+    // Refs for datetime inputs (auto-close pickers)
+    const startDateRef = useRef<HTMLInputElement>(null);
+    const endDateRef = useRef<HTMLInputElement>(null);
+
     // Site lock: when objects are selected or siteFilter is set, only allow objects from the same site
     const lockedSite = useMemo(() => {
         // Priority: siteFilter > selectedObjects
@@ -314,6 +319,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
 
     // Validation state
     const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+    const [validationError, setValidationError] = useState<string | null>(null);
 
     // Validate dates constraints
     useEffect(() => {
@@ -550,6 +556,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
     ]);
 
     // Auto-calculate task end date from estimated charge
+    // RÈGLE D'OR: Une tâche ne peut dépasser un jour calendaire
     useEffect(() => {
         // Only if start date is valid
         if (!formData.date_debut_planifiee) return;
@@ -567,8 +574,26 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         if (hours > 0) {
             const start = new Date(formData.date_debut_planifiee);
             if (!isNaN(start.getTime())) {
-                // Calculate end date based on hours
-                const end = new Date(start.getTime() + hours * 60 * 60 * 1000);
+                // Calculate end date: add hours but STAY on the same day
+                let end = new Date(start.getTime() + hours * 60 * 60 * 1000);
+
+                // RÈGLE D'OR: Si la fin dépasse le jour calendaire, la limiter à 17:00 du même jour
+                const endOfDay = new Date(start);
+                endOfDay.setHours(17, 0, 0, 0); // Fin de journée par défaut: 17:00
+
+                if (end.getDate() !== start.getDate()) {
+                    // La charge dépasse un jour -> limiter à 17:00
+                    end = endOfDay;
+
+                    // Avertir l'utilisateur
+                    const exceededHours = hours - ((end.getTime() - start.getTime()) / (60 * 60 * 1000));
+                    console.warn(
+                        `⚠️ Charge estimée (${hours}h) dépasse une journée de travail. ` +
+                        `Date de fin limitée à ${end.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}. ` +
+                        `Utilisez la récurrence pour planifier les ${exceededHours.toFixed(1)}h restantes.`
+                    );
+                }
+
                 const formattedEnd = end.toISOString().slice(0, 16);
 
                 if (formData.date_fin_planifiee !== formattedEnd) {
@@ -617,30 +642,36 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                 commentaires: tache.commentaires || '',
                 parametres_recurrence: tache.parametres_recurrence || null
             });
-            setShowRecurrence(!!tache.parametres_recurrence);
         }
     }, [tache]);
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
+        setValidationError(null);
+
         if (!formData.id_type_tache || formData.id_type_tache === 0) {
-            alert('Veuillez sélectionner un type de tâche');
+            setValidationError('Veuillez sélectionner un type de tâche');
             return;
         }
+
         onSubmit(formData);
     };
 
     return (
-        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 pointer-events-auto">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-                <form onSubmit={handleSubmit}>
-                    <div className="p-6 border-b border-gray-200">
-                        <h2 className="text-2xl font-bold text-gray-900">
-                            {tache ? 'Modifier la tâche' : 'Nouvelle tâche'}
-                        </h2>
-                    </div>
-
-                    <div className="p-6 space-y-4">
+        <FormModal
+            isOpen={true}
+            onClose={onClose}
+            onSubmit={handleSubmit}
+            title={tache ? 'Modifier la tâche' : 'Nouvelle tâche'}
+            icon={<Clock className="w-5 h-5 text-emerald-600" />}
+            size="2xl"
+            loading={false}
+            error={validationError}
+            submitLabel={tache ? 'Modifier' : 'Créer'}
+            cancelLabel="Annuler"
+            submitDisabled={!!incompatibleObjectsError || filteredTypesTaches.length === 0}
+        >
+            <div className="space-y-4">
                         {/* Validation Warnings */}
                         {validationWarnings.length > 0 && (
                             <div className="bg-orange-50 border-l-4 border-orange-500 p-4 mb-4">
@@ -739,10 +770,17 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                     Date début <span className="text-red-500">*</span>
                                 </label>
                                 <input
+                                    ref={startDateRef}
                                     required
                                     type="datetime-local"
                                     value={formData.date_debut_planifiee}
-                                    onChange={(e) => setFormData({ ...formData, date_debut_planifiee: e.target.value })}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, date_debut_planifiee: e.target.value });
+                                        // Auto-fermeture du picker après sélection
+                                        setTimeout(() => {
+                                            startDateRef.current?.blur();
+                                        }, 100);
+                                    }}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                                 />
                             </div>
@@ -751,10 +789,17 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                     Date fin <span className="text-red-500">*</span>
                                 </label>
                                 <input
+                                    ref={endDateRef}
                                     required
                                     type="datetime-local"
                                     value={formData.date_fin_planifiee}
-                                    onChange={(e) => setFormData({ ...formData, date_fin_planifiee: e.target.value })}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, date_fin_planifiee: e.target.value });
+                                        // Auto-fermeture du picker après sélection
+                                        setTimeout(() => {
+                                            endDateRef.current?.blur();
+                                        }, 100);
+                                    }}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                                 />
                             </div>
@@ -1078,210 +1123,51 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                             </div>
                         )}
 
-                        <div className="border-t pt-4">
-                            <div className="flex items-center justify-between mb-3">
-                                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                                    <Clock className="w-4 h-4" />
-                                    Récurrence personnalisée
-                                </label>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setShowRecurrence(!showRecurrence);
-                                        if (showRecurrence) {
-                                            setFormData({ ...formData, parametres_recurrence: null });
-                                        } else {
-                                            // Default init
-                                            setFormData({
-                                                ...formData,
-                                                parametres_recurrence: {
-                                                    frequence: 'weekly',
-                                                    interval: 1,
-                                                    nombre_occurrences: 4,
-                                                    jours: []
-                                                }
-                                            });
-                                        }
-                                    }}
-                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${showRecurrence ? 'bg-emerald-600' : 'bg-gray-200'}`}
-                                >
-                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${showRecurrence ? 'translate-x-6' : 'translate-x-1'}`} />
-                                </button>
-                            </div>
-
-                            {showRecurrence && formData.parametres_recurrence && (
-                                <div className="space-y-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                    {/* Intervalle et Fréquence */}
-                                    <div className="flex items-end gap-3">
-                                        <div className="flex-1">
-                                            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase">Répéter tous les</label>
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="number"
-                                                    min="1"
-                                                    value={formData.parametres_recurrence.interval || 1}
-                                                    onChange={(e) => setFormData({
-                                                        ...formData,
-                                                        parametres_recurrence: {
-                                                            ...formData.parametres_recurrence!,
-                                                            interval: Number(e.target.value)
-                                                        }
-                                                    })}
-                                                    className="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                                />
-                                                <select
-                                                    value={formData.parametres_recurrence.frequence}
-                                                    onChange={(e) => setFormData({
-                                                        ...formData,
-                                                        parametres_recurrence: {
-                                                            ...formData.parametres_recurrence!,
-                                                            frequence: e.target.value as FrequenceRecurrence
-                                                        }
-                                                    })}
-                                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                                >
-                                                    <option value="daily">Jours</option>
-                                                    <option value="weekly">Semaines</option>
-                                                    <option value="monthly">Mois</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Jours de la semaine (si Hebdo) */}
-                                    {formData.parametres_recurrence.frequence === 'weekly' && (
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-500 mb-2 uppercase">Jours concernés</label>
-                                            <div className="flex justify-between gap-1">
-                                                {[
-                                                    { id: 'MO', label: 'L' },
-                                                    { id: 'TU', label: 'M' },
-                                                    { id: 'WE', label: 'M' },
-                                                    { id: 'TH', label: 'J' },
-                                                    { id: 'FR', label: 'V' },
-                                                    { id: 'SA', label: 'S' },
-                                                    { id: 'SU', label: 'D' }
-                                                ].map((d) => {
-                                                    const isSelected = formData.parametres_recurrence?.jours?.includes(d.id);
-                                                    return (
-                                                        <button
-                                                            key={d.id}
-                                                            type="button"
-                                                            onClick={() => {
-                                                                const currentDays = formData.parametres_recurrence?.jours || [];
-                                                                const newDays = isSelected
-                                                                    ? currentDays.filter(day => day !== d.id)
-                                                                    : [...currentDays, d.id];
-                                                                setFormData({
-                                                                    ...formData,
-                                                                    parametres_recurrence: {
-                                                                        ...formData.parametres_recurrence!,
-                                                                        jours: newDays
-                                                                    }
-                                                                });
-                                                            }}
-                                                            className={`w-8 h-8 rounded-full text-xs font-bold transition-colors ${isSelected
-                                                                ? 'bg-emerald-600 text-white'
-                                                                : 'bg-white border border-gray-300 text-gray-500 hover:bg-gray-100'
-                                                                }`}
-                                                        >
-                                                            {d.label}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Fin de récurrence */}
-                                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-200/50">
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase">Se termine après</label>
-                                            <div className="relative">
-                                                <input
-                                                    type="number"
-                                                    min="1"
-                                                    placeholder="Nb fois"
-                                                    value={formData.parametres_recurrence.nombre_occurrences || ''}
-                                                    onChange={(e) => {
-                                                        const count = e.target.value ? Number(e.target.value) : undefined;
-                                                        let autoDateFin: string | undefined = undefined;
-
-                                                        if (count && formData.date_debut_planifiee && formData.parametres_recurrence) {
-                                                            try {
-                                                                const start = new Date(formData.date_debut_planifiee);
-                                                                if (!isNaN(start.getTime())) {
-                                                                    const p = formData.parametres_recurrence;
-                                                                    const interval = p.interval || 1;
-                                                                    let endDate = new Date(start);
-
-                                                                    if (p.frequence === 'daily') endDate = addDays(start, (count - 1) * interval);
-                                                                    else if (p.frequence === 'weekly') endDate = addWeeks(start, (count - 1) * interval);
-                                                                    else if (p.frequence === 'monthly') endDate = addMonths(start, (count - 1) * interval);
-
-                                                                    autoDateFin = endDate.toISOString().slice(0, 10);
-                                                                }
-                                                            } catch (err) { console.error(err); }
-                                                        }
-
-                                                        setFormData({
-                                                            ...formData,
-                                                            parametres_recurrence: {
-                                                                ...formData.parametres_recurrence!,
-                                                                nombre_occurrences: count,
-                                                                date_fin: autoDateFin
-                                                            }
-                                                        });
-                                                    }}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none pr-12"
-                                                />
-                                                <span className="absolute right-3 top-2.5 text-xs text-gray-400">fois</span>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase">Ou jusqu'au</label>
-                                            <input
-                                                type="date"
-                                                value={formData.parametres_recurrence.date_fin?.split('T')[0] || ''}
-                                                onChange={(e) => setFormData({
+                        {/* Smart Alert: Suggest recurrence for large workloads */}
+                        {chargePreview && chargePreview.totalHeures > 10 && !formData.parametres_recurrence && (
+                            <div className="border-t pt-4">
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+                                    <RefreshCw className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                                    <div className="flex-1">
+                                        <h4 className="text-sm font-semibold text-blue-900">
+                                            Charge importante détectée ({chargePreview.totalHeures.toFixed(1)}h)
+                                        </h4>
+                                        <p className="text-sm text-blue-700 mt-1">
+                                            Cette tâche dépasse une journée de travail (10h max selon la loi marocaine). Pour respecter la règle d'or (1 tâche = 1 jour),
+                                            activez la récurrence quotidienne ci-dessous.
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const days = Math.ceil(chargePreview.totalHeures / 10);
+                                                setFormData({
                                                     ...formData,
                                                     parametres_recurrence: {
-                                                        ...formData.parametres_recurrence!,
-                                                        date_fin: e.target.value ? e.target.value : undefined,
-                                                        nombre_occurrences: undefined
+                                                        frequence: 'daily',
+                                                        interval: 1,
+                                                        nombre_occurrences: days,
                                                     }
-                                                })}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                            />
-                                        </div>
+                                                });
+                                            }}
+                                            className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                                        >
+                                            Activer récurrence ({Math.ceil(chargePreview.totalHeures / 10)} jours)
+                                        </button>
                                     </div>
-                                    <p className="text-[10px] text-gray-400 italic text-center">
-                                        (Remplissez soit le nombre de fois, soit la date de fin)
-                                    </p>
                                 </div>
-                            )}
-                        </div>
-                    </div>
+                            </div>
+                        )}
 
-                    <div className="p-6 border-t border-gray-200 flex gap-3">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                        >
-                            Annuler
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={!!incompatibleObjectsError || filteredTypesTaches.length === 0}
-                            className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-                        >
-                            {tache ? 'Modifier' : 'Créer'}
-                        </button>
-                    </div>
-                </form>
+                        {/* Récurrence (Google Calendar style) */}
+                        <div className="border-t pt-4">
+                            <RecurrenceSelector
+                                value={formData.parametres_recurrence as RecurrenceParams | null}
+                                onChange={(params) => setFormData({ ...formData, parametres_recurrence: params })}
+                                startDate={formData.date_debut_planifiee || new Date().toISOString()}
+                            />
+                        </div>
             </div>
-        </div>
+        </FormModal>
     );
 };
 

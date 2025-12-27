@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TrendingUp, TrendingDown, Minus, Calendar, AlertTriangle, AlertCircle } from 'lucide-react';
@@ -35,13 +34,13 @@ const Dashboard: React.FC = () => {
 
         setStatistics(statsData);
 
-        // Take first 5 recent tasks
+        // Take first 10 recent tasks (more items since we have scroll)
         const tasks = Array.isArray(tasksData) ? tasksData : (tasksData.results || []);
-        setRecentTasks(tasks.slice(0, 5));
+        setRecentTasks(tasks.slice(0, 10));
 
-        // Take first 5 recent reclamations
+        // Take first 10 recent reclamations
         const recls = Array.isArray(reclamationsData) ? reclamationsData : (reclamationsData || []);
-        setRecentReclamations(recls.slice(0, 5));
+        setRecentReclamations(recls.slice(0, 10));
 
       } catch (error) {
         console.error('Erreur lors du chargement des données:', error);
@@ -127,19 +126,9 @@ const Dashboard: React.FC = () => {
   }, [statistics]);
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Tableau de bord</h1>
-          <p className="text-slate-500">Vue d'ensemble de l'activité</p>
-        </div>
-        <div className="text-sm text-slate-500 bg-white px-4 py-2 rounded-full border border-slate-200 shadow-sm">
-          {new Date().toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="p-6 h-full flex flex-col gap-6 overflow-hidden">
+      {/* KPI Cards - Fixed height section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 flex-shrink-0">
         {isLoadingStats ? (
           // Loading skeleton
           Array.from({ length: 4 }).map((_, idx) => (
@@ -159,9 +148,9 @@ const Dashboard: React.FC = () => {
           </div>
         ) : (
           kpis.map((kpi, idx) => (
-            <div key={idx} className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+            <div key={idx} className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
               <div className="text-sm font-medium text-slate-500 mb-1">{kpi.label}</div>
-              <div className="flex items-end justify-between">
+              <div className="flex items-end justify-between relative z-10">
                 <div className="text-3xl font-bold text-slate-800">{kpi.value}</div>
                 <div className={`flex items-center text-sm font-bold ${kpi.trend === 'up' ? 'text-emerald-600' : kpi.trend === 'down' ? 'text-red-500' : 'text-slate-400'
                   }`}>
@@ -173,7 +162,7 @@ const Dashboard: React.FC = () => {
               </div>
               {/* @ts-ignore - icon property is optional and added for chef equipe */}
               {(kpi as any).icon && (
-                <div className="absolute top-6 right-6 p-2 bg-slate-50 rounded-lg">
+                <div className="absolute top-4 right-4 p-2 bg-slate-50 rounded-lg">
                   {(kpi as any).icon}
                 </div>
               )}
@@ -182,10 +171,11 @@ const Dashboard: React.FC = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Main Content Area - Flexible height */}
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Tasks */}
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-6 lg:col-span-2">
-          <div className="flex items-center justify-between mb-6">
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm flex flex-col lg:col-span-2 overflow-hidden">
+          <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
             <h2 className="font-bold text-lg text-slate-800 flex items-center gap-2">
               <Calendar className="w-5 h-5 text-emerald-600" />
               Tâches récentes
@@ -198,63 +188,61 @@ const Dashboard: React.FC = () => {
             </button>
           </div>
 
-          {isLoadingData ? (
-            <div className="animate-pulse space-y-4">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="h-16 bg-slate-100 rounded"></div>
-              ))}
-            </div>
-          ) : recentTasks.length === 0 ? (
-            <div className="text-center py-8 text-slate-500">Aucune tâche récente</div>
-          ) : (
-            <div className="space-y-4">
-              {recentTasks.map(task => (
-                <div key={task.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100 hover:border-emerald-200 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-2 h-12 rounded-full ${task.statut === 'TERMINEE' ? 'bg-emerald-500' :
-                      task.statut === 'EN_COURS' ? 'bg-blue-500' : 'bg-slate-300'
-                      }`}></div>
-                    <div>
-                      <h3 className="font-bold text-slate-800">
-                        {task.type_tache_detail?.nom_tache} (Équipe: {
-                          task.equipes_detail?.length > 0
-                            ? task.equipes_detail.map((e: any) => e.nom_equipe || e.nomEquipe).join(', ')
-                            : (task.equipe_detail as any)?.nom_equipe || task.equipe_detail?.nomEquipe || 'N/A'
-                        })
-                      </h3>
-                      <div className="text-xs text-slate-500 flex items-center gap-2 mt-1">
-                        <span className="bg-white px-2 py-0.5 rounded border border-slate-200">
+          <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+            {isLoadingData ? (
+              <div className="animate-pulse space-y-4">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-16 bg-slate-100 rounded"></div>
+                ))}
+              </div>
+            ) : recentTasks.length === 0 ? (
+              <div className="text-center py-12 text-slate-500 flex flex-col items-center">
+                <Calendar className="w-12 h-12 text-slate-200 mb-3" />
+                <p>Aucune tâche récente</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentTasks.map(task => (
+                  <div key={task.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100 hover:border-emerald-200 transition-colors group">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className={`w-1.5 h-10 rounded-full flex-shrink-0 ${task.statut === 'TERMINEE' ? 'bg-emerald-500' :
+                        task.statut === 'EN_COURS' ? 'bg-blue-500' : 'bg-slate-300'
+                        }`}></div>
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-slate-800 truncate">
                           {task.type_tache_detail?.nom_tache}
-                        </span>
-                        {(task.equipes_detail?.length > 0 || task.equipe_detail) && (
-                          <span>Assigné à : {
-                            task.equipes_detail?.length > 0
-                              ? task.equipes_detail.map((e: any) => e.nom_equipe || e.nomEquipe).join(', ')
-                              : (task.equipe_detail as any)?.nom_equipe || task.equipe_detail?.nomEquipe
-                          }</span>
-                        )}
+                        </h3>
+                        <div className="text-xs text-slate-500 flex items-center gap-2 mt-1 truncate">
+                          <span className="truncate">
+                            Équipe: {
+                              task.equipes_detail?.length > 0
+                                ? task.equipes_detail.map((e: any) => e.nom_equipe || e.nomEquipe).join(', ')
+                                : (task.equipe_detail as any)?.nom_equipe || task.equipe_detail?.nomEquipe || 'N/A'
+                            }
+                          </span>
+                        </div>
                       </div>
                     </div>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-4">
+                      <span className="text-xs font-bold text-slate-500">
+                        {new Date(task.date_debut_planifiee).toLocaleDateString()}
+                      </span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${task.statut === 'TERMINEE' ? 'bg-emerald-100 text-emerald-700' :
+                        task.statut === 'EN_COURS' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                        {task.statut?.replace('_', ' ')}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-xs font-bold text-slate-500">
-                      {new Date(task.date_debut_planifiee).toLocaleDateString()}
-                    </span>
-                    <span className={`text-xs px-2 py-1 rounded-full font-bold ${task.statut === 'TERMINEE' ? 'bg-emerald-100 text-emerald-700' :
-                      task.statut === 'EN_COURS' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
-                      }`}>
-                      {task.statut?.replace('_', ' ')}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Recent Claims */}
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
-          <div className="flex items-center justify-between mb-6">
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm flex flex-col overflow-hidden">
+          <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
             <h2 className="font-bold text-lg text-slate-800 flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-orange-500" />
               Réclamations
@@ -267,47 +255,54 @@ const Dashboard: React.FC = () => {
             </button>
           </div>
 
-          {isLoadingData ? (
-            <div className="animate-pulse space-y-4">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="h-16 bg-slate-100 rounded"></div>
-              ))}
-            </div>
-          ) : recentReclamations.length === 0 ? (
-            <div className="text-center py-8 text-slate-500">Aucune réclamation récente</div>
-          ) : (
-            <div className="space-y-4">
-              {recentReclamations.map(claim => (
-                <div key={claim.id} className="p-4 border border-slate-100 rounded-lg hover:shadow-sm transition-shadow">
-                  <div className="flex justify-between items-start mb-2">
-                    {claim.urgence_niveau && (
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-slate-100 text-slate-700`}
-                        style={{ backgroundColor: claim.urgence_couleur + '20', color: claim.urgence_couleur }}>
-                        {claim.urgence_niveau}
+          <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+            {isLoadingData ? (
+              <div className="animate-pulse space-y-4">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-16 bg-slate-100 rounded"></div>
+                ))}
+              </div>
+            ) : recentReclamations.length === 0 ? (
+              <div className="text-center py-12 text-slate-500 flex flex-col items-center">
+                <AlertCircle className="w-12 h-12 text-slate-200 mb-3" />
+                <p>Aucune réclamation récente</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentReclamations.map(claim => (
+                  <div key={claim.id} className="p-4 border border-slate-100 rounded-lg hover:shadow-sm transition-shadow bg-white">
+                    <div className="flex justify-between items-start mb-2">
+                      {claim.urgence_niveau && (
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-slate-100 text-slate-700`}
+                          style={{ backgroundColor: claim.urgence_couleur + '20', color: claim.urgence_couleur }}>
+                          {claim.urgence_niveau}
+                        </span>
+                      )}
+                      <span className="text-xs text-slate-400">
+                        {new Date(claim.date_creation).toLocaleDateString()}
                       </span>
-                    )}
-                    <span className="text-xs text-slate-400">
-                      {new Date(claim.date_creation).toLocaleDateString()}
-                    </span>
+                    </div>
+                    <h4 className="font-bold text-slate-800 text-sm mb-1 line-clamp-1">
+                      {claim.type_reclamation_nom}
+                    </h4>
+                    <p className="text-xs text-slate-500 mb-2 line-clamp-2">
+                      {claim.description}
+                    </p>
+                    <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-50 mt-2">
+                      <span className="text-slate-400 truncate max-w-[100px]" title={claim.client ? 'Client #' + claim.client : 'Interne'}>
+                        {claim.client ? 'Client #' + claim.client : 'Interne'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full font-medium text-[10px] ${claim.statut === 'RESOLUE' ? 'bg-green-100 text-green-700' :
+                        claim.statut === 'NOUVELLE' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
+                        }`}>
+                        {claim.statut}
+                      </span>
+                    </div>
                   </div>
-                  <h4 className="font-bold text-slate-800 text-sm mb-1">
-                    {claim.type_reclamation_nom}
-                  </h4>
-                  <p className="text-xs text-slate-500 mb-2 truncate">
-                    {claim.description}
-                  </p>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-500">{claim.client ? 'Client #' + claim.client : 'Interne'}</span>
-                    <span className={`px-2 py-0.5 rounded-full font-medium ${claim.statut === 'RESOLUE' ? 'bg-green-100 text-green-700' :
-                      claim.statut === 'NOUVELLE' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
-                      }`}>
-                      {claim.statut}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

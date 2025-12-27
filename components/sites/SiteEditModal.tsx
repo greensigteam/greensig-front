@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Loader2, MapPin, Calendar, FileText, ToggleLeft, ToggleRight, Hash, Ruler, Building2 } from 'lucide-react';
+import { MapPin, Calendar, Hash, Ruler, Building2, Users, Loader2 } from 'lucide-react';
 import { updateSite, UpdateSiteData, SiteFrontend, calculateGeometryMetrics } from '../../services/api';
+import { fetchClients } from '../../services/usersApi';
+import { Client } from '../../types/users';
 import { useToast } from '../../contexts/ToastContext';
+import FormModal, { FormField, FormInput, FormTextarea } from '../FormModal';
 
 interface SiteEditModalProps {
     site: SiteFrontend;
@@ -12,10 +15,17 @@ interface SiteEditModalProps {
 
 export default function SiteEditModal({ site, isOpen, onClose, onSaved }: SiteEditModalProps) {
     const { showToast } = useToast();
-    const [isLoading, setIsLoading] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    
+    // Clients state
+    const [clients, setClients] = useState<Client[]>([]);
+    const [isLoadingClients, setIsLoadingClients] = useState(false);
+
     const [formData, setFormData] = useState<UpdateSiteData>({
         nom_site: '',
         code_site: '',
+        client: undefined,
         adresse: '',
         superficie_totale: null,
         date_debut_contrat: null,
@@ -23,14 +33,36 @@ export default function SiteEditModal({ site, isOpen, onClose, onSaved }: SiteEd
         actif: true,
     });
 
-    const themeColor = '#10b981'; // Emerald-500 to match site theme
+    // Fetch clients on mount
+    useEffect(() => {
+        const loadClients = async () => {
+            setIsLoadingClients(true);
+            try {
+                const response = await fetchClients();
+                // Filter only active clients
+                const activeClients = (response.results || []).filter(c => c.actif);
+                setClients(activeClients);
+            } catch (error) {
+                console.error('Error loading clients:', error);
+                showToast('Erreur lors du chargement des clients', 'error');
+            } finally {
+                setIsLoadingClients(false);
+            }
+        };
+
+        if (isOpen) {
+            loadClients();
+        }
+    }, [isOpen, showToast]);
 
     // Initialize form data when site changes
     useEffect(() => {
         if (site) {
+            console.log('Initializing form with site data:', site);
             setFormData({
                 nom_site: site.name || '',
                 code_site: site.code_site || '',
+                client: site.client,
                 adresse: site.adresse || '',
                 superficie_totale: site.superficie_totale || null,
                 date_debut_contrat: site.date_debut_contrat || null,
@@ -41,7 +73,21 @@ export default function SiteEditModal({ site, isOpen, onClose, onSaved }: SiteEd
     }, [site]);
 
     const handleChange = (field: keyof UpdateSiteData, value: any) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
+        console.log(`Field changed: ${field}`, value);
+        setFormData(prev => {
+            const newState = { ...prev, [field]: value };
+            return newState;
+        });
+    };
+
+    // Helper pour formater la date pour l'input (YYYY-MM-DD)
+    const formatDateForInput = (dateStr: string | null | undefined) => {
+        if (!dateStr) return '';
+        try {
+            return dateStr.split('T')[0];
+        } catch (e) {
+            return '';
+        }
     };
 
     const handleRecalculateArea = async () => {
@@ -50,9 +96,8 @@ export default function SiteEditModal({ site, isOpen, onClose, onSaved }: SiteEd
             return;
         }
 
-        setIsLoading(true);
+        setLoading(true);
         try {
-            // The site object from GeoJSON API has geometry in 'geometry' field
             const result = await calculateGeometryMetrics(site.geometry);
 
             if (result.metrics && result.metrics.area_m2) {
@@ -62,246 +107,194 @@ export default function SiteEditModal({ site, isOpen, onClose, onSaved }: SiteEd
             } else {
                 showToast("Impossible de calculer la superficie", 'error');
             }
-        } catch (error: any) {
-            console.error(error);
+        } catch (err: any) {
+            console.error(err);
             showToast("Erreur lors du calcul", 'error');
         } finally {
-            setIsLoading(false);
+            setLoading(false);
         }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError(null);
 
         if (!formData.nom_site?.trim()) {
-            showToast('Le nom du site est obligatoire', 'error');
+            setError('Le nom du site est obligatoire');
             return;
         }
 
-        setIsLoading(true);
+        setLoading(true);
         try {
             const updatedSite = await updateSite(parseInt(site.id), formData);
             showToast('Site mis à jour avec succès', 'success');
             onSaved?.(updatedSite);
             onClose();
-        } catch (error: any) {
-            showToast(error.message || 'Erreur lors de la mise à jour', 'error');
+        } catch (err: any) {
+            const errorMessage = err.message || 'Erreur lors de la mise à jour';
+            setError(errorMessage);
+            showToast(errorMessage, 'error');
         } finally {
-            setIsLoading(false);
+            setLoading(false);
         }
     };
 
     if (!isOpen) return null;
 
-    const baseInputClass = `w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors focus:ring-[${themeColor}]`;
+    const superficieAction = (
+        <button
+            type="button"
+            onClick={handleRecalculateArea}
+            disabled={loading}
+            className="text-xs text-emerald-600 hover:text-emerald-700 font-medium hover:underline flex items-center gap-1 disabled:opacity-50"
+            title="Recalculer à partir de la géométrie sur la carte"
+        >
+            <Ruler className="w-3 h-3" />
+            Recalculer
+        </button>
+    );
 
     return (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center pointer-events-auto">
-            {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-
-            {/* Modal */}
-            <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col overflow-hidden">
-                {/* Header */}
-                <div
-                    className="flex items-center justify-between px-6 py-4 border-b"
-                    style={{ backgroundColor: `${themeColor}10` }}
-                >
-                    <div className="flex items-center gap-3">
-                        <div
-                            className="w-10 h-10 rounded-lg flex items-center justify-center"
-                            style={{ backgroundColor: themeColor }}
-                        >
-                            <Building2 className="w-5 h-5 text-white" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-semibold text-gray-900">
-                                Modifier le site
-                            </h2>
-                            <p className="text-sm text-gray-500">
-                                ID: {site.id}
-                            </p>
-                        </div>
+        <FormModal
+            isOpen={isOpen}
+            onClose={onClose}
+            onSubmit={handleSubmit}
+            title="Modifier le site"
+            subtitle={site.name}
+            icon={<Building2 className="w-5 h-5" />}
+            size="lg"
+            loading={loading}
+            error={error}
+            submitLabel="Enregistrer"
+            cancelLabel="Annuler"
+        >
+            {/* Client */}
+            <FormField label="Client" icon={<Users className="w-4 h-4" />}>
+                {isLoadingClients ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Chargement des clients...
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 rounded-full transition-colors"
-                        style={{ backgroundColor: 'transparent' }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = `${themeColor}20`}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                ) : (
+                    <select
+                        value={formData.client || ''}
+                        onChange={(e) => handleChange('client', e.target.value ? parseInt(e.target.value) : undefined)}
+                        className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-sm"
+                        disabled={loading}
                     >
-                        <X className="w-5 h-5 text-gray-500" />
-                    </button>
-                </div>
+                        <option value="">-- Aucun client --</option>
+                        {clients.map((client) => (
+                            <option key={client.utilisateur} value={client.utilisateur}>
+                                {client.nomStructure} ({client.nom} {client.prenom})
+                            </option>
+                        ))}
+                    </select>
+                )}
+            </FormField>
 
-                {/* Form */}
-                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
-                    {/* Nom du site */}
-                    <div>
-                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
-                            <Building2 className="w-4 h-4 text-gray-400" />
-                            Nom du site <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                            type="text"
-                            value={formData.nom_site || ''}
-                            onChange={(e) => handleChange('nom_site', e.target.value)}
-                            className={baseInputClass}
-                            style={{ '--tw-ring-color': themeColor } as any}
-                            placeholder="Nom du site"
-                            required
-                        />
-                    </div>
+            {/* Nom du site */}
+            <FormField label="Nom du site" required icon={<Building2 className="w-4 h-4" />}>
+                <FormInput
+                    type="text"
+                    value={formData.nom_site || ''}
+                    onChange={(value) => handleChange('nom_site', value)}
+                    placeholder="Nom du site"
+                    disabled={loading}
+                    required
+                />
+            </FormField>
 
-                    {/* Code du site */}
-                    <div>
-                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
-                            <Hash className="w-4 h-4 text-gray-400" />
-                            Code du site
-                        </label>
-                        <input
-                            type="text"
-                            value={formData.code_site || ''}
-                            onChange={(e) => handleChange('code_site', e.target.value)}
-                            className={baseInputClass}
-                            style={{ '--tw-ring-color': themeColor } as any}
-                            placeholder="Code unique (ex: SITE_001)"
-                        />
-                    </div>
+            {/* Code du site */}
+            <FormField label="Code du site" icon={<Hash className="w-4 h-4" />}>
+                <FormInput
+                    type="text"
+                    value={formData.code_site || ''}
+                    onChange={(value) => handleChange('code_site', value)}
+                    placeholder="Code unique (ex: SITE_001)"
+                    disabled={loading}
+                />
+            </FormField>
 
-                    {/* Adresse */}
-                    <div>
-                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
-                            <MapPin className="w-4 h-4 text-gray-400" />
-                            Adresse
-                        </label>
-                        <textarea
-                            value={formData.adresse || ''}
-                            onChange={(e) => handleChange('adresse', e.target.value)}
-                            className={baseInputClass}
-                            style={{ '--tw-ring-color': themeColor } as any}
-                            placeholder="Adresse du site"
-                            rows={2}
-                        />
-                    </div>
+            {/* Adresse */}
+            <FormField label="Adresse" icon={<MapPin className="w-4 h-4" />}>
+                <FormTextarea
+                    value={formData.adresse || ''}
+                    onChange={(value) => handleChange('adresse', value)}
+                    placeholder="Adresse du site"
+                    rows={2}
+                    disabled={loading}
+                />
+            </FormField>
 
-                    {/* Superficie */}
-                    <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                                <Ruler className="w-4 h-4 text-gray-400" />
-                                Superficie totale (m²)
-                            </label>
-                            <button
-                                type="button"
-                                onClick={handleRecalculateArea}
-                                className="text-xs text-emerald-600 hover:text-emerald-700 font-medium hover:underline flex items-center gap-1"
-                                title="Recalculer à partir de la géométrie sur la carte"
-                            >
-                                <Ruler className="w-3 h-3" />
-                                Recalculer
-                            </button>
-                        </div>
-                        <input
+            {/* Superficie avec bouton Recalculer */}
+            <div className="relative">
+                <FormField label="Superficie totale (m²)" icon={<Ruler className="w-4 h-4" />}>
+                    <div className="flex gap-2">
+                        <FormInput
                             type="number"
                             value={formData.superficie_totale || ''}
-                            onChange={(e) => handleChange('superficie_totale', e.target.value ? parseFloat(e.target.value) : null)}
-                            className={baseInputClass}
-                            style={{ '--tw-ring-color': themeColor } as any}
+                            onChange={(value) => handleChange('superficie_totale', value ? parseFloat(value) : null)}
                             placeholder="Surface en m²"
-                            min="0"
-                            step="0.01"
+                            min={0}
+                            step={0.01}
+                            disabled={loading}
                         />
                     </div>
-
-                    {/* Dates de contrat */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
-                                <Calendar className="w-4 h-4 text-gray-400" />
-                                Début contrat
-                            </label>
-                            <input
-                                type="date"
-                                value={formData.date_debut_contrat || ''}
-                                onChange={(e) => handleChange('date_debut_contrat', e.target.value || null)}
-                                className={baseInputClass}
-                                style={{ '--tw-ring-color': themeColor } as any}
-                            />
-                        </div>
-                        <div>
-                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
-                                <Calendar className="w-4 h-4 text-gray-400" />
-                                Fin contrat
-                            </label>
-                            <input
-                                type="date"
-                                value={formData.date_fin_contrat || ''}
-                                onChange={(e) => handleChange('date_fin_contrat', e.target.value || null)}
-                                className={baseInputClass}
-                                style={{ '--tw-ring-color': themeColor } as any}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Actif toggle */}
-                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">
-                                Site actif
-                            </label>
-                            <p className="text-xs text-gray-500">
-                                Les sites inactifs ne sont pas affichés par défaut
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => handleChange('actif', !formData.actif)}
-                            className={`p-1 rounded-full transition-colors ${formData.actif ? 'text-emerald-600' : 'text-gray-400'
-                                }`}
-                        >
-                            {formData.actif ? (
-                                <ToggleRight className="w-8 h-8" />
-                            ) : (
-                                <ToggleLeft className="w-8 h-8" />
-                            )}
-                        </button>
-                    </div>
-                </form>
-
-                {/* Footer */}
-                <div className="flex items-center justify-end gap-3 px-6 py-4 border-t bg-gray-50">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                        disabled={isLoading}
-                    >
-                        Annuler
-                    </button>
-                    <button
-                        type="submit"
-                        onClick={handleSubmit}
-                        disabled={isLoading}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors disabled:opacity-50"
-                        style={{ backgroundColor: themeColor }}
-                        onMouseEnter={(e) => !isLoading && (e.currentTarget.style.filter = 'brightness(0.9)')}
-                        onMouseLeave={(e) => e.currentTarget.style.filter = 'brightness(1)'}
-                    >
-                        {isLoading ? (
-                            <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Enregistrement...
-                            </>
-                        ) : (
-                            <>
-                                <Save className="w-4 h-4" />
-                                Enregistrer
-                            </>
-                        )}
-                    </button>
+                </FormField>
+                <div className="absolute top-0 right-0">
+                    {superficieAction}
                 </div>
             </div>
-        </div>
+
+            {/* Dates de contrat */}
+            <div className="grid grid-cols-2 gap-4">
+                <FormField label="Début contrat" icon={<Calendar className="w-4 h-4" />}>
+                    <FormInput
+                        type="date"
+                        value={formatDateForInput(formData.date_debut_contrat)}
+                        onChange={(value) => {
+                            console.log('Date debut changed:', value);
+                            handleChange('date_debut_contrat', value || null);
+                        }}
+                        disabled={loading}
+                    />
+                </FormField>
+
+                <FormField label="Fin contrat" icon={<Calendar className="w-4 h-4" />}>
+                    <FormInput
+                        type="date"
+                        value={formatDateForInput(formData.date_fin_contrat)}
+                        onChange={(value) => {
+                            console.log('Date fin changed:', value);
+                            handleChange('date_fin_contrat', value || null);
+                        }}
+                        disabled={loading}
+                    />
+                </FormField>
+            </div>
+
+            {/* Actif toggle */}
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">Site actif</label>
+                    <p className="text-xs text-gray-500">
+                        Les sites inactifs ne sont pas affichés par défaut
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => handleChange('actif', !formData.actif)}
+                    className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50"
+                    style={{ backgroundColor: formData.actif ? '#10b981' : '#d1d5db' }}
+                    disabled={loading}
+                >
+                    <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            formData.actif ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                    />
+                </button>
+            </div>
+        </FormModal>
     );
 }
