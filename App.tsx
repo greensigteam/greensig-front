@@ -40,11 +40,8 @@ import ErrorBoundary from './components/ErrorBoundary';
 import logger from './services/logger';
 
 const PageLoadingFallback = () => (
-  <div className="flex items-center justify-center h-full min-h-[400px]">
-    <div className="flex flex-col items-center gap-3">
-      <div className="animate-spin rounded-full h-10 w-10 border-4 border-emerald-500 border-t-transparent"></div>
-      <p className="text-slate-500 text-sm">Chargement...</p>
-    </div>
+  <div className="fixed inset-0 z-50">
+    <LoadingScreen isLoading={true} loop={true} minDuration={0} />
   </div>
 );
 
@@ -224,29 +221,16 @@ function App() {
   };
 
   // Gestion du chargement:
-  // - Si pas de token (nouvelle visite): LoadingScreen avec video
-  // - Si token existe (refresh/retour): Simple spinner rapide
+  // - Afficher la vidéo en boucle pendant le chargement (nouvelle visite ou refresh)
   if (isRestoringSession) {
-    if (showVideoLoading) {
-      // Premiere visite ou apres deconnexion: afficher la video
-      return <LoadingScreen onLoadingComplete={() => setShowVideoLoading(false)} minDuration={3000} />;
-    } else {
-      // Session existante (refresh): afficher un spinner simple
-      return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-white">
-          <div className="flex flex-col items-center gap-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-emerald-500 border-t-transparent"></div>
-            <p className="text-slate-600 text-sm">Restauration de la session...</p>
-          </div>
-        </div>
-      );
-    }
+    // Afficher la vidéo en boucle - elle s'arrêtera automatiquement quand isRestoringSession passe à false
+    return <LoadingScreen isLoading={isRestoringSession} loop={true} minDuration={0} />;
   }
 
-  // Si pas de token apres verification, afficher d'abord la video puis le login
+  // Si pas de token après vérification, afficher la vidéo puis le login
   if (!user) {
     if (showVideoLoading) {
-      return <LoadingScreen onLoadingComplete={() => setShowVideoLoading(false)} minDuration={3000} />;
+      return <LoadingScreen isLoading={false} loop={true} minDuration={1500} onLoadingComplete={() => setShowVideoLoading(false)} />;
     }
     return <Login onLogin={setUser} />;
   }

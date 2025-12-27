@@ -28,6 +28,7 @@ import TaskFormModal, { InventoryObjectOption } from '../components/planning/Tas
 import QuickTaskCreator from '../components/planning/QuickTaskCreator';
 import PlanningFiltersComponent from '../components/planning/PlanningFilters';
 import { StatusBadge } from '../components/StatusBadge';
+import LoadingScreen from '../components/LoadingScreen';
 import { fetchSites, fetchInventory } from '../services/api';
 import {
     useFloating,
@@ -981,7 +982,11 @@ const Planning: FC = () => {
         );
     };
 
-    if (loading) return <div className="flex items-center justify-center h-full text-gray-500">Chargement...</div>;
+    if (loading) return (
+        <div className="fixed inset-0 z-50">
+            <LoadingScreen isLoading={true} loop={true} minDuration={0} />
+        </div>
+    );
     if (error) return <div className="flex items-center justify-center h-full text-red-500">{error}</div>;
 
     return (

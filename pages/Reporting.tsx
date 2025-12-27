@@ -8,6 +8,7 @@ import {
     Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import { apiFetch } from '../services/api';
+import LoadingScreen from '../components/LoadingScreen';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -163,11 +164,8 @@ const Reporting: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="p-6 flex items-center justify-center h-96">
-                <div className="text-center">
-                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-2"></div>
-                    <p className="text-gray-600">Chargement des statistiques...</p>
-                </div>
+            <div className="fixed inset-0 z-50">
+                <LoadingScreen isLoading={true} loop={true} minDuration={0} />
             </div>
         );
     }

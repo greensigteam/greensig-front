@@ -37,6 +37,7 @@ import {
 import { DataTable } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
 import { useNavigate } from 'react-router-dom';
+import LoadingScreen from '../components/LoadingScreen';
 
 // ...existing code...
 
@@ -730,8 +731,8 @@ const Users: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="p-6 h-full flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-emerald-500 border-t-transparent"></div>
+      <div className="fixed inset-0 z-50">
+        <LoadingScreen isLoading={true} loop={true} minDuration={0} />
       </div>
     );
   }

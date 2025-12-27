@@ -70,6 +70,7 @@ import {
 } from '../types/users';
 
 import EditUserModal from '../components/EditUserModal';
+import LoadingScreen from '../components/LoadingScreen';
 
 // API
 import {
@@ -704,9 +705,8 @@ const Teams: React.FC = () => {
 
   if (loading && !stats) {
     return (
-      <div className="p-6 h-full flex flex-col items-center justify-center gap-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-emerald-500 border-t-transparent"></div>
-        <p className="text-sm text-slate-500">Chargement des données...</p>
+      <div className="fixed inset-0 z-50">
+        <LoadingScreen isLoading={true} loop={true} minDuration={0} />
       </div>
     );
   }

@@ -13,6 +13,7 @@ import {
 } from '../services/suiviTachesApi';
 import { Tache, STATUT_TACHE_COLORS, PRIORITE_LABELS, ETAT_VALIDATION_COLORS, ETAT_VALIDATION_LABELS } from '../types/planning';
 import { PhotoList, ConsommationProduit, ProduitList } from '../types/suiviTaches';
+import LoadingWrapper from '../components/LoadingWrapper';
 
 // Helper pour construire l'URL complète des images
 const getFullImageUrl = (url: string | null): string => {

@@ -6,6 +6,7 @@ import { OLMap } from '../components/OLMap';
 import { StatusBadge } from '../components/StatusBadge';
 import { EditObjectModal } from '../components/EditObjectModal';
 import { MAP_LAYERS } from '../constants';
+import LoadingScreen from '../components/LoadingScreen';
 import {
   ChevronLeft,
   MapPin,
@@ -15,11 +16,8 @@ import {
 } from 'lucide-react';
 
 const LoadingSpinner: React.FC = () => (
-  <div className="flex items-center justify-center h-full">
-    <div className="text-center">
-      <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-2"></div>
-      <p className="text-gray-600">Chargement des détails...</p>
-    </div>
+  <div className="fixed inset-0 z-50">
+    <LoadingScreen isLoading={true} loop={true} minDuration={0} />
   </div>
 );
 

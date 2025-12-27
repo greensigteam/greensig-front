@@ -15,6 +15,7 @@ import { useToast } from '../contexts/ToastContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { DetailRow, DetailGrid, DetailCard, DetailEmptyState } from '../components/DetailModal';
 import { EditClientModal } from '../components/clients/ClientModals';
+import LoadingWrapper from '../components/LoadingWrapper';
 
 // ============================================================================
 // TYPES
@@ -39,11 +40,8 @@ interface InventoryStats {
 // ============================================================================
 
 const LoadingScreen: React.FC = () => (
-    <div className="flex items-center justify-center h-full min-h-[400px]">
-        <div className="text-center">
-            <Loader2 className="w-12 h-12 animate-spin mx-auto text-emerald-600 mb-3" />
-            <p className="text-gray-600">Chargement des détails du client...</p>
-        </div>
+    <div className="fixed inset-0 z-50">
+        <LoadingWrapper isLoading={true} />
     </div>
 );
 
@@ -331,11 +329,7 @@ const OngletSites: React.FC<{
     }, [sites, statusFilter]);
 
     if (isLoading) {
-        return (
-            <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
-            </div>
-        );
+        return <LoadingWrapper isLoading={true}><div /></LoadingWrapper>;
     }
 
     if (sites.length === 0) {
@@ -383,9 +377,7 @@ const OngletSites: React.FC<{
                             {/* Liste des sites */}
                             <div className="flex-1 overflow-y-auto p-4">
                                 {isLoadingAllSites ? (
-                                    <div className="flex items-center justify-center py-12">
-                                        <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
-                                    </div>
+                                    <LoadingWrapper isLoading={true}><div /></LoadingWrapper>
                                 ) : unassignedSites.length === 0 ? (
                                     <div className="text-center py-12">
                                         <MapPinIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -680,11 +672,7 @@ const OngletInventaire: React.FC<{
     isLoading: boolean;
 }> = ({ stats, isLoading }) => {
     if (isLoading) {
-        return (
-            <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
-            </div>
-        );
+        return <LoadingWrapper isLoading={true}><div /></LoadingWrapper>;
     }
 
     if (!stats || stats.totalObjets === 0) {
@@ -815,11 +803,7 @@ const OngletInterventions: React.FC<{
     const itemsPerPage = 10;
 
     if (isLoading) {
-        return (
-            <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
-            </div>
-        );
+        return <LoadingWrapper isLoading={true}><div /></LoadingWrapper>;
     }
 
     if (taches.length === 0) {

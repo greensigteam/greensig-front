@@ -2,61 +2,55 @@ import React, { useEffect, useState, useRef } from 'react';
 import logger from '../services/logger';
 
 interface LoadingScreenProps {
-    onLoadingComplete: () => void;
-    minDuration?: number; // Minimum duration in milliseconds
+    onLoadingComplete?: () => void;
+    minDuration?: number; // Minimum duration in milliseconds (0 = wait indefinitely)
+    isLoading?: boolean; // External loading state - when false, triggers completion
+    loop?: boolean; // Whether to loop the video
 }
 
 const LoadingScreen: React.FC<LoadingScreenProps> = ({
     onLoadingComplete,
-    minDuration = 3000
+    minDuration = 0,
+    isLoading = true,
+    loop = true
 }) => {
-    const [videoEnded, setVideoEnded] = useState(false);
-    const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+    const [minTimeElapsed, setMinTimeElapsed] = useState(minDuration === 0);
     const [fadeOut, setFadeOut] = useState(false);
     const [videoError, setVideoError] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
-    const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
+        if (minDuration === 0) {
+            setMinTimeElapsed(true);
+            return;
+        }
+
         // Set minimum time elapsed after specified duration
         const timer = setTimeout(() => {
             setMinTimeElapsed(true);
         }, minDuration);
 
-        // Fallback: Force completion after max duration if video doesn't load/play
-        fallbackTimerRef.current = setTimeout(() => {
-            logger.warn('Loading screen fallback triggered - forcing completion');
-            setVideoEnded(true);
-            setMinTimeElapsed(true);
-        }, minDuration + 5000); // 5 seconds after minimum duration
-
-        return () => {
-            clearTimeout(timer);
-            if (fallbackTimerRef.current) {
-                clearTimeout(fallbackTimerRef.current);
-            }
-        };
+        return () => clearTimeout(timer);
     }, [minDuration]);
 
     useEffect(() => {
-        // Start fade out when both video ended and minimum time elapsed
-        if (videoEnded && minTimeElapsed) {
+        // Start fade out when loading is complete and minimum time elapsed
+        if (!isLoading && minTimeElapsed) {
             setFadeOut(true);
             // Complete loading after fade out animation
             const fadeOutTimer = setTimeout(() => {
-                onLoadingComplete();
+                if (onLoadingComplete) {
+                    onLoadingComplete();
+                }
             }, 800); // Match the transition duration
             return () => clearTimeout(fadeOutTimer);
         }
         return undefined;
-    }, [videoEnded, minTimeElapsed, onLoadingComplete]);
+    }, [isLoading, minTimeElapsed, onLoadingComplete]);
 
     const handleVideoEnd = () => {
-        logger.debug('Video ended successfully');
-        setVideoEnded(true);
-        if (fallbackTimerRef.current) {
-            clearTimeout(fallbackTimerRef.current);
-        }
+        logger.debug('Video ended (will loop if enabled)');
+        // Video will auto-loop if loop prop is true
     };
 
     const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
@@ -100,6 +94,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
                             autoPlay
                             muted
                             playsInline
+                            loop={loop}
                             onEnded={handleVideoEnd}
                             onError={handleVideoError}
                             onLoadedData={handleVideoLoaded}
