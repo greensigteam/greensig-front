@@ -228,7 +228,7 @@ export default function SiteEditModal({ site, isOpen, onClose, onSaved }: SiteEd
                         <option value="">-- Aucun superviseur --</option>
                         {superviseurs.map((superviseur) => (
                             <option key={superviseur.utilisateur} value={superviseur.utilisateur}>
-                                {superviseur.full_name}
+                                {superviseur.fullName}
                             </option>
                         ))}
                     </select>
