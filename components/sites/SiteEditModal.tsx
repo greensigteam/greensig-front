@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Calendar, Hash, Ruler, Building2, Users, Loader2 } from 'lucide-react';
 import { updateSite, UpdateSiteData, SiteFrontend, calculateGeometryMetrics } from '../../services/api';
-import { fetchClients } from '../../services/usersApi';
-import { Client } from '../../types/users';
+import { fetchClients, fetchSuperviseurs } from '../../services/usersApi';
+import { Client, SuperviseurList } from '../../types/users';
 import { useToast } from '../../contexts/ToastContext';
 import FormModal, { FormField, FormInput, FormTextarea } from '../FormModal';
 
@@ -22,10 +22,15 @@ export default function SiteEditModal({ site, isOpen, onClose, onSaved }: SiteEd
     const [clients, setClients] = useState<Client[]>([]);
     const [isLoadingClients, setIsLoadingClients] = useState(false);
 
+    // Superviseurs state
+    const [superviseurs, setSuperviseurs] = useState<SuperviseurList[]>([]);
+    const [isLoadingSuperviseurs, setIsLoadingSuperviseurs] = useState(false);
+
     const [formData, setFormData] = useState<UpdateSiteData>({
         nom_site: '',
         code_site: '',
         client: undefined,
+        superviseur: undefined,
         adresse: '',
         superficie_totale: null,
         date_debut_contrat: null,
@@ -33,9 +38,10 @@ export default function SiteEditModal({ site, isOpen, onClose, onSaved }: SiteEd
         actif: true,
     });
 
-    // Fetch clients on mount
+    // Fetch clients and superviseurs on mount
     useEffect(() => {
-        const loadClients = async () => {
+        const loadData = async () => {
+            // Load clients
             setIsLoadingClients(true);
             try {
                 const response = await fetchClients();
@@ -48,10 +54,22 @@ export default function SiteEditModal({ site, isOpen, onClose, onSaved }: SiteEd
             } finally {
                 setIsLoadingClients(false);
             }
+
+            // Load superviseurs
+            setIsLoadingSuperviseurs(true);
+            try {
+                const response = await fetchSuperviseurs();
+                setSuperviseurs(response.results || []);
+            } catch (error) {
+                console.error('Error loading superviseurs:', error);
+                showToast('Erreur lors du chargement des superviseurs', 'error');
+            } finally {
+                setIsLoadingSuperviseurs(false);
+            }
         };
 
         if (isOpen) {
-            loadClients();
+            loadData();
         }
     }, [isOpen, showToast]);
 
@@ -63,6 +81,7 @@ export default function SiteEditModal({ site, isOpen, onClose, onSaved }: SiteEd
                 nom_site: site.name || '',
                 code_site: site.code_site || '',
                 client: site.client,
+                superviseur: site.superviseur,
                 adresse: site.adresse || '',
                 superficie_totale: site.superficie_totale || null,
                 date_debut_contrat: site.date_debut_contrat || null,
@@ -186,6 +205,30 @@ export default function SiteEditModal({ site, isOpen, onClose, onSaved }: SiteEd
                         {clients.map((client) => (
                             <option key={client.utilisateur} value={client.utilisateur}>
                                 {client.nomStructure} ({client.nom} {client.prenom})
+                            </option>
+                        ))}
+                    </select>
+                )}
+            </FormField>
+
+            {/* Superviseur affecté */}
+            <FormField label="Superviseur affecté" icon={<Users className="w-4 h-4" />}>
+                {isLoadingSuperviseurs ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Chargement des superviseurs...
+                    </div>
+                ) : (
+                    <select
+                        value={formData.superviseur || ''}
+                        onChange={(e) => handleChange('superviseur', e.target.value ? parseInt(e.target.value) : undefined)}
+                        className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-sm"
+                        disabled={loading}
+                    >
+                        <option value="">-- Aucun superviseur --</option>
+                        {superviseurs.map((superviseur) => (
+                            <option key={superviseur.utilisateur} value={superviseur.utilisateur}>
+                                {superviseur.full_name}
                             </option>
                         ))}
                     </select>

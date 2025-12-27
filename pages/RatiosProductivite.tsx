@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Search, Edit, Trash2, X, Gauge, Filter, Eye, Clock, Calendar, Info } from 'lucide-react';
 import { planningService } from '../services/planningService';
+import LoadingScreen from '../components/LoadingScreen';
 import {
     RatioProductivite, RatioProductiviteCreate, TypeTache,
     UNITE_MESURE_LABELS, TYPES_OBJETS, UniteMesure
@@ -274,8 +275,8 @@ const RatiosProductivite: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-full">
-                <div className="text-gray-500">Chargement...</div>
+            <div className="fixed inset-0 z-50">
+                <LoadingScreen isLoading={true} loop={true} minDuration={0} />
             </div>
         );
     }

@@ -13,6 +13,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import ConfirmModal from '../components/ConfirmModal';
 import { CreateClientModal, EditClientModal } from '../components/clients/ClientModals';
 import { exportClientsToCSV, exportClientsToExcel } from '../services/exportHelpers';
+import LoadingScreen from '../components/LoadingScreen';
 
 // ============================================================================
 // ACTION DROPDOWN COMPONENT (Réutilisé de Sites.tsx)
@@ -321,9 +322,8 @@ export default function Clients() {
             {/* Table */}
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
                 {isLoading ? (
-                    <div className="p-12 text-center">
-                        <Loader2 className="w-8 h-8 animate-spin mx-auto text-emerald-600" />
-                        <p className="text-gray-500 mt-2">Chargement des clients...</p>
+                    <div className="fixed inset-0 z-50">
+                        <LoadingScreen isLoading={true} loop={true} minDuration={0} />
                     </div>
                 ) : paginatedClients.length === 0 ? (
                     <div className="p-12 text-center text-gray-500">

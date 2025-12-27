@@ -4,6 +4,7 @@ import { BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, Cart
 import { TrendingUp, Clock, Star, AlertCircle, Filter, ArrowLeft } from 'lucide-react';
 import { fetchReclamationStats } from '../services/reclamationsApi';
 import { ReclamationStats } from '../types/reclamations';
+import LoadingScreen from '../components/LoadingScreen';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
@@ -46,8 +47,8 @@ const ReclamationsDashboard: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-96">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <div className="fixed inset-0 z-50">
+                <LoadingScreen isLoading={true} loop={true} minDuration={0} />
             </div>
         );
     }

@@ -24,6 +24,7 @@ import { PhotoUpload } from '../components/shared/PhotoUpload';
 import { SatisfactionForm } from '../components/SatisfactionForm';
 import TaskFormModal from '../components/planning/TaskFormModal';
 import { utcToLocalInput, localInputToUTC, formatLocalDate } from '../utils/dateHelpers';
+import LoadingScreen from '../components/LoadingScreen';
 
 import ConfirmModal from '../components/ConfirmModal';
 import { ReclamationTimeline } from '../components/ReclamationTimeline';
@@ -601,10 +602,9 @@ const Reclamations: React.FC = () => {
                             <tbody className="divide-y divide-gray-100">
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={7} className="p-8 text-center text-gray-500">
-                                            <div className="flex justify-center items-center gap-2">
-                                                <div className="animate-spin w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full"></div>
-                                                Chargement...
+                                        <td colSpan={7}>
+                                            <div className="fixed inset-0 z-50">
+                                                <LoadingScreen isLoading={true} loop={true} minDuration={0} />
                                             </div>
                                         </td>
                                     </tr>

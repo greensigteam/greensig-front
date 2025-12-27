@@ -12,6 +12,7 @@ import { TypeTache, TacheCreate } from '../types/planning';
 import { EquipeList } from '../types/users';
 import { useToast } from '../contexts/ToastContext';
 import { useSearch } from '../contexts/SearchContext';
+import LoadingScreen from '../components/LoadingScreen';
 
 // Types de végétation et hydrologie pour les filtres
 const VEGETATION_TYPES = ['Arbre', 'Palmier', 'Gazon', 'Arbuste', 'Vivace', 'Cactus', 'Graminee'];
@@ -1155,11 +1156,8 @@ const Inventory: React.FC = () => {
       <div className="flex-1 overflow-auto min-h-0 print-content">
         {/* Loading State */}
         {isLoadingAPI && (
-          <div className="flex items-center justify-center h-64 no-print">
-            <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mb-2"></div>
-              <p className="text-gray-600">Chargement de l'inventaire...</p>
-            </div>
+          <div className="fixed inset-0 z-50">
+            <LoadingScreen isLoading={true} loop={true} minDuration={0} />
           </div>
         )}
 

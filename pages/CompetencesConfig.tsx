@@ -5,6 +5,7 @@ import { useSearch } from '../contexts/SearchContext';
 import { useToast } from '../contexts/ToastContext';
 import CompetenceModal from '../components/modals/CompetenceModal';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
+import LoadingScreen from '../components/LoadingScreen';
 
 // Types
 import {
@@ -183,8 +184,8 @@ const CompetencesConfig: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="p-6 h-full flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-emerald-500 border-t-transparent"></div>
+      <div className="fixed inset-0 z-50">
+        <LoadingScreen isLoading={true} loop={true} minDuration={0} />
       </div>
     );
   }
