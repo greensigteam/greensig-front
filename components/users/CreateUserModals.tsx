@@ -626,8 +626,8 @@ export const CreateChefEquipeModal: React.FC<CreateModalProps> = ({ onClose, onC
       const operateurResponse = await createOperateur(operateurData);
       const operateurId = operateurResponse.utilisateur;
 
-      // Attribuer le rôle CHEF_EQUIPE
-      const chefRole = roleObjects.find(r => r.nomRole === 'CHEF_EQUIPE');
+      // Attribuer le rôle SUPERVISEUR
+      const chefRole = roleObjects.find(r => r.nomRole === 'SUPERVISEUR');
       if (chefRole) {
         await attribuerRole(String(operateurId), String(chefRole.id));
       }
@@ -1265,14 +1265,14 @@ export const UserTypeMenu: React.FC<UserTypeMenuProps> = ({ onSelect, onClose })
       color: 'green'
     },
     {
-      role: 'CHEF_EQUIPE' as NomRole,
+      role: 'SUPERVISEUR' as NomRole,
       icon: Award,
       label: "Chef d'équipe",
       description: "Gestion d'équipe et planification",
       color: 'yellow'
     },
     {
-      role: 'OPERATEUR' as NomRole,
+      role: 'SUPERVISEUR' as NomRole,
       icon: UserCheck,
       label: 'Opérateur',
       description: 'Interventions terrain et maintenance',

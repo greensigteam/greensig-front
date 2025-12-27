@@ -29,6 +29,33 @@ interface SelectedItemData {
   coordinates: { lat: number; lng: number };
 }
 
+// ✅ SessionStorage keys for state persistence
+const STORAGE_KEYS = {
+  FILTERS: 'inventory_filters',
+  MAIN_TAB: 'inventory_main_tab',
+  CURRENT_PAGE: 'inventory_current_page',
+  SHOW_FILTERS: 'inventory_show_filters'
+};
+
+// ✅ Helper functions for sessionStorage
+const saveToSession = (key: string, value: any) => {
+  try {
+    sessionStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {
+    console.error('Failed to save to sessionStorage:', e);
+  }
+};
+
+const loadFromSession = <T,>(key: string, defaultValue: T): T => {
+  try {
+    const item = sessionStorage.getItem(key);
+    return item ? JSON.parse(item) : defaultValue;
+  } catch (e) {
+    console.error('Failed to load from sessionStorage:', e);
+    return defaultValue;
+  }
+};
+
 // Composant CustomSelect pour des dropdowns modernes
 interface CustomSelectProps {
   value: string;
@@ -154,7 +181,11 @@ const Inventory: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { searchQuery, setPlaceholder } = useSearch();
-  const [mainTab, setMainTab] = useState<'tous' | 'vegetation' | 'hydraulique'>('tous');
+
+  // ✅ Restore main tab from sessionStorage
+  const [mainTab, setMainTab] = useState<'tous' | 'vegetation' | 'hydraulique'>(
+    loadFromSession(STORAGE_KEYS.MAIN_TAB, 'tous')
+  );
 
   // Selection state for creating tasks
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -175,15 +206,19 @@ const Inventory: React.FC = () => {
   const [modalTypesTaches, setModalTypesTaches] = useState<TypeTache[]>([]);
   const [taskSubmitting, setTaskSubmitting] = useState(false);
 
-  // Advanced Filters
-  const [filters, setFilters] = useState({
-    type: 'all',
-    state: 'all',
-    site: 'all',
-    intervention: 'all',
-    family: 'all' // Nouveau filtre famille
-  });
-  const [showFilters, setShowFilters] = useState(false);
+  // ✅ Advanced Filters - Restore from sessionStorage
+  const [filters, setFilters] = useState(
+    loadFromSession(STORAGE_KEYS.FILTERS, {
+      type: 'all',
+      state: 'all',
+      site: 'all',
+      intervention: 'all',
+      family: 'all'
+    })
+  );
+  const [showFilters, setShowFilters] = useState(
+    loadFromSession(STORAGE_KEYS.SHOW_FILTERS, false)
+  );
   const [families, setFamilies] = useState<string[]>([]); // État pour stocker la liste des familles
 
   // API State
@@ -228,11 +263,37 @@ const Inventory: React.FC = () => {
     return () => { mounted = false };
   }, []);
 
-  // Current page for pagination
-  const [currentPage, setCurrentPage] = useState(1);
+  // ✅ Current page for pagination - Restore from sessionStorage
+  const [currentPage, setCurrentPage] = useState(
+    loadFromSession(STORAGE_KEYS.CURRENT_PAGE, 1)
+  );
 
-  // Reset page when switching tabs
+  // ✅ Track first mount to avoid resetting restored state
+  const isFirstMount = useRef(true);
+
+  // ✅ Save state to sessionStorage when it changes
   useEffect(() => {
+    saveToSession(STORAGE_KEYS.MAIN_TAB, mainTab);
+  }, [mainTab]);
+
+  useEffect(() => {
+    saveToSession(STORAGE_KEYS.FILTERS, filters);
+  }, [filters]);
+
+  useEffect(() => {
+    saveToSession(STORAGE_KEYS.CURRENT_PAGE, currentPage);
+  }, [currentPage]);
+
+  useEffect(() => {
+    saveToSession(STORAGE_KEYS.SHOW_FILTERS, showFilters);
+  }, [showFilters]);
+
+  // Reset page when switching tabs (but not on first mount - to preserve restored state)
+  useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
     setCurrentPage(1);
     setFilters({ type: 'all', state: 'all', site: 'all', intervention: 'all', family: 'all' });
   }, [mainTab]);
@@ -337,7 +398,7 @@ const Inventory: React.FC = () => {
         'Arbuste': 'arbuste',
         'Vivace': 'vivace',
         'Cactus': 'cactus',
-        'Graminée': 'graminee',
+        'Graminee': 'graminee',  // ✅ Sans accent pour cohérence
         'Puit': 'puit',
         'Pompe': 'pompe',
         'Vanne': 'vanne',
@@ -364,7 +425,7 @@ const Inventory: React.FC = () => {
         species: props.famille || undefined,
         height: props.hauteur || props.taille || props.profondeur || undefined,
         diameter: props.diametre || props.densite || undefined,
-        surface: props.area_sqm || undefined,
+        surface: props.superficie_calculee || undefined,
         coordinates: {
           lat: coords[1] || 0,
           lng: coords[0] || 0,
@@ -619,6 +680,7 @@ const Inventory: React.FC = () => {
       { key: 'type', label: 'Type', render: (item) => <span className="capitalize">{item.type}</span> },
       { key: 'state', label: 'État', render: (item) => <StatusBadge status={item.state} type="state" />, sortable: false },
       { key: 'species', label: 'Famille', render: (item) => item.species || '-' },
+      { key: 'surface', label: 'Surface (m²)', render: (item) => item.surface ? `${item.surface}` : '-' },  // ✅ Surface ajoutée
       { key: 'diameter', label: 'Densité', render: (item) => item.diameter || '-' },
       { key: 'lastIntervention', label: 'Dernière intervention', render: (item) => item.lastIntervention ? new Date(item.lastIntervention).toLocaleDateString('fr-FR') : '-' }
     ],
@@ -628,6 +690,7 @@ const Inventory: React.FC = () => {
       { key: 'type', label: 'Type', render: (item) => <span className="capitalize">{item.type}</span> },
       { key: 'state', label: 'État', render: (item) => <StatusBadge status={item.state} type="state" />, sortable: false },
       { key: 'species', label: 'Famille', render: (item) => item.species || '-' },
+      { key: 'surface', label: 'Surface (m²)', render: (item) => item.surface ? `${item.surface}` : '-' },  // ✅ Surface ajoutée
       { key: 'diameter', label: 'Densité', render: (item) => item.diameter || '-' },
       { key: 'lastIntervention', label: 'Dernière intervention', render: (item) => item.lastIntervention ? new Date(item.lastIntervention).toLocaleDateString('fr-FR') : '-' }
     ],
@@ -637,6 +700,7 @@ const Inventory: React.FC = () => {
       { key: 'type', label: 'Type', render: (item) => <span className="capitalize">{item.type}</span> },
       { key: 'state', label: 'État', render: (item) => <StatusBadge status={item.state} type="state" />, sortable: false },
       { key: 'species', label: 'Famille', render: (item) => item.species || '-' },
+      { key: 'surface', label: 'Surface (m²)', render: (item) => item.surface ? `${item.surface}` : '-' },  // ✅ Surface ajoutée
       { key: 'diameter', label: 'Densité', render: (item) => item.diameter || '-' },
       { key: 'lastIntervention', label: 'Dernière intervention', render: (item) => item.lastIntervention ? new Date(item.lastIntervention).toLocaleDateString('fr-FR') : '-' }
     ],
@@ -648,6 +712,7 @@ const Inventory: React.FC = () => {
       { key: 'type', label: 'Type', render: (item) => <span className="capitalize">{item.type}</span> },
       { key: 'state', label: 'État', render: (item) => <StatusBadge status={item.state} type="state" />, sortable: false },
       { key: 'species', label: 'Famille', render: (item) => item.species || '-' },
+      { key: 'surface', label: 'Surface (m²)', render: (item) => item.surface ? `${item.surface}` : '-' },  // ✅ Surface ajoutée
       { key: 'diameter', label: 'Densité', render: (item) => item.diameter || '-' },
       { key: 'lastIntervention', label: 'Dernière intervention', render: (item) => item.lastIntervention ? new Date(item.lastIntervention).toLocaleDateString('fr-FR') : '-' }
     ],

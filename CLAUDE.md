@@ -98,19 +98,31 @@ Files are at the root level (no `src/` directory):
 Backend CORS allows `http://localhost:5173` (Vite dev server).
 Frontend expects backend at localhost:8000 (configured in services/api.ts).
 
-## User Roles
-- `ADMIN` - Full access
-- `CHEF_EQUIPE` - Team leader
-- `OPERATEUR` - Standard operations
-- `CLIENT` - Client portal only (redirected on login)
+## User Roles (✅ Refactoring Complete)
+- `ADMIN` - Full access to all features
+- `SUPERVISEUR` - Manages teams, planning, and field operations (replaces CHEF_EQUIPE)
+- `CLIENT` - Client portal access only (redirected on login)
 
-## Key Types (from types.ts)
+**Former roles** (removed in refactoring):
+- ~~`CHEF_EQUIPE`~~ → Now `SUPERVISEUR` (user role for team management)
+- ~~`OPERATEUR`~~ → Now HR data only (operators don't log in)
+
+## Key Types (from types.ts) - ✅ Updated Phase 6
 
 ```typescript
-type Role = 'ADMIN' | 'OPERATEUR' | 'CLIENT' | 'CHEF_EQUIPE';
+// ✅ Updated: OPERATEUR and CHEF_EQUIPE removed, SUPERVISEUR added
+type Role = 'ADMIN' | 'SUPERVISEUR' | 'CLIENT';
+
+// Map types (unchanged)
 enum MapLayerType { PLAN, SATELLITE, TERRAIN, NAVIGATION }
 interface Coordinates { lat: number; lng: number; }
 interface User { id: string; name: string; email: string; role: Role; }
+
+// ✅ New interfaces (Phase 6)
+// See types/users.ts for:
+// - SuperviseurList, SuperviseurDetail, SuperviseurCreate, SuperviseurUpdate
+// - OperateurList (decoupled from Utilisateur - standalone HR data)
+// - EquipeList (now includes superviseur field)
 ```
 
 ## Related Documentation

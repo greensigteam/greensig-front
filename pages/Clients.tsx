@@ -216,9 +216,9 @@ export default function Clients() {
         }
     };
 
-    const handleExportExcel = () => {
+    const handleExportExcel = async () => {
         try {
-            exportClientsToExcel(filteredClients);
+            await exportClientsToExcel(filteredClients);
             showToast(`Export Excel réussi (${filteredClients.length} clients)`, 'success');
         } catch (error) {
             showToast('Erreur lors de l\'export Excel', 'error');

@@ -10,8 +10,8 @@ interface LoginProps {
   onLogin: (user: User) => void;
 }
 
-// Seuls les chefs d'équipe peuvent se connecter dans la partie opérateurs
-const ROLES: Role[] = ['ADMIN', 'CHEF_EQUIPE', 'CLIENT'];
+// Rôles disponibles pour la connexion (superviseurs gèrent les équipes)
+const ROLES: Role[] = ['ADMIN', 'SUPERVISEUR', 'CLIENT'];
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
@@ -53,14 +53,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         } else {
           roles = ['CLIENT'];
         }
-        // Si l'utilisateur sélectionne OPÉRATEUR (CHEF ÉQUIPE), il doit avoir le rôle CHEF_EQUIPE
-        if (selectedRole === 'CHEF_EQUIPE' && !roles.includes('CHEF_EQUIPE')) {
-          setError("Seuls les chefs d'équipe peuvent acceder.");
+        // Si l'utilisateur sélectionne SUPERVISEUR, il doit avoir le rôle SUPERVISEUR
+        if (selectedRole === 'SUPERVISEUR' && !roles.includes('SUPERVISEUR')) {
+          setError("Seuls les superviseurs peuvent accéder à ce rôle.");
           setIsLoading(false);
           return;
         }
         // Pour les autres rôles, vérification classique
-        if (selectedRole !== 'CHEF_EQUIPE' && !roles.includes(selectedRole)) {
+        if (selectedRole !== 'SUPERVISEUR' && !roles.includes(selectedRole)) {
           setError("Vous n'avez pas accès à ce rôle.");
           setIsLoading(false);
           return;
@@ -124,7 +124,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   ? 'bg-white text-emerald-700 shadow-sm border border-emerald-100'
                   : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}
               >
-                {r === 'OPERATEUR' ? 'OPÉRATEUR' : r}
+                {r}
               </button>
             ))}
           </div>

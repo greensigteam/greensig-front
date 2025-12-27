@@ -64,6 +64,10 @@ export interface Reclamation {
     justification_rejet?: string | null;
     date_cloture_reelle?: string | null;
 
+    // Workflow de validation de clôture
+    cloture_proposee_par?: number | null;
+    date_proposition_cloture?: string | null;
+
     photos?: any[]; // Photos directes de la réclamation
     photos_taches?: any[]; // Photos des tâches liées
     historique?: HistoriqueReclamation[];

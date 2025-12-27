@@ -1,5 +1,5 @@
 
-export type Role = 'ADMIN' | 'OPERATEUR' | 'CLIENT' | 'CHEF_EQUIPE';
+export type Role = 'ADMIN' | 'SUPERVISEUR' | 'CLIENT';
 export type ViewState = 'LOGIN' | 'DASHBOARD' | 'MAP' | 'INVENTORY' | 'PLANNING' | 'INTERVENTIONS' | 'CLAIMS' | 'TEAMS' | 'USERS' | 'REPORTING' | 'CLIENT_PORTAL' | 'PRODUCTS' | 'SITES';
 
 export interface User {

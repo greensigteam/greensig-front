@@ -199,7 +199,7 @@ export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
             isOpen={isOpen}
             onClose={onClose}
             onSubmit={handleSubmit}
-            title="Signaler un Problème"
+            title="Signaler une Réclamation"
             icon={<AlertTriangle className="w-5 h-5" />}
             size="lg"
             loading={isSubmitting}
@@ -270,10 +270,10 @@ export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
             ) : null}
 
             <div className="space-y-4">
-                {/* Type de problème */}
+                {/* Type de réclamation */}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Type de problème <span className="text-red-500">*</span>
+                        Type de réclamation <span className="text-red-500">*</span>
                     </label>
                     <select
                         required

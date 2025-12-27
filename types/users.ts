@@ -20,7 +20,7 @@ export type StatutAbsence = 'DEMANDEE' | 'VALIDEE' | 'REFUSEE' | 'ANNULEE';
 
 export type StatutEquipe = 'COMPLETE' | 'PARTIELLE' | 'INDISPONIBLE';
 
-export type NomRole = 'ADMIN' | 'CLIENT' | 'CHEF_EQUIPE' | 'OPERATEUR';
+export type NomRole = 'ADMIN' | 'CLIENT' | 'SUPERVISEUR';
 
 // ============================================================================
 // LABELS POUR L'AFFICHAGE
@@ -68,8 +68,7 @@ export const STATUT_EQUIPE_LABELS: Record<StatutEquipe, string> = {
 export const NOM_ROLE_LABELS: Record<NomRole, string> = {
   ADMIN: 'Administrateur',
   CLIENT: 'Client',
-  CHEF_EQUIPE: "Chef d'equipe",
-  OPERATEUR: 'Operateur'
+  SUPERVISEUR: 'Superviseur'
 };
 
 // ============================================================================
@@ -170,6 +169,40 @@ export interface ClientUpdate {
 }
 
 // ============================================================================
+// SUPERVISEUR
+// ============================================================================
+
+export interface SuperviseurList {
+  utilisateur: number;
+  email: string;
+  nom: string;
+  prenom: string;
+  fullName: string;
+  actif: boolean;
+  nombreEquipesGerees: number;
+}
+
+export interface SuperviseurDetail extends SuperviseurList {
+  utilisateurDetail: Utilisateur;
+  equipesGerees: EquipeList[];
+}
+
+export interface SuperviseurCreate {
+  email: string;
+  nom: string;
+  prenom: string;
+  password: string;
+  actif?: boolean;
+}
+
+export interface SuperviseurUpdate {
+  nom?: string;
+  prenom?: string;
+  email?: string;
+  actif?: boolean;
+}
+
+// ============================================================================
 // COMPETENCE
 // ============================================================================
 
@@ -209,38 +242,39 @@ export interface CompetenceOperateurUpdate {
 // ============================================================================
 
 export interface OperateurList {
-  utilisateur: number;
-  email: string;
+  id: number;
   nom: string;
   prenom: string;
   fullName: string;
-  actif: boolean;
+  email: string;
   numeroImmatriculation: string;
   statut: StatutOperateur;
   equipe: number | null;
   equipeNom: string | null;
+  superviseur: number | null;
+  superviseurNom: string | null;
   dateEmbauche: string;
   telephone: string;
   photo: string | null;
   estChefEquipe: boolean;
   estDisponible: boolean;
+  peutEtreChef: boolean;
 }
 
 export interface OperateurDetail extends OperateurList {
-  utilisateurDetail: Utilisateur;
   competencesDetail: CompetenceOperateur[];
-  equipesDirigeesCount: number;
+  superviseurDetail: SuperviseurList | null;
   peutEtreChef: boolean;
 }
 
 export interface OperateurCreate {
-  email: string;
   nom: string;
   prenom: string;
-  password: string;
+  email?: string;
   numeroImmatriculation: string;
   statut?: StatutOperateur;
   equipe?: number | null;
+  superviseur?: number | null;
   dateEmbauche: string;
   telephone?: string;
   photo?: string;
@@ -250,10 +284,10 @@ export interface OperateurUpdate {
   nom?: string;
   prenom?: string;
   email?: string;
-  actif?: boolean;
   numeroImmatriculation?: string;
   statut?: StatutOperateur;
   equipe?: number | null;
+  superviseur?: number | null;
   telephone?: string;
   photo?: string;
 }
@@ -267,6 +301,8 @@ export interface EquipeList {
   nomEquipe: string;
   chefEquipe: number | null;
   chefEquipeNom: string | null;
+  superviseur: number | null;
+  superviseurNom: string | null;
   actif: boolean;
   dateCreation: string;
   nombreMembres: number;
@@ -275,12 +311,14 @@ export interface EquipeList {
 
 export interface EquipeDetail extends EquipeList {
   chefEquipeDetail: OperateurList | null;
+  superviseurDetail: SuperviseurList | null;
   membres: OperateurList[];
 }
 
 export interface EquipeCreate {
   nomEquipe: string;
   chefEquipe?: number | null;
+  superviseur?: number | null;
   actif?: boolean;
   membres?: number[];
 }
@@ -288,6 +326,7 @@ export interface EquipeCreate {
 export interface EquipeUpdate {
   nomEquipe?: string;
   chefEquipe?: number | null;
+  superviseur?: number | null;
   actif?: boolean;
 }
 
@@ -383,12 +422,15 @@ export interface StatistiquesUtilisateurs {
     actifs: number;
     parRole: Record<NomRole, number>;
   };
+  superviseurs: {
+    total: number;
+    actifs: number;
+  };
   operateurs: {
     total: number;
     actifs: number;
     disponiblesAujourdhui: number;
     parStatut: Record<StatutOperateur, number>;
-    chefsEquipe: number;
   };
   equipes: {
     total: number;
@@ -428,6 +470,7 @@ export interface UtilisateurFilters {
   dateCreationMin?: string;
   dateCreationMax?: string;
   page?: number;
+  pageSize?: number;
 }
 
 export interface OperateurFilters {
@@ -445,6 +488,7 @@ export interface OperateurFilters {
   dateEmbaucheMin?: string;
   dateEmbaucheMax?: string;
   page?: number;
+  pageSize?: number;
 }
 
 export interface EquipeFilters {
@@ -455,6 +499,7 @@ export interface EquipeFilters {
   membresMin?: number;
   membresMax?: number;
   page?: number;
+  pageSize?: number;
 }
 
 export interface AbsenceFilters {
@@ -469,6 +514,7 @@ export interface AbsenceFilters {
   dateFinMax?: string;
   enCours?: boolean;
   page?: number;
+  pageSize?: number;
 }
 
 export interface CompetenceFilters {

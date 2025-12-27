@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getSiteById, fetchAllSites, SiteFrontend, deleteSite, apiFetch } from '../services/api';
+import { getSiteById, fetchAllSites, SiteFrontend, deleteSite, updateSite, apiFetch, fetchCurrentUser } from '../services/api';
+import { fetchClients } from '../services/usersApi';
+import type { Client } from '../types/users';
 import { OLMap } from '../components/OLMap';
 import { MAP_LAYERS } from '../constants';
 import { useToast } from '../contexts/ToastContext';
@@ -21,7 +23,11 @@ import {
     TrendingUp,
     Droplet,
     Trees,
-    Users
+    Users,
+    Plus,
+    Search,
+    X as XIcon,
+    Loader2
 } from 'lucide-react';
 import {
     BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -107,8 +113,30 @@ const SiteDetailPage: React.FC = () => {
     const [statistics, setStatistics] = useState<any>(null);
     const [isLoadingStats, setIsLoadingStats] = useState(false);
 
+    // Client assignment modal
+    const [showAssignClientModal, setShowAssignClientModal] = useState(false);
+    const [clients, setClients] = useState<Client[]>([]);
+    const [isLoadingClients, setIsLoadingClients] = useState(false);
+    const [clientSearchQuery, setClientSearchQuery] = useState('');
+
+    // Current user (for displaying "Vous-même" if client is owner)
+    const [currentUser, setCurrentUser] = useState<any>(null);
+
     // Reload trigger
     const [refreshKey, setRefreshKey] = useState(0);
+
+    // Load current user on mount
+    useEffect(() => {
+        const loadCurrentUser = async () => {
+            try {
+                const user = await fetchCurrentUser();
+                setCurrentUser(user);
+            } catch (error) {
+                console.error('Error loading current user:', error);
+            }
+        };
+        loadCurrentUser();
+    }, []);
 
     useEffect(() => {
         if (!id) {
@@ -196,6 +224,44 @@ const SiteDetailPage: React.FC = () => {
         setIsEditModalOpen(false);
         showToast('Site mis à jour avec succès', 'success');
     };
+
+    // Load clients when modal opens
+    useEffect(() => {
+        if (showAssignClientModal && clients.length === 0) {
+            loadClients();
+        }
+    }, [showAssignClientModal]);
+
+    const loadClients = async () => {
+        setIsLoadingClients(true);
+        try {
+            const data = await fetchClients();
+            setClients(data.results || []);
+        } catch (error: any) {
+            showToast('Erreur lors du chargement des clients', 'error');
+        } finally {
+            setIsLoadingClients(false);
+        }
+    };
+
+    const handleAssignClient = async (clientId: number) => {
+        if (!site) return;
+        try {
+            await updateSite(Number(site.id), { client: clientId });
+            showToast('Client assigné avec succès', 'success');
+            setRefreshKey(prev => prev + 1); // Trigger reload
+            setShowAssignClientModal(false);
+            setClientSearchQuery('');
+        } catch (error: any) {
+            showToast('Erreur lors de l\'assignation du client', 'error');
+        }
+    };
+
+    const filteredClients = clients.filter(c =>
+        c.nomStructure?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+        c.nom?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+        c.email?.toLowerCase().includes(clientSearchQuery.toLowerCase())
+    );
 
     if (isLoading) return <LoadingSpinner />;
     if (error) return <ErrorDisplay message={error} />;
@@ -293,8 +359,26 @@ const SiteDetailPage: React.FC = () => {
                                         <dt className="flex items-center gap-2 text-sm font-medium text-gray-500 mb-1">
                                             <Users className="w-4 h-4" /> Client Propriétaire
                                         </dt>
-                                        <dd className="text-base font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
-                                            {site.client_nom || 'Non assigné'}
+                                        <dd className="flex items-center gap-2">
+                                            <div className="flex-1 text-base font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
+                                                {(() => {
+                                                    // If current user is the owner client, display "Vous-même"
+                                                    if (currentUser &&
+                                                        currentUser.roles?.includes('CLIENT') &&
+                                                        currentUser.client_id &&
+                                                        currentUser.client_id === site.client) {
+                                                        return 'Vous-même';
+                                                    }
+                                                    return site.client_nom || 'Non assigné';
+                                                })()}
+                                            </div>
+                                            <button
+                                                onClick={() => setShowAssignClientModal(true)}
+                                                className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm flex-shrink-0"
+                                                title="Assigner un client"
+                                            >
+                                                <Plus className="w-4 h-4" />
+                                            </button>
                                         </dd>
                                     </div>
 
@@ -714,6 +798,94 @@ const SiteDetailPage: React.FC = () => {
                     onClose={() => setIsEditModalOpen(false)}
                     onSaved={handleEditSuccess}
                 />
+            )}
+
+            {/* Assign Client Modal */}
+            {showAssignClientModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] flex flex-col shadow-2xl">
+                        {/* Header */}
+                        <div className="p-6 border-b flex items-center justify-between">
+                            <h2 className="text-xl font-bold text-gray-900">Assigner un client</h2>
+                            <button
+                                onClick={() => {
+                                    setShowAssignClientModal(false);
+                                    setClientSearchQuery('');
+                                }}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Search bar */}
+                        <div className="p-4 border-b">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Rechercher un client..."
+                                    value={clientSearchQuery}
+                                    onChange={(e) => setClientSearchQuery(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Client list */}
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {isLoadingClients ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+                                </div>
+                            ) : filteredClients.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                                    <p className="text-gray-500">
+                                        {clientSearchQuery
+                                            ? 'Aucun client trouvé pour cette recherche'
+                                            : 'Aucun client disponible'}
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {filteredClients.map((client) => (
+                                        <button
+                                            key={client.utilisateur}
+                                            onClick={() => handleAssignClient(client.utilisateur)}
+                                            className="w-full p-4 border rounded-lg hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left group"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex-1">
+                                                    <div className="font-medium text-gray-900 group-hover:text-emerald-700">
+                                                        {client.nomStructure}
+                                                    </div>
+                                                    <div className="text-sm text-gray-500 mt-1">
+                                                        {client.nom} {client.prenom} • {client.email}
+                                                    </div>
+                                                </div>
+                                                <Plus className="w-5 h-5 text-gray-400 group-hover:text-emerald-600" />
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 border-t bg-gray-50 flex justify-end">
+                            <button
+                                onClick={() => {
+                                    setShowAssignClientModal(false);
+                                    setClientSearchQuery('');
+                                }}
+                                className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+                            >
+                                Fermer
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

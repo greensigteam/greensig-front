@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { X, AlertTriangle } from 'lucide-react';
 import { VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND } from '../constants';
@@ -191,10 +191,11 @@ export const MapPage: React.FC<MapPageProps> = ({
   } = useSearch();
 
   // Override hook's handleSuggestionClick to also update targetLocation
-  const handleSuggestionClick = (suggestion: typeof searchSuggestions[0]) => {
+  // ✅ Memoize to prevent MapSearchBar re-renders
+  const handleSuggestionClick = useCallback((suggestion: typeof searchSuggestions[0]) => {
     hookHandleSuggestionClick(suggestion);
     // La navigation est maintenant gérée par l'effet sur selectedSuggestion
-  };
+  }, [hookHandleSuggestionClick]);
 
   // ✅ Clear persistent drawing state on mount to prevent "white page" issues
   useEffect(() => {
@@ -410,7 +411,7 @@ export const MapPage: React.FC<MapPageProps> = ({
     }
   };
 
-  // Handle clicking "Signaler un problème" button
+  // Handle clicking "Signaler une réclamation" button
   const handleReportProblem = async () => {
     // Load reference data if needed
     if (typesReclamation.length === 0) {
@@ -489,18 +490,19 @@ export const MapPage: React.FC<MapPageProps> = ({
   });
 
   // ========== HANDLERS ==========
-  const handleGeolocation = () => {
+  // ✅ Memoize to prevent MapSearchBar re-renders
+  const handleGeolocation = useCallback(() => {
     setIsSearching(true);
     requestGeolocation();
-  };
+  }, [requestGeolocation, setIsSearching]);
 
   // ========== SEARCH HANDLER ==========
   
-  // Define handleSearch function to be passed to MapSearchBar
-  const handleSearch = async () => {
+  // ✅ Memoize to prevent MapSearchBar re-renders
+  const handleSearch = useCallback(async () => {
     if (!searchQuery || searchQuery.trim().length < 2) return;
     setIsSearching(true);
-  };
+  }, [searchQuery, setIsSearching]);
 
   // Effect to handle selection from suggestions (click in list)
   useEffect(() => {
@@ -533,35 +535,19 @@ export const MapPage: React.FC<MapPageProps> = ({
       }
 
       setIsSearching(true);
-      
+
       try {
-        const query = searchQuery.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const newSuggestions: SearchSuggestion[] = [];
+        const suggestions: SearchSuggestion[] = [];
 
-        // 1. Recherche dans les sites API (Priorité 1)
-        const matchedSites = sites.filter(s => {
-          const name = s.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-          const code = (s.code_site || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-          return name.includes(query) || code.includes(query);
-        }).slice(0, 3); // Limit to 3 sites
-
-        matchedSites.forEach(site => {
-          newSuggestions.push({
-            id: site.id,
-            name: site.name,
-            type: 'Site',
-            coordinates: site.coordinates
-          });
-        });
-
-        // 2. Recherche API Django (Priorité 2)
+        // Single source of truth: Django API backend
+        // Returns all objects (Sites, Vegetation, Hydraulic) filtered by user permissions
         try {
           const apiResults = await searchObjects(searchQuery);
           if (apiResults && apiResults.length > 0) {
-            apiResults.slice(0, 5).forEach(result => {
+            apiResults.slice(0, 8).forEach(result => {
               if (result.location) {
                 const coords = geoJSONToLatLng(result.location.coordinates);
-                newSuggestions.push({
+                suggestions.push({
                   id: result.id.toString(),
                   name: result.name,
                   type: result.type,
@@ -574,14 +560,14 @@ export const MapPage: React.FC<MapPageProps> = ({
           logger.error('Erreur recherche API Django:', error);
         }
 
-        // 3. Fallback: Nominatim (Priorité 3)
-        if (newSuggestions.length < 3) {
+        // Fallback: Nominatim ONLY if no API results
+        if (suggestions.length === 0) {
           try {
             const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=3`);
             if (response.ok) {
               const data = await response.json();
               data.forEach((result: any) => {
-                newSuggestions.push({
+                suggestions.push({
                   id: `nominatim-${result.place_id}`,
                   name: result.display_name,
                   type: 'Lieu',
@@ -595,8 +581,8 @@ export const MapPage: React.FC<MapPageProps> = ({
         }
 
         // Update suggestions in context
-        setSearchSuggestions(newSuggestions);
-        setShowSuggestions(newSuggestions.length > 0);
+        setSearchSuggestions(suggestions);
+        setShowSuggestions(suggestions.length > 0);
 
       } finally {
         setIsSearching(false);

@@ -19,10 +19,12 @@ const SuiviTaches = lazy(() => import('./pages/SuiviTaches'));
 const Produits = lazy(() => import('./pages/Produits'));
 const Reporting = lazy(() => import('./pages/Reporting'));
 const Users = lazy(() => import('./pages/Users'));
+const Parametres = lazy(() => import('./pages/Parametres'));
 const Sites = lazy(() => import('./pages/Sites'));
 const SiteDetailPage = lazy(() => import('./pages/SiteDetailPage'));
 const Clients = lazy(() => import('./pages/Clients'));
 const ClientDetailPage = lazy(() => import('./pages/ClientDetailPage'));
+const OperateurDetailPage = lazy(() => import('./pages/OperateurDetailPage'));
 import { User, MapLayerType, Coordinates, OverlayState, MapObjectDetail, UserLocation, Measurement, MeasurementType } from './types';
 import { MAP_LAYERS } from './constants';
 import { hasExistingToken, fetchCurrentUser, updateInventoryItem, deleteInventoryItem } from './services/api';
@@ -99,11 +101,11 @@ function App() {
         try {
           const userRaw = await fetchCurrentUser();
 
-          // Determine role with priority: ADMIN > CHEF_EQUIPE > OPERATEUR > CLIENT
+          // Determine role with priority: ADMIN > SUPERVISEUR > CLIENT
           let role: any = 'CLIENT';
           if (Array.isArray(userRaw.roles) && userRaw.roles.length > 0) {
             // Priority order for role selection
-            const rolePriority = ['ADMIN', 'CHEF_EQUIPE', 'OPERATEUR', 'CLIENT'];
+            const rolePriority = ['ADMIN', 'SUPERVISEUR', 'CLIENT'];
             for (const priorityRole of rolePriority) {
               if (userRaw.roles.includes(priorityRole)) {
                 role = priorityRole;
@@ -353,12 +355,22 @@ function App() {
                           <Suspense fallback={<PageLoadingFallback />}><Users /></Suspense>
                         </RequireRole>
                       } />
+                      <Route path="operateurs/:id" element={
+                        <RequireRole user={user} roles={['ADMIN']}>
+                          <Suspense fallback={<PageLoadingFallback />}><OperateurDetailPage /></Suspense>
+                        </RequireRole>
+                      } />
 
                       <Route path="planning" element={<Suspense fallback={<PageLoadingFallback />}><Planning /></Suspense>} />
                       <Route path="ratios" element={<Suspense fallback={<PageLoadingFallback />}><RatiosProductivite /></Suspense>} />
                       <Route path="claims" element={<Suspense fallback={<PageLoadingFallback />}><SuiviTaches /></Suspense>} />
                       <Route path="products" element={<Suspense fallback={<PageLoadingFallback />}><Produits /></Suspense>} />
                       <Route path="reporting" element={<Suspense fallback={<PageLoadingFallback />}><Reporting /></Suspense>} />
+                      <Route path="parametres" element={
+                        <RequireRole user={user} roles={['ADMIN']}>
+                          <Suspense fallback={<PageLoadingFallback />}><Parametres /></Suspense>
+                        </RequireRole>
+                      } />
                       <Route path="client" element={<Navigate to="/client/map" replace />} />
                       <Route path="client/map" element={null} />
                       {/* Add a /map route if you want a dedicated map view without the panel */}

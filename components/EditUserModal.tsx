@@ -100,7 +100,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
 
   useEffect(() => {
     const loadComps = async () => {
-      if (!(userRoles.includes('OPERATEUR') || userRoles.includes('CHEF_EQUIPE'))) return;
+      if (!(userRoles.includes('SUPERVISEUR') || userRoles.includes('SUPERVISEUR'))) return;
       try {
         const all = await fetchCompetences();
         setAllCompetences(all);
@@ -146,7 +146,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
 
 
 
-      if (userRoles && (userRoles.includes('OPERATEUR') || userRoles.includes('CHEF_EQUIPE'))) {
+      if (userRoles && (userRoles.includes('SUPERVISEUR') || userRoles.includes('SUPERVISEUR'))) {
         // if operateur profile exists, update it; otherwise create one
         if (operateurInfo) {
           const operateurUpdate: OperateurUpdate = {
@@ -187,8 +187,8 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
 
   // Determine icon color based on roles
   const iconColor = userRoles.includes('ADMIN') ? 'text-purple-600' :
-    userRoles.includes('OPERATEUR') ? 'text-blue-600' :
-    userRoles.includes('CHEF_EQUIPE') ? 'text-yellow-600' :
+    userRoles.includes('SUPERVISEUR') ? 'text-blue-600' :
+    userRoles.includes('SUPERVISEUR') ? 'text-yellow-600' :
     userRoles.includes('CLIENT') ? 'text-green-600' : 'text-gray-600';
 
   const subtitleContent = (
@@ -318,8 +318,8 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
       </FormSection>
 
 
-      {/* Informations opérateur (si OPERATEUR ou CHEF_EQUIPE) */}
-      {(userRoles.includes('OPERATEUR') || userRoles.includes('CHEF_EQUIPE')) && (
+      {/* Informations opérateur (si SUPERVISEUR ou SUPERVISEUR) */}
+      {(userRoles.includes('SUPERVISEUR') || userRoles.includes('SUPERVISEUR')) && (
         <FormSection title="Informations opérateur" icon={<UserCheck className="w-4 h-4" />}>
           <div className="grid grid-cols-2 gap-4">
             <FormField label="Matricule">

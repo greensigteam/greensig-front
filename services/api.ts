@@ -2,6 +2,7 @@
  * Service API pour communication avec le backend Django
  *
  * Base URL configurée via .env (VITE_API_BASE_URL)
+ * Avec cache Dexie pour optimiser les performances
  */
 
 export const hasExistingToken = () => {
@@ -9,9 +10,9 @@ export const hasExistingToken = () => {
 };
 
 import logger from './logger';
+import { db, cacheKeys, cacheTTL } from './db';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
-import { db } from './db';
 
 // Wrapper fetch pour ajouter automatiquement le token
 export async function apiFetch(url: string, options: RequestInit = {}) {
@@ -128,6 +129,7 @@ export interface SiteFrontend {
   client_nom?: string
   adresse?: string
   superficie_totale?: number
+  superficie_calculee?: number
   actif?: boolean
   date_debut_contrat?: string
   date_fin_contrat?: string
@@ -233,6 +235,7 @@ function transformSiteToFrontend(site: SiteGeoJSON, index: number): SiteFrontend
     client_nom: site.properties.client_nom,
     adresse: site.properties.adresse,
     superficie_totale: site.properties.superficie_totale,
+    superficie_calculee: site.properties.superficie_calculee,
     actif: site.properties.actif,
     date_debut_contrat: site.properties.date_debut_contrat,
     date_fin_contrat: site.properties.date_fin_contrat,
@@ -240,42 +243,24 @@ function transformSiteToFrontend(site: SiteGeoJSON, index: number): SiteFrontend
   }
 }
 
-// Cache pour les sites chargés
-let sitesCache: SiteFrontend[] | null = null
-let sitesCacheTimestamp: number = 0
-const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
-
 /**
  * Charge tous les sites depuis l'API et les transforme en format frontend
- * Utilise un cache de 5 minutes pour éviter les requêtes répétées
+ * Utilise Dexie (IndexedDB) avec cache de 15 minutes
  * Le backend filtre automatiquement selon les permissions de l'utilisateur
  */
 export async function fetchAllSites(forceRefresh = false): Promise<SiteFrontend[]> {
-  const now = Date.now()
-
-  // 1. Vérifier le cache mémoire (très rapide)
-  if (!forceRefresh && sitesCache && (now - sitesCacheTimestamp) < CACHE_DURATION) {
-    return sitesCache
+  // Vérifier le cache Dexie
+  if (!forceRefresh) {
+    const cached = await db.get<SiteFrontend[]>(cacheKeys.sites());
+    if (cached) {
+      logger.info(`[Cache HIT] Sites depuis Dexie: ${cached.length}`);
+      return cached;
+    }
   }
 
   try {
-    // 2. Vérifier Dexie (Persistant) si on n'a pas de cache mémoire
-    if (!forceRefresh) {
-      const localSites = await db.sites.toArray();
-      if (localSites.length > 0) {
-        // Optionnel : ne pas utiliser le cache s'il est trop vieux (ex: > 1 jour)
-        const oldestEntry = Math.min(...localSites.map(s => s.lastUpdated));
-        if ((now - oldestEntry) < (24 * 60 * 60 * 1000)) {
-          const transformed = localSites.map(ls => ls.data as SiteFrontend);
-          sitesCache = transformed;
-          sitesCacheTimestamp = now;
-          logger.info(`Sites chargés depuis Dexie: ${transformed.length}`);
-          return transformed;
-        }
-      }
-    }
-
-    // 3. Sinon, charger depuis l'API (filtré automatiquement par permissions)
+    logger.info('[Cache MISS] Sites - Appel API');
+    // Charger depuis l'API (filtré automatiquement par permissions)
     const allSites: SiteGeoJSON[] = []
     let page = 1
     let hasMore = true
@@ -301,31 +286,20 @@ export async function fetchAllSites(forceRefresh = false): Promise<SiteFrontend[
 
     const transformedSites = allSites.map((site, index) => transformSiteToFrontend(site, index))
 
-    // 4. Sauvegarder dans Dexie pour la prochaine fois
-    await db.sites.clear(); // On remplace tout pour la liste complète
-    await db.sites.bulkAdd(transformedSites.map(s => ({
-      id: s.id,
-      name: s.name,
-      lastUpdated: now,
-      data: s
-    })));
+    // Sauvegarder dans le cache Dexie
+    await db.set(cacheKeys.sites(), transformedSites, cacheTTL.standard);
 
-    sitesCache = transformedSites
-    sitesCacheTimestamp = now
-
-    logger.info(`Sites chargés depuis API et sauvés dans Dexie: ${transformedSites.length}`);
+    logger.info(`Sites chargés depuis API: ${transformedSites.length}`);
     return transformedSites
 
   } catch (error) {
     logger.error('Erreur fetchAllSites:', error)
-    if (sitesCache) return sitesCache
-
-    // Tentative ultime : même si forceRefresh=true, si l'API échoue, on prend Dexie
-    const fallbackSites = await db.sites.toArray();
-    if (fallbackSites.length > 0) {
-      return fallbackSites.map(ls => ls.data);
+    // Fallback: retourner le cache même expiré
+    const cached = await db.get<SiteFrontend[]>(cacheKeys.sites());
+    if (cached) {
+      logger.warn('[Fallback] Utilisation du cache expiré suite à une erreur API');
+      return cached;
     }
-
     throw error
   }
 }
@@ -365,10 +339,10 @@ export async function searchSites(query: string): Promise<SiteFrontend[]> {
 /**
  * Vide le cache des sites (utile après une modification)
  */
-export function clearSitesCache() {
-  sitesCache = null
-  sitesCacheTimestamp = 0
-  db.sites.clear(); // Vide aussi Dexie
+export async function clearSitesCache() {
+  await db.invalidatePrefix(cacheKeys.prefixes.sites);
+  await db.remove(cacheKeys.sites());
+  logger.info('[Cache] Sites cache cleared');
 }
 
 // Anciennes fonctions conservées pour compatibilité
@@ -530,7 +504,7 @@ export async function updateSite(id: number, data: UpdateSiteData): Promise<Site
     const result = await handleResponse<any>(response)
 
     // Invalidate sites cache
-    sitesCache = null
+    await clearSitesCache();
 
     // Transform to SiteFrontend format
     const coords = result.geometry?.coordinates?.[0]?.[0] || [0, 0]
@@ -567,7 +541,7 @@ export async function deleteSite(id: number): Promise<void> {
     }
 
     // Invalidate sites cache
-    sitesCache = null
+    await clearSitesCache();
   } catch (error) {
     logger.error('Erreur deleteSite:', error)
     throw error
@@ -609,28 +583,13 @@ export interface InventoryResponse {
 }
 
 /**
- * Récupère les données d'objets pour la carte avec filtrage BBOX et cache local.
+ * Récupère les données d'objets pour la carte avec filtrage BBOX.
  * Le backend filtre automatiquement selon les permissions de l'utilisateur.
  */
 export async function fetchMapData(bbox: string, types: string, zoom: number): Promise<any> {
   try {
     const response = await apiFetch(`${API_BASE_URL}/map/?bbox=${bbox}&types=${types}&zoom=${zoom}`);
     const data = await handleResponse<any>(response);
-
-    if (data.features && data.features.length > 0) {
-      // Sauvegarder les objets en arrière-plan
-      const localObjects = data.features.map((f: any) => ({
-        id: `${f.properties.object_type}-${f.id}`,
-        objectId: f.id,
-        objectType: f.properties.object_type,
-        siteId: f.properties.site_id || null,
-        data: f,
-        lastUpdated: Date.now()
-      }));
-
-      db.inventory.bulkPut(localObjects).catch(err => logger.error('Dexie bulkPut error:', err));
-    }
-
     return data;
   } catch (error) {
     logger.error('Erreur fetchMapData:', error);
@@ -675,18 +634,6 @@ const typeToPathMap: Record<string, string> = {
 };
 
 export async function fetchInventoryItem(objectType: string, objectId: string): Promise<any> {
-  // 1. Tenter de récupérer depuis Dexie d'abord (ultra rapide)
-  try {
-    const localId = `${objectType}-${objectId}`;
-    const cached = await db.inventory.get(localId);
-    if (cached) {
-      logger.info(`Objet chargé depuis Dexie: ${localId}`);
-      return cached.data;
-    }
-  } catch (err) {
-    logger.warn('Erreur lecture Dexie:', err);
-  }
-
   const pathSegment = typeToPathMap[objectType.toLowerCase()];
 
   // If type is not in the mapping (e.g., 'equipement'), use the unified inventory endpoint
@@ -1053,16 +1000,6 @@ export async function updateInventoryItem(
     });
 
     const result = await handleResponse<any>(response);
-
-    // Invalider le cache Dexie pour cet objet (force refetch depuis API)
-    try {
-      const localId = `${objectType}-${objectId}`;
-      await db.inventory.delete(localId);
-      logger.info(`Cache invalidé pour objet modifié: ${localId}`);
-    } catch (cacheError) {
-      logger.warn('Erreur invalidation cache Dexie:', cacheError);
-    }
-
     return result;
   } catch (error) {
     logger.error(`Error updating ${objectType} #${objectId}:`, error);
@@ -1159,16 +1096,6 @@ export async function createInventoryItem(
     });
 
     const result = await handleResponse<any>(response);
-
-    // Invalider le cache Dexie pour cet objet (force refetch depuis API)
-    try {
-      const localId = `${objectType}-${result.id || result.properties?.id}`;
-      await db.inventory.delete(localId);
-      logger.info(`Cache invalidé pour nouvel objet: ${localId}`);
-    } catch (cacheError) {
-      logger.warn('Erreur invalidation cache Dexie:', cacheError);
-    }
-
     return result;
   } catch (error) {
     logger.error(`Error creating ${objectType}:`, error);
@@ -1198,15 +1125,6 @@ export async function deleteInventoryItem(
 
     if (!response.ok && response.status !== 204) {
       throw new ApiError(`Erreur lors de la suppression: ${response.status}`, response.status);
-    }
-
-    // Invalider le cache Dexie pour cet objet supprimé
-    try {
-      const localId = `${objectType}-${objectId}`;
-      await db.inventory.delete(localId);
-      logger.info(`Cache invalidé pour objet supprimé: ${localId}`);
-    } catch (cacheError) {
-      logger.warn('Erreur invalidation cache Dexie:', cacheError);
     }
   } catch (error) {
     logger.error(`Error deleting ${objectType} #${objectId}:`, error);

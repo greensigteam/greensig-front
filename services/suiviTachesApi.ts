@@ -17,6 +17,7 @@ import {
     PhotoList,
     PhotoCreate
 } from '../types/suiviTaches';
+import { db, cacheKeys, cacheTTL } from './db';
 
 const API_BASE_URL = '/api/suivi-taches';
 
@@ -78,7 +79,11 @@ export const createProduit = async (data: ProduitCreate): Promise<ProduitDetail>
         headers: getAuthHeaders(),
         body: JSON.stringify(data)
     });
-    return handleResponse<ProduitDetail>(response);
+    const result = await handleResponse<ProduitDetail>(response);
+
+    // Invalider le cache du suivi des tâches
+    await db.remove(cacheKeys.suiviTaches());
+    return result;
 };
 
 export const updateProduit = async (id: number, data: Partial<ProduitCreate>): Promise<ProduitDetail> => {
@@ -87,7 +92,11 @@ export const updateProduit = async (id: number, data: Partial<ProduitCreate>): P
         headers: getAuthHeaders(),
         body: JSON.stringify(data)
     });
-    return handleResponse<ProduitDetail>(response);
+    const result = await handleResponse<ProduitDetail>(response);
+
+    // Invalider le cache du suivi des tâches
+    await db.remove(cacheKeys.suiviTaches());
+    return result;
 };
 
 export const deleteProduit = async (id: number): Promise<void> => {
@@ -98,6 +107,9 @@ export const deleteProduit = async (id: number): Promise<void> => {
     if (!response.ok) {
         throw new Error('Erreur lors de la suppression');
     }
+
+    // Invalider le cache du suivi des tâches
+    await db.remove(cacheKeys.suiviTaches());
 };
 
 export const fetchProduitsActifs = async (): Promise<ProduitList[]> => {
@@ -121,7 +133,11 @@ export const softDeleteProduit = async (id: number): Promise<{ message: string; 
         method: 'POST',
         headers: getAuthHeaders()
     });
-    return handleResponse<{ message: string; produit: ProduitDetail }>(response);
+    const result = await handleResponse<{ message: string; produit: ProduitDetail }>(response);
+
+    // Invalider le cache du suivi des tâches
+    await db.remove(cacheKeys.suiviTaches());
+    return result;
 };
 
 export const reactivateProduit = async (id: number): Promise<{ message: string; produit: ProduitDetail }> => {
@@ -129,7 +145,11 @@ export const reactivateProduit = async (id: number): Promise<{ message: string; 
         method: 'POST',
         headers: getAuthHeaders()
     });
-    return handleResponse<{ message: string; produit: ProduitDetail }>(response);
+    const result = await handleResponse<{ message: string; produit: ProduitDetail }>(response);
+
+    // Invalider le cache du suivi des tâches
+    await db.remove(cacheKeys.suiviTaches());
+    return result;
 };
 
 // ============================================================================
@@ -150,7 +170,11 @@ export const createMatiereActive = async (data: ProduitMatiereActiveCreate): Pro
         headers: getAuthHeaders(),
         body: JSON.stringify(data)
     });
-    return handleResponse<ProduitMatiereActive>(response);
+    const result = await handleResponse<ProduitMatiereActive>(response);
+
+    // Invalider le cache du suivi des tâches
+    await db.remove(cacheKeys.suiviTaches());
+    return result;
 };
 
 export const updateMatiereActive = async (
@@ -162,7 +186,11 @@ export const updateMatiereActive = async (
         headers: getAuthHeaders(),
         body: JSON.stringify(data)
     });
-    return handleResponse<ProduitMatiereActive>(response);
+    const result = await handleResponse<ProduitMatiereActive>(response);
+
+    // Invalider le cache du suivi des tâches
+    await db.remove(cacheKeys.suiviTaches());
+    return result;
 };
 
 export const deleteMatiereActive = async (id: number): Promise<void> => {
@@ -173,6 +201,9 @@ export const deleteMatiereActive = async (id: number): Promise<void> => {
     if (!response.ok) {
         throw new Error('Erreur lors de la suppression');
     }
+
+    // Invalider le cache du suivi des tâches
+    await db.remove(cacheKeys.suiviTaches());
 };
 
 // ============================================================================
@@ -193,7 +224,11 @@ export const createDose = async (data: DoseProduitCreate): Promise<DoseProduit> 
         headers: getAuthHeaders(),
         body: JSON.stringify(data)
     });
-    return handleResponse<DoseProduit>(response);
+    const result = await handleResponse<DoseProduit>(response);
+
+    // Invalider le cache du suivi des tâches
+    await db.remove(cacheKeys.suiviTaches());
+    return result;
 };
 
 export const updateDose = async (id: number, data: Partial<DoseProduitCreate>): Promise<DoseProduit> => {
@@ -202,7 +237,11 @@ export const updateDose = async (id: number, data: Partial<DoseProduitCreate>): 
         headers: getAuthHeaders(),
         body: JSON.stringify(data)
     });
-    return handleResponse<DoseProduit>(response);
+    const result = await handleResponse<DoseProduit>(response);
+
+    // Invalider le cache du suivi des tâches
+    await db.remove(cacheKeys.suiviTaches());
+    return result;
 };
 
 export const deleteDose = async (id: number): Promise<void> => {
@@ -213,6 +252,9 @@ export const deleteDose = async (id: number): Promise<void> => {
     if (!response.ok) {
         throw new Error('Erreur lors de la suppression');
     }
+
+    // Invalider le cache du suivi des tâches
+    await db.remove(cacheKeys.suiviTaches());
 };
 
 // ============================================================================
@@ -245,7 +287,11 @@ export const createConsommation = async (data: ConsommationProduitCreate): Promi
         headers: getAuthHeaders(),
         body: JSON.stringify(data)
     });
-    return handleResponse<ConsommationProduit>(response);
+    const result = await handleResponse<ConsommationProduit>(response);
+
+    // Invalider le cache du suivi des tâches
+    await db.remove(cacheKeys.suiviTaches());
+    return result;
 };
 
 export const updateConsommation = async (
@@ -257,7 +303,11 @@ export const updateConsommation = async (
         headers: getAuthHeaders(),
         body: JSON.stringify(data)
     });
-    return handleResponse<ConsommationProduit>(response);
+    const result = await handleResponse<ConsommationProduit>(response);
+
+    // Invalider le cache du suivi des tâches
+    await db.remove(cacheKeys.suiviTaches());
+    return result;
 };
 
 export const deleteConsommation = async (id: number): Promise<void> => {
@@ -268,6 +318,9 @@ export const deleteConsommation = async (id: number): Promise<void> => {
     if (!response.ok) {
         throw new Error('Erreur lors de la suppression');
     }
+
+    // Invalider le cache du suivi des tâches
+    await db.remove(cacheKeys.suiviTaches());
 };
 
 // ============================================================================
@@ -329,7 +382,11 @@ export const createPhoto = async (data: PhotoCreate): Promise<Photo> => {
         headers: headers,
         body: formData
     });
-    return handleResponse<Photo>(response);
+    const result = await handleResponse<Photo>(response);
+
+    // Invalider le cache du suivi des tâches
+    await db.remove(cacheKeys.suiviTaches());
+    return result;
 };
 
 export const updatePhoto = async (id: number, data: Partial<PhotoCreate>): Promise<Photo> => {
@@ -338,7 +395,11 @@ export const updatePhoto = async (id: number, data: Partial<PhotoCreate>): Promi
         headers: getAuthHeaders(),
         body: JSON.stringify(data)
     });
-    return handleResponse<Photo>(response);
+    const result = await handleResponse<Photo>(response);
+
+    // Invalider le cache du suivi des tâches
+    await db.remove(cacheKeys.suiviTaches());
+    return result;
 };
 
 export const deletePhoto = async (id: number): Promise<void> => {
@@ -349,4 +410,7 @@ export const deletePhoto = async (id: number): Promise<void> => {
     if (!response.ok) {
         throw new Error('Erreur lors de la suppression');
     }
+
+    // Invalider le cache du suivi des tâches
+    await db.remove(cacheKeys.suiviTaches());
 };

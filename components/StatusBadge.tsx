@@ -1,4 +1,5 @@
 import React from 'react';
+import { Shield, Users, User } from 'lucide-react';
 
 // ============================================================================
 // TYPES
@@ -238,6 +239,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
 }) => {
     let colorClass = '';
     let label = '';
+    let icon: React.ReactNode = null;
 
     // Mode compatibilité : si status et type sont fournis (ancien API)
     if (status && type && !variant) {
@@ -292,13 +294,19 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
             case 'role': {
                 const roleColors: Record<string, string> = {
                     'ADMIN': 'bg-purple-100 text-purple-800 border-purple-200',
-                    'CHEF_EQUIPE': 'bg-blue-100 text-blue-800 border-blue-200',
-                    'OPERATEUR': 'bg-green-100 text-green-800 border-green-200',
+                    'SUPERVISEUR': 'bg-blue-100 text-blue-800 border-blue-200',
                     'CLIENT': 'bg-orange-100 text-orange-800 border-orange-200',
+                };
+
+                const roleIcons: Record<string, React.ReactNode> = {
+                    'ADMIN': <Shield className="w-3 h-3" />,
+                    'SUPERVISEUR': <Users className="w-3 h-3" />,
+                    'CLIENT': <User className="w-3 h-3" />,
                 };
 
                 const roleValue = String(value || '').toUpperCase();
                 colorClass = roleColors[roleValue] || 'bg-gray-100 text-gray-800 border-gray-200';
+                icon = roleIcons[roleValue] || null;
                 label = String(value || 'N/A');
                 break;
             }
@@ -319,7 +327,8 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
     const sizeClass = SIZE_CLASSES[size];
 
     return (
-        <span className={`inline-flex items-center rounded-full font-medium border ${sizeClass} ${colorClass} ${className}`}>
+        <span className={`inline-flex items-center gap-1.5 rounded-full font-medium border ${sizeClass} ${colorClass} ${className}`}>
+            {icon}
             {children || label}
         </span>
     );

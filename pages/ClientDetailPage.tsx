@@ -3,10 +3,10 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
     ChevronLeft, ChevronRight, Building2, User, Mail, Phone, MapPin, Shield, Calendar, Clock,
     Package, MapPin as MapPinIcon, ClipboardList, Edit, Loader2, AlertCircle,
-    TrendingUp, BarChart3, PieChart as PieChartIcon, CheckCircle, XCircle
+    TrendingUp, BarChart3, PieChart as PieChartIcon, CheckCircle, XCircle, Plus, X as XIcon, Search
 } from 'lucide-react';
 import { fetchClients } from '../services/usersApi';
-import { fetchAllSites, SiteFrontend } from '../services/api';
+import { fetchAllSites, SiteFrontend, updateSite } from '../services/api';
 import { planningService } from '../services/planningService';
 import { fetchClientInventoryStats } from '../services/clientInventoryService';
 import type { Client } from '../types/users';
@@ -263,8 +263,66 @@ const OngletGeneral: React.FC<{ client: Client }> = ({ client }) => {
 const OngletSites: React.FC<{
     sites: SiteFrontend[];
     isLoading: boolean;
-}> = ({ sites, isLoading }) => {
+    clientId: number;
+    onRefresh: () => void;
+    showAssignModal: boolean;
+    setShowAssignModal: (show: boolean) => void;
+}> = ({ sites, isLoading, clientId, onRefresh, showAssignModal, setShowAssignModal }) => {
+    const { showToast } = useToast();
     const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+    const [allSites, setAllSites] = useState<SiteFrontend[]>([]);
+    const [isLoadingAllSites, setIsLoadingAllSites] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Charger tous les sites quand le modal s'ouvre
+    useEffect(() => {
+        if (showAssignModal && allSites.length === 0) {
+            loadAllSites();
+        }
+    }, [showAssignModal]);
+
+    const loadAllSites = async () => {
+        setIsLoadingAllSites(true);
+        try {
+            const sites = await fetchAllSites();
+            setAllSites(sites);
+        } catch (error: any) {
+            showToast('Erreur lors du chargement des sites', 'error');
+        } finally {
+            setIsLoadingAllSites(false);
+        }
+    };
+
+    // Sites non assignés (client null ou undefined)
+    const unassignedSites = useMemo(() => {
+        return allSites.filter(s => !s.client).filter(s =>
+            s.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            s.code_site?.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [allSites, searchQuery]);
+
+    // Assigner un site au client
+    const handleAssignSite = async (siteId: string) => {
+        try {
+            await updateSite(Number(siteId), { client: clientId });
+            showToast('Site assigné avec succès', 'success');
+            onRefresh();
+            loadAllSites(); // Rafraîchir la liste des sites disponibles
+        } catch (error: any) {
+            showToast('Erreur lors de l\'assignation du site', 'error');
+        }
+    };
+
+    // Désassigner un site du client
+    const handleUnassignSite = async (siteId: string) => {
+        try {
+            await updateSite(Number(siteId), { client: undefined });
+            showToast('Site désassigné avec succès', 'success');
+            onRefresh();
+        } catch (error: any) {
+            showToast('Erreur lors de la désassignation du site', 'error');
+        }
+    };
 
     const filteredSites = useMemo(() => {
         if (statusFilter === 'all') return sites;
@@ -282,11 +340,109 @@ const OngletSites: React.FC<{
 
     if (sites.length === 0) {
         return (
-            <DetailEmptyState
-                icon={<MapPinIcon className="w-12 h-12" />}
-                title="Aucun site"
-                description="Ce client ne possède pas encore de sites."
-            />
+            <div className="space-y-6">
+                {/* Message vide */}
+                <DetailEmptyState
+                    icon={<MapPinIcon className="w-12 h-12" />}
+                    title="Aucun site"
+                    description="Ce client ne possède pas encore de sites. Utilisez le bouton 'Assigner un site' ci-dessus pour lui assigner des sites."
+                />
+
+                {/* Modal d'assignation (même code que plus bas) */}
+                {showAssignModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] flex flex-col shadow-2xl">
+                            {/* Header */}
+                            <div className="p-6 border-b flex items-center justify-between">
+                                <h2 className="text-xl font-bold text-gray-900">Assigner des sites</h2>
+                                <button
+                                    onClick={() => {
+                                        setShowAssignModal(false);
+                                        setSearchQuery('');
+                                    }}
+                                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                >
+                                    <XIcon className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            {/* Barre de recherche */}
+                            <div className="p-4 border-b">
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Rechercher un site..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Liste des sites */}
+                            <div className="flex-1 overflow-y-auto p-4">
+                                {isLoadingAllSites ? (
+                                    <div className="flex items-center justify-center py-12">
+                                        <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+                                    </div>
+                                ) : unassignedSites.length === 0 ? (
+                                    <div className="text-center py-12">
+                                        <MapPinIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                                        <p className="text-gray-500">
+                                            {searchQuery
+                                                ? 'Aucun site trouvé pour cette recherche'
+                                                : 'Tous les sites sont déjà assignés'}
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {unassignedSites.map((site) => (
+                                            <button
+                                                key={site.id}
+                                                onClick={() => {
+                                                    handleAssignSite(site.id);
+                                                    setShowAssignModal(false);
+                                                    setSearchQuery('');
+                                                }}
+                                                className="w-full p-4 border rounded-lg hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left group"
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex-1">
+                                                        <div className="font-medium text-gray-900 group-hover:text-emerald-700">
+                                                            {site.name || 'Site sans nom'}
+                                                        </div>
+                                                        <div className="text-sm text-gray-500 mt-1">
+                                                            {site.code_site && <span>Code: {site.code_site}</span>}
+                                                            {site.adresse && (
+                                                                <span className="ml-2">• {site.adresse}</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <Plus className="w-5 h-5 text-gray-400 group-hover:text-emerald-600" />
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Footer */}
+                            <div className="p-4 border-t bg-gray-50 flex justify-end">
+                                <button
+                                    onClick={() => {
+                                        setShowAssignModal(false);
+                                        setSearchQuery('');
+                                    }}
+                                    className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+                                >
+                                    Fermer
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
         );
     }
 
@@ -375,10 +531,10 @@ const OngletSites: React.FC<{
                                         <span className="text-xs">{site.adresse}</span>
                                     </div>
                                 )}
-                                {site.superficie && (
+                                {(site.superficie_calculee || site.superficie_totale) && (
                                     <div className="flex items-center gap-2 text-gray-600">
                                         <Package className="w-4 h-4" />
-                                        <span className="text-xs">{site.superficie} m²</span>
+                                        <span className="text-xs">{(site.superficie_calculee || site.superficie_totale)!.toLocaleString()} m²</span>
                                     </div>
                                 )}
                             </div>
@@ -401,10 +557,116 @@ const OngletSites: React.FC<{
                                     </div>
                                 </div>
                             )}
+
+                            {/* Bouton Désassigner */}
+                            <div className="pt-3 border-t border-gray-200">
+                                <button
+                                    onClick={() => handleUnassignSite(site.id)}
+                                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                >
+                                    <XIcon className="w-4 h-4" />
+                                    Désassigner ce site
+                                </button>
+                            </div>
                         </div>
                     </DetailCard>
                 ))}
             </div>
+
+            {/* Modal d'assignation de sites */}
+            {showAssignModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] flex flex-col shadow-2xl">
+                        {/* Header */}
+                        <div className="p-6 border-b flex items-center justify-between">
+                            <h2 className="text-xl font-bold text-gray-900">Assigner des sites</h2>
+                            <button
+                                onClick={() => {
+                                    setShowAssignModal(false);
+                                    setSearchQuery('');
+                                }}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Barre de recherche */}
+                        <div className="p-4 border-b">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Rechercher un site..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Liste des sites */}
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {isLoadingAllSites ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+                                </div>
+                            ) : unassignedSites.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <MapPinIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                                    <p className="text-gray-500">
+                                        {searchQuery
+                                            ? 'Aucun site trouvé pour cette recherche'
+                                            : 'Tous les sites sont déjà assignés'}
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {unassignedSites.map((site) => (
+                                        <button
+                                            key={site.id}
+                                            onClick={() => {
+                                                handleAssignSite(site.id);
+                                                setShowAssignModal(false);
+                                                setSearchQuery('');
+                                            }}
+                                            className="w-full p-4 border rounded-lg hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left group"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex-1">
+                                                    <div className="font-medium text-gray-900 group-hover:text-emerald-700">
+                                                        {site.name || 'Site sans nom'}
+                                                    </div>
+                                                    <div className="text-sm text-gray-500 mt-1">
+                                                        {site.code_site && <span>Code: {site.code_site}</span>}
+                                                        {site.adresse && (
+                                                            <span className="ml-2">• {site.adresse}</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <Plus className="w-5 h-5 text-gray-400 group-hover:text-emerald-600" />
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 border-t bg-gray-50 flex justify-end">
+                            <button
+                                onClick={() => {
+                                    setShowAssignModal(false);
+                                    setSearchQuery('');
+                                }}
+                                className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+                            >
+                                Fermer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -728,6 +990,7 @@ export default function ClientDetailPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<TabType>('general');
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [showAssignSiteModal, setShowAssignSiteModal] = useState(false);
 
     // Data per tab (lazy loaded)
     const [sites, setSites] = useState<SiteFrontend[]>([]);
@@ -878,41 +1141,55 @@ export default function ClientDetailPage() {
 
             {/* Tabs */}
             <div className="flex-shrink-0 bg-white border-b px-6">
-                <div className="flex gap-4">
-                    <TabButton
-                        active={activeTab === 'general'}
-                        onClick={() => setActiveTab('general')}
-                        icon={<Building2 className="w-4 h-4" />}
-                        label="Général"
-                    />
-                    <TabButton
-                        active={activeTab === 'sites'}
-                        onClick={() => setActiveTab('sites')}
-                        icon={<MapPinIcon className="w-4 h-4" />}
-                        label="Sites"
-                        badge={sites.length}
-                    />
-                    <TabButton
-                        active={activeTab === 'inventaire'}
-                        onClick={() => setActiveTab('inventaire')}
-                        icon={<Package className="w-4 h-4" />}
-                        label="Inventaire"
-                        badge={inventoryStats?.totalObjets}
-                    />
-                    <TabButton
-                        active={activeTab === 'interventions'}
-                        onClick={() => setActiveTab('interventions')}
-                        icon={<ClipboardList className="w-4 h-4" />}
-                        label="Interventions"
-                        badge={taches.filter(t => !['TERMINEE', 'ANNULEE'].includes(t.statut)).length}
-                    />
+                <div className="flex items-center justify-between gap-4 py-1">
+                    {/* Left: Tabs */}
+                    <div className="flex gap-4">
+                        <TabButton
+                            active={activeTab === 'general'}
+                            onClick={() => setActiveTab('general')}
+                            icon={<Building2 className="w-4 h-4" />}
+                            label="Général"
+                        />
+                        <TabButton
+                            active={activeTab === 'sites'}
+                            onClick={() => setActiveTab('sites')}
+                            icon={<MapPinIcon className="w-4 h-4" />}
+                            label="Sites"
+                            badge={sites.length}
+                        />
+                        <TabButton
+                            active={activeTab === 'inventaire'}
+                            onClick={() => setActiveTab('inventaire')}
+                            icon={<Package className="w-4 h-4" />}
+                            label="Inventaire"
+                            badge={inventoryStats?.totalObjets}
+                        />
+                        <TabButton
+                            active={activeTab === 'interventions'}
+                            onClick={() => setActiveTab('interventions')}
+                            icon={<ClipboardList className="w-4 h-4" />}
+                            label="Interventions"
+                            badge={taches.filter(t => !['TERMINEE', 'ANNULEE'].includes(t.statut)).length}
+                        />
+                    </div>
+
+                    {/* Right: Action Buttons */}
+                    {activeTab === 'sites' && (
+                        <button
+                            onClick={() => setShowAssignSiteModal(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm text-sm font-medium"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Assigner un site
+                        </button>
+                    )}
                 </div>
             </div>
 
             {/* Main Content */}
             <main className="flex-1 overflow-y-auto bg-gray-50/50 p-6">
                 {activeTab === 'general' && <OngletGeneral client={client} />}
-                {activeTab === 'sites' && <OngletSites sites={sites} isLoading={isLoadingSites} />}
+                {activeTab === 'sites' && <OngletSites sites={sites} isLoading={isLoadingSites} clientId={Number(id)} onRefresh={loadSites} showAssignModal={showAssignSiteModal} setShowAssignModal={setShowAssignSiteModal} />}
                 {activeTab === 'inventaire' && <OngletInventaire stats={inventoryStats} isLoading={isLoadingInventory} />}
                 {activeTab === 'interventions' && <OngletInterventions taches={taches} isLoading={isLoadingTaches} />}
             </main>

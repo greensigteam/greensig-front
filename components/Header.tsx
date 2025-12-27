@@ -17,7 +17,7 @@ const VIEW_TITLES: Record<ViewState, string> = {
   'PLANNING': 'Planning',
   'INTERVENTIONS': 'Rapports Terrain',
   'CLAIMS': 'Signalements',
-  'TEAMS': 'Équipes',
+  'TEAMS': 'Ressources Humaines',
   'USERS': 'Utilisateurs',
   'REPORTING': 'Statistiques',
   'CLIENT_PORTAL': 'Espace Client',

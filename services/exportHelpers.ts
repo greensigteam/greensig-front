@@ -56,7 +56,7 @@ export function exportClientsToCSV(clients: Client[]): void {
  * Exporte une liste de clients au format Excel (HTML table)
  * Format compatible avec Excel via MIME type application/vnd.ms-excel
  */
-export function exportClientsToExcel(clients: Client[]): void {
+export async function exportClientsToExcel(clients: Client[]): Promise<void> {
     const tableRows = clients.map(client => `
         <tr>
             <td>${client.utilisateur}</td>
@@ -77,11 +77,32 @@ export function exportClientsToExcel(clients: Client[]): void {
         </tr>
     `).join('');
 
+    // Récupérer le logo en base64
+    const logoBase64 = await getLogoAsBase64();
+
     const html = `
         <html>
             <head>
                 <meta charset="utf-8">
                 <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                    }
+                    .header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 20px;
+                        padding-bottom: 10px;
+                        border-bottom: 2px solid #10b981;
+                    }
+                    .header h1 {
+                        margin: 0;
+                        color: #10b981;
+                    }
+                    .header img {
+                        height: 60px;
+                    }
                     table {
                         border-collapse: collapse;
                         width: 100%;
@@ -104,7 +125,10 @@ export function exportClientsToExcel(clients: Client[]): void {
                 </style>
             </head>
             <body>
-                <h1>Export Clients - ${new Date().toLocaleDateString('fr-FR')}</h1>
+                <div class="header">
+                    <h1>Export Clients - ${new Date().toLocaleDateString('fr-FR')}</h1>
+                    ${logoBase64 ? `<img src="${logoBase64}" alt="GreenSIG Logo">` : ''}
+                </div>
                 <table>
                     <thead>
                         <tr>
@@ -136,6 +160,27 @@ export function exportClientsToExcel(clients: Client[]): void {
 // ============================================================================
 // HELPERS PRIVÉS
 // ============================================================================
+
+/**
+ * Récupère le logo GreenSIG encodé en base64 pour l'inclure dans les exports
+ */
+async function getLogoAsBase64(): Promise<string | null> {
+    try {
+        const response = await fetch('/logofinal.png');
+        if (!response.ok) return null;
+
+        const blob = await response.blob();
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    } catch (error) {
+        console.error('Erreur lors du chargement du logo:', error);
+        return null;
+    }
+}
 
 /**
  * Télécharge un Blob avec un nom de fichier donné

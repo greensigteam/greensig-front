@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Users, UserPlus, UserMinus, AlertCircle, Save, UserCheck } from 'lucide-react';
-import { EquipeList, EquipeUpdate, OperateurList } from '../types/users';
+import { EquipeList, EquipeUpdate, OperateurList, SuperviseurList } from '../types/users';
 import {
   updateEquipe,
   fetchEquipeMembres,
   fetchOperateurs,
-  fetchChefsPotentiels,
   affecterMembres,
-  retirerMembre
+  retirerMembre,
+  fetchSuperviseurs
 } from '../services/usersApi';
 import DetailModal from '../components/DetailModal';
 
@@ -17,10 +17,19 @@ interface EditEquipeModalProps {
   onSaved: () => void;
 }
 
+// Helper pour nettoyer les valeurs numériques (éviter NaN)
+const cleanNumericValue = (value: number | null | undefined): number | null => {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return null;
+  }
+  return value;
+};
+
 const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSaved }) => {
   const [form, setForm] = useState<EquipeUpdate>({
     nomEquipe: equipe.nomEquipe,
-    chefEquipe: equipe.chefEquipe,
+    chefEquipe: cleanNumericValue(equipe.chefEquipe),
+    superviseur: cleanNumericValue(equipe.superviseur),
     actif: equipe.actif,
   });
   const [loading, setLoading] = useState(false);
@@ -30,7 +39,7 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
   // Members management
   const [membres, setMembres] = useState<OperateurList[]>([]);
   const [availableOperateurs, setAvailableOperateurs] = useState<OperateurList[]>([]);
-  const [chefsPotentiels, setChefsPotentiels] = useState<OperateurList[]>([]);
+  const [superviseurs, setSuperviseurs] = useState<SuperviseurList[]>([]);
   const [loadingMembres, setLoadingMembres] = useState(true);
   const [memberAction, setMemberAction] = useState<string | null>(null);
 
@@ -41,14 +50,14 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
   const loadMembres = async () => {
     setLoadingMembres(true);
     try {
-      const [membresRes, operateursRes, chefsRes] = await Promise.all([
+      const [membresRes, operateursRes, superviseursRes] = await Promise.all([
         fetchEquipeMembres(equipe.id),
         fetchOperateurs({ sansEquipe: true }),
-        fetchChefsPotentiels()
+        fetchSuperviseurs()
       ]);
       setMembres(membresRes);
       setAvailableOperateurs(operateursRes.results);
-      setChefsPotentiels(chefsRes);
+      setSuperviseurs(superviseursRes.results);
     } catch (err) {
       console.error('Erreur chargement membres:', err);
     } finally {
@@ -62,9 +71,14 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
     if (type === 'checkbox') {
       newValue = (e.target as HTMLInputElement).checked;
     }
-    if (name === 'chefEquipe') {
-      // Treat empty string as null to allow removing the chef
-      newValue = value === '' ? null : Number(value);
+    if (name === 'chefEquipe' || name === 'superviseur') {
+      // Treat empty string as null to allow removing the chef or superviseur
+      if (value === '') {
+        newValue = null;
+      } else {
+        const numValue = Number(value);
+        newValue = cleanNumericValue(numValue);
+      }
     }
     setForm(f => ({
       ...f,
@@ -89,7 +103,7 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
   const handleAddMembre = async (operateurId: number) => {
     setMemberAction(`add-${operateurId}`);
     try {
-      const currentMemberIds = membres.map(m => m.utilisateur);
+      const currentMemberIds = membres.map(m => m.id);
       await affecterMembres(equipe.id, { operateurs: [...currentMemberIds, operateurId] });
       await loadMembres();
     } catch (err: any) {
@@ -116,13 +130,10 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
     }
   };
 
-  // Combine current chef with chefs potentiels for the dropdown
-  const chefOptions = [
-    ...chefsPotentiels,
-    ...membres.filter(m => m.estChefEquipe || m.utilisateur === equipe.chefEquipe)
-  ].filter((op, index, self) =>
-    index === self.findIndex(o => o.utilisateur === op.utilisateur)
-  );
+  // Chef d'équipe doit être choisi parmi les membres de l'équipe qui ont la compétence "Gestion d'équipe"
+  const membresChefsPotentiels = membres.filter(m => m.peutEtreChef);
+
+  // Note: On n'utilise plus de tableaux pré-créés pour éviter les problèmes de clés React
 
   // Onglet Informations (formulaire d'édition)
   const infoContent = (
@@ -149,7 +160,30 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Chef d'equipe (optionnel)
+          Superviseur (optionnel)
+        </label>
+        <select
+          name="superviseur"
+          value={form.superviseur ?? ''}
+          onChange={handleChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+        >
+          <option key="superviseur-none" value="">-- Aucun --</option>
+          {superviseurs.map((sup) => (
+            <option key={`superviseur-${sup.utilisateur}`} value={sup.utilisateur}>
+              {sup.fullName}
+              {sup.utilisateur === equipe.superviseur ? ' (actuel)' : ''}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-gray-500">
+          Le superviseur qui gère cette équipe (rôle de gestion)
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Chef d'equipe sur le terrain (optionnel)
         </label>
         <select
           name="chefEquipe"
@@ -157,18 +191,22 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
           onChange={handleChange}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
         >
-          <option value="">-- Aucun --</option>
-          <option disabled value="divider">──────────</option>
-          <option value="">Selectionner un chef</option>
-          {chefOptions.map((op) => (
-            <option key={op.utilisateur} value={op.utilisateur}>
+          <option key="chef-none" value="">-- Aucun --</option>
+          {membresChefsPotentiels.length === 0 && (
+            <option key="chef-no-membres" value="" disabled>
+              Aucun membre avec la compétence "Gestion d'équipe"
+            </option>
+          )}
+          {membresChefsPotentiels.map((op) => (
+            <option key={`chef-${op.id}`} value={op.id}>
               {op.fullName} ({op.numeroImmatriculation})
-              {op.utilisateur === equipe.chefEquipe ? ' (actuel)' : ''}
+              {op.id === equipe.chefEquipe ? ' (actuel)' : ''}
             </option>
           ))}
         </select>
         <p className="mt-1 text-xs text-gray-500">
-          Seuls les operateurs avec la competence "Gestion d'equipe" sont affiches
+          Seuls les membres avec la compétence "Gestion d'équipe" sont affichés
+          {membresChefsPotentiels.length === 0 && ' (aucun membre n\'a cette compétence)'}
         </p>
       </div>
 
@@ -220,15 +258,15 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
           <div className="space-y-2">
             {membres.map((membre) => (
               <div
-                key={membre.utilisateur}
+                key={membre.id}
                 className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
               >
                 <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${membre.utilisateur === equipe.chefEquipe
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${membre.id === equipe.chefEquipe
                     ? 'bg-emerald-200'
                     : 'bg-gray-200'
                     }`}>
-                    {membre.utilisateur === equipe.chefEquipe ? (
+                    {membre.id === equipe.chefEquipe ? (
                       <UserCheck className="w-4 h-4 text-emerald-700" />
                     ) : (
                       <Users className="w-4 h-4 text-gray-600" />
@@ -240,18 +278,18 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {membre.utilisateur === equipe.chefEquipe ? (
+                  {membre.id === equipe.chefEquipe ? (
                     <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
                       Chef d'equipe
                     </span>
                   ) : (
                     <button
-                      onClick={() => handleRemoveMembre(membre.utilisateur)}
-                      disabled={memberAction === `remove-${membre.utilisateur}`}
+                      onClick={() => handleRemoveMembre(membre.id)}
+                      disabled={memberAction === `remove-${membre.id}`}
                       className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg disabled:opacity-50"
                       title="Retirer de l'equipe"
                     >
-                      {memberAction === `remove-${membre.utilisateur}` ? (
+                      {memberAction === `remove-${membre.id}` ? (
                         <div className="w-4 h-4 border-2 border-red-600/30 border-t-red-600 rounded-full animate-spin" />
                       ) : (
                         <UserMinus className="w-4 h-4" />
@@ -279,7 +317,7 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
           <div className="space-y-2 max-h-60 overflow-y-auto">
             {availableOperateurs.map((op) => (
               <div
-                key={op.utilisateur}
+                key={op.id}
                 className="flex items-center justify-between p-3 bg-blue-50 rounded-lg"
               >
                 <div className="flex items-center gap-3">
@@ -292,12 +330,12 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
                   </div>
                 </div>
                 <button
-                  onClick={() => handleAddMembre(op.utilisateur)}
-                  disabled={memberAction === `add-${op.utilisateur}`}
+                  onClick={() => handleAddMembre(op.id)}
+                  disabled={memberAction === `add-${op.id}`}
                   className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded-lg disabled:opacity-50"
                   title="Ajouter a l'equipe"
                 >
-                  {memberAction === `add-${op.utilisateur}` ? (
+                  {memberAction === `add-${op.id}` ? (
                     <div className="w-4 h-4 border-2 border-emerald-600/30 border-t-emerald-600 rounded-full animate-spin" />
                   ) : (
                     <UserPlus className="w-4 h-4" />

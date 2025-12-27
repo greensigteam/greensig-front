@@ -40,14 +40,15 @@ export const MAP_LAYERS: Record<MapLayerType, LayerConfig> = {
 
 // Légende Végétation - Correspond EXACTEMENT aux types de la base de données Django
 // Les noms doivent matcher avec obj.properties.object_type de l'API
+// Palette de couleurs variée pour une meilleure distinction visuelle
 export const VEG_LEGEND = [
-  { type: "Arbre", color: "#22c55e", icon: Trees },
-  { type: "Gazon", color: "#84cc16", icon: Globe },
-  { type: "Palmier", color: "#16a34a", icon: Palmtree },
-  { type: "Arbuste", color: "#65a30d", icon: Leaf },
-  { type: "Vivace", color: "#a3e635", icon: Sprout },
-  { type: "Cactus", color: "#4d7c0f", icon: Mountain },
-  { type: "Graminee", color: "#bef264", icon: Wheat }
+  { type: "Arbre", color: "#059669", icon: Trees },      // Vert forêt (émeraude foncé)
+  { type: "Gazon", color: "#84cc16", icon: Globe },      // Vert lime vif (conservé)
+  { type: "Palmier", color: "#f97316", icon: Palmtree }, // Orange tropical
+  { type: "Arbuste", color: "#10b981", icon: Leaf },     // Émeraude
+  { type: "Vivace", color: "#ec4899", icon: Sprout },    // Rose/Magenta (fleurs)
+  { type: "Cactus", color: "#06b6d4", icon: Mountain },  // Cyan/Teal (bleu-vert)
+  { type: "Graminee", color: "#eab308", icon: Wheat }    // Jaune doré (herbes)
 ];
 
 // Légende Hydrologie - Correspond EXACTEMENT aux types de la base de données Django

@@ -329,8 +329,8 @@ export default function Sites() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className="text-sm text-gray-600 font-mono font-medium bg-gray-50 px-2 py-1 rounded border border-gray-100">
-                                                {site.superficie_totale
-                                                    ? `${site.superficie_totale.toLocaleString()} m²`
+                                                {site.superficie_calculee || site.superficie_totale
+                                                    ? `${(site.superficie_calculee || site.superficie_totale)!.toLocaleString()} m²`
                                                     : '-'
                                                 }
                                             </span>

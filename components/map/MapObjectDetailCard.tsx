@@ -37,7 +37,7 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
 
   if (!selectedObject) return null;
 
-  const canCreateTask = userRole !== 'CHEF_EQUIPE' && userRole !== 'CLIENT';
+  const canCreateTask = userRole !== 'SUPERVISEUR' && userRole !== 'CLIENT';
   const isSite = selectedObject.type === 'Site' || selectedObject.type === 'site';
   const isReclamation = selectedObject.type === 'Reclamation';
 

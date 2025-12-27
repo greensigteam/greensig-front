@@ -592,7 +592,7 @@ const Planning: FC = () => {
             })));
             setClients(clientsArray);
             const roles = userData.roles || [];
-            setIsReadOnly((roles.includes('CHEF_EQUIPE') && !roles.includes('ADMIN')) || roles.includes('CLIENT'));
+            setIsReadOnly((roles.includes('SUPERVISEUR') && !roles.includes('ADMIN')) || roles.includes('CLIENT'));
             setIsClientView(roles.includes('CLIENT'));
 
             // Load sites separately (non-blocking)
@@ -702,9 +702,27 @@ const Planning: FC = () => {
             const pageHeight = pdf.internal.pageSize.getHeight();
             pdf.setFillColor(245, 247, 250);
             pdf.rect(0, 0, pageWidth, 25, 'F');
+
+            // Ajouter le logo GreenSIG en haut à gauche
+            try {
+                const logoResponse = await fetch('/logofinal.png');
+                if (logoResponse.ok) {
+                    const logoBlob = await logoResponse.blob();
+                    const logoBase64 = await new Promise<string>((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result as string);
+                        reader.readAsDataURL(logoBlob);
+                    });
+                    // Ajouter le logo (30mm largeur x 15mm hauteur)
+                    pdf.addImage(logoBase64, 'PNG', 14, 5, 30, 15);
+                }
+            } catch (logoError) {
+                console.error('Erreur chargement logo:', logoError);
+            }
+
             pdf.setFontSize(22);
             pdf.setTextColor(16, 185, 129);
-            pdf.text('GreenSIG', 14, 16);
+            pdf.text('GreenSIG', 50, 16);
             pdf.setFontSize(14);
             pdf.setTextColor(55, 65, 81);
             pdf.text('Planning des interventions', pageWidth - 14, 16, { align: 'right' });
