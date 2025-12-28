@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { X, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, AlertCircle, Loader2 } from 'lucide-react';
 import { OperateurList } from '../../types/users';
 import { createEquipe, affecterMembres } from '../../services/usersApi';
+import { fetchSites, SiteFrontend } from '../../services/api';
 import TransferList from '../TransferList';
 
 interface CreateTeamModalProps {
@@ -19,11 +20,29 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
 }) => {
   const [formData, setFormData] = useState({
     nomEquipe: '',
-    chefEquipe: 0
+    chefEquipe: 0,
+    site: 0
   });
   const [selectedMembres, setSelectedMembres] = useState<OperateurList[]>([]);
+  const [sites, setSites] = useState<SiteFrontend[]>([]);
+  const [loadingSites, setLoadingSites] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadSites = async () => {
+      setLoadingSites(true);
+      try {
+        const sitesData = await fetchSites();
+        setSites(sitesData.filter(s => s.actif));
+      } catch (error) {
+        console.error('Erreur chargement sites:', error);
+      } finally {
+        setLoadingSites(false);
+      }
+    };
+    loadSites();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +60,7 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
       const equipe = await createEquipe({
         nomEquipe: formData.nomEquipe,
         chefEquipe: formData.chefEquipe && formData.chefEquipe !== 0 ? formData.chefEquipe : undefined,
+        site: formData.site && formData.site !== 0 ? formData.site : undefined,
         membres: membresIds.length > 0 ? membresIds : undefined
       });
 
@@ -137,6 +157,35 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
               </select>
               <p className="mt-1 text-xs text-gray-500">
                 Seuls les opérateurs avec la compétence "Gestion d'équipe" sont affichés
+              </p>
+            </div>
+
+            {/* Site d'affectation contractuelle */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Site d'affectation contractuelle (optionnel)
+              </label>
+              {loadingSites ? (
+                <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Chargement des sites...
+                </div>
+              ) : (
+                <select
+                  value={formData.site}
+                  onChange={(e) => setFormData({ ...formData, site: Number(e.target.value) })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                >
+                  <option value={0}>Aucun site</option>
+                  {sites.map((site) => (
+                    <option key={site.id} value={parseInt(site.id)}>
+                      {site.name} {site.code_site ? `(${site.code_site})` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <p className="mt-1 text-xs text-gray-500">
+                Site auquel l'équipe est affectée de manière permanente
               </p>
             </div>
 

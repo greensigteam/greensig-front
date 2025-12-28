@@ -303,6 +303,8 @@ export interface EquipeList {
   chefEquipeNom: string | null;
   superviseur: number | null;
   superviseurNom: string | null;
+  site: number | null;
+  siteNom: string | null;
   actif: boolean;
   dateCreation: string;
   nombreMembres: number;
@@ -319,6 +321,7 @@ export interface EquipeCreate {
   nomEquipe: string;
   chefEquipe?: number | null;
   superviseur?: number | null;
+  site?: number | null;
   actif?: boolean;
   membres?: number[];
 }
@@ -326,7 +329,8 @@ export interface EquipeCreate {
 export interface EquipeUpdate {
   nomEquipe?: string;
   chefEquipe?: number | null;
-  superviseur?: number | null;
+  // ⚠️ superviseur supprimé : désormais déduit automatiquement du site
+  site?: number | null;
   actif?: boolean;
 }
 

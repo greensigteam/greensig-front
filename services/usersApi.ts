@@ -613,10 +613,15 @@ export async function fetchEquipes(
   const queryString = buildQueryParams(filters as Record<string, unknown>);
   const cacheKey = queryString ? `equipes:${queryString}` : cacheKeys.equipes();
 
+  console.log('[fetchEquipes] Filters:', filters);
+  console.log('[fetchEquipes] Query string:', queryString);
+  console.log('[fetchEquipes] Full URL:', `${USERS_API_URL}/equipes/?${queryString}`);
+
   if (!forceRefresh) {
     const cached = await db.get<PaginatedResponse<EquipeList>>(cacheKey);
     if (cached) {
       logCache('[Cache HIT] Équipes', queryString || 'no filters');
+      console.log('[fetchEquipes] Returning cached result:', cached.results.length, 'teams');
       return cached;
     }
   }
@@ -625,6 +630,7 @@ export async function fetchEquipes(
   const result = await fetchApi<PaginatedResponse<EquipeList>>(
     `${USERS_API_URL}/equipes/?${queryString}`
   );
+  console.log('[fetchEquipes] API returned:', result.results.length, 'teams');
 
   // Cache with shorter TTL for paginated results (2 minutes instead of 5)
   const ttl = Object.keys(filters).length > 0 ? 120000 : cacheTTL.standard;

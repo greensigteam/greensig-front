@@ -287,6 +287,8 @@ const Teams: React.FC = () => {
       fetchEquipes({ page, pageSize: 50 }),
       chefsPotentiels.length === 0 ? fetchChefsPotentiels() : Promise.resolve(chefsPotentiels)
     ]);
+    console.log('[Teams] Équipes loaded:', equipesRes.results);
+    console.log('[Teams] First equipe superviseur data:', equipesRes.results[0]);
     setEquipes(equipesRes.results);
     setEquipesTotal(equipesRes.count || 0);
     if (chefsPotentiels.length === 0) {
@@ -447,6 +449,7 @@ const Teams: React.FC = () => {
     { key: 'nomEquipe', label: 'Nom' },
     { key: 'chefEquipeNom', label: "Chef d'équipe", render: (e) => e.chefEquipeNom || '-' },
     { key: 'superviseurNom', label: 'Superviseur', render: (e) => e.superviseurNom || '-' },
+    { key: 'siteNom', label: "Site d'affectation", render: (e) => e.siteNom || '-' },
     {
       key: 'nombreMembres',
       label: 'Membres',

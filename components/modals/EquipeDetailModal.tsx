@@ -44,6 +44,24 @@ const EquipeDetailModal: React.FC<EquipeDetailModalProps> = ({ equipe, onClose }
             </div>
           </div>
 
+          {/* Superviseur et Site */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-500 mb-2 block">Superviseur</label>
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="font-medium text-gray-900">{equipe.superviseurNom || 'Non assigné'}</p>
+                <p className="text-xs text-gray-500">Gère cette équipe</p>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-500 mb-2 block">Site d'affectation</label>
+              <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                <p className="font-medium text-gray-900">{equipe.siteNom || 'Non affecté'}</p>
+                <p className="text-xs text-gray-500">Affectation contractuelle</p>
+              </div>
+            </div>
+          </div>
+
           {/* Chef d'equipe */}
           <div>
             <label className="text-sm font-medium text-gray-500 mb-2 block">Chef d'equipe</label>
