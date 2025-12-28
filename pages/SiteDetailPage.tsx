@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getSiteById, fetchAllSites, SiteFrontend, deleteSite, updateSite, apiFetch, fetchCurrentUser } from '../services/api';
-import { fetchClients } from '../services/usersApi';
-import type { Client } from '../types/users';
+import { fetchClients, fetchEquipes, fetchSuperviseurs, updateEquipe } from '../services/usersApi';
+import type { Client, EquipeList, SuperviseurList } from '../types/users';
 import { OLMap } from '../components/OLMap';
 import { MAP_LAYERS } from '../constants';
 import { useToast } from '../contexts/ToastContext';
@@ -117,6 +117,22 @@ const SiteDetailPage: React.FC = () => {
     const [isLoadingClients, setIsLoadingClients] = useState(false);
     const [clientSearchQuery, setClientSearchQuery] = useState('');
 
+    // Superviseur assignment modal
+    const [showAssignSuperviseurModal, setShowAssignSuperviseurModal] = useState(false);
+    const [superviseurs, setSuperviseurs] = useState<SuperviseurList[]>([]);
+    const [isLoadingSuperviseurs, setIsLoadingSuperviseurs] = useState(false);
+    const [superviseurSearchQuery, setSuperviseurSearchQuery] = useState('');
+
+    // Équipe assignment modal
+    const [showAssignEquipeModal, setShowAssignEquipeModal] = useState(false);
+    const [availableEquipes, setAvailableEquipes] = useState<EquipeList[]>([]);
+    const [isLoadingAvailableEquipes, setIsLoadingAvailableEquipes] = useState(false);
+    const [equipeSearchQuery, setEquipeSearchQuery] = useState('');
+
+    // Équipes affectées au site
+    const [equipes, setEquipes] = useState<EquipeList[]>([]);
+    const [isLoadingEquipes, setIsLoadingEquipes] = useState(false);
+
     // Current user (for displaying "Vous-même" if client is owner)
     const [currentUser, setCurrentUser] = useState<any>(null);
 
@@ -176,6 +192,34 @@ const SiteDetailPage: React.FC = () => {
         };
 
         loadSite();
+    }, [id, refreshKey]);
+
+    // Load équipes affectées au site
+    useEffect(() => {
+        const loadEquipes = async () => {
+            if (!id) return;
+
+            const siteId = parseInt(id);
+            if (isNaN(siteId)) {
+                console.error('Invalid site ID:', id);
+                return;
+            }
+
+            console.log('[SiteDetailPage] Fetching équipes for site:', siteId);
+            setIsLoadingEquipes(true);
+            try {
+                // Force refresh to bypass cache when filtering by site
+                const response = await fetchEquipes({ site: siteId }, true);
+                console.log('[SiteDetailPage] Équipes received:', response.results.length, 'teams');
+                console.log('[SiteDetailPage] First team (if any):', response.results[0]);
+                setEquipes(response.results);
+            } catch (error) {
+                console.error('Erreur chargement équipes:', error);
+            } finally {
+                setIsLoadingEquipes(false);
+            }
+        };
+        loadEquipes();
     }, [id, refreshKey]);
 
     // Load statistics when stats tab is active
@@ -259,6 +303,80 @@ const SiteDetailPage: React.FC = () => {
         c.nomStructure?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
         c.nom?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
         c.email?.toLowerCase().includes(clientSearchQuery.toLowerCase())
+    );
+
+    // Load superviseurs when modal opens
+    useEffect(() => {
+        if (showAssignSuperviseurModal && superviseurs.length === 0) {
+            loadSuperviseurs();
+        }
+    }, [showAssignSuperviseurModal]);
+
+    const loadSuperviseurs = async () => {
+        setIsLoadingSuperviseurs(true);
+        try {
+            const data = await fetchSuperviseurs();
+            setSuperviseurs(data.results || []);
+        } catch (error: any) {
+            showToast('Erreur lors du chargement des superviseurs', 'error');
+        } finally {
+            setIsLoadingSuperviseurs(false);
+        }
+    };
+
+    const handleAssignSuperviseur = async (superviseurId: number) => {
+        if (!site) return;
+        try {
+            await updateSite(Number(site.id), { superviseur: superviseurId });
+            showToast('Superviseur assigné avec succès', 'success');
+            setRefreshKey(prev => prev + 1); // Trigger reload
+            setShowAssignSuperviseurModal(false);
+            setSuperviseurSearchQuery('');
+        } catch (error: any) {
+            showToast('Erreur lors de l\'assignation du superviseur', 'error');
+        }
+    };
+
+    const filteredSuperviseurs = superviseurs.filter(s =>
+        s.fullName?.toLowerCase().includes(superviseurSearchQuery.toLowerCase()) ||
+        s.matricule?.toLowerCase().includes(superviseurSearchQuery.toLowerCase())
+    );
+
+    // Load available équipes when modal opens
+    useEffect(() => {
+        if (showAssignEquipeModal) {
+            loadAvailableEquipes();
+        }
+    }, [showAssignEquipeModal]);
+
+    const loadAvailableEquipes = async () => {
+        setIsLoadingAvailableEquipes(true);
+        try {
+            const data = await fetchEquipes({});
+            setAvailableEquipes(data.results || []);
+        } catch (error: any) {
+            showToast('Erreur lors du chargement des équipes', 'error');
+        } finally {
+            setIsLoadingAvailableEquipes(false);
+        }
+    };
+
+    const handleAssignEquipe = async (equipeId: number) => {
+        if (!site) return;
+        try {
+            // Update équipe with site using proper API function
+            await updateEquipe(equipeId, { site: Number(site.id) });
+            showToast('Équipe assignée avec succès', 'success');
+            setRefreshKey(prev => prev + 1); // Trigger reload
+            setShowAssignEquipeModal(false);
+            setEquipeSearchQuery('');
+        } catch (error: any) {
+            showToast('Erreur lors de l\'assignation de l\'équipe', 'error');
+        }
+    };
+
+    const filteredAvailableEquipes = availableEquipes.filter(e =>
+        e.nomEquipe?.toLowerCase().includes(equipeSearchQuery.toLowerCase())
     );
 
     if (isLoading) return <LoadingSpinner />;
@@ -370,13 +488,15 @@ const SiteDetailPage: React.FC = () => {
                                                     return site.client_nom || 'Non assigné';
                                                 })()}
                                             </div>
-                                            <button
-                                                onClick={() => setShowAssignClientModal(true)}
-                                                className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm flex-shrink-0"
-                                                title="Assigner un client"
-                                            >
-                                                <Plus className="w-4 h-4" />
-                                            </button>
+                                            {currentUser?.roles?.includes('ADMIN') && (
+                                                <button
+                                                    onClick={() => setShowAssignClientModal(true)}
+                                                    className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm flex-shrink-0"
+                                                    title="Assigner un client"
+                                                >
+                                                    <Plus className="w-4 h-4" />
+                                                </button>
+                                            )}
                                         </dd>
                                     </div>
 
@@ -384,8 +504,64 @@ const SiteDetailPage: React.FC = () => {
                                         <dt className="flex items-center gap-2 text-sm font-medium text-gray-500 mb-1">
                                             <Users className="w-4 h-4" /> Superviseur Affecté
                                         </dt>
-                                        <dd className="text-base font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
-                                            {site.superviseur_nom || 'Non assigné'}
+                                        <dd className="flex items-center gap-2">
+                                            <div className="flex-1 text-base font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
+                                                {site.superviseur_nom || 'Non assigné'}
+                                            </div>
+                                            {currentUser?.roles?.includes('ADMIN') && (
+                                                <button
+                                                    onClick={() => setShowAssignSuperviseurModal(true)}
+                                                    className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm flex-shrink-0"
+                                                    title="Assigner un superviseur"
+                                                >
+                                                    <Plus className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </dd>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <dt className="flex items-center justify-between text-sm font-medium text-gray-500 mb-2">
+                                            <span className="flex items-center gap-2">
+                                                <Users className="w-4 h-4" /> Équipes Affectées ({equipes.length})
+                                            </span>
+                                            {currentUser?.roles?.includes('ADMIN') && (
+                                                <button
+                                                    onClick={() => setShowAssignEquipeModal(true)}
+                                                    className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
+                                                    title="Assigner une équipe"
+                                                >
+                                                    <Plus className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                        </dt>
+                                        <dd>
+                                            {isLoadingEquipes ? (
+                                                <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                    Chargement des équipes...
+                                                </div>
+                                            ) : equipes.length > 0 ? (
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    {equipes.map((equipe) => (
+                                                        <div
+                                                            key={equipe.id}
+                                                            className="flex items-center justify-between p-2 bg-purple-50 rounded-lg border border-purple-200"
+                                                        >
+                                                            <div>
+                                                                <p className="font-medium text-gray-900 text-sm">{equipe.nomEquipe}</p>
+                                                                <p className="text-xs text-gray-500">
+                                                                    {equipe.nombreMembres} membre{equipe.nombreMembres > 1 ? 's' : ''}
+                                                                    {equipe.chefEquipeNom ? ` • Chef: ${equipe.chefEquipeNom}` : ''}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="text-base text-gray-500 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
+                                                    Aucune équipe affectée
+                                                </div>
+                                            )}
                                         </dd>
                                     </div>
 
@@ -882,6 +1058,184 @@ const SiteDetailPage: React.FC = () => {
                                 onClick={() => {
                                     setShowAssignClientModal(false);
                                     setClientSearchQuery('');
+                                }}
+                                className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+                            >
+                                Fermer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Assign Superviseur Modal */}
+            {showAssignSuperviseurModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] flex flex-col shadow-2xl">
+                        {/* Header */}
+                        <div className="p-6 border-b flex items-center justify-between">
+                            <h2 className="text-xl font-bold text-gray-900">Assigner un superviseur</h2>
+                            <button
+                                onClick={() => {
+                                    setShowAssignSuperviseurModal(false);
+                                    setSuperviseurSearchQuery('');
+                                }}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Search bar */}
+                        <div className="p-4 border-b">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Rechercher un superviseur..."
+                                    value={superviseurSearchQuery}
+                                    onChange={(e) => setSuperviseurSearchQuery(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Superviseur list */}
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {isLoadingSuperviseurs ? (
+                                <div className="fixed inset-0 z-50">
+                                    <LoadingScreen isLoading={true} loop={true} minDuration={0} />
+                                </div>
+                            ) : filteredSuperviseurs.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                                    <p className="text-gray-500">
+                                        {superviseurSearchQuery
+                                            ? 'Aucun superviseur trouvé pour cette recherche'
+                                            : 'Aucun superviseur disponible'}
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {filteredSuperviseurs.map((superviseur) => (
+                                        <button
+                                            key={superviseur.utilisateur}
+                                            onClick={() => handleAssignSuperviseur(superviseur.utilisateur)}
+                                            className="w-full p-4 border rounded-lg hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left group"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex-1">
+                                                    <div className="font-medium text-gray-900 group-hover:text-emerald-700">
+                                                        {superviseur.fullName}
+                                                    </div>
+                                                    <div className="text-sm text-gray-500 mt-1">
+                                                        Matricule: {superviseur.matricule}
+                                                    </div>
+                                                </div>
+                                                <Plus className="w-5 h-5 text-gray-400 group-hover:text-emerald-600" />
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 border-t bg-gray-50 flex justify-end">
+                            <button
+                                onClick={() => {
+                                    setShowAssignSuperviseurModal(false);
+                                    setSuperviseurSearchQuery('');
+                                }}
+                                className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+                            >
+                                Fermer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Assign Équipe Modal */}
+            {showAssignEquipeModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] flex flex-col shadow-2xl">
+                        {/* Header */}
+                        <div className="p-6 border-b flex items-center justify-between">
+                            <h2 className="text-xl font-bold text-gray-900">Assigner une équipe au site</h2>
+                            <button
+                                onClick={() => {
+                                    setShowAssignEquipeModal(false);
+                                    setEquipeSearchQuery('');
+                                }}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Search bar */}
+                        <div className="p-4 border-b">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Rechercher une équipe..."
+                                    value={equipeSearchQuery}
+                                    onChange={(e) => setEquipeSearchQuery(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Équipe list */}
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {isLoadingAvailableEquipes ? (
+                                <div className="fixed inset-0 z-50">
+                                    <LoadingScreen isLoading={true} loop={true} minDuration={0} />
+                                </div>
+                            ) : filteredAvailableEquipes.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                                    <p className="text-gray-500">
+                                        {equipeSearchQuery
+                                            ? 'Aucune équipe trouvée pour cette recherche'
+                                            : 'Aucune équipe disponible'}
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {filteredAvailableEquipes.map((equipe) => (
+                                        <button
+                                            key={equipe.id}
+                                            onClick={() => handleAssignEquipe(equipe.id)}
+                                            className="w-full p-4 border rounded-lg hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left group"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex-1">
+                                                    <div className="font-medium text-gray-900 group-hover:text-emerald-700">
+                                                        {equipe.nomEquipe}
+                                                    </div>
+                                                    <div className="text-sm text-gray-500 mt-1">
+                                                        {equipe.nombreMembres} membre{equipe.nombreMembres > 1 ? 's' : ''}
+                                                        {equipe.chefEquipeNom ? ` • Chef: ${equipe.chefEquipeNom}` : ''}
+                                                        {equipe.siteNom ? ` • Site actuel: ${equipe.siteNom}` : ''}
+                                                    </div>
+                                                </div>
+                                                <Plus className="w-5 h-5 text-gray-400 group-hover:text-emerald-600" />
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 border-t bg-gray-50 flex justify-end">
+                            <button
+                                onClick={() => {
+                                    setShowAssignEquipeModal(false);
+                                    setEquipeSearchQuery('');
                                 }}
                                 className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
                             >

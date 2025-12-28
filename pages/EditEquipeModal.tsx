@@ -9,6 +9,7 @@ import {
   retirerMembre,
   fetchSuperviseurs
 } from '../services/usersApi';
+import { fetchSites, SiteFrontend } from '../services/api';
 import DetailModal from '../components/DetailModal';
 
 interface EditEquipeModalProps {
@@ -29,7 +30,8 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
   const [form, setForm] = useState<EquipeUpdate>({
     nomEquipe: equipe.nomEquipe,
     chefEquipe: cleanNumericValue(equipe.chefEquipe),
-    superviseur: cleanNumericValue(equipe.superviseur),
+    // ⚠️ superviseur supprimé : désormais déduit automatiquement du site
+    site: cleanNumericValue(equipe.site),
     actif: equipe.actif,
   });
   const [loading, setLoading] = useState(false);
@@ -40,6 +42,7 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
   const [membres, setMembres] = useState<OperateurList[]>([]);
   const [availableOperateurs, setAvailableOperateurs] = useState<OperateurList[]>([]);
   const [superviseurs, setSuperviseurs] = useState<SuperviseurList[]>([]);
+  const [sites, setSites] = useState<SiteFrontend[]>([]);
   const [loadingMembres, setLoadingMembres] = useState(true);
   const [memberAction, setMemberAction] = useState<string | null>(null);
 
@@ -50,14 +53,16 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
   const loadMembres = async () => {
     setLoadingMembres(true);
     try {
-      const [membresRes, operateursRes, superviseursRes] = await Promise.all([
+      const [membresRes, operateursRes, superviseursRes, sitesRes] = await Promise.all([
         fetchEquipeMembres(equipe.id),
         fetchOperateurs({ sansEquipe: true }),
-        fetchSuperviseurs()
+        fetchSuperviseurs(),
+        fetchSites()
       ]);
       setMembres(membresRes);
       setAvailableOperateurs(operateursRes.results);
       setSuperviseurs(superviseursRes.results);
+      setSites(sitesRes.filter(s => s.actif));
     } catch (err) {
       console.error('Erreur chargement membres:', err);
     } finally {
@@ -71,8 +76,8 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
     if (type === 'checkbox') {
       newValue = (e.target as HTMLInputElement).checked;
     }
-    if (name === 'chefEquipe' || name === 'superviseur') {
-      // Treat empty string as null to allow removing the chef or superviseur
+    if (name === 'chefEquipe' || name === 'site') {
+      // Treat empty string as null to allow removing the chef or site
       if (value === '') {
         newValue = null;
       } else {
@@ -160,26 +165,48 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Superviseur (optionnel)
+          Site d'affectation contractuelle (optionnel)
         </label>
         <select
-          name="superviseur"
-          value={form.superviseur ?? ''}
+          name="site"
+          value={form.site ?? ''}
           onChange={handleChange}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
         >
-          <option key="superviseur-none" value="">-- Aucun --</option>
-          {superviseurs.map((sup) => (
-            <option key={`superviseur-${sup.utilisateur}`} value={sup.utilisateur}>
-              {sup.fullName}
-              {sup.utilisateur === equipe.superviseur ? ' (actuel)' : ''}
+          <option key="site-none" value="">-- Aucun site --</option>
+          {sites.map((site) => (
+            <option key={`site-${site.id}`} value={parseInt(site.id)}>
+              {site.name} {site.code_site ? `(${site.code_site})` : ''}
+              {parseInt(site.id) === equipe.site ? ' (actuel)' : ''}
             </option>
           ))}
         </select>
         <p className="mt-1 text-xs text-gray-500">
-          Le superviseur qui gère cette équipe (rôle de gestion)
+          Site auquel l'équipe est affectée de manière permanente
         </p>
       </div>
+
+      {/* Superviseur (calculé automatiquement depuis le site) */}
+      {form.site && (
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Superviseur (déduit du site)
+          </label>
+          <p className="text-sm text-gray-900">
+            {(() => {
+              const selectedSite = sites.find(s => parseInt(s.id) === form.site);
+              if (selectedSite?.superviseur) {
+                const sup = superviseurs.find(s => s.utilisateur === selectedSite.superviseur);
+                return sup?.fullName || 'Chargement...';
+              }
+              return 'Aucun superviseur assigné à ce site';
+            })()}
+          </p>
+          <p className="mt-1 text-xs text-blue-600">
+            Le superviseur est automatiquement celui qui gère le site sélectionné
+          </p>
+        </div>
+      )}
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
