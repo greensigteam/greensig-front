@@ -30,6 +30,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import { ReclamationTimeline } from '../components/ReclamationTimeline';
 import OLMap from '../components/OLMap';
 import { MapLayerType } from '../types';
+import { RECLAMATION_STATUS_COLORS } from '../constants';
 
 const Reclamations: React.FC = () => {
     const navigate = useNavigate();
@@ -676,7 +677,7 @@ const Reclamations: React.FC = () => {
                                                     >
                                                         <Eye className="w-4 h-4" />
                                                     </button>
-                                                    {(isAdmin || (rec.createur === currentUser?.id)) && (
+                                                    {!isClient && (isAdmin || (rec.createur === currentUser?.id)) && (
                                                         <>
                                                             <button
                                                                 onClick={() => handleEdit(rec.id)}
@@ -1016,7 +1017,7 @@ const Reclamations: React.FC = () => {
                             {/* Localisation sur carte */}
                             <div className="mb-6">
                                 <h4 className="text-xs font-semibold uppercase text-gray-500 mb-2">Localisation sur carte</h4>
-                                <div className="h-48 w-full rounded-xl overflow-hidden border border-gray-200 shadow-inner relative">
+                                <div className="h-64 w-full rounded-xl overflow-hidden border border-gray-200 shadow-inner relative">
                                     {selectedReclamation.localisation?.coordinates ? (
                                         <OLMap
                                             activeLayer={{ id: MapLayerType.PLAN, name: 'Plan', url: 'https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png', attribution: '&copy; OpenStreetMap' }}
@@ -1025,7 +1026,17 @@ const Reclamations: React.FC = () => {
                                                     lng: selectedReclamation.localisation.coordinates[0],
                                                     lat: selectedReclamation.localisation.coordinates[1]
                                                 },
-                                                zoom: 17
+                                                zoom: 18
+                                            }}
+                                            highlightedGeometry={{
+                                                type: 'Feature',
+                                                geometry: selectedReclamation.localisation,
+                                                properties: {
+                                                    id: selectedReclamation.id,
+                                                    object_type: 'Reclamation',
+                                                    numero_reclamation: selectedReclamation.numero_reclamation,
+                                                    couleur_statut: RECLAMATION_STATUS_COLORS[selectedReclamation.statut] || '#6b7280'
+                                                }
                                             }}
                                             isMiniMap={true}
                                         />
@@ -1198,8 +1209,8 @@ const Reclamations: React.FC = () => {
                                         Valider clôture
                                     </button>
                                 )}
-                                {/* User 6.6.13 - Bouton Évaluer (visible uniquement si CLOTUREE) */}
-                                {selectedReclamation.statut === 'CLOTUREE' && !selectedReclamation.satisfaction && (
+                                {/* User 6.6.13 - Bouton Évaluer (créateur uniquement après clôture) */}
+                                {currentUser && selectedReclamation.createur === currentUser.id && selectedReclamation.statut === 'CLOTUREE' && !selectedReclamation.satisfaction && (
                                     <button
                                         onClick={() => setShowSatisfactionForm(true)}
                                         className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 font-medium flex items-center gap-2"

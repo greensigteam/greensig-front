@@ -58,9 +58,9 @@ const Dashboard: React.FC = () => {
   const kpis = React.useMemo(() => {
     if (!statistics) return MOCK_KPIS;
 
-    // Si on a des stats spécifiques Chef d'Équipe, on les affiche en priorité
-    if (statistics.chef_equipe_stats) {
-      const stats = statistics.chef_equipe_stats;
+    // Si on a des stats spécifiques Superviseur, on les affiche en priorité
+    if (statistics.superviseur_stats) {
+      const stats = statistics.superviseur_stats;
       return [
         {
           label: "Tâches Aujourd'hui",

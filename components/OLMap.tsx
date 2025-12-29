@@ -1164,18 +1164,30 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
         }
 
         if (feature) {
-          // Create a STRONG highlight style
+          // Get custom color from feature properties or use default cyan
+          const properties = feature.getProperties();
+          const customColor = properties?.couleur_statut || properties?.color || '#00ffff';
+
+          // Convert HEX to RGBA with opacity
+          const hexToRgba = (hex: string, alpha: number = 0.2): string => {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result
+              ? `rgba(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}, ${alpha})`
+              : `rgba(0, 255, 255, ${alpha})`;
+          };
+
+          // Create a STRONG highlight style with custom color
           const highlightStyle = new Style({
             stroke: new Stroke({
-              color: '#00ffff', // Cyan for high visibility
+              color: customColor,
               width: 5,
             }),
             fill: new Fill({
-              color: 'rgba(0, 255, 255, 0.2)',
+              color: hexToRgba(customColor, 0.2),
             }),
             image: new CircleStyle({
               radius: 12,
-              fill: new Fill({ color: '#00ffff' }),
+              fill: new Fill({ color: customColor }),
               stroke: new Stroke({ color: '#fff', width: 3 }),
             }),
             zIndex: 10000

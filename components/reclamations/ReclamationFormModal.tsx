@@ -29,6 +29,7 @@ export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
 }) => {
     const [formData, setFormData] = useState<Partial<ReclamationCreate>>({
         site: preSelectedSiteId,
+        date_constatation: new Date().toISOString(), // Valeur par défaut: maintenant
     });
     const [photos, setPhotos] = useState<File[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);

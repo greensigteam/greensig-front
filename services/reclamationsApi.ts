@@ -31,7 +31,26 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
     }
     if (!response.ok) {
         const error = await response.json().catch(() => ({ detail: 'Erreur réseau' }));
-        throw new Error(error.detail || `Erreur ${response.status}`);
+
+        // Extraire le message d'erreur détaillé
+        let errorMessage = error.detail || `Erreur ${response.status}`;
+
+        // Si c'est une erreur de validation (objet avec champs)
+        if (typeof error === 'object' && !error.detail) {
+            const fieldErrors: string[] = [];
+            for (const [field, messages] of Object.entries(error)) {
+                if (Array.isArray(messages)) {
+                    fieldErrors.push(`${field}: ${messages.join(', ')}`);
+                } else {
+                    fieldErrors.push(`${field}: ${messages}`);
+                }
+            }
+            if (fieldErrors.length > 0) {
+                errorMessage = fieldErrors.join(' | ');
+            }
+        }
+
+        throw new Error(errorMessage);
     }
     return response.json();
 };

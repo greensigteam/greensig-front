@@ -778,14 +778,30 @@ const Planning: FC = () => {
         } catch (err) { alert('Erreur création'); }
     };
 
-    const handleDeleteTache = (id: number) => { setTacheToDelete(id); setPopoverInfo(null); };
+    const handleDeleteTache = (id: number) => {
+        setTacheToDelete(id);
+        setPopoverInfo(null); // Fermer le popover avant suppression
+    };
+
     const confirmDelete = async () => {
         if (!tacheToDelete) return;
+        const deletedId = tacheToDelete;
+
         try {
-            await planningService.deleteTache(tacheToDelete);
+            // Mise à jour optimiste : retirer la tâche de la liste AVANT l'appel API
+            setTaches(prev => prev.filter(t => t.id !== deletedId));
+            setTacheToDelete(null); // Fermer le modal immédiatement
+
+            // Appel API en arrière-plan
+            await planningService.deleteTache(deletedId);
+
+            // Pas besoin de loadTaches() car on a déjà mis à jour l'état optimistiquement
+        } catch (err) {
+            // En cas d'erreur, recharger pour restaurer l'état correct
+            console.error('Erreur suppression tâche:', err);
             await loadTaches();
-            setTacheToDelete(null);
-        } catch (err) { alert('Erreur suppression'); }
+            alert('Erreur lors de la suppression');
+        }
     };
     const handleResetCharge = async (tacheId: number) => { try { await planningService.resetCharge(tacheId); await loadTaches(); } catch (err) { alert('Erreur charge'); } };
 
