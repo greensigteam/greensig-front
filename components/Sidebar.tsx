@@ -33,7 +33,7 @@ const viewToPath: Record<string, string> = {
   USERS: '/users',
   PARAMETRES: '/parametres',
   // Client specific routes
-  CLIENT_MAP: '/client/map',
+  CLIENT_MAP: '/map', // CLIENT accède directement à la carte principale
   CLIENT_CLAIMS: '/reclamations',
   CLIENT_PLANNING: '/planning',
   CLIENT_INTERVENTIONS: '/claims',
@@ -98,6 +98,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'CLIENT_CLAIMS', label: 'Réclamations', icon: AlertCircle, roles: ['CLIENT'] },
     { id: 'CLIENT_PLANNING', label: 'Planning', icon: Calendar, roles: ['CLIENT'] },
     { id: 'CLIENT_INTERVENTIONS', label: 'Interventions', icon: ClipboardList, roles: ['CLIENT'] },
+    { id: 'TEAMS', label: 'RH', icon: Users, roles: ['CLIENT'] },
   ];
 
   // Filter entries based on role

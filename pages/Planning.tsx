@@ -593,7 +593,9 @@ const Planning: FC = () => {
             })));
             setClients(clientsArray);
             const roles = userData.roles || [];
-            setIsReadOnly((roles.includes('SUPERVISEUR') && !roles.includes('ADMIN')) || roles.includes('CLIENT'));
+            // Selon matrice permissions : seul CLIENT est en lecture seule
+            // SUPERVISEUR peut créer/modifier/supprimer des tâches sur ses équipes
+            setIsReadOnly(roles.includes('CLIENT'));
             setIsClientView(roles.includes('CLIENT'));
 
             // Load sites separately (non-blocking)

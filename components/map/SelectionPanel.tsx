@@ -197,8 +197,9 @@ export const SelectionPanel: React.FC<SelectionPanelProps> = ({
              * DÉSACTIVÉ par demande du Product Owner (20/12/2024)
              * Outils de modification de géométrie retirés temporairement.
              * Pour réactiver : décommenter le bloc ci-dessous.
+             * Note: SUPERVISEUR peut modifier (selon matrice permissions), seul CLIENT est en lecture seule
              *
-            {selectedObjects.length > 0 && userRole !== 'SUPERVISEUR' && userRole !== 'CLIENT' && (
+            {selectedObjects.length > 0 && userRole !== 'CLIENT' && (
                 <div className="p-3 border-t border-slate-100 bg-blue-50/50">
                     <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
                         <Pencil className="w-3 h-3" />
@@ -239,8 +240,8 @@ export const SelectionPanel: React.FC<SelectionPanelProps> = ({
             )}
             */}
 
-            {/* Actions */}
-            {selectedObjects.length > 0 && userRole !== 'SUPERVISEUR' && userRole !== 'CLIENT' && (
+            {/* Actions : ADMIN et SUPERVISEUR peuvent créer des tâches (selon matrice permissions) */}
+            {selectedObjects.length > 0 && userRole !== 'CLIENT' && (
                 <div className="p-3 border-t border-slate-100 bg-slate-50/50 space-y-2">
                     {/* Incompatibility Warning */}
                     {!isCompatible && !compatibilityLoading && (

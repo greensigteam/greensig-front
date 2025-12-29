@@ -197,6 +197,8 @@ const Teams: React.FC = () => {
   const isAdmin = !!currentUser?.roles?.includes('ADMIN');
   const isChefEquipe = !!currentUser?.roles?.includes('SUPERVISEUR');
   const isChefEquipeOnly = isChefEquipe && !isAdmin;
+  const isClient = !!currentUser?.roles?.includes('CLIENT');
+  const isReadOnly = isChefEquipeOnly || isClient; // SUPERVISEUR et CLIENT en lecture seule
 
   // Debounce search query (300ms delay)
   useEffect(() => {
@@ -261,6 +263,7 @@ const Teams: React.FC = () => {
   };
 
   const loadTabData = async (tab: TabType) => {
+    setLoading(true);
     try {
       switch (tab) {
         case 'equipes':
@@ -279,28 +282,44 @@ const Teams: React.FC = () => {
     } catch (error) {
       console.error('Erreur chargement données:', error);
       showToast('Erreur lors du chargement des données', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
   const loadEquipesData = async (page: number = equipesPage) => {
-    const [equipesRes, chefsPotentielsRes] = await Promise.all([
-      fetchEquipes({ page, pageSize: 50 }),
-      chefsPotentiels.length === 0 ? fetchChefsPotentiels() : Promise.resolve(chefsPotentiels)
-    ]);
-    console.log('[Teams] Équipes loaded:', equipesRes.results);
-    console.log('[Teams] First equipe superviseur data:', equipesRes.results[0]);
-    setEquipes(equipesRes.results);
-    setEquipesTotal(equipesRes.count || 0);
-    if (chefsPotentiels.length === 0) {
-      setChefsPotentiels(chefsPotentielsRes);
+    console.log('[Teams] 🔄 Loading équipes data, page:', page);
+    try {
+      const [equipesRes, chefsPotentielsRes] = await Promise.all([
+        fetchEquipes({ page, pageSize: 50 }),
+        chefsPotentiels.length === 0 ? fetchChefsPotentiels() : Promise.resolve(chefsPotentiels)
+      ]);
+      console.log('[Teams] ✅ Équipes loaded:', equipesRes.results.length, 'équipes');
+      console.log('[Teams] 📊 Équipes data:', equipesRes.results);
+      console.log('[Teams] 👤 First equipe superviseur data:', equipesRes.results[0]);
+      setEquipes(equipesRes.results);
+      setEquipesTotal(equipesRes.count || 0);
+      if (chefsPotentiels.length === 0) {
+        setChefsPotentiels(chefsPotentielsRes);
+      }
+    } catch (error) {
+      console.error('[Teams] ❌ Error loading équipes:', error);
+      showToast('Erreur lors du chargement des équipes', 'error');
     }
   };
 
   const loadOperateursData = async (page: number = operateursPage) => {
-    // Only load what's needed - removed heavy utilisateurs and clients loading
-    const operateursRes = await fetchOperateurs({ page, pageSize: 50 });
-    setOperateurs(operateursRes.results);
-    setOperateursTotal(operateursRes.count || 0);
+    console.log('[Teams] 🔄 Loading opérateurs data, page:', page);
+    try {
+      const operateursRes = await fetchOperateurs({ page, pageSize: 50 });
+      console.log('[Teams] ✅ Opérateurs loaded:', operateursRes.results.length, 'opérateurs');
+      console.log('[Teams] 📊 Opérateurs data:', operateursRes.results);
+      setOperateurs(operateursRes.results);
+      setOperateursTotal(operateursRes.count || 0);
+    } catch (error) {
+      console.error('[Teams] ❌ Error loading opérateurs:', error);
+      showToast('Erreur lors du chargement des opérateurs', 'error');
+    }
   };
 
   const loadCompetencesData = async () => {
@@ -466,7 +485,7 @@ const Teams: React.FC = () => {
       label: 'Actions',
       render: (e) => (
         <div className="flex gap-1">
-          {!isChefEquipeOnly && (
+          {!isReadOnly && (
             <>
               <button
                 className="p-1 text-blue-600 hover:bg-blue-100 rounded"
@@ -484,7 +503,7 @@ const Teams: React.FC = () => {
               </button>
             </>
           )}
-          {isChefEquipeOnly && (
+          {isReadOnly && (
             <button
               className="p-1 text-gray-600 hover:bg-gray-100 rounded"
               title="Voir détails"
@@ -515,7 +534,7 @@ const Teams: React.FC = () => {
       label: 'Actions',
       render: (o) => (
         <div className="flex gap-1">
-          {!isChefEquipeOnly && (
+          {!isReadOnly && (
             <>
               <button
                 className="p-1 text-blue-600 hover:bg-blue-100 rounded"
@@ -533,7 +552,7 @@ const Teams: React.FC = () => {
               </button>
             </>
           )}
-          {isChefEquipeOnly && (
+          {isReadOnly && (
             <button
               className="p-1 text-gray-600 hover:bg-gray-100 rounded"
               title="Voir détails"
@@ -660,7 +679,7 @@ const Teams: React.FC = () => {
             <Eye className="w-4 h-4" />
           </button>
 
-          {!isChefEquipeOnly && (
+          {!isReadOnly && (
             <>
               {(a.statut === 'DEMANDEE' || a.statut === 'VALIDEE') && (
                 <button
@@ -706,7 +725,7 @@ const Teams: React.FC = () => {
     }
   ];
 
-  if (loading && !stats) {
+  if (loading) {
     return (
       <div className="fixed inset-0 z-50">
         <LoadingScreen isLoading={true} loop={true} minDuration={0} />
@@ -1359,7 +1378,7 @@ const Teams: React.FC = () => {
               </button>
 
               {/* Create Button */}
-              {!isChefEquipeOnly && (
+              {!isReadOnly && (
                 <button
                   onClick={() => setShowCreateAbsence(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm"
@@ -1385,7 +1404,7 @@ const Teams: React.FC = () => {
               </button>
 
               {/* Create Button - Conditional based on tab */}
-              {activeTab === 'equipes' && !isChefEquipeOnly && (
+              {activeTab === 'equipes' && !isReadOnly && (
                 <button
                   onClick={() => setShowCreateTeam(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm"
@@ -1394,7 +1413,7 @@ const Teams: React.FC = () => {
                   Équipe
                 </button>
               )}
-              {activeTab === 'operateurs' && !isChefEquipeOnly && (
+              {activeTab === 'operateurs' && !isReadOnly && (
                 <button
                   onClick={() => {
                     // TODO: Ouvrir modal de création d'opérateur

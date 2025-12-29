@@ -242,6 +242,7 @@ export interface CompetenceOperateurUpdate {
 // ============================================================================
 
 export interface OperateurList {
+  actif: boolean;
   id: number;
   nom: string;
   prenom: string;
