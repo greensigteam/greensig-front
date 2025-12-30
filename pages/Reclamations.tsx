@@ -1168,16 +1168,7 @@ const Reclamations: React.FC = () => {
                             <div className="flex justify-end pt-4 gap-3">
                                 {isAdmin && selectedReclamation.statut !== 'CLOTUREE' && (
                                     <button
-                                        onClick={() => {
-                                            const rec = selectedReclamation;
-                                            setSelectedReclamation(null);
-                                            navigate('/planning', {
-                                                state: {
-                                                    createTaskFromReclamation: true,
-                                                    reclamation: rec
-                                                }
-                                            });
-                                        }}
+                                        onClick={() => handleOpenTaskModal(selectedReclamation)}
                                         className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-2"
                                     >
                                         <ClipboardList className="w-4 h-4" />
