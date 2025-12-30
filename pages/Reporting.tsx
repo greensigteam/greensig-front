@@ -180,9 +180,8 @@ const Reporting: React.FC = () => {
         return (
             <div className="min-h-screen bg-gray-50">
                 {/* Tab Navigation */}
-                <div className="bg-white border-b border-gray-200 px-6 pt-6">
-                    <div className="max-w-7xl mx-auto">
-                        <h1 className="text-2xl font-bold text-gray-900 mb-4">Rapports & Statistiques</h1>
+                <div className="bg-white border-b border-gray-200 px-6 py-4">
+                    <div className="w-full">
                         <div className="flex gap-1">
                             {tabs.map((tab) => (
                                 <button
@@ -210,9 +209,8 @@ const Reporting: React.FC = () => {
         return (
             <div className="min-h-screen bg-gray-50">
                 {/* Tab Navigation */}
-                <div className="bg-white border-b border-gray-200 px-6 pt-6">
-                    <div className="max-w-7xl mx-auto">
-                        <h1 className="text-2xl font-bold text-gray-900 mb-4">Rapports & Statistiques</h1>
+                <div className="bg-white border-b border-gray-200 px-6 py-4">
+                    <div className="w-full">
                         <div className="flex gap-1">
                             {tabs.map((tab) => (
                                 <button
@@ -296,18 +294,8 @@ const Reporting: React.FC = () => {
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Tab Navigation */}
-            <div className="bg-white border-b border-gray-200 px-6 pt-6">
-                <div className="max-w-7xl mx-auto">
-                    <div className="flex justify-between items-center mb-4">
-                        <h1 className="text-2xl font-bold text-gray-900">Rapports & Statistiques</h1>
-                        <button
-                            onClick={loadData}
-                            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2"
-                        >
-                            <RefreshCw className="w-4 h-4" />
-                            Actualiser
-                        </button>
-                    </div>
+            <div className="bg-white border-b border-gray-200 px-6 py-4">
+                <div className="w-full">
                     <div className="flex gap-1">
                         {tabs.map((tab) => (
                             <button
@@ -327,7 +315,7 @@ const Reporting: React.FC = () => {
                 </div>
             </div>
 
-            <div className="p-6 space-y-6 max-w-7xl mx-auto">
+            <div className="p-6 space-y-6 w-full">
 
             {/* KPIs principaux */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
     MapPin, RefreshCw, Edit2, Trash2,
-    ChevronLeft, ChevronRight, AlertCircle, CheckCircle, Loader2, Plus,
+    ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+    AlertCircle, CheckCircle, Loader2, Plus,
     Settings, MoreVertical, Users, Filter
 } from 'lucide-react';
 import { fetchAllSites, updateSite, deleteSite, SiteFrontend } from '../services/api';
@@ -354,42 +355,40 @@ export default function Sites() {
                         </table>
 
                         {/* Pagination */}
-                        <div className="flex items-center justify-between px-6 py-4 border-t bg-gray-50">
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm text-gray-600">Afficher</span>
-                                <select
-                                    value={itemsPerPage}
-                                    onChange={(e) => {
-                                        setItemsPerPage(Number(e.target.value));
-                                        setCurrentPage(1);
-                                    }}
-                                    className="border border-gray-300 rounded-md text-sm py-1 px-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-                                >
-                                    <option value={10}>10</option>
-                                    <option value={20}>20</option>
-                                    <option value={50}>50</option>
-                                </select>
-                                <span className="text-sm text-gray-600">par page</span>
-                            </div>
-
-                            <div className="flex items-center gap-4">
-                                <span className="text-sm text-gray-600">
-                                    {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredSites.length)} sur {filteredSites.length}
-                                </span>
-                                <div className="flex items-center gap-1">
+                        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-3">
+                            <div className="flex items-center justify-between">
+                                <div className="text-sm text-gray-600">
+                                    Affichage {startIndex + 1} à {Math.min(startIndex + itemsPerPage, filteredSites.length)} sur {filteredSites.length}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setCurrentPage(1)}
+                                        disabled={currentPage === 1}
+                                        className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <ChevronsLeft className="w-4 h-4" />
+                                    </button>
                                     <button
                                         onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                         disabled={currentPage === 1}
-                                        className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                        className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        <ChevronLeft className="w-5 h-5" />
+                                        <ChevronLeft className="w-4 h-4" />
                                     </button>
+                                    <span className="px-3 py-1 text-sm">Page {currentPage} sur {totalPages > 0 ? totalPages : 1}</span>
                                     <button
                                         onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                        disabled={currentPage === totalPages}
-                                        className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                        disabled={currentPage === totalPages || totalPages === 0}
+                                        className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        <ChevronRight className="w-5 h-5" />
+                                        <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentPage(totalPages)}
+                                        disabled={currentPage === totalPages || totalPages === 0}
+                                        className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <ChevronsRight className="w-4 h-4" />
                                     </button>
                                 </div>
                             </div>
