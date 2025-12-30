@@ -10,12 +10,17 @@ This is the frontend for **GreenSIG**, a green spaces management system (Systèm
 
 ```bash
 npm install          # Install dependencies
-npm run dev          # Start dev server (http://localhost:5173)
-npm run build        # Production build
+npm run dev          # Start dev server (http://localhost:3000)
+npm run build        # Production build (runs TypeScript check - fails on type errors)
 npm run preview      # Preview production build
 ```
 
-Environment: Create `.env` with `VITE_API_BASE_URL=http://localhost:8000/api` (defaults to `/api`).
+**No lint or test commands are configured.** TypeScript strict mode is enabled with `noUncheckedIndexedAccess` - array/object access returns `T | undefined`.
+
+Environment variables (`.env`):
+- `VITE_API_BASE_URL` - Backend API URL (optional, Vite proxies `/api` to localhost:8000)
+- `VITE_USE_TUNNEL=true` - Enable Cloudflare tunnel mode (WSS on port 443)
+- `GEMINI_API_KEY` - Google Gemini AI API key (for AI features)
 
 ## Architecture
 
@@ -95,8 +100,8 @@ Files are at the root level (no `src/` directory):
 
 ## API Configuration
 
-Backend CORS allows `http://localhost:5173` (Vite dev server).
-Frontend expects backend at localhost:8000 (configured in services/api.ts).
+Vite proxies `/api` and `/media` to `http://127.0.0.1:8000` (configured in `vite.config.ts`).
+Path alias: `@/*` maps to project root (e.g., `import { api } from '@/services/api'`).
 
 ## User Roles (✅ Refactoring Complete)
 - `ADMIN` - Full access to all features
