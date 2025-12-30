@@ -635,17 +635,23 @@ const OngletInterventions: React.FC<{
 };
 
 // ============================================================================
-// MAIN COMPONENT
+// CONTENT COMPONENT (shared between page and modal)
 // ============================================================================
 
-export default function OperateurDetailPage() {
-    const { id } = useParams<{ id: string }>();
+interface OperateurDetailContentProps {
+    operateur: OperateurDetail;
+    isModal?: boolean;
+    onClose?: () => void;
+}
+
+export const OperateurDetailContent: React.FC<OperateurDetailContentProps> = ({
+    operateur,
+    isModal = false,
+    onClose
+}) => {
     const navigate = useNavigate();
     const { showToast } = useToast();
 
-    // State
-    const [operateur, setOperateur] = useState<OperateurDetail | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<TabType>('general');
 
     // Data per tab (lazy loaded)
@@ -653,11 +659,6 @@ export default function OperateurDetailPage() {
     const [isLoadingAbsences, setIsLoadingAbsences] = useState(false);
     const [taches, setTaches] = useState<Tache[]>([]);
     const [isLoadingTaches, setIsLoadingTaches] = useState(false);
-
-    // Load operateur
-    useEffect(() => {
-        loadOperateur();
-    }, [id]);
 
     // Lazy load tab data
     useEffect(() => {
@@ -671,29 +672,10 @@ export default function OperateurDetailPage() {
         }
     }, [activeTab, operateur]);
 
-    const loadOperateur = async () => {
-        if (!id) {
-            showToast('ID opérateur manquant', 'error');
-            navigate('/users');
-            return;
-        }
-
-        setIsLoading(true);
-        try {
-            const data = await fetchOperateurById(Number(id));
-            setOperateur(data);
-        } catch (error: any) {
-            showToast(error.message || 'Erreur lors du chargement', 'error');
-            navigate('/users');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
     const loadAbsences = async () => {
         setIsLoadingAbsences(true);
         try {
-            const response = await fetchAbsences({ operateur: Number(id) });
+            const response = await fetchAbsences({ operateur: operateur.id });
             setAbsences(response.results || []);
         } catch (error: any) {
             showToast('Erreur lors du chargement des absences', 'error');
@@ -719,18 +701,23 @@ export default function OperateurDetailPage() {
         }
     };
 
-    if (isLoading) return <LoadingScreen />;
-    if (!operateur) return null;
+    const handleBack = () => {
+        if (isModal && onClose) {
+            onClose();
+        } else {
+            navigate(-1);
+        }
+    };
 
     return (
-        <div className="h-full bg-white flex flex-col">
+        <div className={`bg-white flex flex-col ${isModal ? 'h-full' : 'h-full'}`}>
             {/* Header */}
             <header className="flex-shrink-0 bg-white border-b p-4 flex justify-between items-center">
                 <div className="flex items-center gap-4">
                     <button
-                        onClick={() => navigate(-1)}
+                        onClick={handleBack}
                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                        title="Retour"
+                        title={isModal ? "Fermer" : "Retour"}
                     >
                         <ChevronLeft className="w-6 h-6" />
                     </button>
@@ -761,11 +748,10 @@ export default function OperateurDetailPage() {
                         </div>
                     </div>
                 </div>
-                {/* TODO: Ajouter un bouton "Modifier" avec une modale d'édition */}
             </header>
 
             {/* Tabs */}
-            <div className="flex-shrink-0 bg-white border-b px-6">
+            <div className="flex-shrink-0 bg-white border-b px-6 overflow-x-auto">
                 <div className="flex gap-4">
                     <TabButton
                         active={activeTab === 'general'}
@@ -806,4 +792,62 @@ export default function OperateurDetailPage() {
             </main>
         </div>
     );
+};
+
+// ============================================================================
+// MODAL WRAPPER (for use in Teams.tsx and other places)
+// ============================================================================
+
+interface OperateurDetailModalProps {
+    operateur: OperateurDetail;
+    onClose: () => void;
+}
+
+export const OperateurDetailModal: React.FC<OperateurDetailModalProps> = ({ operateur, onClose }) => {
+    return (
+        <div className="fixed inset-0 z-50 bg-white">
+            <OperateurDetailContent operateur={operateur} isModal onClose={onClose} />
+        </div>
+    );
+};
+
+// ============================================================================
+// PAGE COMPONENT (for /operateurs/:id route)
+// ============================================================================
+
+export default function OperateurDetailPage() {
+    const { id } = useParams<{ id: string }>();
+    const navigate = useNavigate();
+    const { showToast } = useToast();
+
+    const [operateur, setOperateur] = useState<OperateurDetail | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        loadOperateur();
+    }, [id]);
+
+    const loadOperateur = async () => {
+        if (!id) {
+            showToast('ID opérateur manquant', 'error');
+            navigate('/users');
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const data = await fetchOperateurById(Number(id));
+            setOperateur(data);
+        } catch (error: any) {
+            showToast(error.message || 'Erreur lors du chargement', 'error');
+            navigate('/users');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    if (isLoading) return <LoadingScreen />;
+    if (!operateur) return null;
+
+    return <OperateurDetailContent operateur={operateur} />;
 }

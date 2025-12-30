@@ -49,7 +49,7 @@ import CompetenceMatrix, { ViewMode } from '../components/CompetenceMatrix';
 import CreateTeamModal from '../components/modals/CreateTeamModal';
 import EquipeDetailModal from '../components/modals/EquipeDetailModal';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
-import OperateurDetailModal from '../components/modals/OperateurDetailModal';
+import { OperateurDetailModal } from './OperateurDetailPage';
 import { useNavigate } from 'react-router-dom';
 
 // Types
