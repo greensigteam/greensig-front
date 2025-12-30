@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     BarChart3, TrendingUp, Users, AlertTriangle, RefreshCw, Calendar,
-    CheckCircle, Clock, XCircle, Trees, Droplet, Building2
+    Trees, Droplet, Building2, FileText
 } from 'lucide-react';
 import {
     BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
@@ -9,6 +9,8 @@ import {
 } from 'recharts';
 import { apiFetch } from '../services/api';
 import LoadingScreen from '../components/LoadingScreen';
+import MonthlyReport from './MonthlyReport';
+import WeeklyReport from './WeeklyReport';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -138,7 +140,10 @@ const ProgressBar: React.FC<{
     </div>
 );
 
+type TabType = 'statistics' | 'monthly' | 'weekly';
+
 const Reporting: React.FC = () => {
+    const [activeTab, setActiveTab] = useState<TabType>('statistics');
     const [data, setData] = useState<ReportingData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -159,9 +164,79 @@ const Reporting: React.FC = () => {
     };
 
     useEffect(() => {
-        loadData();
-    }, []);
+        if (activeTab === 'statistics') {
+            loadData();
+        }
+    }, [activeTab]);
 
+    const tabs = [
+        { id: 'statistics' as TabType, label: 'Statistiques', icon: BarChart3 },
+        { id: 'monthly' as TabType, label: 'Rapport de Site', icon: FileText },
+        { id: 'weekly' as TabType, label: 'Rapport Hebdomadaire', icon: Calendar },
+    ];
+
+    // Render tab content based on active tab
+    if (activeTab === 'monthly') {
+        return (
+            <div className="min-h-screen bg-gray-50">
+                {/* Tab Navigation */}
+                <div className="bg-white border-b border-gray-200 px-6 pt-6">
+                    <div className="max-w-7xl mx-auto">
+                        <h1 className="text-2xl font-bold text-gray-900 mb-4">Rapports & Statistiques</h1>
+                        <div className="flex gap-1">
+                            {tabs.map((tab) => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`flex items-center gap-2 px-4 py-3 font-medium text-sm rounded-t-lg transition-colors ${
+                                        activeTab === tab.id
+                                            ? 'bg-emerald-50 text-emerald-700 border-b-2 border-emerald-600'
+                                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                                    }`}
+                                >
+                                    <tab.icon className="w-4 h-4" />
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+                <MonthlyReport />
+            </div>
+        );
+    }
+
+    if (activeTab === 'weekly') {
+        return (
+            <div className="min-h-screen bg-gray-50">
+                {/* Tab Navigation */}
+                <div className="bg-white border-b border-gray-200 px-6 pt-6">
+                    <div className="max-w-7xl mx-auto">
+                        <h1 className="text-2xl font-bold text-gray-900 mb-4">Rapports & Statistiques</h1>
+                        <div className="flex gap-1">
+                            {tabs.map((tab) => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`flex items-center gap-2 px-4 py-3 font-medium text-sm rounded-t-lg transition-colors ${
+                                        activeTab === tab.id
+                                            ? 'bg-emerald-50 text-emerald-700 border-b-2 border-emerald-600'
+                                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                                    }`}
+                                >
+                                    <tab.icon className="w-4 h-4" />
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+                <WeeklyReport />
+            </div>
+        );
+    }
+
+    // Statistics tab content
     if (loading) {
         return (
             <div className="fixed inset-0 z-50">
@@ -219,21 +294,40 @@ const Reporting: React.FC = () => {
     ];
 
     return (
-        <div className="p-6 space-y-6 max-w-7xl mx-auto">
-            {/* Header */}
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Rapports & Statistiques</h1>
-                    <p className="text-gray-500">Analyse de la performance et de l'activité</p>
+        <div className="min-h-screen bg-gray-50">
+            {/* Tab Navigation */}
+            <div className="bg-white border-b border-gray-200 px-6 pt-6">
+                <div className="max-w-7xl mx-auto">
+                    <div className="flex justify-between items-center mb-4">
+                        <h1 className="text-2xl font-bold text-gray-900">Rapports & Statistiques</h1>
+                        <button
+                            onClick={loadData}
+                            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2"
+                        >
+                            <RefreshCw className="w-4 h-4" />
+                            Actualiser
+                        </button>
+                    </div>
+                    <div className="flex gap-1">
+                        {tabs.map((tab) => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`flex items-center gap-2 px-4 py-3 font-medium text-sm rounded-t-lg transition-colors ${
+                                    activeTab === tab.id
+                                        ? 'bg-emerald-50 text-emerald-700 border-b-2 border-emerald-600'
+                                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                                }`}
+                            >
+                                <tab.icon className="w-4 h-4" />
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
-                <button
-                    onClick={loadData}
-                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2"
-                >
-                    <RefreshCw className="w-4 h-4" />
-                    Actualiser
-                </button>
             </div>
+
+            <div className="p-6 space-y-6 max-w-7xl mx-auto">
 
             {/* KPIs principaux */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -327,7 +421,7 @@ const Reporting: React.FC = () => {
                                     <XAxis type="number" domain={[0, 100]} />
                                     <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} />
                                     <Tooltip
-                                        formatter={(value: number, name: string) => [
+                                        formatter={(value, name) => [
                                             name === 'charge' ? `${value}%` : value,
                                             name === 'charge' ? 'Charge' : 'Tâches'
                                         ]}
@@ -400,7 +494,7 @@ const Reporting: React.FC = () => {
                                             cx="50%"
                                             cy="50%"
                                             labelLine={false}
-                                            label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                                            label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
                                             outerRadius={70}
                                             dataKey="value"
                                         >
@@ -464,7 +558,7 @@ const Reporting: React.FC = () => {
                                     cx="50%"
                                     cy="50%"
                                     labelLine={true}
-                                    label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
+                                    label={({ name, value, percent }) => `${name}: ${value} (${((percent ?? 0) * 100).toFixed(0)}%)`}
                                     outerRadius={80}
                                     dataKey="value"
                                 >
@@ -508,7 +602,7 @@ const Reporting: React.FC = () => {
                                             cx="50%"
                                             cy="50%"
                                             labelLine={false}
-                                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                                            label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
                                             outerRadius={80}
                                             dataKey="value"
                                         >
@@ -538,6 +632,7 @@ const Reporting: React.FC = () => {
                     )}
                 </div>
             </div>
+        </div>
         </div>
     );
 };

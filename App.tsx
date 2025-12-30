@@ -18,6 +18,8 @@ const RatiosProductivite = lazy(() => import('./pages/RatiosProductivite'));
 const SuiviTaches = lazy(() => import('./pages/SuiviTaches'));
 const Produits = lazy(() => import('./pages/Produits'));
 const Reporting = lazy(() => import('./pages/Reporting'));
+const MonthlyReport = lazy(() => import('./pages/MonthlyReport'));
+const WeeklyReport = lazy(() => import('./pages/WeeklyReport'));
 const Users = lazy(() => import('./pages/Users'));
 const Parametres = lazy(() => import('./pages/Parametres'));
 const Sites = lazy(() => import('./pages/Sites'));
@@ -350,6 +352,16 @@ function App() {
                       <Route path="claims" element={<Suspense fallback={<PageLoadingFallback />}><SuiviTaches /></Suspense>} />
                       <Route path="products" element={<Suspense fallback={<PageLoadingFallback />}><Produits /></Suspense>} />
                       <Route path="reporting" element={<Suspense fallback={<PageLoadingFallback />}><Reporting /></Suspense>} />
+                      <Route path="monthly-report" element={
+                        <RequireRole user={user} roles={['ADMIN']}>
+                          <Suspense fallback={<PageLoadingFallback />}><MonthlyReport /></Suspense>
+                        </RequireRole>
+                      } />
+                      <Route path="weekly-report" element={
+                        <RequireRole user={user} roles={['ADMIN']}>
+                          <Suspense fallback={<PageLoadingFallback />}><WeeklyReport /></Suspense>
+                        </RequireRole>
+                      } />
                       <Route path="parametres" element={
                         <RequireRole user={user} roles={['ADMIN']}>
                           <Suspense fallback={<PageLoadingFallback />}><Parametres /></Suspense>

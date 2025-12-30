@@ -29,6 +29,8 @@ const viewToPath: Record<string, string> = {
   CLAIMS: '/claims',
   TEAMS: '/teams',
   REPORTING: '/reporting',
+  MONTHLY_REPORT: '/monthly-report',
+  WEEKLY_REPORT: '/weekly-report',
   CLIENT_PORTAL: '/client',
   USERS: '/users',
   PARAMETRES: '/parametres',
