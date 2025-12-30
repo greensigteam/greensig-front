@@ -1,9 +1,20 @@
 import { useState, useEffect, useMemo, useRef, type FC, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { addDays, addWeeks, addMonths } from 'date-fns';
+import { addDays, addWeeks, addMonths, format } from 'date-fns';
 import {
     Clock, X, Search, ChevronDown, Timer, RefreshCw, Gauge, ExternalLink, Calculator, TreePine, AlertTriangle, MapPin, Ban
 } from 'lucide-react';
+
+// ============================================================================
+// HELPER: Format date for datetime-local input (respects local timezone)
+// ============================================================================
+const formatDateTimeLocal = (date: Date): string => {
+    return format(date, "yyyy-MM-dd'T'HH:mm");
+};
+
+const formatDateLocal = (date: Date): string => {
+    return format(date, 'yyyy-MM-dd');
+};
 import { planningService } from '../../services/planningService';
 import { fetchInventory, type InventoryResponse } from '../../services/api';
 import {
@@ -252,24 +263,29 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         return [];
     };
 
-    // Default dates: today 8:00 to today 17:00
+    // Default dates: current time (real-time) to end of day or +1h if late
     const getDefaultStartDate = () => {
-        const now = new Date();
-        now.setHours(8, 0, 0, 0);
-        return now.toISOString().slice(0, 16);
+        return formatDateTimeLocal(new Date());
     };
     const getDefaultEndDate = () => {
         const now = new Date();
-        now.setHours(17, 0, 0, 0);
-        return now.toISOString().slice(0, 16);
+        const endOfDay = new Date();
+        endOfDay.setHours(17, 0, 0, 0);
+
+        // Si on est après 16h, mettre fin à +1h de maintenant
+        if (now.getHours() >= 16) {
+            const end = new Date(now.getTime() + 60 * 60 * 1000); // +1 heure
+            return formatDateTimeLocal(end);
+        }
+        return formatDateTimeLocal(endOfDay);
     };
 
     const [formData, setFormData] = useState<TacheCreate>({
         id_client: tache?.client_detail?.id || initialValues?.id_client || null,
         id_type_tache: tache?.type_tache_detail?.id || initialValues?.id_type_tache || 0,
         equipes_ids: initialEquipesIds(),
-        date_debut_planifiee: tache?.date_debut_planifiee?.slice(0, 16) || initialValues?.date_debut_planifiee || getDefaultStartDate(),
-        date_fin_planifiee: tache?.date_fin_planifiee?.slice(0, 16) || initialValues?.date_fin_planifiee || getDefaultEndDate(),
+        date_debut_planifiee: tache?.date_debut_planifiee ? formatDateTimeLocal(new Date(tache.date_debut_planifiee)) : (initialValues?.date_debut_planifiee || getDefaultStartDate()),
+        date_fin_planifiee: tache?.date_fin_planifiee ? formatDateTimeLocal(new Date(tache.date_fin_planifiee)) : (initialValues?.date_fin_planifiee || getDefaultEndDate()),
         priorite: tache?.priorite || initialValues?.priorite || 3,
         commentaires: tache?.commentaires || initialValues?.commentaires || '',
         parametres_recurrence: tache?.parametres_recurrence || null,
@@ -534,7 +550,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                 endDate = addMonths(start, (count - 1) * interval);
             }
 
-            const formattedDate = endDate.toISOString().slice(0, 10);
+            const formattedDate = formatDateLocal(endDate);
 
             if (p.date_fin !== formattedDate) {
                 setFormData(prev => ({
@@ -594,7 +610,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                     );
                 }
 
-                const formattedEnd = end.toISOString().slice(0, 16);
+                const formattedEnd = formatDateTimeLocal(end);
 
                 if (formData.date_fin_planifiee !== formattedEnd) {
                     setFormData(prev => ({ ...prev, date_fin_planifiee: formattedEnd }));
@@ -636,8 +652,8 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                 id_client: tache.client_detail ? ((tache.client_detail as any).utilisateur || tache.client_detail.utilisateur) : null,
                 id_type_tache: tache.type_tache_detail ? tache.type_tache_detail.id : 0,
                 equipes_ids: equipesIds(),
-                date_debut_planifiee: tache.date_debut_planifiee.slice(0, 16),
-                date_fin_planifiee: tache.date_fin_planifiee.slice(0, 16),
+                date_debut_planifiee: formatDateTimeLocal(new Date(tache.date_debut_planifiee)),
+                date_fin_planifiee: formatDateTimeLocal(new Date(tache.date_fin_planifiee)),
                 priorite: tache.priorite,
                 commentaires: tache.commentaires || '',
                 parametres_recurrence: tache.parametres_recurrence || null

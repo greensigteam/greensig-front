@@ -24,6 +24,7 @@ import { PhotoUpload } from '../components/shared/PhotoUpload';
 import { SatisfactionForm } from '../components/SatisfactionForm';
 import TaskFormModal from '../components/planning/TaskFormModal';
 import { utcToLocalInput, localInputToUTC, formatLocalDate } from '../utils/dateHelpers';
+import { format } from 'date-fns';
 import LoadingScreen from '../components/LoadingScreen';
 
 import ConfirmModal from '../components/ConfirmModal';
@@ -103,6 +104,7 @@ const Reclamations: React.FC = () => {
     }, [searchTerm]);
 
     // Initialiser date_constatation avec la date actuelle lors de l'ouverture du modal en mode création
+    // On utilise toISOString() pour stocker en UTC, puis utcToLocalInput() convertit en heure locale pour l'affichage
     useEffect(() => {
         if (isCreateModalOpen && !editingId && !formData.date_constatation) {
             setFormData(prev => ({
@@ -466,8 +468,8 @@ const Reclamations: React.FC = () => {
             id_client: reclamation.client || null,
             priorite: 3,
             commentaires: `Tâche liée à la réclamation ${reclamation.numero_reclamation}`,
-            date_debut_planifiee: new Date().toISOString().slice(0, 16),
-            date_fin_planifiee: new Date(Date.now() + 3600000).toISOString().slice(0, 16),
+            date_debut_planifiee: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+            date_fin_planifiee: format(new Date(Date.now() + 3600000), "yyyy-MM-dd'T'HH:mm"),
             reclamation: reclamation.id,
         });
 

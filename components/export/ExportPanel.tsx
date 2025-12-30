@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { format } from 'date-fns';
 import {
     Download,
     FileJson,
@@ -102,7 +103,7 @@ export default function ExportPanel({
     const { showToast } = useToast();
 
     const [objectType, setObjectType] = useState<string>(selectedType || '');
-    const [format, setFormat] = useState<ExportFormat>('geojson');
+    const [exportFormat, setExportFormat] = useState<ExportFormat>('geojson');
     const [exportAll, setExportAll] = useState(!selectedIds?.length);
     const [isExporting, setIsExporting] = useState(false);
 
@@ -128,20 +129,20 @@ export default function ExportPanel({
             let blob: Blob;
 
             if (exportAll || !selectedIds?.length) {
-                blob = await exportGeoData(endpoint, format);
+                blob = await exportGeoData(endpoint, exportFormat);
             } else {
-                blob = await exportSelection(objectType, selectedIds, format);
+                blob = await exportSelection(objectType, selectedIds, exportFormat);
             }
 
             // Generate filename
-            const timestamp = new Date().toISOString().slice(0, 10);
-            const extension = getExportFileExtension(format);
+            const timestamp = format(new Date(), 'yyyy-MM-dd');
+            const extension = getExportFileExtension(exportFormat);
             const filename = `${endpoint}_${timestamp}${extension}`;
 
             // Download
             downloadBlob(blob, filename);
 
-            showToast(`Export ${format.toUpperCase()} réussi`, 'success');
+            showToast(`Export ${exportFormat.toUpperCase()} réussi`, 'success');
             onClose();
         } catch (error: any) {
             showToast(error.message || 'Erreur lors de l\'export', 'error');
@@ -258,16 +259,16 @@ export default function ExportPanel({
                                 {dataFormats.map(option => (
                                     <button
                                         key={option.id}
-                                        onClick={() => setFormat(option.id)}
+                                        onClick={() => setExportFormat(option.id)}
                                         className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-colors text-left ${
-                                            format === option.id
+                                            exportFormat === option.id
                                                 ? 'border-blue-500 bg-blue-50'
                                                 : 'border-gray-200 hover:border-gray-300'
                                         }`}
                                     >
                                         <div
                                             className={`${
-                                                format === option.id
+                                                exportFormat === option.id
                                                     ? 'text-blue-600'
                                                     : 'text-gray-400'
                                             }`}
@@ -294,16 +295,16 @@ export default function ExportPanel({
                                 {geoFormats.map(option => (
                                     <button
                                         key={option.id}
-                                        onClick={() => setFormat(option.id)}
+                                        onClick={() => setExportFormat(option.id)}
                                         className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-colors ${
-                                            format === option.id
+                                            exportFormat === option.id
                                                 ? 'border-blue-500 bg-blue-50'
                                                 : 'border-gray-200 hover:border-gray-300'
                                         }`}
                                     >
                                         <div
                                             className={`${
-                                                format === option.id
+                                                exportFormat === option.id
                                                     ? 'text-blue-600'
                                                     : 'text-gray-400'
                                             }`}
@@ -353,7 +354,7 @@ export default function ExportPanel({
                         ) : (
                             <>
                                 <Download className="w-4 h-4" />
-                                Exporter en {format.toUpperCase()}
+                                Exporter en {exportFormat.toUpperCase()}
                             </>
                         )}
                     </button>
