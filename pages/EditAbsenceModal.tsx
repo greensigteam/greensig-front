@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { format } from 'date-fns';
 import { Calendar, AlertCircle } from 'lucide-react';
 import {
   Absence,
@@ -171,7 +172,7 @@ const EditAbsenceModal: React.FC<EditAbsenceModalProps> = ({
             name="dateDebut"
             value={form.dateDebut}
             onChange={handleChange}
-            min={canEdit ? new Date().toISOString().split('T')[0] : undefined}
+            min={canEdit ? format(new Date(), 'yyyy-MM-dd') : undefined}
             required
             disabled={!canEdit}
           />

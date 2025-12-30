@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { format } from 'date-fns';
 import { Calendar } from 'lucide-react';
 import {
   TypeAbsence,
@@ -202,7 +203,7 @@ const CreateAbsenceModal: React.FC<CreateAbsenceModalProps> = ({
               type="date"
               value={form.dateDebut}
               onChange={(value) => handleChange('dateDebut', value)}
-              min={new Date().toISOString().split('T')[0]}
+              min={format(new Date(), 'yyyy-MM-dd')}
               required
             />
           </FormField>

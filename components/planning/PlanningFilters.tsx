@@ -128,7 +128,7 @@ const PlanningFiltersComponent: FC<PlanningFiltersProps> = ({
             >
                 <option value="">Toutes les équipes</option>
                 {equipes.map(eq => (
-                    <option key={eq.id} value={eq.id}>{eq.nom}</option>
+                    <option key={eq.id} value={eq.id}>{eq.nomEquipe}</option>
                 ))}
             </select>
 

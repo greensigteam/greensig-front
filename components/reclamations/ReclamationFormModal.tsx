@@ -5,6 +5,7 @@ import { GeoJSONGeometry } from '../../types';
 import { createReclamation, uploadPhoto, detectSiteFromGeometry, DetectedSiteInfo } from '../../services/reclamationsApi';
 import { PhotoUpload } from '../shared/PhotoUpload';
 import { FormModal } from '../FormModal';
+import { utcToLocalInput, localInputToUTC } from '../../utils/dateHelpers';
 
 interface ReclamationFormModalProps {
     isOpen: boolean;
@@ -338,12 +339,15 @@ export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
                         <input
                             type="datetime-local"
                             required
-                            value={formData.date_constatation ? formData.date_constatation.slice(0, 16) : ''}
+                            value={utcToLocalInput(formData.date_constatation)}
                             className="w-full pl-10 pr-4 py-2.5 rounded-lg border-gray-300 border focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
-                            onChange={e => setFormData({
-                                ...formData,
-                                date_constatation: e.target.value ? new Date(e.target.value).toISOString() : undefined
-                            })}
+                            onChange={e => {
+                                const utcValue = localInputToUTC(e.target.value);
+                                setFormData({
+                                    ...formData,
+                                    date_constatation: utcValue || undefined
+                                });
+                            }}
                         />
                     </div>
                     <p className="text-xs text-gray-500 mt-1">Date et heure où le problème a été constaté</p>

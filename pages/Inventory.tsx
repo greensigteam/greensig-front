@@ -1077,16 +1077,18 @@ const Inventory: React.FC = () => {
               icon={<Activity className="w-4 h-4" />}
             />
 
-            {/* Family Filter */}
-            <CustomSelect
-              value={filters.family}
-              onChange={(val) => setFilters({ ...filters, family: val })}
-              options={[
-                { value: 'all', label: 'Famille: Toutes' },
-                ...families.map(f => ({ value: f, label: f }))
-              ]}
-              icon={<Sprout className="w-4 h-4" />}
-            />
+            {/* Family Filter - Only for vegetation */}
+            {mainTab !== 'hydraulique' && (
+              <CustomSelect
+                value={filters.family}
+                onChange={(val) => setFilters({ ...filters, family: val })}
+                options={[
+                  { value: 'all', label: 'Famille: Toutes' },
+                  ...families.map(f => ({ value: f, label: f }))
+                ]}
+                icon={<Sprout className="w-4 h-4" />}
+              />
+            )}
 
             {/* Maintenance Filter */}
             <CustomSelect

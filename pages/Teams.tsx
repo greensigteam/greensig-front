@@ -49,11 +49,13 @@ import CompetenceMatrix, { ViewMode } from '../components/CompetenceMatrix';
 import CreateTeamModal from '../components/modals/CreateTeamModal';
 import EquipeDetailModal from '../components/modals/EquipeDetailModal';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
+import { OperateurDetailModal } from './OperateurDetailPage';
 import { useNavigate } from 'react-router-dom';
 
 // Types
 import {
   OperateurList,
+  OperateurDetail,
   EquipeList,
   EquipeDetail,
   Absence,
@@ -75,6 +77,7 @@ import LoadingScreen from '../components/LoadingScreen';
 // API
 import {
   fetchOperateurs,
+  fetchOperateurById,
   fetchEquipes,
   fetchEquipeById,
   fetchAbsences,
@@ -162,6 +165,7 @@ const Teams: React.FC = () => {
   // Modals
   const [showCreateTeam, setShowCreateTeam] = useState(false);
   const [selectedEquipe, setSelectedEquipe] = useState<EquipeDetail | null>(null);
+  const [selectedOperateur, setSelectedOperateur] = useState<OperateurDetail | null>(null);
   const [editingUser, setEditingUser] = useState<Utilisateur | null>(null);
   const [showCreateAbsence, setShowCreateAbsence] = useState(false);
   const [selectedAbsence, setSelectedAbsence] = useState<Absence | null>(null);
@@ -371,8 +375,13 @@ const Teams: React.FC = () => {
 
   // Handlers
   const handleViewOperateur = async (operateurId: number) => {
-    // Navigate to operateur detail page instead of opening modal
-    navigate(`/operateurs/${operateurId}`);
+    try {
+      const detail = await fetchOperateurById(operateurId);
+      setSelectedOperateur(detail);
+    } catch (error) {
+      console.error('Erreur chargement opérateur:', error);
+      showToast('Erreur lors du chargement des détails de l\'opérateur', 'error');
+    }
   };
 
   const handleViewEquipe = async (equipeId: number) => {
@@ -1593,6 +1602,13 @@ const Teams: React.FC = () => {
           }}
           onCancel={() => setDeleteAbsenceId(null)}
           confirmText="Annuler l'absence"
+        />
+      )}
+
+      {selectedOperateur && (
+        <OperateurDetailModal
+          operateur={selectedOperateur}
+          onClose={() => setSelectedOperateur(null)}
         />
       )}
     </div >

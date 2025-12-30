@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { User, ViewState, MapSearchResult, SearchSuggestion, TargetLocation } from '../types';
-import { Bell, X, Search, Loader2, MapPin, ChevronRight, Command } from 'lucide-react';
+import { Bell, X, Search, Loader2, MapPin, ChevronRight, Command, Clock } from 'lucide-react';
 import { useSearch } from '../contexts/SearchContext';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 interface HeaderProps {
   user: User;
@@ -50,9 +52,18 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
 
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
   const mobileSearchRef = useRef<HTMLDivElement>(null);
   const mobileInputRef = useRef<HTMLInputElement>(null);
   const desktopInputRef = useRef<HTMLInputElement>(null);
+
+  // Real-time clock update (every second)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Determine current view from path
   const currentPath = location.pathname;
@@ -161,6 +172,19 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
 
       {/* RIGHT: Actions & Profile */}
       <div className="flex items-center justify-end gap-3 md:gap-5 w-1/4">
+        {/* Real-time Clock - Casablanca/Morocco timezone */}
+        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-200">
+          <Clock className="w-4 h-4 text-emerald-600" />
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold text-slate-700 tabular-nums">
+              {format(currentTime, 'HH:mm:ss', { locale: fr })}
+            </span>
+            <span className="text-[10px] text-slate-500 leading-none">
+              {format(currentTime, 'EEEE d MMM', { locale: fr })}
+            </span>
+          </div>
+        </div>
+
         <button className="relative p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-all duration-200 group">
           <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
           <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white shadow-sm"></span>
