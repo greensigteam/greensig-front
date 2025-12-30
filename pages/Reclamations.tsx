@@ -662,7 +662,10 @@ const Reclamations: React.FC = () => {
                                                 <div className="flex gap-2">
                                                     {!isClient && !isChefEquipe && (
                                                         <button
-                                                            onClick={() => handleOpenTaskModal(rec)}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleOpenTaskModal(rec);
+                                                            }}
                                                             disabled={rec.statut === 'CLOTUREE'}
                                                             className={`p-1 rounded ${rec.statut === 'CLOTUREE'
                                                                 ? 'text-gray-400 cursor-not-allowed'
@@ -673,7 +676,10 @@ const Reclamations: React.FC = () => {
                                                         </button>
                                                     )}
                                                     <button
-                                                        onClick={() => handleDetails(rec.id)}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDetails(rec.id);
+                                                        }}
                                                         className="p-1 text-blue-600 hover:bg-blue-50 rounded"
                                                         title="Voir détails"
                                                     >
@@ -682,14 +688,20 @@ const Reclamations: React.FC = () => {
                                                     {!isClient && (isAdmin || (rec.createur === currentUser?.id)) && (
                                                         <>
                                                             <button
-                                                                onClick={() => handleEdit(rec.id)}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleEdit(rec.id);
+                                                                }}
                                                                 className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"
                                                                 title="Modifier"
                                                             >
                                                                 <Edit2 className="w-4 h-4" />
                                                             </button>
                                                             <button
-                                                                onClick={() => handleDelete(rec.id)}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleDelete(rec.id);
+                                                                }}
                                                                 className="p-1 text-red-600 hover:bg-red-50 rounded"
                                                                 title="Supprimer"
                                                             >
