@@ -40,6 +40,7 @@ import { DrawingProvider } from './contexts/DrawingContext';
 import { SearchProvider } from './contexts/SearchContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import logger from './services/logger';
+import ConfirmDeleteModal from './components/modals/ConfirmDeleteModal';
 
 const PageLoadingFallback = () => (
   <div className="fixed inset-0 z-50">
@@ -85,6 +86,9 @@ function App() {
   const [measurementType, setMeasurementType] = useState<MeasurementType>('distance');
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [currentMeasurement, setCurrentMeasurement] = useState<Measurement | null>(null);
+
+  // Deletion modal state
+  const [itemToDelete, setItemToDelete] = useState<{ id: string; type: string } | null>(null);
 
   const mapRef = useRef<any>(null);
 
@@ -201,10 +205,13 @@ function App() {
   };
 
   const handleObjectDelete = async (objectId: string, objectType: string) => {
-    // Ask for confirmation
-    if (!window.confirm(`Êtes-vous sûr de vouloir supprimer cet objet (${objectType} #${objectId}) ?`)) {
-      return;
-    }
+    // Ask for confirmation via modal
+    setItemToDelete({ id: objectId, type: objectType });
+  };
+
+  const executeObjectDelete = async () => {
+    if (!itemToDelete) return;
+    const { id: objectId, type: objectType } = itemToDelete;
 
     try {
       await deleteInventoryItem(objectType, objectId);
@@ -378,8 +385,18 @@ function App() {
             </DrawingProvider>
           </SelectionProvider>
         </ToastProvider>
+        {itemToDelete && (
+          <ConfirmDeleteModal
+            title="Supprimer l'objet ?"
+            message={`Êtes-vous sûr de vouloir supprimer cet objet (${itemToDelete.type} #${itemToDelete.id}) ? Cette action est irréversible.`}
+            onConfirm={executeObjectDelete}
+            onCancel={() => setItemToDelete(null)}
+            confirmText="Supprimer"
+            cancelText="Annuler"
+          />
+        )}
       </ErrorBoundary>
-    </BrowserRouter>
+    </BrowserRouter >
   );
 }
 export default App;

@@ -30,6 +30,7 @@ import PlanningFiltersComponent from '../components/planning/PlanningFilters';
 import { StatusBadge } from '../components/StatusBadge';
 import LoadingScreen from '../components/LoadingScreen';
 import { fetchSites, fetchInventory } from '../services/api';
+import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import {
     useFloating,
     offset,
@@ -790,19 +791,14 @@ const Planning: FC = () => {
         const deletedId = tacheToDelete;
 
         try {
-            // Mise à jour optimiste : retirer la tâche de la liste AVANT l'appel API
-            setTaches(prev => prev.filter(t => t.id !== deletedId));
-            setTacheToDelete(null); // Fermer le modal immédiatement
-
-            // Appel API en arrière-plan
             await planningService.deleteTache(deletedId);
-
-            // Pas besoin de loadTaches() car on a déjà mis à jour l'état optimistiquement
+            setTaches(prev => prev.filter(t => t.id !== deletedId));
+            setTacheToDelete(null);
         } catch (err) {
             // En cas d'erreur, recharger pour restaurer l'état correct
             console.error('Erreur suppression tâche:', err);
             await loadTaches();
-            alert('Erreur lors de la suppression');
+            throw err; // Re-throw pour que le modal affiche l'erreur
         }
     };
     const handleResetCharge = async (tacheId: number) => { try { await planningService.resetCharge(tacheId); await loadTaches(); } catch (err) { alert('Erreur charge'); } };
@@ -1285,17 +1281,12 @@ const Planning: FC = () => {
 
             {/* Delete Confirmation Modal */}
             {tacheToDelete && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
-                        <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500"><Trash2 className="w-7 h-7" /></div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">Supprimer la tâche ?</h3>
-                        <p className="text-sm text-gray-500 mb-8">Cette action est irréversible.</p>
-                        <div className="flex gap-3">
-                            <button onClick={() => setTacheToDelete(null)} className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium">Annuler</button>
-                            <button onClick={confirmDelete} className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 font-medium">Supprimer</button>
-                        </div>
-                    </div>
-                </div>
+                <ConfirmDeleteModal
+                    title="Supprimer la tâche ?"
+                    message="Cette action est irréversible."
+                    onConfirm={confirmDelete}
+                    onCancel={() => setTacheToDelete(null)}
+                />
             )}
 
             {/* Quick Task Creator */}

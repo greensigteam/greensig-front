@@ -14,6 +14,7 @@ import {
 import { Tache, STATUT_TACHE_COLORS, PRIORITE_LABELS, ETAT_VALIDATION_COLORS, ETAT_VALIDATION_LABELS } from '../types/planning';
 import { PhotoList, ConsommationProduit, ProduitList } from '../types/suiviTaches';
 import LoadingWrapper from '../components/LoadingWrapper';
+import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 
 // Helper pour construire l'URL complète des images
 const getFullImageUrl = (url: string | null): string => {
@@ -78,6 +79,10 @@ const SuiviTaches: React.FC = () => {
         type: 'start' | 'complete' | 'cancel';
         icon: 'play' | 'check' | 'x';
     } | null>(null);
+
+    // Delete confirmation modals
+    const [deletingPhotoId, setDeletingPhotoId] = useState<number | null>(null);
+    const [deletingConsommationId, setDeletingConsommationId] = useState<number | null>(null);
 
     // Chargement initial des tâches (filtrées automatiquement par le backend selon les permissions)
     useEffect(() => {
@@ -176,12 +181,13 @@ const SuiviTaches: React.FC = () => {
     };
 
     const handleDeletePhoto = async (photoId: number) => {
-        if (!confirm("Supprimer cette photo ?")) return;
         try {
             await deletePhoto(photoId);
             setPhotos(prev => prev.filter(p => p.id !== photoId));
+            setDeletingPhotoId(null);
         } catch (error) {
             console.error("Erreur suppression photo", error);
+            throw error; // Re-throw pour que le modal affiche l'erreur
         }
     };
 
@@ -211,12 +217,13 @@ const SuiviTaches: React.FC = () => {
     };
 
     const handleDeleteConsommation = async (consoId: number) => {
-        if (!confirm("Supprimer cette ligne de consommation ?")) return;
         try {
             await deleteConsommation(consoId);
             setConsommations(prev => prev.filter(c => c.id !== consoId));
+            setDeletingConsommationId(null);
         } catch (error) {
             console.error("Erreur suppression consommation", error);
+            throw error; // Re-throw pour que le modal affiche l'erreur
         }
     };
 
@@ -780,7 +787,7 @@ const SuiviTaches: React.FC = () => {
                                                                 </a>
                                                                 {!isClientView && (
                                                                     <button
-                                                                        onClick={() => handleDeletePhoto(photo.id)}
+                                                                        onClick={() => setDeletingPhotoId(photo.id)}
                                                                         className="p-2 bg-red-500/80 hover:bg-red-600 rounded-full text-white backdrop-blur-sm"
                                                                     >
                                                                         <Trash2 className="w-5 h-5" />
@@ -884,7 +891,7 @@ const SuiviTaches: React.FC = () => {
                                                             {!isClientView && (
                                                                 <td className="p-4 text-right">
                                                                     <button
-                                                                        onClick={() => handleDeleteConsommation(conso.id)}
+                                                                        onClick={() => setDeletingConsommationId(conso.id)}
                                                                         className="text-gray-400 hover:text-red-500 p-1"
                                                                     >
                                                                         <Trash2 className="w-4 h-4" />
@@ -990,6 +997,26 @@ const SuiviTaches: React.FC = () => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Modal de suppression photo */}
+            {deletingPhotoId && (
+                <ConfirmDeleteModal
+                    title="Supprimer cette photo ?"
+                    message="Cette action est irréversible."
+                    onConfirm={() => handleDeletePhoto(deletingPhotoId)}
+                    onCancel={() => setDeletingPhotoId(null)}
+                />
+            )}
+
+            {/* Modal de suppression consommation */}
+            {deletingConsommationId && (
+                <ConfirmDeleteModal
+                    title="Supprimer cette consommation ?"
+                    message="Cette action est irréversible."
+                    onConfirm={() => handleDeleteConsommation(deletingConsommationId)}
+                    onCancel={() => setDeletingConsommationId(null)}
+                />
             )}
 
             {/* Modal de validation ADMIN */}

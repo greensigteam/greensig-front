@@ -28,6 +28,7 @@ import { format } from 'date-fns';
 import LoadingScreen from '../components/LoadingScreen';
 
 import ConfirmModal from '../components/ConfirmModal';
+import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import { ReclamationTimeline } from '../components/ReclamationTimeline';
 import OLMap from '../components/OLMap';
 import { MapLayerType } from '../types';
@@ -94,6 +95,9 @@ const Reclamations: React.FC = () => {
         message: '',
         variant: 'info'
     });
+
+    // Delete confirmation state
+    const [deletingReclamationId, setDeletingReclamationId] = useState<number | null>(null);
 
     // Debounce search term (300ms delay)
     useEffect(() => {
@@ -256,27 +260,23 @@ const Reclamations: React.FC = () => {
     };
 
     const handleDelete = (id: number) => {
-        setModalConfig({
-            isOpen: true,
-            title: 'Supprimer la réclamation ?',
-            message: 'Êtes-vous sûr de vouloir supprimer cette réclamation ?',
-            variant: 'danger',
-            confirmLabel: 'Supprimer',
-            onConfirm: async () => {
-                try {
-                    await deleteReclamation(id);
-                    setReclamations(prev => prev.filter(r => r.id !== id));
-                    setModalConfig(prev => ({ ...prev, isOpen: false }));
-                    // Feedback différé
-                    setTimeout(() => {
-                        setModalConfig({ isOpen: true, title: 'Succès', message: 'Réclamation supprimée.', variant: 'success', onConfirm: () => setModalConfig(p => ({ ...p, isOpen: false })) });
-                    }, 300);
-                } catch (error) {
-                    console.error(error);
-                    setModalConfig({ isOpen: true, title: 'Erreur', message: "Impossible de supprimer la réclamation.", variant: 'danger' });
-                }
-            }
-        });
+        setDeletingReclamationId(id);
+    };
+
+    const confirmDeleteReclamation = async () => {
+        if (!deletingReclamationId) return;
+        try {
+            await deleteReclamation(deletingReclamationId);
+            setReclamations(prev => prev.filter(r => r.id !== deletingReclamationId));
+            setDeletingReclamationId(null);
+            // Feedback différé
+            setTimeout(() => {
+                setModalConfig({ isOpen: true, title: 'Succès', message: 'Réclamation supprimée.', variant: 'success', onConfirm: () => setModalConfig(p => ({ ...p, isOpen: false })) });
+            }, 300);
+        } catch (error) {
+            console.error(error);
+            throw error;
+        }
     };
 
     const handleDetails = async (id: number) => {
@@ -1299,6 +1299,16 @@ const Reclamations: React.FC = () => {
                 }}
                 onCancel={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}
             />
+
+            {/* Delete Confirmation Modal */}
+            {deletingReclamationId && (
+                <ConfirmDeleteModal
+                    title="Supprimer la réclamation ?"
+                    message="Cette action est irréversible."
+                    onConfirm={confirmDeleteReclamation}
+                    onCancel={() => setDeletingReclamationId(null)}
+                />
+            )}
 
             {/* User 6.6.13 - Formulaire Satisfaction */}
             {showSatisfactionForm && selectedReclamation && (

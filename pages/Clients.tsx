@@ -10,7 +10,7 @@ import type { Client, ClientUpdate } from '../types/users';
 import { useToast } from '../contexts/ToastContext';
 import { useSearch } from '../contexts/SearchContext';
 import { StatusBadge } from '../components/StatusBadge';
-import ConfirmModal from '../components/ConfirmModal';
+import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import { CreateClientModal, EditClientModal } from '../components/clients/ClientModals';
 import { exportClientsToCSV, exportClientsToExcel } from '../services/exportHelpers';
 import LoadingScreen from '../components/LoadingScreen';
@@ -117,7 +117,6 @@ export default function Clients() {
 
     // Delete confirmation
     const [deletingClient, setDeletingClient] = useState<Client | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
 
     // Create modal (sera implémenté en Phase 2)
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -194,7 +193,6 @@ export default function Clients() {
     const handleDelete = async () => {
         if (!deletingClient) return;
 
-        setIsDeleting(true);
         try {
             await deleteClient(deletingClient.utilisateur);
             showToast('Client supprimé avec succès', 'success');
@@ -202,8 +200,7 @@ export default function Clients() {
             loadClients();
         } catch (error: any) {
             showToast(error.message || 'Erreur lors de la suppression', 'error');
-        } finally {
-            setIsDeleting(false);
+            throw error;
         }
     };
 
@@ -503,16 +500,11 @@ export default function Clients() {
 
             {/* Delete Confirmation Modal */}
             {deletingClient && (
-                <ConfirmModal
-                    isOpen={!!deletingClient}
-                    onClose={() => setDeletingClient(null)}
+                <ConfirmDeleteModal
+                    title={`Supprimer ${deletingClient.nomStructure} ?`}
+                    message="Cette action est irréversible."
                     onConfirm={handleDelete}
                     onCancel={() => setDeletingClient(null)}
-                    title="Supprimer le client"
-                    message={`Êtes-vous sûr de vouloir supprimer ${deletingClient.nomStructure} ? Cette action est irréversible.`}
-                    confirmLabel="Supprimer"
-                    variant="danger"
-                    loading={isDeleting}
                 />
             )}
         </div>

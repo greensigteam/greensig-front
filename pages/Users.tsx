@@ -16,6 +16,7 @@ import {
   CreateOperateurModal,
   UserTypeMenu
 } from '../components/users/CreateUserModals';
+import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import { AdminDetailModal } from '../components/users/UserDetailModals';
 import React, { useState, useEffect } from 'react';
 import {
@@ -112,7 +113,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
 
   // Trouver les donnees specifiques selon le type
   const clientData = clients.find(c => c.utilisateur === user.id);
-  const operateurData = operateurs.find(o => o.utilisateur === user.id);
+  const operateurData = operateurs.find(o => o.id === user.id);
 
   // Champs communs
   const [formData, setFormData] = useState({
@@ -170,7 +171,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
           numeroImmatriculation: operateurFields.numeroImmatriculation,
           telephone: operateurFields.telephone
         };
-        await updateOperateur(operateurData.utilisateur, operateurUpdate);
+        await updateOperateur(operateurData.id, operateurUpdate);
       }
 
       onUpdated();
@@ -545,6 +546,7 @@ const Users: React.FC = () => {
   const [showCreateOperateur, setShowCreateOperateur] = useState(false);
   const [selectedAdminUser, setSelectedAdminUser] = useState<Utilisateur | null>(null);
   const [editingUser, setEditingUser] = useState<Utilisateur | null>(null);
+  const [deleteUserId, setDeleteUserId] = useState<number | null>(null);
 
   // Handler pour la sélection du type d'utilisateur
   const handleUserTypeSelect = (type: NomRole) => {
@@ -908,12 +910,9 @@ const Users: React.FC = () => {
                   <button
                     className="p-1 text-red-600 hover:bg-red-100 rounded"
                     title="Supprimer"
-                    onClick={async (e) => {
+                    onClick={(e) => {
                       e.stopPropagation();
-                      if (window.confirm('Supprimer cet utilisateur ?')) {
-                        await deleteUtilisateur(Number(user.id));
-                        loadData();
-                      }
+                      setDeleteUserId(Number(user.id));
                     }}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -983,6 +982,20 @@ const Users: React.FC = () => {
           operateurs={operateurs}
           onClose={() => setEditingUser(null)}
           onUpdated={loadData}
+        />
+      )}
+
+      {deleteUserId && (
+        <ConfirmDeleteModal
+          title="Supprimer l'utilisateur ?"
+          message="Êtes-vous sûr de vouloir supprimer cet utilisateur ? Cette action est irréversible."
+          onConfirm={async () => {
+            await deleteUtilisateur(deleteUserId);
+            loadData();
+          }}
+          onCancel={() => setDeleteUserId(null)}
+          confirmText="Supprimer"
+          cancelText="Annuler"
         />
       )}
     </div>

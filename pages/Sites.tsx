@@ -9,18 +9,19 @@ import { fetchAllSites, updateSite, deleteSite, SiteFrontend } from '../services
 import { useToast } from '../contexts/ToastContext';
 import { useSearch } from '../contexts/SearchContext';
 import SiteEditModal from '../components/sites/SiteEditModal';
+import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 
 // Composant Dropdown pour les actions
-const ActionDropdown = ({ 
-    onEdit, 
-    onDelete, 
-    onToggleActive, 
-    isActive 
-}: { 
-    onEdit: () => void, 
-    onDelete: () => void, 
+const ActionDropdown = ({
+    onEdit,
+    onDelete,
+    onToggleActive,
+    isActive
+}: {
+    onEdit: () => void,
+    onDelete: () => void,
     onToggleActive: () => void,
-    isActive: boolean 
+    isActive: boolean
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -37,13 +38,13 @@ const ActionDropdown = ({
 
     return (
         <div className="relative" ref={dropdownRef}>
-            <button 
+            <button
                 onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
                 className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
             >
                 <MoreVertical className="w-5 h-5" />
             </button>
-            
+
             {isOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 z-50 py-1 animate-in fade-in zoom-in-95 duration-100">
                     <button
@@ -90,7 +91,7 @@ export default function Sites() {
     const [sites, setSites] = useState<SiteFrontend[]>([]);
     const [filteredSites, setFilteredSites] = useState<SiteFrontend[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    
+
     // Filtre statut: 'all', 'active', 'inactive'
     const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('active');
 
@@ -103,7 +104,6 @@ export default function Sites() {
 
     // Delete confirmation
     const [deletingSite, setDeletingSite] = useState<SiteFrontend | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
 
     // Set search placeholder
     useEffect(() => {
@@ -178,7 +178,6 @@ export default function Sites() {
     const handleDelete = async () => {
         if (!deletingSite) return;
 
-        setIsDeleting(true);
         try {
             await deleteSite(parseInt(deletingSite.id));
             setSites(prev => prev.filter(s => s.id !== deletingSite.id));
@@ -186,8 +185,6 @@ export default function Sites() {
             setDeletingSite(null);
         } catch (error: any) {
             showToast(error.message || 'Erreur lors de la suppression', 'error');
-        } finally {
-            setIsDeleting(false);
         }
     };
 
@@ -200,36 +197,33 @@ export default function Sites() {
         <div className="p-6 space-y-6">
             {/* Toolbar */}
             <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                
+
                 {/* Left: Status Filters */}
                 <div className="flex items-center bg-gray-100 p-1 rounded-lg">
                     <button
                         onClick={() => setStatusFilter('all')}
-                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                            statusFilter === 'all' 
-                                ? 'bg-white text-gray-900 shadow-sm' 
-                                : 'text-gray-500 hover:text-gray-700'
-                        }`}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${statusFilter === 'all'
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
+                            }`}
                     >
                         Tous
                     </button>
                     <button
                         onClick={() => setStatusFilter('active')}
-                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                            statusFilter === 'active' 
-                                ? 'bg-white text-emerald-700 shadow-sm' 
-                                : 'text-gray-500 hover:text-gray-700'
-                        }`}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${statusFilter === 'active'
+                            ? 'bg-white text-emerald-700 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
+                            }`}
                     >
                         Actifs
                     </button>
                     <button
                         onClick={() => setStatusFilter('inactive')}
-                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                            statusFilter === 'inactive' 
-                                ? 'bg-white text-gray-900 shadow-sm' 
-                                : 'text-gray-500 hover:text-gray-700'
-                        }`}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${statusFilter === 'inactive'
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
+                            }`}
                     >
                         Inactifs
                     </button>
@@ -240,7 +234,7 @@ export default function Sites() {
                     <span className="text-sm text-gray-500 hidden sm:inline-block mr-2">
                         {filteredSites.length} site{filteredSites.length > 1 ? 's' : ''}
                     </span>
-                    
+
                     <div className="h-6 w-px bg-gray-200 hidden sm:block"></div>
 
                     <button
@@ -337,18 +331,17 @@ export default function Sites() {
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <span
-                                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                                                    site.actif !== false
-                                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                                                        : 'bg-gray-100 text-gray-600 border border-gray-200'
-                                                }`}
+                                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${site.actif !== false
+                                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                                    : 'bg-gray-100 text-gray-600 border border-gray-200'
+                                                    }`}
                                             >
                                                 <div className={`w-1.5 h-1.5 rounded-full ${site.actif !== false ? 'bg-emerald-500' : 'bg-gray-400'}`} />
                                                 {site.actif !== false ? 'Actif' : 'Inactif'}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <ActionDropdown 
+                                            <ActionDropdown
                                                 onEdit={() => setEditingSite(site)}
                                                 onDelete={() => setDeletingSite(site)}
                                                 onToggleActive={() => handleToggleActive(site)}
@@ -417,49 +410,14 @@ export default function Sites() {
 
             {/* Delete Confirmation Modal */}
             {deletingSite && (
-                <div className="fixed inset-0 z-[1000] flex items-center justify-center pointer-events-auto">
-                    <div className="absolute inset-0 bg-black/50" onClick={() => !isDeleting && setDeletingSite(null)} />
-                    <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
-                        <div className="flex items-center gap-4 mb-4">
-                            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
-                                <AlertCircle className="w-6 h-6 text-red-600" />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-semibold text-gray-900">Supprimer le site</h3>
-                                <p className="text-sm text-gray-500">{deletingSite.name}</p>
-                            </div>
-                        </div>
-                        <p className="text-gray-600 mb-6">
-                            Cette action est irréversible. Tous les objets associés à ce site seront également supprimés.
-                        </p>
-                        <div className="flex justify-end gap-3">
-                            <button
-                                onClick={() => setDeletingSite(null)}
-                                disabled={isDeleting}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                            >
-                                Annuler
-                            </button>
-                            <button
-                                onClick={handleDelete}
-                                disabled={isDeleting}
-                                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
-                            >
-                                {isDeleting ? (
-                                    <>
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                        Suppression...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Trash2 className="w-4 h-4" />
-                                        Supprimer
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <ConfirmDeleteModal
+                    title="Supprimer le site"
+                    message={`Êtes-vous sûr de vouloir supprimer le site "${deletingSite.name}" ? Cette action est irréversible. Tous les objets associés à ce site seront également supprimés.`}
+                    onConfirm={handleDelete}
+                    onCancel={() => setDeletingSite(null)}
+                    confirmText="Supprimer"
+                    cancelText="Annuler"
+                />
             )}
         </div>
     );

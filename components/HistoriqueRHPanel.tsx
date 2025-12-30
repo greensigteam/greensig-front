@@ -61,10 +61,10 @@ const HistoriqueRHPanel: React.FC<HistoriqueRHPanelProps> = ({ operateurs, equip
   // Combiner operateurs et chefs d'equipe (sans doublons)
   const allPersonnel = React.useMemo(() => {
     const map = new Map<number, OperateurList>();
-    operateurs.forEach(op => map.set(op.utilisateur, op));
+    operateurs.forEach(op => map.set(op.id, op));
     chefsPotentiels.forEach(chef => {
-      if (!map.has(chef.utilisateur)) {
-        map.set(chef.utilisateur, chef);
+      if (!map.has(chef.id)) {
+        map.set(chef.id, chef);
       }
     });
     return Array.from(map.values()).sort((a, b) => a.fullName.localeCompare(b.fullName));
@@ -288,7 +288,7 @@ const HistoriqueRHPanel: React.FC<HistoriqueRHPanelProps> = ({ operateurs, equip
             >
               <option value="">Tous personnel</option>
               {allPersonnel.filter(p => p.actif).map((person) => (
-                <option key={person.utilisateur} value={person.utilisateur}>
+                <option key={person.id} value={person.id}>
                   {person.fullName} {person.estChefEquipe ? '(Chef)' : ''}
                 </option>
               ))}

@@ -171,7 +171,7 @@ const Reporting: React.FC = () => {
 
     const tabs = [
         { id: 'statistics' as TabType, label: 'Statistiques', icon: BarChart3 },
-        { id: 'monthly' as TabType, label: 'Rapport de Site', icon: FileText },
+        { id: 'monthly' as TabType, label: 'Rapport de Site mensuel', icon: FileText },
         { id: 'weekly' as TabType, label: 'Rapport Hebdomadaire', icon: Calendar },
     ];
 

@@ -387,11 +387,11 @@ export const ChefEquipeDetailModal: React.FC<ChefEquipeDetailModalProps> = ({
   useEffect(() => {
     let mounted = true;
     const loadOperateurDetail = async () => {
-      const op = operateurs.find(o => o.utilisateur === user.id);
+      const op = operateurs.find(o => o.id === user.id);
       if (!op) return;
       setLoading(true);
       try {
-        const detail = await fetchOperateurById(op.utilisateur);
+        const detail = await fetchOperateurById(op.id);
         if (mounted) setOperateurDetail(detail);
       } catch (e) {
         // ignore
@@ -655,11 +655,11 @@ export const OperateurDetailModal: React.FC<OperateurDetailModalProps> = ({
   useEffect(() => {
     let mounted = true;
     const loadOperateurDetail = async () => {
-      const op = operateurs.find(o => o.utilisateur === user.id);
+      const op = operateurs.find(o => o.id === user.id);
       if (!op) return;
       setLoading(true);
       try {
-        const detail = await fetchOperateurById(op.utilisateur);
+        const detail = await fetchOperateurById(op.id);
         if (mounted) setOperateurDetail(detail);
       } catch (e) {
         // ignore

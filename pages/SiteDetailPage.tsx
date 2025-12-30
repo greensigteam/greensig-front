@@ -7,6 +7,7 @@ import { OLMap } from '../components/OLMap';
 import { MAP_LAYERS } from '../constants';
 import { useToast } from '../contexts/ToastContext';
 import SiteEditModal from '../components/sites/SiteEditModal';
+import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import LoadingScreen from '../components/LoadingScreen';
 import {
     ChevronLeft,
@@ -110,6 +111,7 @@ const SiteDetailPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'info' | 'stats'>('info');
     const [statistics, setStatistics] = useState<any>(null);
     const [isLoadingStats, setIsLoadingStats] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
 
     // Client assignment modal
     const [showAssignClientModal, setShowAssignClientModal] = useState(false);
@@ -248,10 +250,6 @@ const SiteDetailPage: React.FC = () => {
     const handleDelete = async () => {
         if (!site) return;
 
-        if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce site ? Cette action est irréversible.")) {
-            return;
-        }
-
         try {
             await deleteSite(parseInt(site.id));
             showToast('Site supprimé avec succès', 'success');
@@ -339,7 +337,7 @@ const SiteDetailPage: React.FC = () => {
 
     const filteredSuperviseurs = superviseurs.filter(s =>
         s.fullName?.toLowerCase().includes(superviseurSearchQuery.toLowerCase()) ||
-        s.matricule?.toLowerCase().includes(superviseurSearchQuery.toLowerCase())
+        s.email?.toLowerCase().includes(superviseurSearchQuery.toLowerCase())
     );
 
     // Load available équipes when modal opens
@@ -419,12 +417,22 @@ const SiteDetailPage: React.FC = () => {
                         Modifier
                     </button>
                     <button
-                        onClick={handleDelete}
+                        onClick={() => setShowDeleteModal(true)}
                         className="flex items-center gap-2 px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
                     >
                         <Trash2 className="w-4 h-4" />
                         Supprimer
                     </button>
+                    {showDeleteModal && (
+                        <ConfirmDeleteModal
+                            title="Supprimer le site"
+                            message="Êtes-vous sûr de vouloir supprimer ce site ? Cette action est irréversible."
+                            onConfirm={handleDelete}
+                            onCancel={() => setShowDeleteModal(false)}
+                            confirmText="Supprimer"
+                            cancelText="Annuler"
+                        />
+                    )}
                 </div>
             </header>
 
@@ -434,8 +442,8 @@ const SiteDetailPage: React.FC = () => {
                     <button
                         onClick={() => setActiveTab('info')}
                         className={`px-4 py-3 font-medium border-b-2 transition-colors ${activeTab === 'info'
-                                ? 'border-emerald-600 text-emerald-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                            ? 'border-emerald-600 text-emerald-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
                             }`}
                     >
                         <div className="flex items-center gap-2">
@@ -446,8 +454,8 @@ const SiteDetailPage: React.FC = () => {
                     <button
                         onClick={() => setActiveTab('stats')}
                         className={`px-4 py-3 font-medium border-b-2 transition-colors ${activeTab === 'stats'
-                                ? 'border-emerald-600 text-emerald-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                            ? 'border-emerald-600 text-emerald-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
                             }`}
                     >
                         <div className="flex items-center gap-2">
@@ -780,7 +788,7 @@ const SiteDetailPage: React.FC = () => {
                                                             cx="50%"
                                                             cy="50%"
                                                             labelLine={false}
-                                                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                                                            label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
                                                             outerRadius={80}
                                                             fill="#8884d8"
                                                             dataKey="value"
@@ -830,7 +838,7 @@ const SiteDetailPage: React.FC = () => {
                                                             cx="50%"
                                                             cy="50%"
                                                             labelLine={false}
-                                                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                                                            label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
                                                             outerRadius={80}
                                                             fill="#8884d8"
                                                             dataKey="value"
@@ -913,7 +921,7 @@ const SiteDetailPage: React.FC = () => {
                                                             cx="50%"
                                                             cy="50%"
                                                             labelLine={false}
-                                                            label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                                                            label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
                                                             outerRadius={80}
                                                             fill="#8884d8"
                                                             dataKey="value"
@@ -1129,7 +1137,7 @@ const SiteDetailPage: React.FC = () => {
                                                         {superviseur.fullName}
                                                     </div>
                                                     <div className="text-sm text-gray-500 mt-1">
-                                                        Matricule: {superviseur.matricule}
+                                                        {superviseur.email}
                                                     </div>
                                                 </div>
                                                 <Plus className="w-5 h-5 text-gray-400 group-hover:text-emerald-600" />

@@ -500,6 +500,8 @@ export interface EquipeFilters {
   search?: string;
   actif?: boolean;
   chefEquipe?: number;
+  site?: number;
+  superviseur?: number;
   statutOperationnel?: StatutEquipe;
   membresMin?: number;
   membresMax?: number;
