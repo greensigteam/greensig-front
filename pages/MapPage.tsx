@@ -356,9 +356,21 @@ export const MapPage: React.FC<MapPageProps> = ({
     const preSelected: InventoryObjectOption[] = [];
 
     if (object) {
-      // Only add if ID is numeric (skip sites or non-inventory items if needed)
       const objId = Number(object.id);
-      if (!isNaN(objId)) {
+
+      // Check if this is a Reclamation
+      if (object.type === 'Reclamation') {
+        // Link the task to this reclamation
+        if (!isNaN(objId)) {
+          initialValues.reclamation = objId;
+        }
+        // Set site from reclamation if available
+        const siteId = object.attributes?.site;
+        if (siteId && !isNaN(Number(siteId))) {
+          initialValues.id_site = Number(siteId);
+        }
+      } else if (!isNaN(objId)) {
+        // Regular inventory object - add to pre-selected objects
         // Try to get superficie from attributes (various possible keys)
         const superficieStr = object.attributes?.['superficie_calculee']
           || object.attributes?.['Surface (m²)']
