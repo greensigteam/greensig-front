@@ -361,13 +361,9 @@ export const MapPage: React.FC<MapPageProps> = ({
       // Check if this is a Reclamation
       if (object.type === 'Reclamation') {
         // Link the task to this reclamation
+        // The site is determined from the reclamation itself in the backend
         if (!isNaN(objId)) {
           initialValues.reclamation = objId;
-        }
-        // Set site from reclamation if available
-        const siteId = object.attributes?.site;
-        if (siteId && !isNaN(Number(siteId))) {
-          initialValues.id_site = Number(siteId);
         }
       } else if (!isNaN(objId)) {
         // Regular inventory object - add to pre-selected objects
@@ -666,7 +662,6 @@ export const MapPage: React.FC<MapPageProps> = ({
       });
 
       const pdfBlob = await exportPDF({
-        title: 'Export Carte GreenSIG',
         mapImageBase64,
         visibleLayers,
         center: [center.lng, center.lat],
@@ -744,7 +739,7 @@ export const MapPage: React.FC<MapPageProps> = ({
   };
 
   // ✅ Handle object created successfully
-  const handleObjectCreated = (objectData: any) => {
+  const handleObjectCreated = (_objectData: any) => {
     showToast(`${pendingObjectType} créé avec succès!`, 'success');
     setShowCreateModal(false);
     clearDrawnGeometry();

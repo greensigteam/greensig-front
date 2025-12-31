@@ -809,7 +809,6 @@ export async function fetchStatistics(): Promise<Statistics> {
 // ==============================================================================
 
 export interface ExportPDFRequest {
-  title: string
   mapImageBase64: string
   visibleLayers: Record<string, boolean>
   center: [number, number]  // [lng, lat]
