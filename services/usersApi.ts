@@ -33,6 +33,7 @@ import {
   OperateurCreate,
   OperateurUpdate,
   SuperviseurList,
+  SuperviseurCreate,
   EquipeList,
   EquipeDetail,
   EquipeCreate,
@@ -708,10 +709,62 @@ export async function affecterCompetence(
 // ============================================================================
 
 export async function fetchSuperviseurs(): Promise<PaginatedResponse<SuperviseurList>> {
-  // Récupérer les utilisateurs avec le rôle SUPERVISEUR
-  const result = await fetchApi<PaginatedResponse<SuperviseurList>>(
+  // D'abord essayer de récupérer depuis le modèle Superviseur
+  const superviseurResult = await fetchApi<PaginatedResponse<SuperviseurList>>(
     `${USERS_API_URL}/superviseurs/`
-  );
+  ).catch(() => ({ count: 0, next: null, previous: null, results: [] }));
+
+  // Ensuite récupérer les utilisateurs avec le rôle SUPERVISEUR
+  const usersResult = await fetchApi<PaginatedResponse<Utilisateur>>(
+    `${USERS_API_URL}/utilisateurs/?role=SUPERVISEUR&actif=true`
+  ).catch(() => ({ count: 0, next: null, previous: null, results: [] }));
+
+  // Fusionner les deux listes (éviter les doublons par email)
+  const seen = new Set<string>();
+  const merged: SuperviseurList[] = [];
+
+  // Ajouter d'abord les superviseurs du modèle Superviseur
+  for (const sup of superviseurResult.results) {
+    if (sup.email && !seen.has(sup.email)) {
+      seen.add(sup.email);
+      merged.push(sup);
+    }
+  }
+
+  // Ajouter les utilisateurs avec le rôle SUPERVISEUR qui ne sont pas déjà dans la liste
+  for (const user of usersResult.results) {
+    if (user.email && !seen.has(user.email)) {
+      seen.add(user.email);
+      merged.push({
+        utilisateur: user.id,
+        email: user.email,
+        nom: user.nom,
+        prenom: user.prenom,
+        fullName: user.fullName || `${user.prenom} ${user.nom}`,
+        actif: user.actif,
+        nombreEquipesGerees: 0
+      });
+    }
+  }
+
+  return {
+    count: merged.length,
+    next: null,
+    previous: null,
+    results: merged
+  };
+}
+
+export async function createSuperviseur(data: SuperviseurCreate): Promise<SuperviseurList> {
+  // Crée automatiquement : Utilisateur + Profil Superviseur + Rôle SUPERVISEUR
+  const result = await fetchApi<SuperviseurList>(`${USERS_API_URL}/superviseurs/`, {
+    method: 'POST',
+    body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
+  });
+
+  // Invalider les caches
+  await db.remove(cacheKeys.users());
+  await db.invalidatePrefix('superviseurs:');
   return result;
 }
 

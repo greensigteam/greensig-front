@@ -30,6 +30,7 @@ import {
   createUtilisateur,
   createOperateur,
   createClient,
+  createSuperviseur,
   attribuerRole,
   affecterCompetence
 } from '../../services/usersApi';
@@ -557,10 +558,7 @@ export const CreateChefEquipeModal: React.FC<CreateModalProps> = ({ onClose, onC
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tabIndex, setTabIndex] = useState(0);
   const [roleObjects, setRoleObjects] = useState<Role[]>([]);
-  const [competences, setCompetences] = useState<Competence[]>([]);
-  const [selectedCompetences, setSelectedCompetences] = useState<{ competenceId: number; niveau: NiveauCompetence }[]>([]);
 
   const [formData, setFormData] = useState({
     email: '',
@@ -574,23 +572,7 @@ export const CreateChefEquipeModal: React.FC<CreateModalProps> = ({ onClose, onC
 
   useEffect(() => {
     fetchRoles().then(setRoleObjects);
-    fetchCompetences().then(setCompetences);
   }, []);
-
-  const handleCompetenceChange = (competenceId: number, niveau: NiveauCompetence) => {
-    setSelectedCompetences((prev) => {
-      const exists = prev.find((c) => c.competenceId === competenceId);
-      if (exists) {
-        return prev.map((c) => c.competenceId === competenceId ? { ...c, niveau } : c);
-      } else {
-        return [...prev, { competenceId, niveau }];
-      }
-    });
-  };
-
-  const handleRemoveCompetence = (competenceId: number) => {
-    setSelectedCompetences((prev) => prev.filter((c) => c.competenceId !== competenceId));
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -613,33 +595,36 @@ export const CreateChefEquipeModal: React.FC<CreateModalProps> = ({ onClose, onC
 
     setLoading(true);
     try {
-      const operateurData: OperateurCreate = {
+      // 1. Créer l'utilisateur (avec compte de connexion)
+      const utilisateurData = {
         email: formData.email,
         nom: formData.nom,
         prenom: formData.prenom,
         password: formData.password,
-        numeroImmatriculation: formData.matricule,
-        dateEmbauche: new Date().toISOString().split('T')[0],
-        telephone: formData.telephone || ''
+        passwordConfirm: formData.passwordConfirm,
+        actif: true
       };
 
-      const operateurResponse = await createOperateur(operateurData);
-      const operateurId = operateurResponse.utilisateur;
+      const utilisateurResponse = await createUtilisateur(utilisateurData);
+      const utilisateurId = utilisateurResponse.id;
 
-      // Attribuer le rôle SUPERVISEUR
+      // 2. Attribuer le rôle SUPERVISEUR
       const chefRole = roleObjects.find(r => r.nomRole === 'SUPERVISEUR');
-      if (chefRole) {
-        await attribuerRole(String(operateurId), String(chefRole.id));
+      if (chefRole && utilisateurId) {
+        await attribuerRole(String(utilisateurId), String(chefRole.id));
       }
 
-      // Affecter les compétences
-      if (selectedCompetences.length > 0) {
-        for (const comp of selectedCompetences) {
-          await affecterCompetence(operateurId, {
-            competenceId: comp.competenceId,
-            niveau: comp.niveau
-          });
-        }
+      // 3. Créer l'opérateur lié pour les données RH (matricule, téléphone, etc.)
+      if (utilisateurId) {
+        const operateurData: OperateurCreate = {
+          nom: formData.nom,
+          prenom: formData.prenom,
+          email: formData.email,
+          numeroImmatriculation: formData.matricule,
+          dateEmbauche: new Date().toISOString().split('T')[0],
+          telephone: formData.telephone || ''
+        };
+        await createOperateur(operateurData);
       }
 
       onCreated();
@@ -697,183 +682,113 @@ export const CreateChefEquipeModal: React.FC<CreateModalProps> = ({ onClose, onC
               </div>
             )}
 
-            <Tab.Group selectedIndex={tabIndex} onChange={setTabIndex}>
-              <Tab.List className="flex space-x-2 border-b mb-4">
-                <Tab className={({ selected }) =>
-                  selected ? 'px-4 py-2 border-b-2 border-yellow-500 font-semibold' : 'px-4 py-2 text-gray-500'}>
-                  Informations
-                </Tab>
-                <Tab className={({ selected }) =>
-                  selected ? 'px-4 py-2 border-b-2 border-yellow-500 font-semibold' : 'px-4 py-2 text-gray-500'}>
-                  Compétences
-                </Tab>
-              </Tab.List>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Prénom <span className="text-red-500">*</span>
+                </label>
+                <input
+                  required
+                  type="text"
+                  value={formData.prenom}
+                  onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nom <span className="text-red-500">*</span>
+                </label>
+                <input
+                  required
+                  type="text"
+                  value={formData.nom}
+                  onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
+                />
+              </div>
+            </div>
 
-              <Tab.Panels>
-                <Tab.Panel>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Prénom <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        required
-                        type="text"
-                        value={formData.prenom}
-                        onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Nom <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        required
-                        type="text"
-                        value={formData.nom}
-                        onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
-                      />
-                    </div>
-                  </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  required
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
+                />
+              </div>
+            </div>
 
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        required
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
-                      />
-                    </div>
-                  </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Mot de passe <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    required
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Confirmer <span className="text-red-500">*</span>
+                </label>
+                <input
+                  required
+                  type={showPassword ? 'text' : 'password'}
+                  value={formData.passwordConfirm}
+                  onChange={(e) => setFormData({ ...formData, passwordConfirm: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
+                />
+              </div>
+            </div>
 
-                  <div className="grid grid-cols-2 gap-4 mt-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Mot de passe <span className="text-red-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <input
-                          required
-                          type={showPassword ? 'text' : 'password'}
-                          value={formData.password}
-                          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                          className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Confirmer <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        required
-                        type={showPassword ? 'text' : 'password'}
-                        value={formData.passwordConfirm}
-                        onChange={(e) => setFormData({ ...formData, passwordConfirm: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 mt-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Matricule <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        required
-                        type="text"
-                        value={formData.matricule}
-                        onChange={(e) => setFormData({ ...formData, matricule: e.target.value })}
-                        placeholder="Ex: CE-2024-001"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
-                      <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input
-                          type="tel"
-                          value={formData.telephone}
-                          onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
-                          placeholder="06 XX XX XX XX"
-                          className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </Tab.Panel>
-
-                <Tab.Panel>
-                  <div className="mb-2 text-sm text-gray-600">
-                    Sélectionnez les compétences du superviseur (optionnel).
-                  </div>
-                  {competences.length === 0 ? (
-                    <div className="text-gray-500 text-sm">Aucune compétence disponible.</div>
-                  ) : (
-                    <table className="min-w-full border text-sm mt-2">
-                      <thead>
-                        <tr className="bg-gray-100">
-                          <th className="px-2 py-1 border">Compétence</th>
-                          <th className="px-2 py-1 border">Catégorie</th>
-                          <th className="px-2 py-1 border">Niveau</th>
-                          <th className="px-2 py-1 border">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {competences.map((comp) => {
-                          const selected = selectedCompetences.find((c) => c.competenceId === comp.id);
-                          return (
-                            <tr key={comp.id} className={selected ? 'bg-yellow-50' : ''}>
-                              <td className="px-2 py-1 border font-medium">{comp.nomCompetence}</td>
-                              <td className="px-2 py-1 border text-gray-500">{comp.categorieDisplay}</td>
-                              <td className="px-2 py-1 border">
-                                <select
-                                  className="border rounded px-2 py-1 text-sm"
-                                  value={selected ? selected.niveau : ''}
-                                  onChange={(e) => {
-                                    const niveau = e.target.value as NiveauCompetence;
-                                    if (niveau) handleCompetenceChange(comp.id, niveau);
-                                  }}
-                                >
-                                  <option value="">Niveau...</option>
-                                  {Object.keys(NIVEAU_COMPETENCE_LABELS).map((niv) => (
-                                    <option key={niv} value={niv}>{NIVEAU_COMPETENCE_LABELS[niv as NiveauCompetence]}</option>
-                                  ))}
-                                </select>
-                              </td>
-                              <td className="px-2 py-1 border text-center">
-                                {selected && (
-                                  <button type="button" className="text-red-500 text-xs" onClick={() => handleRemoveCompetence(comp.id)}>
-                                    Retirer
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  )}
-                </Tab.Panel>
-              </Tab.Panels>
-            </Tab.Group>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Matricule <span className="text-red-500">*</span>
+                </label>
+                <input
+                  required
+                  type="text"
+                  value={formData.matricule}
+                  onChange={(e) => setFormData({ ...formData, matricule: e.target.value })}
+                  placeholder="Ex: CE-2024-001"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="tel"
+                    value={formData.telephone}
+                    onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
+                    placeholder="06 XX XX XX XX"
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="p-6 border-t border-gray-200 flex gap-3">
@@ -904,18 +819,16 @@ export const CreateChefEquipeModal: React.FC<CreateModalProps> = ({ onClose, onC
 
 export const CreateOperateurModal: React.FC<CreateModalProps> = ({ onClose, onCreated }) => {
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tabIndex, setTabIndex] = useState(0);
   const [competences, setCompetences] = useState<Competence[]>([]);
   const [selectedCompetences, setSelectedCompetences] = useState<{ competenceId: number; niveau: NiveauCompetence }[]>([]);
 
+  // Les opérateurs sont des données RH uniquement - pas de compte de connexion
   const [formData, setFormData] = useState({
     email: '',
     nom: '',
     prenom: '',
-    password: '',
-    passwordConfirm: '',
     matricule: '',
     telephone: ''
   });
@@ -943,16 +856,6 @@ export const CreateOperateurModal: React.FC<CreateModalProps> = ({ onClose, onCr
     e.preventDefault();
     setError(null);
 
-    if (formData.password !== formData.passwordConfirm) {
-      setError('Les mots de passe ne correspondent pas');
-      return;
-    }
-
-    if (formData.password.length < 8) {
-      setError('Le mot de passe doit contenir au moins 8 caractères');
-      return;
-    }
-
     if (!formData.matricule.trim()) {
       setError('Le matricule est requis pour un opérateur');
       return;
@@ -960,21 +863,21 @@ export const CreateOperateurModal: React.FC<CreateModalProps> = ({ onClose, onCr
 
     setLoading(true);
     try {
+      // Créer l'opérateur (données RH uniquement, pas de compte de connexion)
       const operateurData: OperateurCreate = {
-        email: formData.email,
         nom: formData.nom,
         prenom: formData.prenom,
-        password: formData.password,
+        email: formData.email || undefined,
         numeroImmatriculation: formData.matricule,
         dateEmbauche: new Date().toISOString().split('T')[0],
         telephone: formData.telephone || ''
       };
 
       const operateurResponse = await createOperateur(operateurData);
-      const operateurId = operateurResponse.utilisateur;
+      const operateurId = operateurResponse.id;
 
       // Affecter les compétences
-      if (selectedCompetences.length > 0) {
+      if (selectedCompetences.length > 0 && operateurId) {
         for (const comp of selectedCompetences) {
           await affecterCompetence(operateurId, {
             competenceId: comp.competenceId,
@@ -1052,6 +955,9 @@ export const CreateOperateurModal: React.FC<CreateModalProps> = ({ onClose, onCr
 
               <Tab.Panels>
                 <Tab.Panel>
+                  <p className="text-xs text-gray-500 mb-4 bg-blue-50 p-2 rounded">
+                    Les opérateurs sont des données RH uniquement. Ils n'ont pas de compte de connexion.
+                  </p>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1081,52 +987,15 @@ export const CreateOperateurModal: React.FC<CreateModalProps> = ({ onClose, onCr
 
                   <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email <span className="text-red-500">*</span>
+                      Email (optionnel)
                     </label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input
-                        required
                         type="email"
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 mt-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Mot de passe <span className="text-red-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <input
-                          required
-                          type={showPassword ? 'text' : 'password'}
-                          value={formData.password}
-                          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                          className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Confirmer <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        required
-                        type={showPassword ? 'text' : 'password'}
-                        value={formData.passwordConfirm}
-                        onChange={(e) => setFormData({ ...formData, passwordConfirm: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                       />
                     </div>
                   </div>

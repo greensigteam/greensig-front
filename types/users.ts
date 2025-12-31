@@ -263,7 +263,10 @@ export interface SuperviseurCreate {
   nom: string;
   prenom: string;
   password: string;
-  actif?: boolean;
+  matricule: string;
+  telephone?: string;
+  secteur_geographique?: string;
+  date_prise_fonction?: string;
 }
 
 export interface SuperviseurUpdate {
