@@ -10,21 +10,18 @@ import {
     ClipboardList,
     Star,
     Eye,
-    X,
-    Users
+    X
 } from 'lucide-react';
-import { Reclamation, TypeReclamation, Urgence } from '../types/reclamations';
+import { Reclamation } from '../types/reclamations';
 import {
     fetchReclamationById,
-    fetchTypesReclamations,
-    fetchUrgences,
     cloturerReclamation,
     validerCloture,
     createSatisfaction
 } from '../services/reclamationsApi';
 import { planningService } from '../services/planningService';
 import { fetchEquipes, fetchCurrentUser } from '../services/usersApi';
-import { TypeTache, TacheCreate, Tache } from '../types/planning';
+import { TypeTache, TacheCreate } from '../types/planning';
 import { EquipeList, Utilisateur } from '../types/users';
 import { SatisfactionForm } from '../components/SatisfactionForm';
 import TaskFormModal from '../components/planning/TaskFormModal';
@@ -35,6 +32,106 @@ import ConfirmModal from '../components/ConfirmModal';
 import { ReclamationTimeline } from '../components/ReclamationTimeline';
 import OLMap from '../components/OLMap';
 import { RECLAMATION_STATUS_COLORS, MAP_LAYERS } from '../constants';
+
+/**
+ * Calculate the center coordinates from any GeoJSON geometry.
+ * Handles Point, Polygon, MultiPolygon, LineString, MultiLineString.
+ */
+function getGeometryCenter(geometry: any): { lat: number; lng: number } | null {
+    if (!geometry || !geometry.type || !geometry.coordinates) {
+        return null;
+    }
+
+    const coords = geometry.coordinates;
+
+    switch (geometry.type) {
+        case 'Point':
+            if (Array.isArray(coords) && coords.length >= 2 &&
+                typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+                return { lng: coords[0], lat: coords[1] };
+            }
+            return null;
+
+        case 'LineString':
+        case 'MultiPoint':
+            if (Array.isArray(coords) && coords.length > 0) {
+                let sumLng = 0, sumLat = 0, count = 0;
+                for (const pt of coords) {
+                    if (Array.isArray(pt) && pt.length >= 2) {
+                        sumLng += pt[0];
+                        sumLat += pt[1];
+                        count++;
+                    }
+                }
+                if (count > 0) {
+                    return { lng: sumLng / count, lat: sumLat / count };
+                }
+            }
+            return null;
+
+        case 'Polygon':
+            // Use first ring (exterior) to calculate centroid
+            if (Array.isArray(coords) && coords.length > 0 && Array.isArray(coords[0])) {
+                const ring = coords[0];
+                let sumLng = 0, sumLat = 0, count = 0;
+                for (const pt of ring) {
+                    if (Array.isArray(pt) && pt.length >= 2) {
+                        sumLng += pt[0];
+                        sumLat += pt[1];
+                        count++;
+                    }
+                }
+                if (count > 0) {
+                    return { lng: sumLng / count, lat: sumLat / count };
+                }
+            }
+            return null;
+
+        case 'MultiPolygon':
+            // Use first polygon's exterior ring
+            if (Array.isArray(coords) && coords.length > 0 &&
+                Array.isArray(coords[0]) && coords[0].length > 0 &&
+                Array.isArray(coords[0][0])) {
+                const ring = coords[0][0];
+                let sumLng = 0, sumLat = 0, count = 0;
+                for (const pt of ring) {
+                    if (Array.isArray(pt) && pt.length >= 2) {
+                        sumLng += pt[0];
+                        sumLat += pt[1];
+                        count++;
+                    }
+                }
+                if (count > 0) {
+                    return { lng: sumLng / count, lat: sumLat / count };
+                }
+            }
+            return null;
+
+        case 'MultiLineString':
+            // Average all points from all lines
+            if (Array.isArray(coords)) {
+                let sumLng = 0, sumLat = 0, count = 0;
+                for (const line of coords) {
+                    if (Array.isArray(line)) {
+                        for (const pt of line) {
+                            if (Array.isArray(pt) && pt.length >= 2) {
+                                sumLng += pt[0];
+                                sumLat += pt[1];
+                                count++;
+                            }
+                        }
+                    }
+                }
+                if (count > 0) {
+                    return { lng: sumLng / count, lat: sumLat / count };
+                }
+            }
+            return null;
+
+        default:
+            return null;
+    }
+}
 
 const ReclamationDetailPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -540,12 +637,12 @@ const ReclamationDetailPage: React.FC = () => {
                                             {[1, 2, 3, 4, 5].map((star) => (
                                                 <Star
                                                     key={star}
-                                                    className={`w-6 h-6 ${star <= reclamation.satisfaction.note ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
+                                                    className={`w-6 h-6 ${star <= (reclamation.satisfaction?.note ?? 0) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
                                                 />
                                             ))}
                                         </div>
-                                        <p className="text-2xl font-bold text-gray-800">{reclamation.satisfaction.note}/5</p>
-                                        {reclamation.satisfaction.commentaire && (
+                                        <p className="text-2xl font-bold text-gray-800">{reclamation.satisfaction?.note ?? 0}/5</p>
+                                        {reclamation.satisfaction?.commentaire && (
                                             <p className="mt-3 text-sm text-gray-600 italic">"{reclamation.satisfaction.commentaire}"</p>
                                         )}
                                     </div>
@@ -624,30 +721,33 @@ const ReclamationDetailPage: React.FC = () => {
                                 </h2>
                             </div>
                             <div className="h-[500px]">
-                                {reclamation.localisation ? (
-                                    <OLMap
-                                        isMiniMap={true}
-                                        activeLayer={MAP_LAYERS.SATELLITE}
-                                        targetLocation={{
-                                            coordinates: {
-                                                lat: reclamation.localisation.coordinates[1],
-                                                lng: reclamation.localisation.coordinates[0]
-                                            },
-                                            zoom: 17
-                                        }}
-                                        searchResult={{
-                                            name: reclamation.numero_reclamation,
-                                            coordinates: {
-                                                lat: reclamation.localisation.coordinates[1],
-                                                lng: reclamation.localisation.coordinates[0]
-                                            }
-                                        }}
-                                    />
-                                ) : (
-                                    <div className="h-full flex items-center justify-center bg-slate-50">
-                                        <p className="text-gray-400 text-sm">Aucune localisation disponible</p>
-                                    </div>
-                                )}
+                                {(() => {
+                                    const center = getGeometryCenter(reclamation.localisation);
+                                    if (center) {
+                                        return (
+                                            <OLMap
+                                                isMiniMap={true}
+                                                activeLayer={MAP_LAYERS.SATELLITE}
+                                                targetLocation={{
+                                                    coordinates: center,
+                                                    zoom: 17
+                                                }}
+                                                highlightedGeometry={{
+                                                    type: 'Feature',
+                                                    geometry: reclamation.localisation,
+                                                    properties: {
+                                                        couleur_statut: RECLAMATION_STATUS_COLORS[reclamation.statut] || '#f97316'
+                                                    }
+                                                }}
+                                            />
+                                        );
+                                    }
+                                    return (
+                                        <div className="h-full flex items-center justify-center bg-slate-50">
+                                            <p className="text-gray-400 text-sm">Aucune localisation disponible</p>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
                     </div>

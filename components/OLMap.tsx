@@ -468,109 +468,50 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     });
     dataLayerRef.current = dataLayer;
 
-    // ✅ Réclamations Layer - Affiche les réclamations non clôturées avec code couleur et clustering
+    // ✅ Réclamations Layer - Affiche les réclamations non clôturées avec code couleur
     const reclamationsSource = new VectorSource();
     reclamationsSourceRef.current = reclamationsSource;
 
-    // Priority order for statuses (most urgent first)
-    const STATUS_PRIORITY: Record<string, number> = {
-      'NOUVELLE': 1,
-      'PRISE_EN_COMPTE': 2,
-      'EN_COURS': 3,
-      'RESOLUE': 4,
-      'CLOTUREE': 5
-    };
+    // Style function for reclamations (used by both layers)
+    const getReclamationStyle = (feature: Feature): Style | Style[] => {
+      const props = feature.getProperties();
+      const statut = props.statut || 'NOUVELLE';
+      const color = RECLAMATION_STATUS_COLORS[statut] || '#ef4444';
+      const geomType = feature.getGeometry()?.getType();
 
-    // Get most urgent status color from a cluster
-    const getMostUrgentColor = (features: Feature[]): string => {
-      let mostUrgent = 'CLOTUREE';
-      let minPriority = 999;
-
-      features.forEach(f => {
-        const statut = f.get('statut') || 'NOUVELLE';
-        const priority = STATUS_PRIORITY[statut] || 999;
-        if (priority < minPriority) {
-          minPriority = priority;
-          mostUrgent = statut;
-        }
-      });
-
-      return RECLAMATION_STATUS_COLORS[mostUrgent] || '#ef4444';
-    };
-
-    // Cluster source for réclamations
-    const reclamationsClusterSource = new Cluster({
-      distance: 40, // Distance en pixels pour regrouper
-      minDistance: 20,
-      source: reclamationsSource,
-      geometryFunction: (feature) => {
-        const geom = feature.getGeometry();
-        return (geom?.getType() === 'Point' ? geom : null) as Point;
+      // Point: cercle avec icône d'alerte
+      if (geomType === 'Point') {
+        return new Style({
+          image: new CircleStyle({
+            radius: 12,
+            fill: new Fill({ color: color }),
+            stroke: new Stroke({ color: '#ffffff', width: 3 })
+          }),
+          text: new Text({
+            text: '!',
+            font: 'bold 14px sans-serif',
+            fill: new Fill({ color: '#ffffff' }),
+            offsetY: 1
+          })
+        });
+      } else {
+        // Polygon/LineString/Circle/MultiPolygon: contour coloré avec remplissage semi-transparent
+        return new Style({
+          fill: new Fill({ color: `${color}40` }), // 25% opacity
+          stroke: new Stroke({
+            color: color,
+            width: 3,
+            lineDash: [8, 4] // Ligne pointillée pour différencier des objets normaux
+          })
+        });
       }
-    });
+    };
 
+    // Reclamations layer - renders all geometry types directly (no clustering)
     const reclamationsLayer = new VectorLayer({
-      source: reclamationsClusterSource,
+      source: reclamationsSource,
       zIndex: 25, // En-dessous des objets (50) mais au-dessus des sites (1)
-      style: (feature) => {
-        const clusterFeatures = feature.get('features') as Feature[] | undefined;
-        const size = clusterFeatures?.length || 1;
-
-        if (size > 1 && clusterFeatures) {
-          // Cluster: afficher le nombre et utiliser la couleur la plus urgente
-          const color = getMostUrgentColor(clusterFeatures);
-          const radius = Math.min(14 + size * 2, 28);
-
-          return new Style({
-            image: new CircleStyle({
-              radius: radius,
-              fill: new Fill({ color: color }),
-              stroke: new Stroke({ color: '#ffffff', width: 3 })
-            }),
-            text: new Text({
-              text: size.toString(),
-              font: 'bold 12px sans-serif',
-              fill: new Fill({ color: '#ffffff' }),
-              stroke: new Stroke({ color: 'rgba(0,0,0,0.3)', width: 2 })
-            })
-          });
-        }
-
-        // Single feature - use original styling
-        const singleFeature = clusterFeatures?.[0] || feature;
-        const props = singleFeature.getProperties();
-        const statut = props.statut || 'NOUVELLE';
-        const color = RECLAMATION_STATUS_COLORS[statut] || '#ef4444';
-        const geomType = singleFeature.getGeometry()?.getType();
-
-        // Style de base avec bordure blanche pour plus de visibilité
-        if (geomType === 'Point') {
-          // Point: cercle avec icône d'alerte
-          return new Style({
-            image: new CircleStyle({
-              radius: 12,
-              fill: new Fill({ color: color }),
-              stroke: new Stroke({ color: '#ffffff', width: 3 })
-            }),
-            text: new Text({
-              text: '!',
-              font: 'bold 14px sans-serif',
-              fill: new Fill({ color: '#ffffff' }),
-              offsetY: 1
-            })
-          });
-        } else {
-          // Polygon/LineString: contour coloré avec remplissage semi-transparent
-          return new Style({
-            fill: new Fill({ color: `${color}40` }), // 25% opacity
-            stroke: new Stroke({
-              color: color,
-              width: 3,
-              lineDash: [8, 4] // Ligne pointillée pour différencier des objets normaux
-            })
-          });
-        }
-      }
+      style: (feature) => getReclamationStyle(feature as Feature)
     });
     reclamationsLayerRef.current = reclamationsLayer;
 
@@ -660,6 +601,11 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
 
   // Fetch Data Function - Unified endpoint with bbox
   const fetchData = async () => {
+    // ✅ Skip data fetch for mini-maps (they only display highlighted geometry)
+    if (isMiniMap) {
+      return;
+    }
+
     console.log('=== fetchData START (UNIFIED ENDPOINT) ===');
 
     if (!mapInstance.current || !dataLayerRef.current || !sitesLayerRef.current) {
@@ -947,6 +893,8 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
         feature.set('couleur_statut', feat.properties.couleur_statut);
         feature.set('urgence', feat.properties.urgence);
         feature.set('type_reclamation', feat.properties.type_reclamation);
+        feature.set('type_reclamation_symbole', feat.properties.type_reclamation_symbole);
+        feature.set('type_reclamation_categorie', feat.properties.type_reclamation_categorie);
         feature.set('description', feat.properties.description);
         feature.set('site_nom', feat.properties.site_nom);
         feature.set('id', feat.properties.id);
