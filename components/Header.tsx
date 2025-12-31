@@ -24,7 +24,8 @@ const VIEW_TITLES: Record<ViewState, string> = {
   'REPORTING': 'Statistiques',
   'CLIENT_PORTAL': 'Espace Client',
   'PRODUCTS': 'Gestion des Produits',
-  'SITES': 'Gestion des Sites'
+  'SITES': 'Gestion des Sites',
+  'CLIENTS': 'Clients'
 };
 
 const PATH_TO_VIEW: Record<string, ViewState> = {
@@ -38,7 +39,10 @@ const PATH_TO_VIEW: Record<string, ViewState> = {
   '/reporting': 'REPORTING',
   '/client': 'CLIENT_PORTAL',
   '/sites': 'SITES',
-  '/products': 'PRODUCTS'
+  '/products': 'PRODUCTS',
+  '/users': 'USERS',
+  '/clients': 'CLIENTS',
+  '/structures': 'CLIENTS'
 };
 
 const Header: React.FC<HeaderProps> = ({ user }) => {
@@ -100,7 +104,8 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
   }, []);
 
   // Ne pas afficher la barre de recherche sur certaines pages
-  const hideSearch = currentPath.startsWith('/map') || currentPath.startsWith('/client');
+  // Note: /client/ pour le portail client, mais pas /clients pour la page de gestion
+  const hideSearch = currentPath.startsWith('/map') || currentPath === '/client' || currentPath.startsWith('/client/');
 
   const handleClearSearch = () => {
     setSearchQuery('');

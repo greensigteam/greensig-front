@@ -87,19 +87,19 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, options, i
     <div className={`relative ${className}`} ref={containerRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between bg-white border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm hover:border-gray-400 ${isOpen ? 'ring-2 ring-emerald-500/20 border-emerald-500' : ''}`}
+        className={`w-full flex items-center justify-between bg-white border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm hover:border-slate-400 ${isOpen ? 'ring-2 ring-emerald-500/20 border-emerald-500' : ''}`}
       >
         <div className="flex items-center gap-2 truncate">
-          {icon && <span className="text-gray-500 flex-shrink-0">{icon}</span>}
-          <span className={`truncate ${value === 'all' ? 'text-gray-600' : 'text-gray-900 font-medium'}`}>
+          {icon && <span className="text-slate-500 flex-shrink-0">{icon}</span>}
+          <span className={`truncate ${value === 'all' ? 'text-slate-600' : 'text-slate-900 font-medium'}`}>
             {selectedLabel}
           </span>
         </div>
-        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ml-2 ${isOpen ? 'transform rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 flex-shrink-0 ml-2 ${isOpen ? 'transform rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-auto animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-auto animate-in fade-in zoom-in-95 duration-100">
           <div className="py-1">
             {options.map((option) => (
               <button
@@ -108,7 +108,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, options, i
                   onChange(option.value);
                   setIsOpen(false);
                 }}
-                className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between hover:bg-gray-50 transition-colors ${value === option.value ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-gray-700'}`}
+                className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between hover:bg-slate-50 transition-colors ${value === option.value ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-slate-700'}`}
               >
                 <span className="truncate">{option.label}</span>
                 {value === option.value && <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />}
@@ -140,7 +140,7 @@ const ExportDropdown = ({ onExportCSV, onExportExcel, onPrint }: { onExportCSV: 
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
       >
         <Download className="w-4 h-4" />
         <span>Exporter</span>
@@ -148,27 +148,27 @@ const ExportDropdown = ({ onExportCSV, onExportExcel, onPrint }: { onExportCSV: 
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-50 py-1 animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-100 z-50 py-1 animate-in fade-in zoom-in-95 duration-100">
           <button
             onClick={() => { onExportCSV(); setIsOpen(false); }}
-            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
           >
             <FileText className="w-4 h-4 text-emerald-600" />
             CSV
           </button>
           <button
             onClick={() => { onExportExcel(); setIsOpen(false); }}
-            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
           >
             <FileText className="w-4 h-4 text-green-600" />
             Excel (XLSX)
           </button>
-          <div className="border-t border-gray-100 my-1"></div>
+          <div className="border-t border-slate-100 my-1"></div>
           <button
             onClick={() => { onPrint(); setIsOpen(false); }}
-            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
           >
-            <Printer className="w-4 h-4 text-gray-500" />
+            <Printer className="w-4 h-4 text-slate-500" />
             Imprimer
           </button>
         </div>
@@ -985,14 +985,14 @@ const Inventory: React.FC = () => {
       `}</style>
 
       {/* Toolbar */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex-shrink-0 no-print">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex-shrink-0 no-print">
         {/* Left: Main Tabs */}
-        <div className="flex items-center bg-gray-100 p-1 rounded-lg">
+        <div className="flex items-center bg-slate-100 p-1 rounded-lg">
           <button
             onClick={() => setMainTab('tous')}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${mainTab === 'tous'
               ? 'bg-white text-emerald-700 shadow-sm'
-              : 'text-gray-500 hover:text-gray-700'
+              : 'text-slate-500 hover:text-slate-700'
               }`}
           >
             <FileText className="w-4 h-4" />
@@ -1002,7 +1002,7 @@ const Inventory: React.FC = () => {
             onClick={() => setMainTab('vegetation')}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${mainTab === 'vegetation'
               ? 'bg-white text-emerald-700 shadow-sm'
-              : 'text-gray-500 hover:text-gray-700'
+              : 'text-slate-500 hover:text-slate-700'
               }`}
           >
             <Leaf className="w-4 h-4" />
@@ -1012,7 +1012,7 @@ const Inventory: React.FC = () => {
             onClick={() => setMainTab('hydraulique')}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${mainTab === 'hydraulique'
               ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-gray-500 hover:text-gray-700'
+              : 'text-slate-500 hover:text-slate-700'
               }`}
           >
             <Droplet className="w-4 h-4" />
@@ -1027,7 +1027,7 @@ const Inventory: React.FC = () => {
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${showFilters || hasActiveFilters
               ? 'bg-emerald-50 border-emerald-600 text-emerald-700'
-              : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+              : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
               }`}
           >
             <Filter className="w-4 h-4" />
@@ -1040,7 +1040,7 @@ const Inventory: React.FC = () => {
           </button>
 
           {/* Export Dropdown */}
-          <ExportDropdown 
+          <ExportDropdown
             onExportCSV={handleExportCSV}
             onExportExcel={handleExportExcel}
             onPrint={handlePrint}
@@ -1050,7 +1050,7 @@ const Inventory: React.FC = () => {
 
       {/* Filters Panel */}
       {showFilters && (
-        <div className="mb-6 pb-4 border-b border-gray-200 bg-gray-50 p-4 rounded-lg flex-shrink-0 no-print">
+        <div className="mb-6 pb-4 border-b border-slate-200 bg-slate-50 p-4 rounded-lg flex-shrink-0 no-print">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Site Filter */}
             <CustomSelect
@@ -1130,12 +1130,12 @@ const Inventory: React.FC = () => {
       )}
 
       {/* Type Filter Tabs (Secondary) */}
-      <div className="mb-6 flex gap-2 overflow-x-auto pb-2 border-b border-gray-200 flex-shrink-0 no-print">
+      <div className="mb-6 flex gap-2 overflow-x-auto pb-2 border-b border-slate-200 flex-shrink-0 no-print">
         <button
           onClick={() => setFilters({ ...filters, type: 'all' })}
           className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all ${filters.type === 'all'
             ? 'bg-emerald-600 text-white shadow-md'
-            : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+            : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
         >
           Tous
@@ -1146,7 +1146,7 @@ const Inventory: React.FC = () => {
             onClick={() => setFilters({ ...filters, type })}
             className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all ${filters.type === type
               ? 'bg-emerald-600 text-white shadow-md'
-              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
               }`}
           >
             {type}
@@ -1170,7 +1170,7 @@ const Inventory: React.FC = () => {
               <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
               <h3 className="text-lg font-semibold text-red-800 mb-2">Erreur de chargement</h3>
               <p className="text-red-600 mb-4">{apiError}</p>
-              <p className="text-sm text-gray-600">Vérifiez que le serveur Django est démarré.</p>
+              <p className="text-sm text-slate-600">Vérifiez que le serveur Django est démarré.</p>
             </div>
           </div>
         )}
@@ -1199,13 +1199,13 @@ const Inventory: React.FC = () => {
       {/* Floating Action Bar when items are selected */}
       {selectedItemsCache.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-[95vw] no-print">
-          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 px-4 py-3 flex items-center gap-4">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 px-4 py-3 flex items-center gap-4">
             {/* Selection count */}
             <div className="flex items-center gap-2 flex-shrink-0">
               <span className="bg-emerald-100 text-emerald-700 font-bold px-2.5 py-0.5 rounded-full text-sm">
                 {selectedItemsCache.size}
               </span>
-              <span className="text-gray-600 text-sm whitespace-nowrap">
+              <span className="text-slate-600 text-sm whitespace-nowrap">
                 sélectionné{selectedItemsCache.size > 1 ? 's' : ''}
               </span>
               {/* Show selected types - compact */}
@@ -1213,7 +1213,7 @@ const Inventory: React.FC = () => {
                 {[...new Set(Array.from(selectedItemsCache.values()).map(item => item.type))].map(type => (
                   <span
                     key={type}
-                    className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded capitalize"
+                    className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-xs rounded capitalize"
                   >
                     {type}
                   </span>
@@ -1222,7 +1222,7 @@ const Inventory: React.FC = () => {
             </div>
 
             {/* Divider */}
-            <div className="h-6 w-px bg-gray-200 flex-shrink-0"></div>
+            <div className="h-6 w-px bg-slate-200 flex-shrink-0"></div>
 
             {/* Incompatibility warning - compact */}
             {!isTaskCompatible && !compatibilityLoading && (
@@ -1249,7 +1249,7 @@ const Inventory: React.FC = () => {
                   setSelectedIds(new Set());
                   setSelectedItemsCache(new Map());
                 }}
-                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
                 title="Effacer la sélection"
               >
                 <X className="w-4 h-4" />
@@ -1290,12 +1290,12 @@ const Inventory: React.FC = () => {
                 disabled={!isTaskCompatible || compatibilityLoading || modalLoading}
                 className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 text-sm font-medium shadow-sm whitespace-nowrap ${
                   !isTaskCompatible || compatibilityLoading || modalLoading
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
                     : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                 }`}
               >
                 {compatibilityLoading || modalLoading ? (
-                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <>
                     <ClipboardList className="w-4 h-4" />
@@ -1318,6 +1318,7 @@ const Inventory: React.FC = () => {
           onSubmit={handleTaskSubmit}
         />
       )}
+
     </div>
   );
 };

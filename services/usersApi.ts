@@ -15,9 +15,16 @@ import {
   UtilisateurUpdate,
   ChangePassword,
   Role,
+  StructureClient,
+  StructureClientDetail,
+  StructureClientCreate,
+  StructureClientUpdate,
+  StructureClientFilters,
   Client,
+  ClientUser,
   ClientCreate,
   ClientUpdate,
+  ClientFilters,
   Competence,
   CompetenceOperateur,
   CompetenceOperateurCreate,
@@ -205,8 +212,9 @@ export async function updateUtilisateur(
     body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
   });
 
-  // Invalider le cache
+  // Invalider les caches utilisateurs et clients
   await db.remove(cacheKeys.users());
+  await db.remove('clients');
   return result;
 }
 
@@ -244,7 +252,95 @@ export async function fetchRoles(): Promise<Role[]> {
 }
 
 // ============================================================================
-// CLIENTS
+// STRUCTURES CLIENTS
+// ============================================================================
+
+export async function fetchStructures(
+  filters: StructureClientFilters = {},
+  forceRefresh = false
+): Promise<PaginatedResponse<StructureClient>> {
+  const queryString = buildQueryParams(filters as Record<string, unknown>);
+  const cacheKey = queryString ? `structures:${queryString}` : 'structures';
+
+  if (!forceRefresh) {
+    const cached = await db.get<PaginatedResponse<StructureClient>>(cacheKey);
+    if (cached) {
+      logCache('[Cache HIT] Structures');
+      return cached;
+    }
+  }
+
+  logCache('[Cache MISS] Structures - Appel API');
+  const result = await fetchApi<PaginatedResponse<StructureClient>>(
+    `${USERS_API_URL}/structures/?${queryString}`
+  );
+  await db.set(cacheKey, result, cacheTTL.standard);
+  return result;
+}
+
+export async function fetchStructureById(id: number): Promise<StructureClientDetail> {
+  return fetchApi<StructureClientDetail>(`${USERS_API_URL}/structures/${id}/`);
+}
+
+export async function createStructure(data: StructureClientCreate): Promise<StructureClient> {
+  const result = await fetchApi<StructureClient>(`${USERS_API_URL}/structures/`, {
+    method: 'POST',
+    body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
+  });
+
+  // Invalider le cache
+  await db.invalidatePrefix('structures');
+  return result;
+}
+
+export async function updateStructure(
+  id: number,
+  data: StructureClientUpdate
+): Promise<StructureClient> {
+  const result = await fetchApi<StructureClient>(`${USERS_API_URL}/structures/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
+  });
+
+  // Invalider le cache
+  await db.invalidatePrefix('structures');
+  return result;
+}
+
+export async function deleteStructure(id: number): Promise<void> {
+  await fetchApi<void>(`${USERS_API_URL}/structures/${id}/`, {
+    method: 'DELETE'
+  });
+
+  // Invalider le cache
+  await db.invalidatePrefix('structures');
+  await db.remove('clients');
+}
+
+export async function fetchStructureUtilisateurs(structureId: number): Promise<ClientUser[]> {
+  return fetchApi<ClientUser[]>(`${USERS_API_URL}/structures/${structureId}/utilisateurs/`);
+}
+
+export async function addUserToStructure(
+  structureId: number,
+  userData: { email: string; nom: string; prenom: string; password: string }
+): Promise<Client> {
+  const result = await fetchApi<Client>(
+    `${USERS_API_URL}/structures/${structureId}/ajouter_utilisateur/`,
+    {
+      method: 'POST',
+      body: JSON.stringify(camelToSnake(userData as unknown as Record<string, unknown>))
+    }
+  );
+
+  // Invalider les caches
+  await db.invalidatePrefix('structures');
+  await db.remove('clients');
+  return result;
+}
+
+// ============================================================================
+// CLIENTS (Utilisateurs de structures)
 // ============================================================================
 
 export async function fetchClients(forceRefresh = false): Promise<PaginatedResponse<Client>> {
@@ -260,6 +356,24 @@ export async function fetchClients(forceRefresh = false): Promise<PaginatedRespo
   const result = await fetchApi<PaginatedResponse<Client>>(`${USERS_API_URL}/clients/`);
   await db.set('clients', result, cacheTTL.standard);
   return result;
+}
+
+/**
+ * Récupère un client par son ID utilisateur
+ * Utilise l'endpoint /clients/?utilisateur={id} pour filtrer
+ */
+export async function fetchClientByUserId(userId: number): Promise<Client | null> {
+  try {
+    // L'API supporte le filtre par utilisateur
+    const result = await fetchApi<PaginatedResponse<Client>>(`${USERS_API_URL}/clients/?utilisateur=${userId}`);
+    if (result.results && result.results.length > 0) {
+      return result.results[0] ?? null;
+    }
+    return null;
+  } catch (error) {
+    console.error('Erreur fetchClientByUserId:', error);
+    return null;
+  }
 }
 
 export async function createClient(data: ClientCreate): Promise<Client> {

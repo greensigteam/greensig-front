@@ -55,25 +55,25 @@ const TypeTacheSelector: FC<TypeTacheSelectorProps> = ({ value, typesTaches, onC
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left flex items-center justify-between hover:border-emerald-500 focus:ring-2 focus:ring-emerald-500 outline-none"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-left flex items-center justify-between hover:border-emerald-500 focus:ring-2 focus:ring-emerald-500 outline-none"
             >
-                <span className={selectedType ? 'text-gray-900' : 'text-gray-400'}>
+                <span className={selectedType ? 'text-slate-900' : 'text-slate-400'}>
                     {selectedType?.nom_tache || 'Sélectionner un type'}
                 </span>
                 <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isOpen && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-hidden flex flex-col">
+                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-64 overflow-hidden flex flex-col">
                     <div className="p-2 border-b">
                         <div className="relative">
-                            <Search className="absolute left-2 top-2.5 w-4 h-4 text-gray-400" />
+                            <Search className="absolute left-2 top-2.5 w-4 h-4 text-slate-400" />
                             <input
                                 type="text"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder="Rechercher..."
-                                className="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 outline-none"
+                                className="w-full pl-8 pr-3 py-2 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-emerald-500 outline-none"
                                 autoFocus
                             />
                         </div>
@@ -95,7 +95,7 @@ const TypeTacheSelector: FC<TypeTacheSelectorProps> = ({ value, typesTaches, onC
                             </button>
                         ))}
                         {filteredTypes.length === 0 && (
-                            <div className="px-3 py-2 text-sm text-gray-500 text-center">
+                            <div className="px-3 py-2 text-sm text-slate-500 text-center">
                                 Aucun résultat
                             </div>
                         )}
@@ -141,7 +141,7 @@ const MultiEquipeSelector: FC<MultiEquipeSelectorProps> = ({ values, equipes, on
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left flex items-center justify-between hover:border-emerald-500 focus:ring-2 focus:ring-emerald-500 outline-none min-h-[42px]"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-left flex items-center justify-between hover:border-emerald-500 focus:ring-2 focus:ring-emerald-500 outline-none min-h-[42px]"
             >
                 <div className="flex-1 flex flex-wrap gap-1">
                     {selectedEquipes.length > 0 ? (
@@ -168,23 +168,23 @@ const MultiEquipeSelector: FC<MultiEquipeSelectorProps> = ({ values, equipes, on
                             </span>
                         ))
                     ) : (
-                        <span className="text-gray-400">Sélectionner des équipes</span>
+                        <span className="text-slate-400">Sélectionner des équipes</span>
                     )}
                 </div>
                 <ChevronDown className={`w-4 h-4 ml-2 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isOpen && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-hidden flex flex-col">
+                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-64 overflow-hidden flex flex-col">
                     <div className="p-2 border-b">
                         <div className="relative">
-                            <Search className="absolute left-2 top-2.5 w-4 h-4 text-gray-400" />
+                            <Search className="absolute left-2 top-2.5 w-4 h-4 text-slate-400" />
                             <input
                                 type="text"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder="Rechercher..."
-                                className="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 outline-none"
+                                className="w-full pl-8 pr-3 py-2 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-emerald-500 outline-none"
                                 autoFocus
                             />
                         </div>
@@ -198,7 +198,7 @@ const MultiEquipeSelector: FC<MultiEquipeSelectorProps> = ({ values, equipes, on
                                     key={equipe.id}
                                     type="button"
                                     onClick={() => toggleEquipe(equipe.id)}
-                                    className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between ${isSelected ? 'bg-emerald-50' : 'hover:bg-gray-50'
+                                    className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between ${isSelected ? 'bg-emerald-50' : 'hover:bg-slate-50'
                                         }`}
                                 >
                                     <span>{equipe.nomEquipe}</span>
@@ -207,7 +207,7 @@ const MultiEquipeSelector: FC<MultiEquipeSelectorProps> = ({ values, equipes, on
                             );
                         })}
                         {filteredEquipes.length === 0 && (
-                            <div className="px-3 py-2 text-sm text-gray-500 text-center">
+                            <div className="px-3 py-2 text-sm text-slate-500 text-center">
                                 Aucun résultat
                             </div>
                         )}
@@ -743,7 +743,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
 
                         {/* Type de tâche avec création dynamique */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
                                 Type de tâche <span className="text-red-500">*</span>
                                 {selectedObjects.length > 0 && filteredTypesTaches.length < typesTaches.length && !loadingFilteredTypes && (
                                     <span className="ml-2 text-xs text-amber-600 font-normal">
@@ -751,7 +751,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                     </span>
                                 )}
                                 {loadingFilteredTypes && (
-                                    <span className="ml-2 text-xs text-gray-400 font-normal">
+                                    <span className="ml-2 text-xs text-slate-400 font-normal">
                                         Chargement...
                                     </span>
                                 )}
@@ -762,7 +762,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                 onChange={(id) => setFormData({ ...formData, id_type_tache: id })}
                             />
                             {selectedObjects.length > 0 && filteredTypesTaches.length > 0 && filteredTypesTaches.length < typesTaches.length && (
-                                <p className="text-xs text-gray-500 mt-1">
+                                <p className="text-xs text-slate-500 mt-1">
                                     Seuls les types de tâches applicables aux objets sélectionnés sont affichés.
                                 </p>
                             )}
@@ -770,7 +770,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
 
                         {/* Équipes avec sélection multiple (US-PLAN-013) */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
                                 Équipes
                             </label>
                             <MultiEquipeSelector
@@ -782,7 +782,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
                                     Date début <span className="text-red-500">*</span>
                                 </label>
                                 <input
@@ -797,11 +797,11 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                             startDateRef.current?.blur();
                                         }, 100);
                                     }}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
                                     Date fin <span className="text-red-500">*</span>
                                 </label>
                                 <input
@@ -816,19 +816,19 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                             endDateRef.current?.blur();
                                         }, 100);
                                     }}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                                 />
                             </div>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
                                 Priorité
                             </label>
                             <select
                                 value={formData.priorite}
                                 onChange={(e) => setFormData({ ...formData, priorite: Number(e.target.value) as PrioriteTache })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                             >
                                 {Object.entries(PRIORITE_LABELS).map(([value, label]) => (
                                     <option key={value} value={value}>
@@ -839,14 +839,14 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
                                 Commentaires
                             </label>
                             <textarea
                                 value={formData.commentaires}
                                 onChange={(e) => setFormData({ ...formData, commentaires: e.target.value })}
                                 rows={3}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                                 placeholder="Détails de la tâche..."
                             />
                         </div>
@@ -855,7 +855,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                         {tache && (
                             <div className="border-t pt-4">
                                 <div className="flex items-center justify-between mb-3">
-                                    <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                    <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
                                         <Timer className="w-4 h-4" />
                                         Charge estimée
                                         {chargeManuelle && (
@@ -896,18 +896,18 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                                 setFormData({ ...formData, charge_estimee_heures: val });
                                                 if (val !== null) setChargeManuelle(true);
                                             }}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none pr-16"
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none pr-16"
                                             placeholder="Auto"
                                         />
-                                        <span className="absolute right-3 top-2.5 text-sm text-gray-400">heures</span>
+                                        <span className="absolute right-3 top-2.5 text-sm text-slate-400">heures</span>
                                     </div>
                                     {!chargeManuelle && tache.charge_estimee_heures !== null && (
-                                        <span className="text-sm text-gray-500 whitespace-nowrap">
+                                        <span className="text-sm text-slate-500 whitespace-nowrap">
                                             Calculé: {tache.charge_estimee_heures}h
                                         </span>
                                     )}
                                 </div>
-                                <p className="text-xs text-gray-400 mt-1">
+                                <p className="text-xs text-slate-400 mt-1">
                                     {chargeManuelle
                                         ? 'Valeur saisie manuellement. Cliquez sur "Recalculer auto" pour revenir au calcul automatique.'
                                         : (
@@ -925,7 +925,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                         {/* Sélecteur d'objets de l'inventaire */}
                         <div className="border-t pt-4">
                             <div className="flex items-center justify-between mb-3">
-                                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
                                     <TreePine className="w-4 h-4" />
                                     Objets concernés
                                     {selectedObjects.length > 0 && (
@@ -990,23 +990,23 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
 
                             {/* Object selector dropdown */}
                             {showObjectSelector && (
-                                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-3">
+                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-3">
                                     <div className="relative">
-                                        <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                                        <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
                                         <input
                                             type="text"
                                             value={objectSearchQuery}
                                             onChange={(e) => setObjectSearchQuery(e.target.value)}
                                             placeholder="Rechercher par nom, type ou site..."
-                                            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                                            className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                                         />
                                     </div>
 
                                     <div className="max-h-48 overflow-y-auto space-y-1">
                                         {loadingObjects ? (
-                                            <div className="text-center py-4 text-gray-500 text-sm">Chargement...</div>
+                                            <div className="text-center py-4 text-slate-500 text-sm">Chargement...</div>
                                         ) : filteredObjects.length === 0 ? (
-                                            <div className="text-center py-4 text-gray-500 text-sm">
+                                            <div className="text-center py-4 text-slate-500 text-sm">
                                                 {objectSearchQuery
                                                     ? 'Aucun résultat pour cette recherche'
                                                     : lockedSite
@@ -1023,17 +1023,17 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                                         onClick={() => toggleObjectSelection(obj)}
                                                         className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-sm transition-colors ${isSelected
                                                             ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                                            : 'bg-white hover:bg-gray-100 border border-gray-200'
+                                                            : 'bg-white hover:bg-slate-100 border border-slate-200'
                                                             }`}
                                                     >
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-2">
                                                                 <span className="font-medium truncate">{obj.nom}</span>
-                                                                <span className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">
+                                                                <span className="text-xs bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">
                                                                     {obj.type}
                                                                 </span>
                                                             </div>
-                                                            <div className="text-xs text-gray-500 truncate">
+                                                            <div className="text-xs text-slate-500 truncate">
                                                                 {obj.site}{obj.soussite && ` → ${obj.soussite}`}
                                                             </div>
                                                         </div>
@@ -1045,7 +1045,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                             })
                                         )}
                                         {filteredObjects.length > 50 && (
-                                            <div className="text-center py-2 text-xs text-gray-400">
+                                            <div className="text-center py-2 text-xs text-slate-400">
                                                 +{filteredObjects.length - 50} autres résultats...
                                             </div>
                                         )}
@@ -1058,7 +1058,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                         {!tache && selectedObjects.length > 0 && formData.id_type_tache > 0 && (
                             <div className="border-t pt-4">
                                 <div className="flex items-center justify-between mb-3">
-                                    <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                    <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
                                         <Calculator className="w-4 h-4" />
                                         Aperçu de la charge estimée
                                     </label>
@@ -1074,7 +1074,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                 </div>
 
                                 {loadingRatios ? (
-                                    <div className="bg-gray-50 p-3 rounded-lg text-center text-gray-500 text-sm">
+                                    <div className="bg-slate-50 p-3 rounded-lg text-center text-slate-500 text-sm">
                                         Chargement des ratios...
                                     </div>
                                 ) : chargePreview ? (
@@ -1123,7 +1123,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                         )}
                                     </div>
                                 ) : (
-                                    <div className="bg-gray-50 p-3 rounded-lg text-center text-gray-500 text-sm">
+                                    <div className="bg-slate-50 p-3 rounded-lg text-center text-slate-500 text-sm">
                                         {ratios.length === 0 ? (
                                             <span>
                                                 Aucun ratio configuré.{' '}

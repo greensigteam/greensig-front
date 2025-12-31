@@ -468,18 +468,80 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     });
     dataLayerRef.current = dataLayer;
 
-    // ✅ Réclamations Layer - Affiche les réclamations non clôturées avec code couleur
+    // ✅ Réclamations Layer - Affiche les réclamations non clôturées avec code couleur et clustering
     const reclamationsSource = new VectorSource();
     reclamationsSourceRef.current = reclamationsSource;
 
-    const reclamationsLayer = new VectorLayer({
+    // Priority order for statuses (most urgent first)
+    const STATUS_PRIORITY: Record<string, number> = {
+      'NOUVELLE': 1,
+      'PRISE_EN_COMPTE': 2,
+      'EN_COURS': 3,
+      'RESOLUE': 4,
+      'CLOTUREE': 5
+    };
+
+    // Get most urgent status color from a cluster
+    const getMostUrgentColor = (features: Feature[]): string => {
+      let mostUrgent = 'CLOTUREE';
+      let minPriority = 999;
+
+      features.forEach(f => {
+        const statut = f.get('statut') || 'NOUVELLE';
+        const priority = STATUS_PRIORITY[statut] || 999;
+        if (priority < minPriority) {
+          minPriority = priority;
+          mostUrgent = statut;
+        }
+      });
+
+      return RECLAMATION_STATUS_COLORS[mostUrgent] || '#ef4444';
+    };
+
+    // Cluster source for réclamations
+    const reclamationsClusterSource = new Cluster({
+      distance: 40, // Distance en pixels pour regrouper
+      minDistance: 20,
       source: reclamationsSource,
-      zIndex: 100, // Au-dessus des objets mais en-dessous de la sélection
+      geometryFunction: (feature) => {
+        const geom = feature.getGeometry();
+        return (geom?.getType() === 'Point' ? geom : null) as Point;
+      }
+    });
+
+    const reclamationsLayer = new VectorLayer({
+      source: reclamationsClusterSource,
+      zIndex: 25, // En-dessous des objets (50) mais au-dessus des sites (1)
       style: (feature) => {
-        const props = feature.getProperties();
+        const clusterFeatures = feature.get('features') as Feature[] | undefined;
+        const size = clusterFeatures?.length || 1;
+
+        if (size > 1 && clusterFeatures) {
+          // Cluster: afficher le nombre et utiliser la couleur la plus urgente
+          const color = getMostUrgentColor(clusterFeatures);
+          const radius = Math.min(14 + size * 2, 28);
+
+          return new Style({
+            image: new CircleStyle({
+              radius: radius,
+              fill: new Fill({ color: color }),
+              stroke: new Stroke({ color: '#ffffff', width: 3 })
+            }),
+            text: new Text({
+              text: size.toString(),
+              font: 'bold 12px sans-serif',
+              fill: new Fill({ color: '#ffffff' }),
+              stroke: new Stroke({ color: 'rgba(0,0,0,0.3)', width: 2 })
+            })
+          });
+        }
+
+        // Single feature - use original styling
+        const singleFeature = clusterFeatures?.[0] || feature;
+        const props = singleFeature.getProperties();
         const statut = props.statut || 'NOUVELLE';
         const color = RECLAMATION_STATUS_COLORS[statut] || '#ef4444';
-        const geomType = feature.getGeometry()?.getType();
+        const geomType = singleFeature.getGeometry()?.getType();
 
         // Style de base avec bordure blanche pour plus de visibilité
         if (geomType === 'Point') {
@@ -515,7 +577,7 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     // Create map (without hook layers to avoid "Duplicate item" error)
     const map = new Map({
       target: innerMapRef.current,
-      layers: [baseLayer, sitesLayer, dataLayer, reclamationsLayer, selectionLayer], // ✅ Réclamations ajoutée
+      layers: [baseLayer, sitesLayer, reclamationsLayer, dataLayer, selectionLayer], // ✅ Order: sites < reclamations < objects < selection
       overlays: [overlay], // ✅ Only our own overlay
       view: new View({
         center: fromLonLat([INITIAL_POSITION.lng, INITIAL_POSITION.lat]),
@@ -606,8 +668,23 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
 
     try {
       const view = mapInstance.current.getView();
-      const extent = view.calculateExtent(mapInstance.current.getSize());
+      const mapSize = mapInstance.current.getSize();
+
+      // Skip if map size is invalid (not yet rendered)
+      if (!mapSize || mapSize[0] === 0 || mapSize[1] === 0) {
+        console.log('⚠️ Map size invalid, skipping fetch');
+        return;
+      }
+
+      const extent = view.calculateExtent(mapSize);
       const [west, south, east, north] = transformExtent(extent, 'EPSG:3857', 'EPSG:4326');
+
+      // Skip if bbox contains invalid values (NaN, Infinity)
+      if (!Number.isFinite(west) || !Number.isFinite(south) || !Number.isFinite(east) || !Number.isFinite(north)) {
+        console.log('⚠️ Invalid bbox coordinates, skipping fetch');
+        return;
+      }
+
       const zoom = Math.round(view.getZoom() || 10);
 
       // ✅ Use ref to get current value (avoids stale closure)
@@ -829,8 +906,20 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
 
     try {
       const view = mapInstance.current.getView();
-      const extent = view.calculateExtent(mapInstance.current.getSize());
+      const mapSize = mapInstance.current.getSize();
+
+      // Skip if map size is invalid (not yet rendered)
+      if (!mapSize || mapSize[0] === 0 || mapSize[1] === 0) {
+        return;
+      }
+
+      const extent = view.calculateExtent(mapSize);
       const [west, south, east, north] = transformExtent(extent, 'EPSG:3857', 'EPSG:4326');
+
+      // Skip if bbox contains invalid values (NaN, Infinity)
+      if (!Number.isFinite(west) || !Number.isFinite(south) || !Number.isFinite(east) || !Number.isFinite(north)) {
+        return;
+      }
 
       const data = await fetchReclamationsForMap({
         bbox: `${west},${south},${east},${north}`

@@ -1,20 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Calendar, Clock, Search, MapPin,
     ChevronRight, Camera, Package, AlertCircle, Plus, Trash2,
     Loader2, FileImage, Play, CheckCircle, XCircle, ThumbsUp, ThumbsDown, ShieldCheck
 } from 'lucide-react';
 import { planningService } from '../services/planningService';
-import { fetchCurrentUser } from '../services/api';
+import { fetchCurrentUser, fetchAllSites, SiteFrontend } from '../services/api';
+import { fetchEquipes, fetchClients } from '../services/usersApi';
 import {
     fetchPhotosParTache, createPhoto, deletePhoto,
     fetchConsommationsParTache, createConsommation, deleteConsommation,
     fetchProduitsActifs
 } from '../services/suiviTachesApi';
-import { Tache, STATUT_TACHE_COLORS, PRIORITE_LABELS, ETAT_VALIDATION_COLORS, ETAT_VALIDATION_LABELS } from '../types/planning';
+import { Tache, STATUT_TACHE_COLORS, PRIORITE_LABELS, ETAT_VALIDATION_COLORS, ETAT_VALIDATION_LABELS, PlanningFilters, EMPTY_PLANNING_FILTERS } from '../types/planning';
 import { PhotoList, ConsommationProduit, ProduitList } from '../types/suiviTaches';
+import { Client, EquipeList } from '../types/users';
 import LoadingWrapper from '../components/LoadingWrapper';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
+import PlanningFiltersComponent from '../components/planning/PlanningFilters';
 
 // Helper pour construire l'URL complète des images
 const getFullImageUrl = (url: string | null): string => {
@@ -34,6 +37,13 @@ const SuiviTaches: React.FC = () => {
     const [taches, setTaches] = useState<Tache[]>([]);
     const [selectedTache, setSelectedTache] = useState<Tache | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+
+    // State Filtres
+    const [filters, setFilters] = useState<PlanningFilters>(EMPTY_PLANNING_FILTERS);
+    const [clients, setClients] = useState<Client[]>([]);
+    const [equipes, setEquipes] = useState<EquipeList[]>([]);
+    const [sites, setSites] = useState<SiteFrontend[]>([]);
+    const [loadingFilters, setLoadingFilters] = useState(true);
 
     // State Détail Tâche
     const [activeTab, setActiveTab] = useState<'info' | 'photos' | 'produits'>('info');
@@ -89,7 +99,27 @@ const SuiviTaches: React.FC = () => {
         loadTaches();
         loadProduitsOptions();
         loadUserRole();
+        loadFilterData();
     }, []);
+
+    // Charger les données pour les filtres
+    const loadFilterData = async () => {
+        setLoadingFilters(true);
+        try {
+            const [clientsRes, equipesRes, sitesArray] = await Promise.all([
+                fetchClients(),
+                fetchEquipes(),
+                fetchAllSites() // Retourne directement SiteFrontend[]
+            ]);
+            setClients(clientsRes.results || []);
+            setEquipes(equipesRes.results || []);
+            setSites(sitesArray.filter(s => s.actif));
+        } catch (error) {
+            console.error("Erreur chargement données filtres", error);
+        } finally {
+            setLoadingFilters(false);
+        }
+    };
 
     const loadUserRole = async () => {
         try {
@@ -320,30 +350,89 @@ const SuiviTaches: React.FC = () => {
 
     // --- RENDER ---
 
-    const filteredTaches = taches.filter(t => {
-        const teamNames = t.equipes_detail?.length > 0
-            ? t.equipes_detail.map((e: any) => e.nom_equipe || e.nomEquipe).join(' ')
-            : (t.equipe_detail as any)?.nom_equipe || t.equipe_detail?.nomEquipe || '';
+    // Sites filtrés par client sélectionné
+    const filteredSites = useMemo(() => {
+        if (filters.clientId === null) return sites;
+        return sites.filter(s => s.client === filters.clientId);
+    }, [sites, filters.clientId]);
 
-        return t.type_tache_detail?.nom_tache.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            teamNames.toLowerCase().includes(searchQuery.toLowerCase());
-    });
+    // Tâches filtrées
+    const filteredTaches = useMemo(() => {
+        return taches.filter(t => {
+            // Filtre texte (recherche)
+            const teamNames = t.equipes_detail?.length > 0
+                ? t.equipes_detail.map((e: any) => e.nom_equipe || e.nomEquipe).join(' ')
+                : (t.equipe_detail as any)?.nom_equipe || t.equipe_detail?.nomEquipe || '';
+
+            const matchesSearch = !searchQuery ||
+                t.type_tache_detail?.nom_tache.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                teamNames.toLowerCase().includes(searchQuery.toLowerCase());
+
+            if (!matchesSearch) return false;
+
+            // Filtre par client (via client_detail de la tâche)
+            if (filters.clientId !== null) {
+                const tacheClientId = t.client_detail?.utilisateur;
+                if (tacheClientId !== filters.clientId) return false;
+            }
+
+            // Filtre par site (via objets_detail - les objets sont liés aux sites)
+            if (filters.siteId !== null) {
+                // Comparaison en nombre car obj.site peut être number ou string
+                const hasSite = t.objets_detail?.some(obj =>
+                    Number(obj.site) === filters.siteId
+                );
+                if (!hasSite) return false;
+            }
+
+            // Filtre par équipe
+            if (filters.equipeId !== null) {
+                const tacheEquipeIds = t.equipes_detail?.map((e: any) => e.id) || [];
+                if (!tacheEquipeIds.includes(filters.equipeId)) return false;
+            }
+
+            // Filtre par statut
+            if (filters.statuts.length > 0) {
+                if (!filters.statuts.includes(t.statut)) return false;
+            }
+
+            return true;
+        });
+    }, [taches, searchQuery, filters]);
 
     return (
         <div className="flex h-full bg-gray-50 overflow-hidden">
             {/* LISTE DES TACHES (SIDEBAR GAUCHE) */}
-            <div className={`w-full md:w-1/3 min-w-[320px] max-w-md bg-white border-r border-gray-200 flex flex-col ${selectedTache ? 'hidden md:flex' : 'flex'}`}>
-                <div className="p-4 border-b border-gray-100">
-                    <h1 className="text-xl font-bold text-gray-800 mb-4">Journal de tâches</h1>
+            <div className={`w-full md:w-1/3 min-w-[320px] max-w-md bg-white border-r border-slate-200 flex flex-col ${selectedTache ? 'hidden md:flex' : 'flex'}`}>
+                <div className="p-4 border-b border-slate-100 space-y-4">
+                    <h1 className="text-xl font-bold text-slate-800">Journal de tâches</h1>
+
+                    {/* Filtres */}
+                    <PlanningFiltersComponent
+                        filters={filters}
+                        onFiltersChange={setFilters}
+                        clients={clients}
+                        sites={filteredSites.map(s => ({ id: parseInt(s.id), name: s.name }))}
+                        equipes={equipes}
+                        disabled={loadingFilters}
+                    />
+
+                    {/* Recherche */}
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
                             type="text"
                             placeholder="Rechercher une tâche..."
-                            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                         />
+                    </div>
+
+                    {/* Compteur de résultats */}
+                    <div className="text-xs text-slate-500">
+                        {filteredTaches.length} tâche{filteredTaches.length > 1 ? 's' : ''}
+                        {filteredTaches.length !== taches.length && ` sur ${taches.length}`}
                     </div>
                 </div>
 

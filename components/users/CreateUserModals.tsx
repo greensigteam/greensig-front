@@ -550,7 +550,7 @@ export const CreateClientModal: React.FC<CreateModalProps> = ({ onClose, onCreat
 };
 
 // ============================================================================
-// MODAL - Créer un Chef d'équipe
+// MODAL - Créer un Superviseur
 // ============================================================================
 
 export const CreateChefEquipeModal: React.FC<CreateModalProps> = ({ onClose, onCreated }) => {
@@ -607,7 +607,7 @@ export const CreateChefEquipeModal: React.FC<CreateModalProps> = ({ onClose, onC
     }
 
     if (!formData.matricule.trim()) {
-      setError("Le matricule est requis pour un chef d'équipe");
+      setError("Le matricule est requis pour un superviseur");
       return;
     }
 
@@ -645,7 +645,7 @@ export const CreateChefEquipeModal: React.FC<CreateModalProps> = ({ onClose, onC
       onCreated();
       onClose();
     } catch (err: any) {
-      console.error("Erreur création chef d'équipe:", err);
+      console.error("Erreur création superviseur:", err);
       if (err?.data) {
         const errorMessages: string[] = [];
         for (const [field, messages] of Object.entries(err.data)) {
@@ -663,7 +663,7 @@ export const CreateChefEquipeModal: React.FC<CreateModalProps> = ({ onClose, onC
       } else if (err?.message) {
         setError(err.message);
       } else {
-        setError("Erreur lors de la création du chef d'équipe.");
+        setError("Erreur lors de la création du superviseur.");
       }
     } finally {
       setLoading(false);
@@ -679,7 +679,7 @@ export const CreateChefEquipeModal: React.FC<CreateModalProps> = ({ onClose, onC
               <Award className="w-6 h-6 text-yellow-600" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Nouveau Chef d'équipe</h2>
+              <h2 className="text-xl font-bold text-gray-900">Nouveau Superviseur</h2>
               <p className="text-sm text-gray-500">Gestion d'équipe et planification</p>
             </div>
           </div>
@@ -822,7 +822,7 @@ export const CreateChefEquipeModal: React.FC<CreateModalProps> = ({ onClose, onC
 
                 <Tab.Panel>
                   <div className="mb-2 text-sm text-gray-600">
-                    Sélectionnez les compétences du chef d'équipe (optionnel).
+                    Sélectionnez les compétences du superviseur (optionnel).
                   </div>
                   {competences.length === 0 ? (
                     <div className="text-gray-500 text-sm">Aucune compétence disponible.</div>
@@ -889,7 +889,7 @@ export const CreateChefEquipeModal: React.FC<CreateModalProps> = ({ onClose, onC
               disabled={loading}
               className="flex-1 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50"
             >
-              {loading ? 'Création...' : "Créer Chef d'équipe"}
+              {loading ? 'Création...' : "Créer Superviseur"}
             </button>
           </div>
         </form>
@@ -1267,7 +1267,7 @@ export const UserTypeMenu: React.FC<UserTypeMenuProps> = ({ onSelect, onClose })
     {
       role: 'SUPERVISEUR' as NomRole,
       icon: Award,
-      label: "Chef d'équipe",
+      label: "Superviseur",
       description: "Gestion d'équipe et planification",
       color: 'yellow'
     },

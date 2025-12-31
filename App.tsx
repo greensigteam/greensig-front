@@ -11,6 +11,7 @@ const OLMap = lazy(() => import('./components/OLMap').then(m => ({ default: m.OL
 const Inventory = lazy(() => import('./pages/Inventory'));
 const InventoryDetailPage = lazy(() => import('./pages/InventoryDetailPage'));
 const Reclamations = lazy(() => import('./pages/Reclamations'));
+const ReclamationDetailPage = lazy(() => import('./pages/ReclamationDetailPage'));
 const ReclamationsDashboard = lazy(() => import('./pages/ReclamationsDashboard'));
 const Teams = lazy(() => import('./pages/Teams'));
 const Planning = lazy(() => import('./pages/Planning'));
@@ -25,7 +26,8 @@ const Parametres = lazy(() => import('./pages/Parametres'));
 const Sites = lazy(() => import('./pages/Sites'));
 const SiteDetailPage = lazy(() => import('./pages/SiteDetailPage'));
 const Clients = lazy(() => import('./pages/Clients'));
-const ClientDetailPage = lazy(() => import('./pages/ClientDetailPage'));
+const StructureDetailPage = lazy(() => import('./pages/StructureDetailPage'));
+const ClientUserDetailPage = lazy(() => import('./pages/ClientUserDetailPage'));
 const OperateurDetailPage = lazy(() => import('./pages/OperateurDetailPage'));
 import { User, MapLayerType, Coordinates, OverlayState, MapObjectDetail, UserLocation, Measurement, MeasurementType } from './types';
 import { MAP_LAYERS } from './constants';
@@ -334,13 +336,19 @@ function App() {
                           <Suspense fallback={<PageLoadingFallback />}><Clients /></Suspense>
                         </RequireRole>
                       } />
-                      <Route path="clients/:id" element={
+                      <Route path="structures/:id" element={
                         <RequireRole user={user} roles={['ADMIN']}>
-                          <Suspense fallback={<PageLoadingFallback />}><ClientDetailPage /></Suspense>
+                          <Suspense fallback={<PageLoadingFallback />}><StructureDetailPage /></Suspense>
+                        </RequireRole>
+                      } />
+                      <Route path="structures/:structureId/utilisateurs/:userId" element={
+                        <RequireRole user={user} roles={['ADMIN']}>
+                          <Suspense fallback={<PageLoadingFallback />}><ClientUserDetailPage /></Suspense>
                         </RequireRole>
                       } />
                       <Route path="interventions" element={<Navigate to="/reclamations" replace />} />
                       <Route path="reclamations" element={<Suspense fallback={<PageLoadingFallback />}><Reclamations /></Suspense>} />
+                      <Route path="reclamations/:id" element={<Suspense fallback={<PageLoadingFallback />}><ReclamationDetailPage /></Suspense>} />
                       <Route path="reclamations/stats" element={<Suspense fallback={<PageLoadingFallback />}><ReclamationsDashboard /></Suspense>} />
                       <Route path="teams" element={<Suspense fallback={<PageLoadingFallback />}><Teams /></Suspense>} />
                       <Route path="users" element={

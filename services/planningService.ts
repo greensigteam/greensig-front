@@ -22,7 +22,8 @@ export const planningService = {
         client_id?: number,
         equipe_id?: number,
         page?: number,
-        has_reclamation?: boolean
+        has_reclamation?: boolean,
+        objet_id?: number
     } = {}): Promise<PaginatedResponse<Tache>> {
         const query = new URLSearchParams();
         if (params.start_date) query.append('start_date', params.start_date);
@@ -31,6 +32,7 @@ export const planningService = {
         if (params.equipe_id) query.append('equipe_id', params.equipe_id.toString());
         if (params.page) query.append('page', params.page.toString());
         if (params.has_reclamation) query.append('has_reclamation', 'true');
+        if (params.objet_id) query.append('objet_id', params.objet_id.toString());
 
         const response = await apiFetch(`${BASE_URL}/taches/?${query.toString()}`);
         if (!response.ok) throw new Error('Erreur lors du chargement des tâches');

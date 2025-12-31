@@ -17,7 +17,7 @@ import {
   UserTypeMenu
 } from '../components/users/CreateUserModals';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
-import { AdminDetailModal } from '../components/users/UserDetailModals';
+import { AdminDetailModal, ClientDetailModal, UserDetailModalSelector } from '../components/users/UserDetailModals';
 import React, { useState, useEffect } from 'react';
 import {
   Users as UsersIcon,
@@ -28,12 +28,14 @@ import {
   Search,
   X,
   Edit2,
-  Trash2,
+  UserX,
   Mail,
   Award,
   Check,
   AlertCircle,
-  Save
+  Save,
+  MoreVertical,
+  Eye
 } from 'lucide-react';
 import { DataTable } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
@@ -54,7 +56,8 @@ import {
   updateOperateur,
   fetchOperateurs,
   attribuerRole,
-  retirerRole
+  retirerRole,
+  fetchClientByUserId
 } from '../services/usersApi';
 
 // ============================================================================
@@ -77,6 +80,13 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
   const [userRoles, setUserRoles] = useState<NomRole[]>(user.roles);
   const [allRoles, setAllRoles] = useState<Role[]>([]);
   const [currentUserRoles, setCurrentUserRoles] = useState<NomRole[]>([]);
+  const [loadedClientData, setLoadedClientData] = useState<Client | null>(null);
+  const [clientDataLoading, setClientDataLoading] = useState(false);
+
+  // Trouver les donnees specifiques selon le type
+  const clientDataFromList = clients.find(c => c.utilisateur === user.id);
+  const clientData = loadedClientData || clientDataFromList;
+  const operateurData = operateurs.find(o => o.id === user.id);
 
   useEffect(() => {
     // Charger tous les rôles disponibles
@@ -89,6 +99,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
       }
     };
     fetchAllRoles();
+
     // Récupérer le profil utilisateur courant pour vérifier les permissions
     const fetchMe = async () => {
       try {
@@ -109,11 +120,33 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
       }
     };
     fetchMe();
-  }, []);
 
-  // Trouver les donnees specifiques selon le type
-  const clientData = clients.find(c => c.utilisateur === user.id);
-  const operateurData = operateurs.find(o => o.id === user.id);
+    // Si l'utilisateur est un CLIENT et les données ne sont pas dans la liste, les charger depuis l'API
+    if (user.roles.includes('CLIENT') && !clientDataFromList) {
+      const loadClientData = async () => {
+        setClientDataLoading(true);
+        try {
+          const data = await fetchClientByUserId(user.id);
+          if (data) {
+            setLoadedClientData(data);
+            // Mettre à jour les champs client avec les données chargées
+            setClientFields({
+              nomStructure: data.nomStructure || '',
+              adresse: data.adresse || '',
+              telephone: data.telephone || '',
+              contactPrincipal: data.contactPrincipal || '',
+              emailFacturation: data.emailFacturation || ''
+            });
+          }
+        } catch (err) {
+          console.error('Erreur chargement client:', err);
+        } finally {
+          setClientDataLoading(false);
+        }
+      };
+      loadClientData();
+    }
+  }, [user.id, user.roles, clientDataFromList]);
 
   // Champs communs
   const [formData, setFormData] = useState({
@@ -125,11 +158,11 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
 
   // Champs Client
   const [clientFields, setClientFields] = useState({
-    nomStructure: clientData?.nomStructure || '',
-    adresse: clientData?.adresse || '',
-    telephone: clientData?.telephone || '',
-    contactPrincipal: clientData?.contactPrincipal || '',
-    emailFacturation: clientData?.emailFacturation || ''
+    nomStructure: clientDataFromList?.nomStructure || '',
+    adresse: clientDataFromList?.adresse || '',
+    telephone: clientDataFromList?.telephone || '',
+    contactPrincipal: clientDataFromList?.contactPrincipal || '',
+    emailFacturation: clientDataFromList?.emailFacturation || ''
   });
 
   // Champs Operateur
@@ -547,6 +580,7 @@ const Users: React.FC = () => {
   const [selectedAdminUser, setSelectedAdminUser] = useState<Utilisateur | null>(null);
   const [editingUser, setEditingUser] = useState<Utilisateur | null>(null);
   const [deleteUserId, setDeleteUserId] = useState<number | null>(null);
+  const [openActionMenu, setOpenActionMenu] = useState<number | null>(null);
 
   // Handler pour la sélection du type d'utilisateur
   const handleUserTypeSelect = (type: NomRole) => {
@@ -628,23 +662,9 @@ const Users: React.FC = () => {
   };
 
   const handleRowClick = (user: Utilisateur) => {
-    // Navigate to appropriate detail page based on role
-    if (user.roles.includes('CLIENT')) {
-      // Find the client record to get the correct ID
-      const clientData = clients.find(c => c.utilisateur === user.id);
-      if (clientData) {
-        navigate(`/clients/${clientData.utilisateur}`);
-      }
-    } else if (user.roles.includes('SUPERVISEUR')) {
-      // SUPERVISEUR users: For now, show modal (could create a SuperviseurDetailPage later)
-      setSelectedAdminUser(user);
-    } else if (user.roles.includes('ADMIN')) {
-      // Show modal for admins
-      setSelectedAdminUser(user);
-    } else {
-      // Fallback: show admin modal
-      setSelectedAdminUser(user);
-    }
+    // Show detail modal for all user types
+    // UserDetailModalSelector will choose the appropriate modal based on role
+    setSelectedAdminUser(user);
   };
 
   // Filtre par rôle (dropdown)
@@ -675,29 +695,33 @@ const Users: React.FC = () => {
   // Columns - Mêmes colonnes pour tous les onglets (affichage des infos utilisateur)
   const columns = [
     {
-      key: 'fullName',
-      label: 'Nom',
+      key: 'prenom',
+      label: 'Prénom',
       render: (u: Utilisateur) => (
         <div className="flex items-center gap-3">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${u.roles.includes('ADMIN') ? 'bg-purple-100' :
             u.roles.includes('SUPERVISEUR') ? 'bg-blue-100' :
-              u.roles.includes('SUPERVISEUR') ? 'bg-yellow-100' :
-                u.roles.includes('CLIENT') ? 'bg-green-100' : 'bg-gray-100'
+              u.roles.includes('CLIENT') ? 'bg-green-100' : 'bg-gray-100'
             }`}>
             {u.roles.includes('ADMIN') ? (
               <Shield className="w-4 h-4 text-purple-600" />
             ) : u.roles.includes('SUPERVISEUR') ? (
               <UserCheck className="w-4 h-4 text-blue-600" />
-            ) : u.roles.includes('SUPERVISEUR') ? (
-              <Award className="w-4 h-4 text-yellow-600" />
             ) : (
               <Building2 className="w-4 h-4 text-green-600" />
             )}
           </div>
-          <div>
-            <p className="font-medium text-gray-900">{u.fullName}</p>
-            <p className="text-xs text-gray-500">{u.email}</p>
-          </div>
+          <span className="font-medium text-gray-900">{u.prenom}</span>
+        </div>
+      )
+    },
+    {
+      key: 'nom',
+      label: 'Nom',
+      render: (u: Utilisateur) => (
+        <div>
+          <p className="font-medium text-gray-900">{u.nom}</p>
+          <p className="text-xs text-gray-500">{u.email}</p>
         </div>
       )
     },
@@ -896,27 +920,65 @@ const Users: React.FC = () => {
               key: 'actions',
               label: 'Actions',
               render: (user) => (
-                <div className="flex gap-2">
+                <div className="relative">
                   <button
-                    className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-                    title="Modifier"
-                    onClick={e => {
-                      e.stopPropagation();
-                      setEditingUser(user);
-                    }}
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    className="p-1 text-red-600 hover:bg-red-100 rounded"
-                    title="Supprimer"
+                    className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Actions"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setDeleteUserId(Number(user.id));
+                      setOpenActionMenu(openActionMenu === user.id ? null : user.id);
                     }}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <MoreVertical className="w-4 h-4" />
                   </button>
+
+                  {openActionMenu === user.id && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenActionMenu(null);
+                        }}
+                      />
+                      <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                        <button
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRowClick(user);
+                            setOpenActionMenu(null);
+                          }}
+                        >
+                          <Eye className="w-4 h-4 text-gray-500" />
+                          Voir les détails
+                        </button>
+                        <button
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingUser(user);
+                            setOpenActionMenu(null);
+                          }}
+                        >
+                          <Edit2 className="w-4 h-4 text-blue-500" />
+                          Modifier
+                        </button>
+                        <hr className="my-1 border-gray-100" />
+                        <button
+                          className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteUserId(Number(user.id));
+                            setOpenActionMenu(null);
+                          }}
+                        >
+                          <UserX className="w-4 h-4" />
+                          Désactiver
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               ),
               sortable: false
@@ -964,8 +1026,10 @@ const Users: React.FC = () => {
       )}
 
       {selectedAdminUser && (
-        <AdminDetailModal
+        <UserDetailModalSelector
           user={selectedAdminUser}
+          clients={clients}
+          operateurs={operateurs}
           onClose={() => setSelectedAdminUser(null)}
           onEdit={(user) => {
             setSelectedAdminUser(null);
@@ -987,14 +1051,14 @@ const Users: React.FC = () => {
 
       {deleteUserId && (
         <ConfirmDeleteModal
-          title="Supprimer l'utilisateur ?"
-          message="Êtes-vous sûr de vouloir supprimer cet utilisateur ? Cette action est irréversible."
+          title="Désactiver l'utilisateur ?"
+          message="Êtes-vous sûr de vouloir désactiver cet utilisateur ? Son compte ne sera plus accessible."
           onConfirm={async () => {
             await deleteUtilisateur(deleteUserId);
             loadData();
           }}
           onCancel={() => setDeleteUserId(null)}
-          confirmText="Supprimer"
+          confirmText="Désactiver"
           cancelText="Annuler"
         />
       )}

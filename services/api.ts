@@ -91,8 +91,10 @@ export interface SiteGeoJSON {
   properties: {
     nom_site: string
     code_site: string
-    client: number
+    client?: number
     client_nom?: string
+    structure_client?: number
+    structure_client_nom?: string
     superviseur?: number
     superviseur_nom?: string
     adresse?: string
@@ -129,6 +131,8 @@ export interface SiteFrontend {
   code_site?: string
   client?: number
   client_nom?: string
+  structure_client?: number
+  structure_client_nom?: string
   superviseur?: number
   superviseur_nom?: string
   adresse?: string
@@ -237,6 +241,8 @@ function transformSiteToFrontend(site: SiteGeoJSON, index: number): SiteFrontend
     code_site: site.properties.code_site,
     client: site.properties.client,
     client_nom: site.properties.client_nom,
+    structure_client: site.properties.structure_client,
+    structure_client_nom: site.properties.structure_client_nom,
     superviseur: site.properties.superviseur,
     superviseur_nom: site.properties.superviseur_nom,
     adresse: site.properties.adresse,
@@ -490,6 +496,7 @@ export interface UpdateSiteData {
   nom_site?: string
   code_site?: string
   client?: number
+  structure_client?: number
   superviseur?: number | null
   adresse?: string
   superficie_totale?: number | null
@@ -529,6 +536,8 @@ export async function updateSite(id: number, data: UpdateSiteData): Promise<Site
       code_site: result.properties?.code_site,
       client: result.properties?.client,
       client_nom: result.properties?.client_nom,
+      structure_client: result.properties?.structure_client,
+      structure_client_nom: result.properties?.structure_client_nom,
       superviseur: result.properties?.superviseur,
       superviseur_nom: result.properties?.superviseur_nom,
       adresse: result.properties?.adresse,

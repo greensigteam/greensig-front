@@ -18,19 +18,20 @@ import {
     Calendar,
     Ruler,
     Hash,
-    CheckCircle,
-    AlertCircle,
     Building2,
     BarChart3,
     TrendingUp,
     Droplet,
     Trees,
     Users,
+    UsersRound,
     Plus,
     Search,
     X as XIcon,
-    Loader2
+    Loader2,
+    UserMinus
 } from 'lucide-react';
+import { StatusBadge } from '../components/StatusBadge';
 import {
     BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
@@ -87,17 +88,42 @@ const ErrorDisplay: React.FC<{ message: string }> = ({ message }) => (
 );
 
 const StatCard: React.FC<{ title: string; value: string | number; icon: React.ReactNode; color: string }> = ({ title, value, icon, color }) => (
-    <div className="bg-white p-6 rounded-xl border shadow-sm hover:shadow-md transition-shadow">
+    <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
         <div className="flex items-center justify-between">
             <div>
-                <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
-                <p className="text-3xl font-bold text-gray-900">{value}</p>
+                <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
+                <p className="text-3xl font-bold text-slate-800">{value}</p>
             </div>
             <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${color}`}>
                 {icon}
             </div>
         </div>
     </div>
+);
+
+const TabButton: React.FC<{
+    active: boolean;
+    onClick: () => void;
+    icon: React.ReactNode;
+    label: string;
+    badge?: number;
+}> = ({ active, onClick, icon, label, badge }) => (
+    <button
+        onClick={onClick}
+        className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
+            active
+                ? 'border-emerald-600 text-emerald-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+        }`}
+    >
+        {icon}
+        <span className="font-medium text-sm">{label}</span>
+        {badge !== undefined && badge > 0 && (
+            <span className="ml-1 px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-full">
+                {badge}
+            </span>
+        )}
+    </button>
 );
 
 const SiteDetailPage: React.FC = () => {
@@ -108,7 +134,7 @@ const SiteDetailPage: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<'info' | 'stats'>('info');
+    const [activeTab, setActiveTab] = useState<'info' | 'equipes' | 'stats'>('info');
     const [statistics, setStatistics] = useState<any>(null);
     const [isLoadingStats, setIsLoadingStats] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -384,26 +410,28 @@ const SiteDetailPage: React.FC = () => {
     return (
         <div className="h-full bg-white flex flex-col">
             {/* Header */}
-            <header className="flex-shrink-0 bg-white border-b p-4 flex justify-between items-center">
+            <header className="flex-shrink-0 bg-white border-b border-slate-200 p-4 flex justify-between items-center">
                 <div className="flex items-center gap-4">
-                    <Link to="/sites" className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Retour à la liste">
+                    <Link to="/sites" className="p-2 hover:bg-slate-100 rounded-lg transition-colors" title="Retour à la liste">
                         <ChevronLeft className="w-6 h-6" />
                     </Link>
                     <div className="flex items-center gap-3">
-                        <div className={`w-12 h-12 rounded-lg flex items-center justify-center bg-gray-100`} style={{ backgroundColor: `${site.color}20` }}>
+                        <div className={`w-12 h-12 rounded-lg flex items-center justify-center bg-slate-100`} style={{ backgroundColor: `${site.color}20` }}>
                             <Building2 className="w-6 h-6" style={{ color: site.color }} />
                         </div>
                         <div>
-                            <h1 className="text-xl font-bold text-gray-900">{site.name}</h1>
-                            <div className="flex items-center gap-2 text-sm text-gray-500">
-                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200">
+                            <h1 className="text-xl font-bold text-slate-800">{site.name}</h1>
+                            <div className="flex items-center gap-2 text-sm text-slate-500">
+                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
                                     {site.category}
                                 </span>
                                 <span>•</span>
-                                <span className={`inline-flex items-center gap-1 ${site.actif ? 'text-emerald-600' : 'text-gray-400'}`}>
-                                    {site.actif ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
-                                    {site.actif ? 'Actif' : 'Inactif'}
-                                </span>
+                                <StatusBadge
+                                    variant="boolean"
+                                    value={site.actif}
+                                    labels={{ true: 'Actif', false: 'Inactif' }}
+                                    size="xs"
+                                />
                             </div>
                         </div>
                     </div>
@@ -411,7 +439,7 @@ const SiteDetailPage: React.FC = () => {
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => setIsEditModalOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors"
                     >
                         <Edit className="w-4 h-4" />
                         Modifier
@@ -437,54 +465,60 @@ const SiteDetailPage: React.FC = () => {
             </header>
 
             {/* Tabs */}
-            <div className="flex-shrink-0 bg-white border-b px-6">
-                <div className="flex gap-4">
-                    <button
-                        onClick={() => setActiveTab('info')}
-                        className={`px-4 py-3 font-medium border-b-2 transition-colors ${activeTab === 'info'
-                            ? 'border-emerald-600 text-emerald-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
-                            }`}
-                    >
-                        <div className="flex items-center gap-2">
-                            <Info className="w-4 h-4" />
-                            Informations
-                        </div>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('stats')}
-                        className={`px-4 py-3 font-medium border-b-2 transition-colors ${activeTab === 'stats'
-                            ? 'border-emerald-600 text-emerald-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
-                            }`}
-                    >
-                        <div className="flex items-center gap-2">
-                            <BarChart3 className="w-4 h-4" />
-                            Statistiques
-                        </div>
-                    </button>
+            <div className="flex-shrink-0 bg-white border-b border-slate-100 px-6">
+                <div className="flex items-center justify-between gap-4 py-1">
+                    <div className="flex gap-4">
+                        <TabButton
+                            active={activeTab === 'info'}
+                            onClick={() => setActiveTab('info')}
+                            icon={<Info className="w-4 h-4" />}
+                            label="Général"
+                        />
+                        <TabButton
+                            active={activeTab === 'equipes'}
+                            onClick={() => setActiveTab('equipes')}
+                            icon={<UsersRound className="w-4 h-4" />}
+                            label="Équipes"
+                            badge={equipes.length}
+                        />
+                        <TabButton
+                            active={activeTab === 'stats'}
+                            onClick={() => setActiveTab('stats')}
+                            icon={<BarChart3 className="w-4 h-4" />}
+                            label="Statistiques"
+                        />
+                    </div>
+                    {activeTab === 'equipes' && currentUser?.roles?.includes('ADMIN') && (
+                        <button
+                            onClick={() => setShowAssignEquipeModal(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm text-sm font-medium"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Assigner une équipe
+                        </button>
+                    )}
                 </div>
             </div>
 
             {/* Main Content */}
-            <main className="flex-1 overflow-y-auto bg-gray-50/50">
+            <main className="flex-1 overflow-y-auto bg-slate-50">
                 {activeTab === 'info' ? (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
                         {/* Left Column - Details */}
                         <div className="md:col-span-2 space-y-6">
-                            <div className="bg-white p-6 rounded-xl border shadow-sm">
-                                <h2 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2 border-b pb-3">
+                            <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+                                <h2 className="text-lg font-semibold text-slate-800 mb-6 flex items-center gap-2 border-b border-slate-100 pb-3">
                                     <Info className="w-5 h-5 text-emerald-600" />
                                     Informations Générales
                                 </h2>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                     <div>
-                                        <dt className="flex items-center gap-2 text-sm font-medium text-gray-500 mb-1">
+                                        <dt className="flex items-center gap-2 text-xs font-medium text-slate-500 mb-1">
                                             <Users className="w-4 h-4" /> Client Propriétaire
                                         </dt>
                                         <dd className="flex items-center gap-2">
-                                            <div className="flex-1 text-base font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
+                                            <div className="flex-1 p-4 bg-slate-50 rounded-lg border border-slate-100 text-sm font-bold text-slate-800">
                                                 {(() => {
                                                     // If current user is the owner client, display "Vous-même"
                                                     if (currentUser &&
@@ -509,11 +543,11 @@ const SiteDetailPage: React.FC = () => {
                                     </div>
 
                                     <div>
-                                        <dt className="flex items-center gap-2 text-sm font-medium text-gray-500 mb-1">
+                                        <dt className="flex items-center gap-2 text-xs font-medium text-slate-500 mb-1">
                                             <Users className="w-4 h-4" /> Superviseur Affecté
                                         </dt>
                                         <dd className="flex items-center gap-2">
-                                            <div className="flex-1 text-base font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
+                                            <div className="flex-1 p-4 bg-slate-50 rounded-lg border border-slate-100 text-sm font-bold text-slate-800">
                                                 {site.superviseur_nom || 'Non assigné'}
                                             </div>
                                             {currentUser?.roles?.includes('ADMIN') && (
@@ -527,75 +561,30 @@ const SiteDetailPage: React.FC = () => {
                                             )}
                                         </dd>
                                     </div>
-                                    <div className="col-span-2">
-                                        <dt className="flex items-center justify-between text-sm font-medium text-gray-500 mb-2">
-                                            <span className="flex items-center gap-2">
-                                                <Users className="w-4 h-4" /> Équipes Affectées ({equipes.length})
-                                            </span>
-                                            {currentUser?.roles?.includes('ADMIN') && (
-                                                <button
-                                                    onClick={() => setShowAssignEquipeModal(true)}
-                                                    className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
-                                                    title="Assigner une équipe"
-                                                >
-                                                    <Plus className="w-3.5 h-3.5" />
-                                                </button>
-                                            )}
-                                        </dt>
-                                        <dd>
-                                            {isLoadingEquipes ? (
-                                                <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
-                                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                                    Chargement des équipes...
-                                                </div>
-                                            ) : equipes.length > 0 ? (
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    {equipes.map((equipe) => (
-                                                        <div
-                                                            key={equipe.id}
-                                                            className="flex items-center justify-between p-2 bg-purple-50 rounded-lg border border-purple-200"
-                                                        >
-                                                            <div>
-                                                                <p className="font-medium text-gray-900 text-sm">{equipe.nomEquipe}</p>
-                                                                <p className="text-xs text-gray-500">
-                                                                    {equipe.nombreMembres} membre{equipe.nombreMembres > 1 ? 's' : ''}
-                                                                    {equipe.chefEquipeNom ? ` • Chef: ${equipe.chefEquipeNom}` : ''}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <div className="text-base text-gray-500 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
-                                                    Aucune équipe affectée
-                                                </div>
-                                            )}
-                                        </dd>
-                                    </div>
 
                                     <div>
-                                        <dt className="flex items-center gap-2 text-sm font-medium text-gray-500 mb-1">
+                                        <dt className="flex items-center gap-2 text-xs font-medium text-slate-500 mb-1">
                                             <Hash className="w-4 h-4" /> Code Site
                                         </dt>
-                                        <dd className="text-base font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100 font-mono">
+                                        <dd className="p-4 bg-slate-50 rounded-lg border border-slate-100 text-sm font-bold text-slate-800 font-mono">
                                             {site.code_site || 'N/A'}
                                         </dd>
                                     </div>
 
                                     <div>
-                                        <dt className="flex items-center gap-2 text-sm font-medium text-gray-500 mb-1">
+                                        <dt className="flex items-center gap-2 text-xs font-medium text-slate-500 mb-1">
                                             <MapPin className="w-4 h-4" /> Adresse
                                         </dt>
-                                        <dd className="text-base text-gray-900 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
+                                        <dd className="p-4 bg-slate-50 rounded-lg border border-slate-100 text-sm font-bold text-slate-800">
                                             {site.adresse || 'N/A'}
                                         </dd>
                                     </div>
 
                                     <div>
-                                        <dt className="flex items-center gap-2 text-sm font-medium text-gray-500 mb-1">
+                                        <dt className="flex items-center gap-2 text-xs font-medium text-slate-500 mb-1">
                                             <Ruler className="w-4 h-4" /> Superficie Totale
                                         </dt>
-                                        <dd className="text-base font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
+                                        <dd className="p-4 bg-slate-50 rounded-lg border border-slate-100 text-sm font-bold text-slate-800">
                                             {site.superficie_totale
                                                 ? `${site.superficie_totale.toLocaleString('fr-FR')} m²`
                                                 : 'Non définie'
@@ -605,23 +594,23 @@ const SiteDetailPage: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="bg-white p-6 rounded-xl border shadow-sm">
-                                <h2 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2 border-b pb-3">
+                            <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+                                <h2 className="text-lg font-semibold text-slate-800 mb-6 flex items-center gap-2 border-b border-slate-100 pb-3">
                                     <Calendar className="w-5 h-5 text-emerald-600" />
                                     Contrat
                                 </h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                     <div>
-                                        <dt className="text-sm font-medium text-gray-500 mb-1">Date de début</dt>
-                                        <dd className="text-base text-gray-900">
+                                        <dt className="text-sm font-medium text-slate-500 mb-1">Date de début</dt>
+                                        <dd className="text-base text-slate-800">
                                             {site.date_debut_contrat
                                                 ? new Date(site.date_debut_contrat).toLocaleDateString('fr-FR')
                                                 : 'Non définie'}
                                         </dd>
                                     </div>
                                     <div>
-                                        <dt className="text-sm font-medium text-gray-500 mb-1">Date de fin</dt>
-                                        <dd className="text-base text-gray-900">
+                                        <dt className="text-sm font-medium text-slate-500 mb-1">Date de fin</dt>
+                                        <dd className="text-base text-slate-800">
                                             {site.date_fin_contrat
                                                 ? new Date(site.date_fin_contrat).toLocaleDateString('fr-FR')
                                                 : 'Non définie'}
@@ -633,12 +622,12 @@ const SiteDetailPage: React.FC = () => {
 
                         {/* Right Column - Map */}
                         <div className="space-y-6">
-                            <div className="bg-white p-4 rounded-xl border shadow-sm h-full flex flex-col">
-                                <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                            <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm h-full flex flex-col">
+                                <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
                                     <MapPin className="w-5 h-5 text-emerald-600" />
                                     Localisation
                                 </h2>
-                                <div className="flex-1 min-h-[300px] rounded-lg overflow-hidden border">
+                                <div className="flex-1 min-h-[300px] rounded-lg overflow-hidden border border-slate-100">
                                     <OLMap
                                         isMiniMap={true}
                                         activeLayer={MAP_LAYERS.SATELLITE}
@@ -662,53 +651,170 @@ const SiteDetailPage: React.FC = () => {
                                         }}
                                     />
                                 </div>
-                                <p className="text-xs text-gray-500 mt-2 text-center">
+                                <p className="text-xs text-slate-500 mt-2 text-center">
                                     Cliquez pour voir sur la carte principale
                                 </p>
                             </div>
                         </div>
                     </div>
+                ) : activeTab === 'equipes' ? (
+                    /* Onglet Équipes */
+                    <div className="p-6">
+                        {isLoadingEquipes ? (
+                            <div className="flex items-center justify-center py-12">
+                                <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+                            </div>
+                        ) : equipes.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {equipes.map((equipe) => (
+                                    <div
+                                        key={equipe.id}
+                                        className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow group"
+                                    >
+                                        <div className="flex items-start justify-between mb-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center">
+                                                    <UsersRound className="w-6 h-6 text-purple-600" />
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-bold text-slate-800">{equipe.nomEquipe}</h3>
+                                                    <p className="text-sm text-slate-500">
+                                                        {equipe.nombreMembres} membre{equipe.nombreMembres > 1 ? 's' : ''}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            {currentUser?.roles?.includes('ADMIN') && (
+                                                <button
+                                                    onClick={async () => {
+                                                        try {
+                                                            await updateEquipe(equipe.id, { site: null });
+                                                            showToast('Équipe désassignée avec succès', 'success');
+                                                            setRefreshKey(prev => prev + 1);
+                                                        } catch (error) {
+                                                            showToast('Erreur lors de la désassignation', 'error');
+                                                        }
+                                                    }}
+                                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                    title="Désassigner cette équipe"
+                                                >
+                                                    <UserMinus className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {equipe.chefEquipeNom && (
+                                            <div className="mb-3 p-3 bg-slate-50 rounded-lg">
+                                                <p className="text-xs font-medium text-slate-500 mb-1">Chef d'équipe</p>
+                                                <p className="text-sm font-bold text-slate-800">{equipe.chefEquipeNom}</p>
+                                            </div>
+                                        )}
+
+                                        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                                            <StatusBadge
+                                                variant="boolean"
+                                                value={equipe.nombreMembres > 0}
+                                                labels={{ true: 'Active', false: 'Vide' }}
+                                                size="xs"
+                                            />
+                                            <button
+                                                onClick={() => navigate(`/teams?equipe=${equipe.id}`)}
+                                                className="text-xs text-emerald-600 font-medium hover:underline"
+                                            >
+                                                Voir détails
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-12 text-center">
+                                <UsersRound className="w-16 h-16 text-slate-200 mx-auto mb-4" />
+                                <h3 className="text-lg font-bold text-slate-800 mb-2">Aucune équipe affectée</h3>
+                                <p className="text-slate-500 mb-6">
+                                    Ce site n'a pas encore d'équipes assignées pour les interventions.
+                                </p>
+                                {currentUser?.roles?.includes('ADMIN') && (
+                                    <button
+                                        onClick={() => setShowAssignEquipeModal(true)}
+                                        className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        Assigner une équipe
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 ) : (
+                    /* Onglet Statistiques */
                     <div className="p-6">
                         {isLoadingStats ? (
-                            <div className="fixed inset-0 z-50">
-                                <LoadingScreen isLoading={true} loop={true} minDuration={0} />
+                            /* Loading skeleton style Dashboard */
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    {Array.from({ length: 4 }).map((_, idx) => (
+                                        <div key={idx} className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm animate-pulse">
+                                            <div className="h-4 bg-slate-200 rounded w-2/3 mb-3"></div>
+                                            <div className="h-8 bg-slate-200 rounded w-1/2"></div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {Array.from({ length: 2 }).map((_, idx) => (
+                                        <div key={idx} className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm animate-pulse">
+                                            <div className="h-5 bg-slate-200 rounded w-1/3 mb-4"></div>
+                                            <div className="h-64 bg-slate-100 rounded"></div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         ) : statistics ? (
                             <div className="space-y-6">
-                                {/* Overview Cards */}
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                    <StatCard
-                                        title="Total Objets"
-                                        value={statistics.total_objects}
-                                        icon={<BarChart3 className="w-6 h-6 text-white" />}
-                                        color="bg-emerald-600"
-                                    />
-                                    <StatCard
-                                        title="Végétation"
-                                        value={statistics.vegetation.total}
-                                        icon={<Trees className="w-6 h-6 text-white" />}
-                                        color="bg-green-600"
-                                    />
-                                    <StatCard
-                                        title="Hydraulique"
-                                        value={statistics.hydraulique.total}
-                                        icon={<Droplet className="w-6 h-6 text-white" />}
-                                        color="bg-blue-600"
-                                    />
-                                    <StatCard
-                                        title="Maintenance Urgente"
-                                        value={statistics.interventions.urgent_maintenance}
-                                        icon={<TrendingUp className="w-6 h-6 text-white" />}
-                                        color="bg-orange-600"
-                                    />
+                                {/* KPI Cards - style Dashboard */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+                                        <div className="text-sm font-medium text-slate-500 mb-1">Total Objets</div>
+                                        <div className="flex items-end justify-between">
+                                            <div className="text-3xl font-bold text-slate-800">{statistics.total_objects}</div>
+                                        </div>
+                                        <div className="absolute top-4 right-4 p-2 bg-emerald-50 rounded-lg">
+                                            <BarChart3 className="w-5 h-5 text-emerald-600" />
+                                        </div>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+                                        <div className="text-sm font-medium text-slate-500 mb-1">Végétation</div>
+                                        <div className="flex items-end justify-between">
+                                            <div className="text-3xl font-bold text-slate-800">{statistics.vegetation.total}</div>
+                                        </div>
+                                        <div className="absolute top-4 right-4 p-2 bg-green-50 rounded-lg">
+                                            <Trees className="w-5 h-5 text-green-600" />
+                                        </div>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+                                        <div className="text-sm font-medium text-slate-500 mb-1">Hydraulique</div>
+                                        <div className="flex items-end justify-between">
+                                            <div className="text-3xl font-bold text-slate-800">{statistics.hydraulique.total}</div>
+                                        </div>
+                                        <div className="absolute top-4 right-4 p-2 bg-blue-50 rounded-lg">
+                                            <Droplet className="w-5 h-5 text-blue-600" />
+                                        </div>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+                                        <div className="text-sm font-medium text-slate-500 mb-1">Maintenance Urgente</div>
+                                        <div className="flex items-end justify-between">
+                                            <div className="text-3xl font-bold text-slate-800">{statistics.interventions.urgent_maintenance}</div>
+                                        </div>
+                                        <div className="absolute top-4 right-4 p-2 bg-orange-50 rounded-lg">
+                                            <TrendingUp className="w-5 h-5 text-orange-600" />
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {/* Charts Section - Bar Charts for Types */}
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                     {/* Vegetation by Type - Bar Chart */}
-                                    <div className="bg-white p-6 rounded-xl border shadow-sm">
-                                        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                                    <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+                                        <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
                                             <Trees className="w-5 h-5 text-green-600" />
                                             Végétation par Type
                                         </h3>
@@ -738,8 +844,8 @@ const SiteDetailPage: React.FC = () => {
                                     </div>
 
                                     {/* Hydraulic by Type - Bar Chart */}
-                                    <div className="bg-white p-6 rounded-xl border shadow-sm">
-                                        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                                    <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+                                        <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
                                             <Droplet className="w-5 h-5 text-blue-600" />
                                             Hydraulique par Type
                                         </h3>
@@ -772,8 +878,8 @@ const SiteDetailPage: React.FC = () => {
                                 {/* Pie Charts for State Distribution */}
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                     {/* Vegetation State - Pie Chart */}
-                                    <div className="bg-white p-6 rounded-xl border shadow-sm">
-                                        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                                    <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+                                        <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
                                             <Trees className="w-5 h-5 text-green-600" />
                                             État Végétation
                                         </h3>
@@ -804,7 +910,7 @@ const SiteDetailPage: React.FC = () => {
                                                     </PieChart>
                                                 </ResponsiveContainer>
                                             ) : (
-                                                <div className="flex items-center justify-center h-full text-gray-400">
+                                                <div className="flex items-center justify-center h-full text-slate-400">
                                                     Aucune donnée
                                                 </div>
                                             )}
@@ -814,7 +920,7 @@ const SiteDetailPage: React.FC = () => {
                                             {Object.entries(statistics.vegetation.by_state).map(([state, count]: [string, any]) => (
                                                 <div key={state} className="flex items-center gap-2">
                                                     <span className="w-3 h-3 rounded-full" style={{ backgroundColor: STATE_COLORS[state] }}></span>
-                                                    <span className="text-sm text-gray-600 capitalize">{state}:</span>
+                                                    <span className="text-sm text-slate-600 capitalize">{state}:</span>
                                                     <span className="text-sm font-semibold">{count}</span>
                                                 </div>
                                             ))}
@@ -822,8 +928,8 @@ const SiteDetailPage: React.FC = () => {
                                     </div>
 
                                     {/* Hydraulic State - Pie Chart */}
-                                    <div className="bg-white p-6 rounded-xl border shadow-sm">
-                                        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                                    <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+                                        <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
                                             <Droplet className="w-5 h-5 text-blue-600" />
                                             État Hydraulique
                                         </h3>
@@ -854,7 +960,7 @@ const SiteDetailPage: React.FC = () => {
                                                     </PieChart>
                                                 </ResponsiveContainer>
                                             ) : (
-                                                <div className="flex items-center justify-center h-full text-gray-400">
+                                                <div className="flex items-center justify-center h-full text-slate-400">
                                                     Aucune donnée
                                                 </div>
                                             )}
@@ -864,7 +970,7 @@ const SiteDetailPage: React.FC = () => {
                                             {Object.entries(statistics.hydraulique.by_state).map(([state, count]: [string, any]) => (
                                                 <div key={state} className="flex items-center gap-2">
                                                     <span className="w-3 h-3 rounded-full" style={{ backgroundColor: STATE_COLORS[state] }}></span>
-                                                    <span className="text-sm text-gray-600 capitalize">{state}:</span>
+                                                    <span className="text-sm text-slate-600 capitalize">{state}:</span>
                                                     <span className="text-sm font-semibold">{count}</span>
                                                 </div>
                                             ))}
@@ -874,8 +980,8 @@ const SiteDetailPage: React.FC = () => {
 
                                 {/* Top Families - Bar Chart */}
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    <div className="bg-white p-6 rounded-xl border shadow-sm">
-                                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Top Familles de Végétation</h3>
+                                    <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+                                        <h3 className="text-lg font-semibold text-slate-800 mb-4">Top Familles de Végétation</h3>
                                         {statistics.vegetation.by_family.length > 0 ? (
                                             <div className="h-64">
                                                 <ResponsiveContainer width="100%" height="100%">
@@ -896,15 +1002,15 @@ const SiteDetailPage: React.FC = () => {
                                                 </ResponsiveContainer>
                                             </div>
                                         ) : (
-                                            <div className="h-64 flex items-center justify-center text-gray-400">
+                                            <div className="h-64 flex items-center justify-center text-slate-400">
                                                 Aucune famille enregistrée
                                             </div>
                                         )}
                                     </div>
 
                                     {/* Intervention Stats - Pie Chart */}
-                                    <div className="bg-white p-6 rounded-xl border shadow-sm">
-                                        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                                    <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+                                        <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
                                             <TrendingUp className="w-5 h-5 text-orange-600" />
                                             Répartition des Interventions
                                         </h3>
@@ -939,7 +1045,7 @@ const SiteDetailPage: React.FC = () => {
                                                     </PieChart>
                                                 </ResponsiveContainer>
                                             ) : (
-                                                <div className="flex items-center justify-center h-full text-gray-400">
+                                                <div className="flex items-center justify-center h-full text-slate-400">
                                                     Aucune donnée d'intervention
                                                 </div>
                                             )}
@@ -948,30 +1054,34 @@ const SiteDetailPage: React.FC = () => {
                                 </div>
 
                                 {/* Intervention Statistics */}
-                                <div className="bg-white p-6 rounded-xl border shadow-sm">
-                                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                                <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+                                    <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
                                         <TrendingUp className="w-5 h-5 text-orange-600" />
                                         Statistiques d'Intervention
                                     </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div className="p-4 bg-gray-50 rounded-lg">
-                                            <p className="text-sm text-gray-500 mb-1">Jamais intervenu</p>
-                                            <p className="text-2xl font-bold text-gray-900">{statistics.interventions.never_intervened}</p>
+                                        <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                                            <p className="text-sm text-slate-500 mb-1">Jamais intervenu</p>
+                                            <p className="text-2xl font-bold text-slate-800">{statistics.interventions.never_intervened}</p>
                                         </div>
-                                        <div className="p-4 bg-orange-50 rounded-lg">
+                                        <div className="p-4 bg-orange-50 rounded-lg border border-orange-100">
                                             <p className="text-sm text-orange-600 mb-1">Maintenance urgente (&gt; 6 mois)</p>
                                             <p className="text-2xl font-bold text-orange-700">{statistics.interventions.urgent_maintenance}</p>
                                         </div>
-                                        <div className="p-4 bg-green-50 rounded-lg">
-                                            <p className="text-sm text-green-600 mb-1">Derniers 30 jours</p>
-                                            <p className="text-2xl font-bold text-green-700">{statistics.interventions.last_30_days}</p>
+                                        <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-100">
+                                            <p className="text-sm text-emerald-600 mb-1">Derniers 30 jours</p>
+                                            <p className="text-2xl font-bold text-emerald-700">{statistics.interventions.last_30_days}</p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         ) : (
-                            <div className="text-center text-gray-500 py-12">
-                                Aucune statistique disponible
+                            <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-12 text-center">
+                                <BarChart3 className="w-16 h-16 text-slate-200 mx-auto mb-4" />
+                                <h3 className="text-lg font-bold text-slate-800 mb-2">Aucune statistique disponible</h3>
+                                <p className="text-slate-500">
+                                    Les statistiques de ce site ne sont pas encore disponibles.
+                                </p>
                             </div>
                         )}
                     </div>
