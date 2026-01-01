@@ -113,24 +113,24 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
   };
 
   return (
-    <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200/60 shadow-sm flex items-center justify-between px-6 z-20 shrink-0 transition-all duration-300 sticky top-0">
-      
+    <header className="h-16 md:h-20 bg-white/80 backdrop-blur-md border-b border-slate-200/60 shadow-sm flex items-center justify-between px-3 md:px-6 z-20 shrink-0 transition-all duration-300 sticky top-0">
+
       {/* LEFT: Title & Breadcrumbs */}
-      <div className="flex flex-col justify-center min-w-0 w-1/4">
-        <h2 className="text-base md:text-lg font-bold text-slate-800 tracking-tight truncate leading-tight">
+      <div className="flex flex-col justify-center min-w-0 shrink-0">
+        <h2 className="text-sm md:text-lg font-bold text-slate-800 tracking-tight truncate leading-tight">
           {VIEW_TITLES[currentView] || 'GreenSIG'}
         </h2>
-        <div className="flex items-center gap-1.5 text-[10px] md:text-xs text-slate-500 truncate">
-          <span className="text-slate-400 hidden sm:inline">GreenSIG</span>
-          <span className="hidden sm:inline text-slate-300">/</span>
+        <div className="hidden sm:flex items-center gap-1.5 text-[10px] md:text-xs text-slate-500 truncate">
+          <span className="text-slate-400">GreenSIG</span>
+          <span className="text-slate-300">/</span>
           <span className="font-medium text-emerald-600 truncate">
             {currentView ? (currentView.charAt(0) + currentView.slice(1).toLowerCase()) : ''}
           </span>
         </div>
       </div>
 
-      {/* CENTER: Search Bar */}
-      <div className="flex-1 flex justify-center max-w-2xl px-4">
+      {/* CENTER: Search Bar - Hidden on small screens, shown on md+ */}
+      <div className="hidden md:flex flex-1 justify-center max-w-2xl px-4">
         {!hideSearch && (
           <div className={`relative w-full group transition-all duration-300 ease-out ${isFocused ? 'scale-[1.02] -translate-y-0.5' : ''}`}>
             <div className={`absolute inset-0 bg-emerald-500/5 rounded-xl blur-sm transition-opacity duration-300 ${isFocused ? 'opacity-100' : 'opacity-0'}`}></div>
@@ -176,9 +176,19 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
       </div>
 
       {/* RIGHT: Actions & Profile */}
-      <div className="flex items-center justify-end gap-3 md:gap-5 w-1/4">
-        {/* Real-time Clock - Casablanca/Morocco timezone */}
-        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-200">
+      <div className="flex items-center justify-end gap-2 md:gap-4 shrink-0">
+        {/* Mobile Search Button - Only shown on small screens */}
+        {!hideSearch && (
+          <button
+            onClick={() => setMobileSearchOpen(true)}
+            className="md:hidden p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-all duration-200"
+          >
+            <Search className="w-5 h-5" />
+          </button>
+        )}
+
+        {/* Real-time Clock - Hidden on small screens */}
+        <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-200">
           <Clock className="w-4 h-4 text-emerald-600" />
           <div className="flex flex-col">
             <span className="text-sm font-semibold text-slate-700 tabular-nums">
@@ -190,25 +200,25 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
           </div>
         </div>
 
-        <button className="relative p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-all duration-200 group">
+        <button className="relative p-2 md:p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-all duration-200 group">
           <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
-          <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white shadow-sm"></span>
+          <span className="absolute top-2 right-2 md:top-2.5 md:right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white shadow-sm"></span>
         </button>
 
-        <div className="flex items-center gap-3 pl-4 border-l border-slate-200/60 h-10">
+        <div className="flex items-center gap-2 md:gap-3 pl-2 md:pl-4 border-l border-slate-200/60 h-10">
           <div className="hidden md:flex flex-col items-end">
             <span className="text-xs font-bold text-slate-700 leading-none mb-0.5">{user.name}</span>
             <span className="text-[10px] font-medium text-emerald-600 uppercase tracking-wide bg-emerald-50 px-2 py-0.5 rounded-full">{user.role}</span>
           </div>
-          <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center text-white font-bold shadow-md shadow-emerald-500/20 ring-2 ring-white text-sm cursor-pointer hover:scale-105 transition-transform duration-200">
+          <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center text-white font-bold shadow-md shadow-emerald-500/20 ring-2 ring-white text-xs md:text-sm cursor-pointer hover:scale-105 transition-transform duration-200">
             {user.avatar || (user.name ? user.name.charAt(0) : '')}
           </div>
         </div>
 
-        <div className="pl-2">
+        <div className="pl-1 md:pl-2">
           <Link
             to="/map"
-            className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+            className="p-2 md:p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
             title="Fermer le panneau"
           >
             <X className="w-5 h-5" />

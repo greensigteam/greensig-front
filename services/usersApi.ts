@@ -631,48 +631,11 @@ export async function fetchOperateursDisponibles(): Promise<OperateurList[]> {
 }
 
 export async function fetchChefsPotentiels(): Promise<OperateurList[]> {
-  // Récupérer les opérateurs pouvant être chef d'équipe (par compétence "Gestion d'équipe")
-  // Note: Les chefs d'équipe sont des opérateurs (données RH), pas des utilisateurs
+  // Récupérer uniquement les opérateurs pouvant être chef d'équipe
+  // Les superviseurs sont des UTILISATEURS (comptes de connexion), pas des opérateurs (données RH)
+  // Ils ne doivent PAS apparaître dans cette liste
   const operateursRes = await fetchApi<OperateurList[]>(`${USERS_API_URL}/operateurs/chefs_potentiels/`);
-
-  // Les superviseurs (utilisateurs) ne sont PAS des opérateurs, donc on ne les inclut pas ici
-  const usersRes = await fetchApi<PaginatedResponse<Utilisateur>>(
-    `${USERS_API_URL}/utilisateurs/?role=SUPERVISEUR&actif=true`
-  ).catch(() => ({ count: 0, next: null, previous: null, results: [] } as PaginatedResponse<Utilisateur>));
-
-  const usersAsOperateurs: OperateurList[] = (usersRes && usersRes.results ? usersRes.results : []).map(u => ({
-    utilisateur: u.id,
-    email: u.email,
-    nom: u.nom,
-    prenom: u.prenom,
-    fullName: u.fullName || `${u.prenom} ${u.nom}`,
-    actif: u.actif,
-    numeroImmatriculation: '',
-    statut: null as any,
-    equipe: null as any,
-    equipeNom: null as any,
-    dateEmbauche: null as any,
-    telephone: '',
-    photo: null as any,
-    estChefEquipe: true,
-    estDisponible: false
-  }));
-
-  // Merge unique by `utilisateur` id
-  const merged: OperateurList[] = [];
-  const seen = new Set<number>();
-  for (const op of operateursRes) {
-    merged.push(op);
-    seen.add(op.utilisateur);
-  }
-  for (const u of usersAsOperateurs) {
-    if (!seen.has(u.utilisateur)) {
-      merged.push(u);
-      seen.add(u.utilisateur);
-    }
-  }
-
-  return merged;
+  return operateursRes;
 }
 
 export async function fetchCompetencesOperateur(

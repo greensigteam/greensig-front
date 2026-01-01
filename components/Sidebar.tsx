@@ -84,7 +84,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'DASHBOARD', label: 'Tableau de bord', icon: LayoutDashboard, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'MAP', label: 'Cartographie', icon: MapIcon, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['ADMIN', 'SUPERVISEUR'] },
-    { id: 'SITES', label: 'Gestion des sites', icon: MapPin, roles: ['ADMIN'] },
+    { id: 'SITES', label: 'Gestion des sites', icon: MapPin, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'CLIENTS', label: 'Clients', icon: Users, roles: ['ADMIN'] },
     { id: 'PRODUCTS', label: 'Gestion de produits', icon: Package, roles: ['ADMIN'] },
     { id: 'PLANNING', label: 'Planification', icon: Calendar, roles: ['ADMIN', 'SUPERVISEUR'] },

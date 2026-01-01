@@ -22,7 +22,8 @@ import {
   NiveauCompetence,
   NIVEAU_COMPETENCE_LABELS,
   OperateurCreate,
-  ClientCreate
+  ClientCreate,
+  SuperviseurCreate
 } from '../../types/users';
 import {
   fetchRoles,
@@ -558,7 +559,6 @@ export const CreateChefEquipeModal: React.FC<CreateModalProps> = ({ onClose, onC
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [roleObjects, setRoleObjects] = useState<Role[]>([]);
 
   const [formData, setFormData] = useState({
     email: '',
@@ -569,10 +569,6 @@ export const CreateChefEquipeModal: React.FC<CreateModalProps> = ({ onClose, onC
     matricule: '',
     telephone: ''
   });
-
-  useEffect(() => {
-    fetchRoles().then(setRoleObjects);
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -595,37 +591,21 @@ export const CreateChefEquipeModal: React.FC<CreateModalProps> = ({ onClose, onC
 
     setLoading(true);
     try {
-      // 1. Créer l'utilisateur (avec compte de connexion)
-      const utilisateurData = {
+      // Utiliser l'endpoint superviseurs/ qui crée automatiquement :
+      // 1. Le compte Utilisateur
+      // 2. Le profil Superviseur (avec matricule, téléphone, etc.)
+      // 3. L'attribution du rôle SUPERVISEUR
+      const superviseurData: SuperviseurCreate = {
         email: formData.email,
         nom: formData.nom,
         prenom: formData.prenom,
         password: formData.password,
-        passwordConfirm: formData.passwordConfirm,
-        actif: true
+        matricule: formData.matricule,
+        telephone: formData.telephone || undefined,
+        date_prise_fonction: new Date().toISOString().split('T')[0]
       };
 
-      const utilisateurResponse = await createUtilisateur(utilisateurData);
-      const utilisateurId = utilisateurResponse.id;
-
-      // 2. Attribuer le rôle SUPERVISEUR
-      const chefRole = roleObjects.find(r => r.nomRole === 'SUPERVISEUR');
-      if (chefRole && utilisateurId) {
-        await attribuerRole(String(utilisateurId), String(chefRole.id));
-      }
-
-      // 3. Créer l'opérateur lié pour les données RH (matricule, téléphone, etc.)
-      if (utilisateurId) {
-        const operateurData: OperateurCreate = {
-          nom: formData.nom,
-          prenom: formData.prenom,
-          email: formData.email,
-          numeroImmatriculation: formData.matricule,
-          dateEmbauche: new Date().toISOString().split('T')[0],
-          telephone: formData.telephone || ''
-        };
-        await createOperateur(operateurData);
-      }
+      await createSuperviseur(superviseurData);
 
       onCreated();
       onClose();

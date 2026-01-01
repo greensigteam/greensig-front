@@ -879,9 +879,14 @@ const Inventory: React.FC = () => {
       const filename = `inventaire_${new Date().toISOString().split('T')[0]}.xlsx`;
       downloadBlob(blob, filename);
       showToast("Export Excel réussi", "success");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erreur export Excel:", error);
-      showToast("Erreur lors de l'export Excel", "error");
+      // 404 = pas de données à exporter
+      if (error?.status === 404) {
+        showToast("Aucune donnée à exporter", "info");
+      } else {
+        showToast("Erreur lors de l'export Excel", "error");
+      }
     }
   };
 
@@ -924,9 +929,14 @@ const Inventory: React.FC = () => {
       const filename = `inventaire_${new Date().toISOString().split('T')[0]}.pdf`;
       downloadBlob(blob, filename);
       showToast("Export PDF réussi", "success");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erreur export PDF:", error);
-      showToast("Erreur lors de l'export PDF", "error");
+      // 404 = pas de données à exporter
+      if (error?.status === 404) {
+        showToast("Aucune donnée à exporter", "info");
+      } else {
+        showToast("Erreur lors de l'export PDF", "error");
+      }
     }
   };
 

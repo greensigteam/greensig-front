@@ -47,6 +47,7 @@ import CompetenceMatrix, { ViewMode } from '../components/CompetenceMatrix';
 
 // Modales extraites
 import CreateTeamModal from '../components/modals/CreateTeamModal';
+import CreateOperateurModal from '../components/modals/CreateOperateurModal';
 import EquipeDetailModal from '../components/modals/EquipeDetailModal';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import { OperateurDetailModal } from './OperateurDetailPage';
@@ -164,6 +165,7 @@ const Teams: React.FC = () => {
 
   // Modals
   const [showCreateTeam, setShowCreateTeam] = useState(false);
+  const [showCreateOperateur, setShowCreateOperateur] = useState(false);
   const [selectedEquipe, setSelectedEquipe] = useState<EquipeDetail | null>(null);
   const [selectedOperateur, setSelectedOperateur] = useState<OperateurDetail | null>(null);
   const [editingUser, setEditingUser] = useState<Utilisateur | null>(null);
@@ -184,6 +186,20 @@ const Teams: React.FC = () => {
     dateDebut: '',
     dateFin: ''
   });
+
+  // Filtres opérateurs
+  const [operateurFilters, setOperateurFilters] = useState<{
+    statut: string;
+    equipe: string;
+    estChef: string;
+    disponible: string;
+  }>({
+    statut: '',
+    equipe: '',
+    estChef: '',
+    disponible: ''
+  });
+  const [showOperateurFilters, setShowOperateurFilters] = useState(false);
 
   const [currentUser, setCurrentUser] = useState<Utilisateur | null>(null);
 
@@ -271,7 +287,7 @@ const Teams: React.FC = () => {
     try {
       switch (tab) {
         case 'equipes':
-          await loadEquipesData();
+          await loadEquipesData(equipesPage, true); // Force refresh to bypass cache
           break;
         case 'operateurs':
           await loadOperateursData();
@@ -291,16 +307,19 @@ const Teams: React.FC = () => {
     }
   };
 
-  const loadEquipesData = async (page: number = equipesPage) => {
-    console.log('[Teams] 🔄 Loading équipes data, page:', page);
+  const loadEquipesData = async (page: number = equipesPage, forceRefresh: boolean = false) => {
+    console.log('[Teams] 🔄 Loading équipes data, page:', page, 'forceRefresh:', forceRefresh);
     try {
       const [equipesRes, chefsPotentielsRes] = await Promise.all([
-        fetchEquipes({ page, pageSize: 50 }),
+        fetchEquipes({ page, pageSize: 50 }, forceRefresh),
         chefsPotentiels.length === 0 ? fetchChefsPotentiels() : Promise.resolve(chefsPotentiels)
       ]);
       console.log('[Teams] ✅ Équipes loaded:', equipesRes.results.length, 'équipes');
       console.log('[Teams] 📊 Équipes data:', equipesRes.results);
-      console.log('[Teams] 👤 First equipe superviseur data:', equipesRes.results[0]);
+      // Debug: Log superviseur data for each team
+      equipesRes.results.forEach((eq: EquipeList) => {
+        console.log(`[Teams] 📋 ${eq.nomEquipe}: superviseurNom="${eq.superviseurNom}", siteNom="${eq.siteNom}"`);
+      });
       setEquipes(equipesRes.results);
       setEquipesTotal(equipesRes.count || 0);
       if (chefsPotentiels.length === 0) {
@@ -312,12 +331,28 @@ const Teams: React.FC = () => {
     }
   };
 
-  const loadOperateursData = async (page: number = operateursPage) => {
-    console.log('[Teams] 🔄 Loading opérateurs data, page:', page);
+  const loadOperateursData = async (page: number = operateursPage, filters = operateurFilters) => {
+    console.log('[Teams] 🔄 Loading opérateurs data, page:', page, 'filters:', filters);
     try {
-      const operateursRes = await fetchOperateurs({ page, pageSize: 50 });
+      // Construire les filtres pour l'API
+      const apiFilters: Record<string, unknown> = { page, pageSize: 50 };
+      if (filters.statut) apiFilters.statut = filters.statut;
+      if (filters.equipe === 'sans_equipe') {
+        apiFilters.sansEquipe = true;
+      } else if (filters.equipe) {
+        apiFilters.equipe = parseInt(filters.equipe);
+      }
+      if (filters.estChef === 'true') apiFilters.estChef = true;
+      if (filters.estChef === 'false') apiFilters.estChef = false;
+      if (filters.disponible === 'true') apiFilters.disponible = true;
+      if (filters.disponible === 'false') apiFilters.disponible = false;
+
+      // Charger aussi les équipes si pas encore chargées (pour le filtre)
+      const [operateursRes] = await Promise.all([
+        fetchOperateurs(apiFilters),
+        equipes.length === 0 ? fetchEquipes({ pageSize: 100 }).then(res => setEquipes(res.results)) : Promise.resolve()
+      ]);
       console.log('[Teams] ✅ Opérateurs loaded:', operateursRes.results.length, 'opérateurs');
-      console.log('[Teams] 📊 Opérateurs data:', operateursRes.results);
       setOperateurs(operateursRes.results);
       setOperateursTotal(operateursRes.count || 0);
     } catch (error) {
@@ -532,6 +567,17 @@ const Teams: React.FC = () => {
     { key: 'nom', label: 'Nom' },
     { key: 'prenom', label: 'Prénom' },
     { key: 'equipeNom', label: 'Équipe', render: (o) => o.equipeNom || '-' },
+    {
+      key: 'estChefEquipe',
+      label: 'Chef',
+      render: (o) => o.estChefEquipe ? (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
+          <Star className="w-3 h-3" />
+          Chef
+        </span>
+      ) : null,
+      sortable: false
+    },
     {
       key: 'statut',
       label: 'Statut',
@@ -1399,8 +1445,8 @@ const Teams: React.FC = () => {
             </>
           )}
 
-          {/* Equipes and Operateurs tabs controls */}
-          {(activeTab === 'equipes' || activeTab === 'operateurs') && (
+          {/* Equipes tab controls */}
+          {activeTab === 'equipes' && (
             <>
               {/* Refresh Button */}
               <button
@@ -1412,8 +1458,8 @@ const Teams: React.FC = () => {
                 Rafraîchir
               </button>
 
-              {/* Create Button - Conditional based on tab */}
-              {activeTab === 'equipes' && !isReadOnly && (
+              {/* Create Button */}
+              {!isReadOnly && (
                 <button
                   onClick={() => setShowCreateTeam(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm"
@@ -1422,12 +1468,264 @@ const Teams: React.FC = () => {
                   Équipe
                 </button>
               )}
-              {activeTab === 'operateurs' && !isReadOnly && (
+            </>
+          )}
+
+          {/* Operateurs tab controls */}
+          {activeTab === 'operateurs' && (
+            <>
+              {/* Filters Toggle */}
+              <button
+                onClick={() => setShowOperateurFilters(!showOperateurFilters)}
+                className={`relative p-2.5 rounded-lg transition-all duration-200 ${
+                  showOperateurFilters || operateurFilters.statut || operateurFilters.equipe || operateurFilters.estChef || operateurFilters.disponible
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 shadow-sm'
+                }`}
+                title="Filtres"
+              >
+                <Filter className="w-4 h-4" />
+                {(operateurFilters.statut || operateurFilters.equipe || operateurFilters.estChef || operateurFilters.disponible) && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold shadow">
+                    {(operateurFilters.statut ? 1 : 0) + (operateurFilters.equipe ? 1 : 0) + (operateurFilters.estChef ? 1 : 0) + (operateurFilters.disponible ? 1 : 0)}
+                  </span>
+                )}
+              </button>
+
+              {/* Inline Filters */}
+              {showOperateurFilters && (
+                <>
+                  {/* Statut Filter */}
+                  <Listbox value={operateurFilters.statut} onChange={(val) => {
+                    const newFilters = { ...operateurFilters, statut: val };
+                    setOperateurFilters(newFilters);
+                    setOperateursPage(1);
+                    loadOperateursData(1, newFilters);
+                  }}>
+                    <div className="relative">
+                      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[130px]">
+                        <UserCheck className="w-4 h-4 text-gray-500" />
+                        <span className="flex-1 text-left">
+                          {operateurFilters.statut === '' && 'Statut'}
+                          {operateurFilters.statut === 'ACTIF' && 'Actif'}
+                          {operateurFilters.statut === 'INACTIF' && 'Inactif'}
+                          {operateurFilters.statut === 'EN_CONGE' && 'En congé'}
+                        </span>
+                        <ChevronDown className="w-4 h-4 text-gray-400" />
+                      </Listbox.Button>
+                      <Transition
+                        as={React.Fragment}
+                        leave="transition ease-in duration-100"
+                        leaveFrom="opacity-100"
+                        leaveTo="opacity-0"
+                      >
+                        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                          <Listbox.Option value="" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+                            {({ selected }) => <span className={selected ? 'font-semibold' : 'font-normal'}>Tous statuts</span>}
+                          </Listbox.Option>
+                          <Listbox.Option value="ACTIF" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>Actif</span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                          <Listbox.Option value="INACTIF" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-gray-400"></span>
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>Inactif</span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                          <Listbox.Option value="EN_CONGE" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>En congé</span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                        </Listbox.Options>
+                      </Transition>
+                    </div>
+                  </Listbox>
+
+                  {/* Équipe Filter */}
+                  <Listbox value={operateurFilters.equipe} onChange={(val) => {
+                    const newFilters = { ...operateurFilters, equipe: val };
+                    setOperateurFilters(newFilters);
+                    setOperateursPage(1);
+                    loadOperateursData(1, newFilters);
+                  }}>
+                    <div className="relative">
+                      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]">
+                        <Users className="w-4 h-4 text-gray-500" />
+                        <span className="flex-1 text-left truncate">
+                          {operateurFilters.equipe === '' ? 'Équipe' : equipes.find(e => e.id === parseInt(operateurFilters.equipe))?.nomEquipe || 'Équipe'}
+                        </span>
+                        <ChevronDown className="w-4 h-4 text-gray-400" />
+                      </Listbox.Button>
+                      <Transition
+                        as={React.Fragment}
+                        leave="transition ease-in duration-100"
+                        leaveFrom="opacity-100"
+                        leaveTo="opacity-0"
+                      >
+                        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-48 overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                          <Listbox.Option value="" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+                            {({ selected }) => <span className={selected ? 'font-semibold' : 'font-normal'}>Toutes équipes</span>}
+                          </Listbox.Option>
+                          <Listbox.Option value="sans_equipe" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <Ban className="w-4 h-4 text-gray-400" />
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>Sans équipe</span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                          {equipes.filter(e => e.actif).map(eq => (
+                            <Listbox.Option key={eq.id} value={String(eq.id)} className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+                              {({ selected }) => <span className={`block truncate ${selected ? 'font-semibold' : 'font-normal'}`}>{eq.nomEquipe}</span>}
+                            </Listbox.Option>
+                          ))}
+                        </Listbox.Options>
+                      </Transition>
+                    </div>
+                  </Listbox>
+
+                  {/* Chef d'équipe Filter */}
+                  <Listbox value={operateurFilters.estChef} onChange={(val) => {
+                    const newFilters = { ...operateurFilters, estChef: val };
+                    setOperateurFilters(newFilters);
+                    setOperateursPage(1);
+                    loadOperateursData(1, newFilters);
+                  }}>
+                    <div className="relative">
+                      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]">
+                        <Star className="w-4 h-4 text-gray-500" />
+                        <span className="flex-1 text-left">
+                          {operateurFilters.estChef === '' && "Chef d'équipe"}
+                          {operateurFilters.estChef === 'true' && 'Chefs uniquement'}
+                          {operateurFilters.estChef === 'false' && 'Non-chefs'}
+                        </span>
+                        <ChevronDown className="w-4 h-4 text-gray-400" />
+                      </Listbox.Button>
+                      <Transition
+                        as={React.Fragment}
+                        leave="transition ease-in duration-100"
+                        leaveFrom="opacity-100"
+                        leaveTo="opacity-0"
+                      >
+                        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                          <Listbox.Option value="" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+                            {({ selected }) => <span className={selected ? 'font-semibold' : 'font-normal'}>Tous</span>}
+                          </Listbox.Option>
+                          <Listbox.Option value="true" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <Star className="w-4 h-4 text-amber-500" />
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>Chefs d'équipe</span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                          <Listbox.Option value="false" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <Users className="w-4 h-4 text-gray-500" />
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>Membres uniquement</span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                        </Listbox.Options>
+                      </Transition>
+                    </div>
+                  </Listbox>
+
+                  {/* Disponibilité Filter */}
+                  <Listbox value={operateurFilters.disponible} onChange={(val) => {
+                    const newFilters = { ...operateurFilters, disponible: val };
+                    setOperateurFilters(newFilters);
+                    setOperateursPage(1);
+                    loadOperateursData(1, newFilters);
+                  }}>
+                    <div className="relative">
+                      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]">
+                        <Calendar className="w-4 h-4 text-gray-500" />
+                        <span className="flex-1 text-left">
+                          {operateurFilters.disponible === '' && 'Disponibilité'}
+                          {operateurFilters.disponible === 'true' && 'Disponibles'}
+                          {operateurFilters.disponible === 'false' && 'Indisponibles'}
+                        </span>
+                        <ChevronDown className="w-4 h-4 text-gray-400" />
+                      </Listbox.Button>
+                      <Transition
+                        as={React.Fragment}
+                        leave="transition ease-in duration-100"
+                        leaveFrom="opacity-100"
+                        leaveTo="opacity-0"
+                      >
+                        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                          <Listbox.Option value="" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+                            {({ selected }) => <span className={selected ? 'font-semibold' : 'font-normal'}>Tous</span>}
+                          </Listbox.Option>
+                          <Listbox.Option value="true" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <CheckCircle className="w-4 h-4 text-green-500" />
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>Disponibles aujourd'hui</span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                          <Listbox.Option value="false" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+                            {({ selected }) => (
+                              <div className="flex items-center gap-2">
+                                <XCircle className="w-4 h-4 text-red-500" />
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>Indisponibles</span>
+                              </div>
+                            )}
+                          </Listbox.Option>
+                        </Listbox.Options>
+                      </Transition>
+                    </div>
+                  </Listbox>
+
+                  {/* Reset Filters */}
+                  {(operateurFilters.statut || operateurFilters.equipe || operateurFilters.estChef || operateurFilters.disponible) && (
+                    <button
+                      onClick={() => {
+                        const emptyFilters = { statut: '', equipe: '', estChef: '', disponible: '' };
+                        setOperateurFilters(emptyFilters);
+                        setOperateursPage(1);
+                        loadOperateursData(1, emptyFilters);
+                      }}
+                      className="p-2.5 rounded-lg text-red-600 hover:bg-red-50 transition-all duration-200 border border-red-200 hover:border-red-300 shadow-sm"
+                      title="Réinitialiser les filtres"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </>
+              )}
+
+              {/* Separator */}
+              <div className="h-8 w-px bg-gray-300"></div>
+
+              {/* Refresh Button */}
+              <button
+                onClick={loadData}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors font-medium shadow-sm"
+                title="Rafraîchir"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Rafraîchir
+              </button>
+
+              {/* Create Button */}
+              {!isReadOnly && (
                 <button
-                  onClick={() => {
-                    // TODO: Ouvrir modal de création d'opérateur
-                    showToast('Fonctionnalité à venir : Créer un nouvel opérateur', 'info');
-                  }}
+                  onClick={() => setShowCreateOperateur(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm"
                 >
                   <Plus className="w-4 h-4" />
@@ -1516,6 +1814,12 @@ const Teams: React.FC = () => {
         />
       )}
 
+      {showCreateOperateur && (
+        <CreateOperateurModal
+          onClose={() => setShowCreateOperateur(false)}
+          onCreated={loadData}
+        />
+      )}
 
       {selectedEquipe && (
         <EquipeDetailModal

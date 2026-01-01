@@ -548,7 +548,7 @@ const StatCard: React.FC<StatCardProps> = ({ icon, label, value, color }) => (
 // COMPOSANT PRINCIPAL - Users
 // ============================================================================
 
-type TabType = 'tous' | 'admins' | 'operateurs' | 'clients' | 'chefs';
+type TabType = 'tous' | 'admins' | 'operateurs' | 'clients' | 'superviseurs';
 
 const Users: React.FC = () => {
   const navigate = useNavigate();
@@ -568,7 +568,7 @@ const Users: React.FC = () => {
     admins: number;
     operateurs: number;
     clients: number;
-    chefsEquipe: number;
+    superviseurs: number;
   } | null>(null);
 
   // Modals
@@ -637,7 +637,7 @@ const Users: React.FC = () => {
         admins: parRoleCounts['ADMIN'] || 0,
         operateurs: parRoleCounts['SUPERVISEUR'] || 0,
         clients: parRoleCounts['CLIENT'] || 0,
-        chefsEquipe: parRoleCounts['SUPERVISEUR'] || 0
+        superviseurs: parRoleCounts['SUPERVISEUR'] || 0
       });
     } catch (error) {
       console.error('Erreur chargement donnees:', error);
@@ -674,7 +674,7 @@ const Users: React.FC = () => {
     if (activeTab === 'admins' && !(u.roles && u.roles.includes('ADMIN'))) return false;
     if (activeTab === 'operateurs' && !(u.roles && u.roles.includes('SUPERVISEUR'))) return false;
     if (activeTab === 'clients' && !(u.roles && u.roles.includes('CLIENT'))) return false;
-    if (activeTab === 'chefs' && !(u.roles && u.roles.includes('SUPERVISEUR'))) return false;
+    if (activeTab === 'superviseurs' && !(u.roles && u.roles.includes('SUPERVISEUR'))) return false;
 
     // Filter by role (dropdown)
     if (roleFilter && !(u.roles && u.roles.includes(roleFilter as any))) return false;
@@ -809,8 +809,8 @@ const Users: React.FC = () => {
           />
           <StatCard
             icon={<Award className="w-5 h-5 text-yellow-600" />}
-            label="Chefs d'equipe"
-            value={stats.chefsEquipe}
+            label="Superviseurs"
+            value={stats.superviseurs}
             color="bg-yellow-100"
           />
           <StatCard
@@ -858,15 +858,15 @@ const Users: React.FC = () => {
           </span>
         </button>
         <button
-          onClick={() => { setActiveTab('chefs'); setRoleFilter(null); }}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'chefs'
+          onClick={() => { setActiveTab('superviseurs'); setRoleFilter(null); }}
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'superviseurs'
             ? 'border-emerald-500 text-emerald-600'
             : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
         >
           <span className="flex items-center gap-2">
             <Award className="w-4 h-4" />
-            Chefs d'équipe ({utilisateurs.filter(u => u.roles && u.roles.includes('SUPERVISEUR')).length})
+            Superviseurs ({utilisateurs.filter(u => u.roles && u.roles.includes('SUPERVISEUR')).length})
           </span>
         </button>
         <button
@@ -904,7 +904,7 @@ const Users: React.FC = () => {
             <option value="">Tous les rôles</option>
             <option value="ADMIN">Admin</option>
             <option value="SUPERVISEUR">Opérateur</option>
-            <option value="SUPERVISEUR">Chef d'équipe</option>
+            <option value="SUPERVISEUR">Superviseur</option>
             <option value="CLIENT">Client</option>
           </select>
         </div>
