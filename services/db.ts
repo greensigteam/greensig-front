@@ -8,6 +8,13 @@
 import Dexie, { Table } from 'dexie';
 
 // ============================================================================
+// VERSION DU CACHE
+// ============================================================================
+// Incrémenter cette version pour forcer l'invalidation du cache
+// lors d'un déploiement ou d'un changement de structure de données
+const CACHE_VERSION = '2.0.0';
+
+// ============================================================================
 // TYPES
 // ============================================================================
 
@@ -164,6 +171,55 @@ export class GreenSIGDatabase extends Dexie {
 // ============================================================================
 
 export const db = new GreenSIGDatabase();
+
+// ============================================================================
+// GESTION DE VERSION DU CACHE
+// ============================================================================
+
+/**
+ * Vérifie la version du cache et le vide si elle a changé.
+ * Cela garantit que les anciennes données corrompues ou obsolètes
+ * sont automatiquement supprimées lors des mises à jour.
+ */
+async function checkCacheVersion(): Promise<void> {
+  const VERSION_KEY = '__cache_version__';
+
+  try {
+    const entry = await db.cache.get(VERSION_KEY);
+    const storedVersion = entry?.data as string | undefined;
+
+    if (storedVersion !== CACHE_VERSION) {
+      console.log(`[DB] Version du cache changée (${storedVersion || 'aucune'} → ${CACHE_VERSION})`);
+      console.log('[DB] Vidage automatique du cache...');
+
+      // Vider tout le cache
+      await db.cache.clear();
+
+      // Stocker la nouvelle version
+      await db.cache.put({
+        id: VERSION_KEY,
+        data: CACHE_VERSION,
+        timestamp: Date.now(),
+        expiresAt: Date.now() + (365 * 24 * 60 * 60 * 1000) // 1 an
+      });
+
+      console.log('[DB] Cache vidé et nouvelle version enregistrée');
+    } else {
+      console.log(`[DB] Version du cache OK (${CACHE_VERSION})`);
+    }
+  } catch (error) {
+    console.error('[DB] Erreur vérification version cache:', error);
+    // En cas d'erreur, on vide le cache par sécurité
+    try {
+      await db.cache.clear();
+    } catch {
+      // Ignorer les erreurs de vidage
+    }
+  }
+}
+
+// Vérification de version au démarrage
+checkCacheVersion();
 
 // Nettoyage automatique au démarrage
 db.cleanExpired();

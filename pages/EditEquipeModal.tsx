@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Users, UserPlus, UserMinus, AlertCircle, Save, UserCheck } from 'lucide-react';
-import { EquipeList, EquipeUpdate, OperateurList, SuperviseurList } from '../types/users';
+import { EquipeList, EquipeUpdate, OperateurList } from '../types/users';
 import {
   updateEquipe,
   fetchEquipeMembres,
   fetchOperateurs,
   affecterMembres,
   retirerMembre,
-  fetchSuperviseurs
+  invalidateCache
 } from '../services/usersApi';
-import { fetchSites, SiteFrontend } from '../services/api';
 import DetailModal from '../components/DetailModal';
 
 interface EditEquipeModalProps {
@@ -30,8 +29,6 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
   const [form, setForm] = useState<EquipeUpdate>({
     nomEquipe: equipe.nomEquipe,
     chefEquipe: cleanNumericValue(equipe.chefEquipe),
-    // ⚠️ superviseur supprimé : désormais déduit automatiquement du site
-    site: cleanNumericValue(equipe.site),
     actif: equipe.actif,
   });
   const [loading, setLoading] = useState(false);
@@ -41,8 +38,6 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
   // Members management
   const [membres, setMembres] = useState<OperateurList[]>([]);
   const [availableOperateurs, setAvailableOperateurs] = useState<OperateurList[]>([]);
-  const [superviseurs, setSuperviseurs] = useState<SuperviseurList[]>([]);
-  const [sites, setSites] = useState<SiteFrontend[]>([]);
   const [loadingMembres, setLoadingMembres] = useState(true);
   const [memberAction, setMemberAction] = useState<string | null>(null);
 
@@ -53,16 +48,15 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
   const loadMembres = async () => {
     setLoadingMembres(true);
     try {
-      const [membresRes, operateursRes, superviseursRes, sitesRes] = await Promise.all([
+      // Invalider le cache des opérateurs pour forcer un appel API frais
+      await invalidateCache('operateurs');
+
+      const [membresRes, operateursRes] = await Promise.all([
         fetchEquipeMembres(equipe.id),
-        fetchOperateurs({ sansEquipe: true }),
-        fetchSuperviseurs(),
-        fetchSites()
+        fetchOperateurs({ sansEquipe: true })
       ]);
       setMembres(membresRes);
       setAvailableOperateurs(operateursRes.results);
-      setSuperviseurs(superviseursRes.results);
-      setSites(sitesRes.filter(s => s.actif));
     } catch (err) {
       console.error('Erreur chargement membres:', err);
     } finally {
@@ -76,8 +70,8 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
     if (type === 'checkbox') {
       newValue = (e.target as HTMLInputElement).checked;
     }
-    if (name === 'chefEquipe' || name === 'site') {
-      // Treat empty string as null to allow removing the chef or site
+    if (name === 'chefEquipe') {
+      // Treat empty string as null to allow removing the chef
       if (value === '') {
         newValue = null;
       } else {
@@ -135,8 +129,8 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
     }
   };
 
-  // Chef d'équipe doit être choisi parmi les membres de l'équipe qui ont la compétence "Gestion d'équipe"
-  const membresChefsPotentiels = membres.filter(m => m.peutEtreChef);
+  // Tout membre actif peut être nommé chef d'équipe
+  const membresActifs = membres.filter(m => m.statut === 'ACTIF');
 
   // Note: On n'utilise plus de tableaux pré-créés pour éviter les problèmes de clés React
 
@@ -165,51 +159,6 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Site d'affectation contractuelle (optionnel)
-        </label>
-        <select
-          name="site"
-          value={form.site ?? ''}
-          onChange={handleChange}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-        >
-          <option key="site-none" value="">-- Aucun site --</option>
-          {sites.map((site) => (
-            <option key={`site-${site.id}`} value={parseInt(site.id)}>
-              {site.name} {site.code_site ? `(${site.code_site})` : ''}
-              {parseInt(site.id) === equipe.site ? ' (actuel)' : ''}
-            </option>
-          ))}
-        </select>
-        <p className="mt-1 text-xs text-gray-500">
-          Site auquel l'équipe est affectée de manière permanente
-        </p>
-      </div>
-
-      {/* Superviseur (calculé automatiquement depuis le site) */}
-      {form.site && (
-        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Superviseur (déduit du site)
-          </label>
-          <p className="text-sm text-gray-900">
-            {(() => {
-              const selectedSite = sites.find(s => parseInt(s.id) === form.site);
-              if (selectedSite?.superviseur) {
-                const sup = superviseurs.find(s => s.utilisateur === selectedSite.superviseur);
-                return sup?.fullName || 'Chargement...';
-              }
-              return 'Aucun superviseur assigné à ce site';
-            })()}
-          </p>
-          <p className="mt-1 text-xs text-blue-600">
-            Le superviseur est automatiquement celui qui gère le site sélectionné
-          </p>
-        </div>
-      )}
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
           Chef d'equipe sur le terrain (optionnel)
         </label>
         <select
@@ -219,12 +168,12 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
         >
           <option key="chef-none" value="">-- Aucun --</option>
-          {membresChefsPotentiels.length === 0 && (
+          {membresActifs.length === 0 && (
             <option key="chef-no-membres" value="" disabled>
-              Aucun membre avec la compétence "Gestion d'équipe"
+              Aucun membre actif dans l'équipe
             </option>
           )}
-          {membresChefsPotentiels.map((op) => (
+          {membresActifs.map((op) => (
             <option key={`chef-${op.id}`} value={op.id}>
               {op.fullName} ({op.numeroImmatriculation})
               {op.id === equipe.chefEquipe ? ' (actuel)' : ''}
@@ -232,8 +181,7 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
           ))}
         </select>
         <p className="mt-1 text-xs text-gray-500">
-          Seuls les membres avec la compétence "Gestion d'équipe" sont affichés
-          {membresChefsPotentiels.length === 0 && ' (aucun membre n\'a cette compétence)'}
+          Tout membre actif de l'équipe peut être nommé chef
         </p>
       </div>
 

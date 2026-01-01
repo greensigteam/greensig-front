@@ -1148,114 +1148,127 @@ export default function MonthlyReport() {
         {`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');`}
       </style>
 
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
-              <FileText className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Rapport de Site</h1>
-              <p className="text-gray-500">Générez un rapport d'activité complet pour un site</p>
+      <div className="w-full">
+        {/* Header amélioré */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 mb-6">
+          {/* Bandeau supérieur avec couleur sidebar */}
+          <div className="bg-emerald-900 px-6 py-5 rounded-t-2xl">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur flex items-center justify-center">
+                <FileText className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-white">Rapport de Site mensuel</h1>
+                <p className="text-emerald-200 text-sm">Générez un rapport d'activité complet pour une période</p>
+              </div>
             </div>
           </div>
 
           {/* Filtres */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="relative">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                <MapPin className="w-4 h-4 inline mr-1" />
-                Sites * {selectedSites.length > 0 && <span className="text-emerald-600">({selectedSites.length})</span>}
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowSiteDropdown(!showSiteDropdown)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-white text-left flex items-center justify-between"
-              >
-                <span className={selectedSites.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
-                  {selectedSites.length === 0
-                    ? 'Sélectionner des sites'
-                    : selectedSites.length === 1
-                      ? sites.find(s => s.id === selectedSites[0])?.nom_site || '1 site'
-                      : `${selectedSites.length} sites sélectionnés`}
-                </span>
-                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showSiteDropdown ? 'rotate-180' : ''}`} />
-              </button>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+              <div className="relative">
+                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-emerald-600" />
+                  Sites
+                  {selectedSites.length > 0 && (
+                    <span className="ml-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
+                      {selectedSites.length}
+                    </span>
+                  )}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowSiteDropdown(!showSiteDropdown)}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-gray-50 hover:bg-white text-left flex items-center justify-between group"
+                >
+                  <span className={selectedSites.length === 0 ? 'text-gray-400' : 'text-gray-900 font-medium'}>
+                    {selectedSites.length === 0
+                      ? 'Sélectionner des sites'
+                      : selectedSites.length === 1
+                        ? sites.find(s => s.id === selectedSites[0])?.nom_site || '1 site'
+                        : `${selectedSites.length} sites sélectionnés`}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform group-hover:text-emerald-600 ${showSiteDropdown ? 'rotate-180' : ''}`} />
+                </button>
 
-              {showSiteDropdown && (
-                <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-auto">
-                  <div className="p-2 border-b border-gray-100">
-                    <button
-                      type="button"
-                      onClick={toggleAllSites}
-                      className="w-full px-3 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors text-left"
-                    >
-                      {selectedSites.length === sites.length ? 'Tout désélectionner' : 'Tout sélectionner'}
-                    </button>
+                {showSiteDropdown && (
+                  <div className="absolute z-50 mt-2 w-full bg-white border border-gray-200 rounded-xl shadow-xl max-h-60 overflow-auto">
+                    <div className="p-2 border-b border-gray-100 bg-gray-50">
+                      <button
+                        type="button"
+                        onClick={toggleAllSites}
+                        className="w-full px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 rounded-lg transition-colors text-left flex items-center gap-2"
+                      >
+                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${selectedSites.length === sites.length ? 'bg-emerald-600 border-emerald-600' : 'border-gray-300'}`}>
+                          {selectedSites.length === sites.length && <CheckCircle2 className="w-3 h-3 text-white" />}
+                        </div>
+                        {selectedSites.length === sites.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+                      </button>
+                    </div>
+                    {sites.map(site => (
+                      <label
+                        key={site.id}
+                        className="flex items-center gap-3 px-4 py-2.5 hover:bg-emerald-50 cursor-pointer transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedSites.includes(site.id)}
+                          onChange={() => toggleSiteSelection(site.id)}
+                          className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                        />
+                        <span className="text-sm text-gray-700">{site.nom_site}</span>
+                      </label>
+                    ))}
                   </div>
-                  {sites.map(site => (
-                    <label
-                      key={site.id}
-                      className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedSites.includes(site.id)}
-                        onChange={() => toggleSiteSelection(site.id)}
-                        className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-                      />
-                      <span className="text-sm text-gray-700">{site.nom_site}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                <Calendar className="w-4 h-4 inline mr-1" />
-                Date début
-              </label>
-              <input
-                type="date"
-                value={dateDebut}
-                onChange={e => setDateDebut(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                <Calendar className="w-4 h-4 inline mr-1" />
-                Date fin
-              </label>
-              <input
-                type="date"
-                value={dateFin}
-                onChange={e => setDateFin(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-              />
-            </div>
-
-            <div className="flex items-end">
-              <button
-                onClick={handleGenerateReport}
-                disabled={loading || selectedSites.length === 0}
-                className="w-full px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 flex items-center justify-center gap-2 font-semibold shadow-lg transition-all"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Chargement...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="w-5 h-5" />
-                    Générer
-                  </>
                 )}
-              </button>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-emerald-600" />
+                  Date début
+                </label>
+                <input
+                  type="date"
+                  value={dateDebut}
+                  onChange={e => setDateDebut(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-gray-50 hover:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-emerald-600" />
+                  Date fin
+                </label>
+                <input
+                  type="date"
+                  value={dateFin}
+                  onChange={e => setDateFin(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-gray-50 hover:bg-white"
+                />
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  onClick={handleGenerateReport}
+                  disabled={loading || selectedSites.length === 0}
+                  className="w-full px-5 py-3 bg-emerald-900 text-white rounded-xl hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold shadow-lg hover:shadow-xl transition-all"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Chargement...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-5 h-5" />
+                      Générer le rapport
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1273,20 +1286,32 @@ export default function MonthlyReport() {
 
         {/* Aperçu du rapport multi-sites */}
         {multiSiteReports.length > 0 && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {/* Header global */}
-            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-6 text-white shadow-xl">
-              <div className="flex items-center justify-between">
+            <div className="bg-emerald-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
+              {/* Motif décoratif */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+
+              <div className="flex items-center justify-between relative z-10">
                 <div>
-                  <h2 className="text-2xl font-bold">Rapport Global - {multiSiteReports.length} Sites</h2>
-                  <p className="text-indigo-100 text-sm mt-2">
-                    Du {format(new Date(dateDebut), 'dd MMMM yyyy', { locale: fr })} au {format(new Date(dateFin), 'dd MMMM yyyy', { locale: fr })}
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center">
+                      <FileText className="w-5 h-5 text-white" />
+                    </div>
+                    <span className="px-3 py-1 bg-white/20 rounded-full text-sm font-medium">
+                      {multiSiteReports.length} site{multiSiteReports.length > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <h2 className="text-2xl font-bold">Rapport Global Multi-sites</h2>
+                  <p className="text-emerald-200 text-sm mt-1">
+                    {format(new Date(dateDebut), 'dd MMMM yyyy', { locale: fr })} → {format(new Date(dateFin), 'dd MMMM yyyy', { locale: fr })}
                   </p>
                 </div>
                 <button
                   onClick={handleDownloadMultiPDF}
                   disabled={generating}
-                  className="px-6 py-3 bg-white text-emerald-600 rounded-xl font-semibold hover:bg-emerald-50 disabled:opacity-50 flex items-center gap-2 shadow-lg transition-all"
+                  className="px-6 py-3.5 bg-white text-emerald-900 rounded-xl font-semibold hover:bg-emerald-50 disabled:opacity-50 flex items-center gap-2 shadow-lg transition-all hover:scale-105"
                 >
                   {generating ? (
                     <>
@@ -1361,20 +1386,30 @@ export default function MonthlyReport() {
 
         {/* Aperçu du rapport (un seul site) */}
         {reportData && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {/* Header du rapport */}
-            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-6 text-white shadow-xl">
-              <div className="flex items-center justify-between">
+            <div className="bg-emerald-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
+              {/* Motif décoratif */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+
+              <div className="flex items-center justify-between relative z-10">
                 <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center">
+                      <MapPin className="w-5 h-5 text-white" />
+                    </div>
+                    <span className="px-3 py-1 bg-white/20 rounded-full text-sm font-medium">
+                      {reportData.periode.nb_jours} jours
+                    </span>
+                  </div>
                   <h2 className="text-2xl font-bold">{reportData.site?.nom || 'Site'}</h2>
-                  <p className="text-emerald-100 text-sm mt-2">
-                    {formatPeriode()} • {reportData.periode.nb_jours} jours
-                  </p>
+                  <p className="text-emerald-200 text-sm mt-1">{formatPeriode()}</p>
                 </div>
                 <button
                   onClick={handleDownloadPDF}
                   disabled={generating}
-                  className="px-6 py-3 bg-white text-emerald-600 rounded-xl font-semibold hover:bg-emerald-50 disabled:opacity-50 flex items-center gap-2 shadow-lg transition-all"
+                  className="px-6 py-3.5 bg-white text-emerald-900 rounded-xl font-semibold hover:bg-emerald-50 disabled:opacity-50 flex items-center gap-2 shadow-lg transition-all hover:scale-105"
                 >
                   {generating ? (
                     <>
@@ -1542,12 +1577,56 @@ export default function MonthlyReport() {
 
         {/* État initial */}
         {!reportData && multiSiteReports.length === 0 && !loading && !error && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
-            <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Générez un rapport de site</h3>
-            <p className="text-gray-500 max-w-md mx-auto">
-              Sélectionnez un ou plusieurs sites et définissez la période souhaitée, puis cliquez sur "Générer" pour visualiser et télécharger le rapport.
-            </p>
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-8 text-center border-b border-emerald-100">
+              <div className="w-20 h-20 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+                <FileText className="w-10 h-10 text-emerald-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Rapport de Site mensuel</h3>
+              <p className="text-gray-600 max-w-md mx-auto">
+                Générez un rapport d'activité complet pour une période personnalisée
+              </p>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <span className="text-emerald-700 font-bold text-sm">1</span>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm">Sélectionnez les sites</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Un ou plusieurs sites</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <span className="text-emerald-700 font-bold text-sm">2</span>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm">Date de début</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Début de la période</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <span className="text-emerald-700 font-bold text-sm">3</span>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm">Date de fin</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Fin de la période</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <span className="text-emerald-700 font-bold text-sm">4</span>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm">Générez le rapport</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Visualisez et téléchargez</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -156,7 +156,7 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
                 ))}
               </select>
               <p className="mt-1 text-xs text-gray-500">
-                Seuls les opérateurs avec la compétence "Gestion d'équipe" sont affichés
+                Tout opérateur actif peut être nommé chef d'équipe
               </p>
             </div>
 

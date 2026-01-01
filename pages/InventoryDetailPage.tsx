@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { fetchInventoryItem, ApiError } from '../services/api';
 import { InventoryItem } from '../services/mockData'; // Use the correct type definition
@@ -7,12 +7,22 @@ import { StatusBadge } from '../components/StatusBadge';
 import { EditObjectModal } from '../components/EditObjectModal';
 import { MAP_LAYERS } from '../constants';
 import LoadingScreen from '../components/LoadingScreen';
+import { planningService } from '../services/planningService';
+import { fetchEquipes } from '../services/usersApi';
+import { Tache, TacheCreate, TypeTache, STATUT_TACHE_LABELS, STATUT_TACHE_COLORS } from '../types/planning';
+import { EquipeList } from '../types/users';
+import TaskFormModal, { InventoryObjectOption } from '../components/planning/TaskFormModal';
+import { useToast } from '../contexts/ToastContext';
 import {
   ChevronLeft,
   MapPin,
   Info,
   Wrench,
-  Edit
+  Edit,
+  Plus,
+  Calendar,
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 
 const LoadingSpinner: React.FC = () => (
@@ -33,11 +43,22 @@ const ErrorDisplay: React.FC<{ message: string }> = ({ message }) => (
 const InventoryDetailPage: React.FC = () => {
   const { objectType, objectId } = useParams<{ objectType: string; objectId: string }>();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [item, setItem] = useState<InventoryItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // États pour l'historique des tâches
+  const [taches, setTaches] = useState<Tache[]>([]);
+  const [tachesLoading, setTachesLoading] = useState(false);
+  const [tachesError, setTachesError] = useState<string | null>(null);
+
+  // États pour la modale de création de tâche
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [modalEquipes, setModalEquipes] = useState<EquipeList[]>([]);
+  const [modalTypesTaches, setModalTypesTaches] = useState<TypeTache[]>([]);
 
   useEffect(() => {
     if (!objectType || !objectId) {
@@ -108,63 +129,204 @@ const InventoryDetailPage: React.FC = () => {
     loadItem();
   }, [objectType, objectId, refreshKey]);
 
+  // Charger l'historique des tâches
+  useEffect(() => {
+    if (!objectId) return;
+
+    const loadTaches = async () => {
+      setTachesLoading(true);
+      setTachesError(null);
+      try {
+        const response = await planningService.getTaches({ objet_id: parseInt(objectId, 10) });
+        setTaches(response.results || []);
+      } catch (err) {
+        console.error('Error loading tasks:', err);
+        setTachesError('Erreur lors du chargement des tâches');
+      } finally {
+        setTachesLoading(false);
+      }
+    };
+
+    loadTaches();
+  }, [objectId, refreshKey]);
+
+  // Préparer l'objet pré-sélectionné pour la modale de création de tâche
+  const preSelectedObjects: InventoryObjectOption[] = useMemo(() => {
+    if (!item || !objectType || !objectId) return [];
+    const props = (item as any).properties || item;
+    return [{
+      id: parseInt(objectId, 10),
+      type: objectType.charAt(0).toUpperCase() + objectType.slice(1),
+      nom: item.name,
+      site: props.site_nom || '',
+      soussite: props.sous_site_nom || ''
+    }];
+  }, [item, objectType, objectId]);
+
+  // Ouvrir la modale de création de tâche
+  const handleOpenTaskModal = async () => {
+    try {
+      // Charger les équipes et types de tâches en parallèle
+      const [equipesData, typesTachesData] = await Promise.all([
+        fetchEquipes(),
+        planningService.getApplicableTypesTaches([objectType ? objectType.charAt(0).toUpperCase() + objectType.slice(1) : ''])
+      ]);
+
+      setModalEquipes(equipesData.results || []);
+      setModalTypesTaches(typesTachesData.types_taches || []);
+      setShowTaskModal(true);
+    } catch (err) {
+      console.error('Error loading task modal data:', err);
+      showToast('Erreur lors du chargement des données', 'error');
+    }
+  };
+
+  // Soumettre la création de tâche
+  const handleTaskSubmit = async (data: TacheCreate) => {
+    try {
+      await planningService.createTache(data);
+      showToast('Tâche créée avec succès', 'success');
+      setShowTaskModal(false);
+      // Rafraîchir l'historique des tâches
+      setRefreshKey(prev => prev + 1);
+    } catch (err) {
+      console.error('Error creating task:', err);
+      showToast('Erreur lors de la création de la tâche', 'error');
+    }
+  };
+
   if (isLoading) return <LoadingSpinner />;
   if (error) return <ErrorDisplay message={error} />;
   if (!item) return <ErrorDisplay message="Objet non trouvé." />;
 
   return (
-    <div className="h-full bg-white flex flex-col">
+    <div className="h-full bg-slate-50 flex flex-col">
       {/* Header */}
-      <header className="flex-shrink-0 bg-white border-b p-4 flex justify-between items-center">
+      <header className="flex-shrink-0 bg-white border-b border-slate-200 p-4 flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <Link to="/inventory" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+          <Link to="/inventory" className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-500 hover:text-slate-700">
             <ChevronLeft className="w-6 h-6" />
           </Link>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">{item.name}</h1>
-            <div className="flex items-center gap-2 text-sm text-gray-500">
+            <h1 className="text-xl font-bold text-slate-800">{item.name}</h1>
+            <div className="flex items-center gap-2 text-sm text-slate-500">
               <span className="capitalize">{item.type}</span>
-              <span>•</span>
+              <span className="text-slate-300">•</span>
               <StatusBadge status={item.state} type="state" />
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={handleOpenTaskModal}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+          >
+            <Plus className="w-4 h-4" />
+            Créer une tâche
+          </button>
+          <button
             onClick={() => setIsEditModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors font-medium"
           >
             <Edit className="w-4 h-4" />
             Modifier
           </button>
-
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 p-4 overflow-y-auto">
+      <main className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6 p-6 overflow-y-auto">
         {/* Left Column - Details */}
-        <div className="md:col-span-2 bg-gray-50 p-6 rounded-lg border">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"><Info className="w-5 h-5 text-emerald-600" />Informations Générales</h2>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-6">
+        <div className="md:col-span-2 bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+          <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2"><Info className="w-5 h-5 text-emerald-600" />Informations Générales</h2>
+          <dl className="grid grid-cols-2 gap-4">
             {getRelevantFields(item, objectType || '').map((field) => (
-              <div key={field.label} className="col-span-1">
-                <dt className="text-sm font-medium text-gray-500">{field.label}</dt>
-                <dd className="mt-1 text-gray-900">{field.value || 'N/A'}</dd>
+              <div key={field.label} className="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                <dt className="text-xs font-medium text-slate-500 mb-1">{field.label}</dt>
+                <dd className="text-sm font-bold text-slate-800">{field.value || 'N/A'}</dd>
               </div>
             ))}
           </dl>
 
-          <h2 className="text-lg font-semibold text-gray-800 mt-8 mb-4 flex items-center gap-2"><Wrench className="w-5 h-5 text-emerald-600" />Historique de taches</h2>
-          <div className="text-center py-8 text-gray-500 bg-white rounded-lg border">
-            <p>L'historique des interventions sera affiché ici.</p>
-          </div>
+          <h2 className="text-lg font-bold text-slate-800 mt-8 mb-4 flex items-center gap-2">
+            <Wrench className="w-5 h-5 text-emerald-600" />
+            Historique des tâches
+            {taches.length > 0 && (
+              <span className="ml-2 text-sm font-normal text-slate-500">({taches.length})</span>
+            )}
+          </h2>
+
+          {tachesLoading ? (
+            <div className="flex items-center justify-center py-8 bg-slate-50 rounded-lg border border-slate-100">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600"></div>
+              <span className="ml-2 text-slate-500">Chargement...</span>
+            </div>
+          ) : tachesError ? (
+            <div className="flex items-center justify-center py-8 bg-red-50 rounded-lg border border-red-100 text-red-600">
+              <AlertCircle className="w-5 h-5 mr-2" />
+              {tachesError}
+            </div>
+          ) : taches.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 bg-slate-50 rounded-lg border border-slate-100">
+              <Wrench className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+              <p>Aucune tâche associée à cet objet.</p>
+              <button
+                onClick={handleOpenTaskModal}
+                className="mt-3 text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+              >
+                + Créer une première tâche
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {taches.map((tache) => (
+                <div
+                  key={tache.id}
+                  onClick={() => navigate(`/planning?tache=${tache.id}`)}
+                  className="p-4 bg-slate-50 rounded-lg border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/30 cursor-pointer transition-all"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold text-slate-800 truncate">
+                          {tache.type_tache_detail?.nom_tache || 'Tâche'}
+                        </span>
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${STATUT_TACHE_COLORS[tache.statut]?.bg || 'bg-slate-100'} ${STATUT_TACHE_COLORS[tache.statut]?.text || 'text-slate-600'}`}>
+                          {STATUT_TACHE_LABELS[tache.statut] || tache.statut}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-slate-500">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {new Date(tache.date_debut_planifiee).toLocaleDateString('fr-FR')}
+                        </span>
+                        {tache.equipes_detail && tache.equipes_detail.length > 0 && (
+                          <span className="truncate">
+                            {tache.equipes_detail.map(e => e.nom).join(', ')}
+                          </span>
+                        )}
+                      </div>
+                      {tache.commentaires && (
+                        <p className="mt-1 text-xs text-slate-500 line-clamp-1">{tache.commentaires}</p>
+                      )}
+                    </div>
+                    {tache.date_fin_reelle && (
+                      <div className="flex items-center gap-1 text-xs text-slate-400 ml-2">
+                        <Clock className="w-3.5 h-3.5" />
+                        {new Date(tache.date_fin_reelle).toLocaleDateString('fr-FR')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Right Column - Map and Photos */}
-        <div className="space-y-4">
-          <div className="bg-gray-50 p-4 rounded-lg border">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"><MapPin className="w-5 h-5 text-emerald-600" />Localisation</h2>
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2"><MapPin className="w-5 h-5 text-emerald-600" />Localisation</h2>
             <div className="h-64 rounded-lg cursor-pointer" title="Cliquer pour voir sur la grande carte">
               <OLMap
                 isMiniMap={true}
@@ -207,6 +369,17 @@ const InventoryDetailPage: React.FC = () => {
           setRefreshKey(prev => prev + 1);
         }}
       />
+
+      {/* Task Creation Modal */}
+      {showTaskModal && (
+        <TaskFormModal
+          equipes={modalEquipes}
+          typesTaches={modalTypesTaches}
+          preSelectedObjects={preSelectedObjects}
+          onClose={() => setShowTaskModal(false)}
+          onSubmit={handleTaskSubmit}
+        />
+      )}
     </div>
   );
 };

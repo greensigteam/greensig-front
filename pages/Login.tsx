@@ -4,7 +4,7 @@
 
 import React, { useState } from 'react';
 import { User, Role } from '../types';
-import { Lock, Mail, UserCircle } from 'lucide-react';
+import { Lock, Mail, UserCircle, Eye, EyeOff } from 'lucide-react';
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -16,6 +16,7 @@ const ROLES: Role[] = ['ADMIN', 'SUPERVISEUR', 'CLIENT'];
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role>('ADMIN');
@@ -147,13 +148,20 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <div className="relative">
               <Lock className="absolute left-3 top-3 w-5 h-5 text-emerald-600/50" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-slate-200 bg-slate-50 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400 text-slate-800"
+                className="w-full pl-10 pr-10 py-2.5 border border-slate-200 bg-slate-50 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400 text-slate-800"
                 placeholder="Mot de passe"
                 required
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-3 text-emerald-600/50 hover:text-emerald-700 transition-colors"
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
             </div>
           </div>
 

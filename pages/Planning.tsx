@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, memo, useRef, type FC, type MouseEvent } from 'react';
+import { useState, useEffect, useMemo, useCallback, memo, useRef, type FC } from 'react';
 import { Calendar as BigCalendar, dateFnsLocalizer } from 'react-big-calendar';
 import withDragAndDrop, { EventInteractionArgs } from 'react-big-calendar/lib/addons/dragAndDrop';
 import { useLocation } from 'react-router-dom';
@@ -20,16 +20,15 @@ import { fetchCurrentUser } from '../services/api';
 import {
     Tache, TacheCreate, TacheUpdate, TypeTache,
     STATUT_TACHE_LABELS, STATUT_TACHE_COLORS,
-    PRIORITE_LABELS, PRIORITE_COLORS,
-    PlanningFilters, EMPTY_PLANNING_FILTERS, countActivePlanningFilters
+    PRIORITE_LABELS, PRIORITE_COLORS
 } from '../types/planning';
 import { EquipeList, Client } from '../types/users';
 import TaskFormModal, { InventoryObjectOption } from '../components/planning/TaskFormModal';
 import QuickTaskCreator from '../components/planning/QuickTaskCreator';
-import PlanningFiltersComponent from '../components/planning/PlanningFilters';
 import { StatusBadge } from '../components/StatusBadge';
 import LoadingScreen from '../components/LoadingScreen';
 import { fetchSites, fetchInventory } from '../services/api';
+import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import {
     useFloating,
     offset,
@@ -111,24 +110,15 @@ interface CalendarEvent {
 // COMPOSANT TÂCHE (Google Tasks Style)
 // ============================================================================
 
-const TaskEvent = memo(function TaskEvent({ event, title }: { event: CalendarEvent, title: string }) {
+const TaskEvent = memo(function TaskEvent({ event }: { event: CalendarEvent, title?: string }) {
     const tache = event.resource;
     const isCompleted = tache.statut === 'TERMINEE';
     const isUrgent = tache.priorite === 5;
 
-    // Gestion du clic sur la checkbox (stop propagation pour ne pas ouvrir le détail)
-    const handleCheckClick = (e: MouseEvent) => {
-        e.stopPropagation();
-        // L'action sera gérée par le parent via une fonction passée ou un contexte,
-        // mais ici on simule visuellement pour l'instant ou on utilise un bus d'événement
-        // Pour simplifier, on laisse le clic global gérer l'ouverture, et le détail aura la checkbox.
-        // Si on veut le check direct depuis la grille, il faut passer la fonction update.
-    };
-
     return (
         <div
             className={`
-                group flex items-start gap-2 p-1.5 rounded-lg transition-all duration-200
+                task-event-root group flex items-start gap-2 p-1.5 rounded-lg transition-all duration-200
                 ${isCompleted ? 'opacity-60' : 'hover:bg-gray-100'}
                 ${tache.charge_estimee_heures ? 'min-h-[28px]' : ''}
             `}
@@ -148,7 +138,7 @@ const TaskEvent = memo(function TaskEvent({ event, title }: { event: CalendarEve
             </div>
 
             {/* Contenu Texte */}
-            <div className="flex flex-col leading-tight min-w-0">
+            <div className="task-event-content flex flex-col leading-tight min-w-0">
                 <span
                     className={`
                         text-xs font-medium truncate
@@ -220,7 +210,7 @@ const TaskDetailPopover: FC<PopoverProps> = ({ tache, reference, onClose, onEdit
     const [isOpen, setIsOpen] = useState(true);
 
     console.log('🎯 POPOVER RENDER:', {
-        tache: tache.titre,
+        tache: tache.type_tache_detail?.nom_tache,
         referenceType: reference instanceof Element ? 'DOM Element' : 'VirtualElement',
         referenceBoundingRect: reference && typeof reference === 'object' && 'getBoundingClientRect' in reference
             ? reference.getBoundingClientRect()
@@ -360,7 +350,7 @@ const TaskDetailPopover: FC<PopoverProps> = ({ tache, reference, onClose, onEdit
                             </div>
                         )}
                         <div className="flex items-center gap-2">
-                            <StatusBadge variant="default" status={tache.statut}>
+                            <StatusBadge status={tache.statut}>
                                 {STATUT_TACHE_LABELS[tache.statut]}
                             </StatusBadge>
                             {tache.priorite > 1 && (
@@ -386,27 +376,12 @@ const Planning: FC = () => {
     const [typesTaches, setTypesTaches] = useState<TypeTache[]>([]);
     const [sites, setSites] = useState<Array<{ id: number; name: string }>>([]);
 
-    // === FILTRES STATE ===
-    const [clients, setClients] = useState<Client[]>([]);
-    const [filters, setFilters] = useState<PlanningFilters>(() => {
-        // Restaurer depuis localStorage au mount
-        const saved = localStorage.getItem('planningFilters');
-        if (saved) {
-            try {
-                return JSON.parse(saved);
-            } catch (e) {
-                console.error('Failed to parse saved filters:', e);
-                return EMPTY_PLANNING_FILTERS;
-            }
-        }
-        return EMPTY_PLANNING_FILTERS;
-    });
-
+    const [_clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const [isReadOnly, setIsReadOnly] = useState(false);
-    const [isClientView, setIsClientView] = useState(false);
+    const [_isClientView, setIsClientView] = useState(false);
     const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
 
     // Popover State
@@ -437,135 +412,8 @@ const Planning: FC = () => {
     const [initialTaskValues, setInitialTaskValues] = useState<Partial<TacheCreate> | undefined>(undefined);
     const [preSelectedObjects, setPreSelectedObjects] = useState<InventoryObjectOption[] | undefined>(undefined);
 
-    // === LOGIQUE DE FILTRAGE (Performance optimisée) ===
-    const filteredTaches = useMemo(() => {
-        let result = taches;
-
-        // Filtre Client
-        if (filters.clientId !== null) {
-            result = result.filter(t => t.client_detail?.utilisateur === filters.clientId);
-        }
-
-        // Filtre Site
-        if (filters.siteId !== null) {
-            result = result.filter(t =>
-                t.objets_detail?.some(obj => obj.site === filters.siteId!.toString())
-            );
-        }
-
-        // Filtre Équipe (support multi-teams US-PLAN-013)
-        if (filters.equipeId !== null) {
-            result = result.filter(t => {
-                if (t.equipes_detail?.length > 0) {
-                    return t.equipes_detail.some(eq => eq.id === filters.equipeId);
-                }
-                return t.equipe_detail?.id === filters.equipeId;
-            });
-        }
-
-        // Filtre Statuts (multi-select)
-        if (filters.statuts.length > 0) {
-            result = result.filter(t => filters.statuts.includes(t.statut));
-        }
-
-        return result;
-    }, [taches, filters]);
-
-    // Sites filtrés selon client sélectionné
-    const availableSites = useMemo(() => {
-        console.log('🔍 [FILTRAGE SITES] Début du calcul');
-        console.log('  → Client sélectionné:', filters.clientId);
-        console.log('  → Nombre total de sites:', sites.length);
-        console.log('  → Nombre total de tâches:', taches.length);
-
-        if (filters.clientId === null) {
-            console.log('  ✅ Aucun client sélectionné, retour de tous les sites');
-            return sites;
-        }
-
-        // Filtrer sites via les tâches du client
-        const clientTaches = taches.filter(t => t.client_detail?.utilisateur === filters.clientId);
-        console.log('  → Tâches du client:', clientTaches.length);
-
-        // Debug: Afficher quelques tâches
-        if (clientTaches.length === 0) {
-            console.warn('  ⚠️ Aucune tâche trouvée pour ce client !');
-            console.log('  → Toutes les tâches:', taches.map(t => ({
-                id: t.id,
-                client_id: t.client_detail?.utilisateur,
-                client_nom: t.client_detail?.nom_structure
-            })));
-        } else {
-            console.log('  → Exemples de tâches client:', clientTaches.slice(0, 3).map(t => ({
-                id: t.id,
-                type: t.type_tache_detail.nom_tache,
-                objets_count: t.objets_detail?.length || 0
-            })));
-        }
-
-        const siteIds = new Set<number>();
-
-        clientTaches.forEach(t => {
-            if (!t.objets_detail || t.objets_detail.length === 0) {
-                console.log(`  ⚠️ Tâche ${t.id} n'a pas d'objets liés`);
-                return;
-            }
-
-            t.objets_detail?.forEach(obj => {
-                const siteId = parseInt(obj.site);
-                if (!isNaN(siteId)) {
-                    siteIds.add(siteId);
-                    console.log(`  ✓ Site ${siteId} trouvé via objet ${obj.id}`);
-                }
-            });
-        });
-
-        console.log('  → Sites IDs extraits:', Array.from(siteIds));
-        const filteredSites = sites.filter(s => siteIds.has(s.id));
-        console.log('  → Sites filtrés:', filteredSites.map(s => ({ id: s.id, name: s.name })));
-
-        return filteredSites;
-    }, [filters.clientId, sites, taches]);
-
-    // Handler filtres avec persistence
-    const handleFiltersChange = useCallback((newFilters: PlanningFilters) => {
-        setFilters(newFilters);
-        localStorage.setItem('planningFilters', JSON.stringify(newFilters));
-    }, []);
-
-    // Validate saved filters against loaded data (handle deleted IDs)
-    useEffect(() => {
-        if (loading) return;
-
-        let needsUpdate = false;
-        const validated = { ...filters };
-
-        // Validate clientId
-        if (filters.clientId !== null && !clients.find(c => c.utilisateur === filters.clientId)) {
-            console.warn(`Saved clientId ${filters.clientId} not found in loaded data, resetting`);
-            validated.clientId = null;
-            validated.siteId = null; // Reset dependent filter
-            needsUpdate = true;
-        }
-
-        // Validate siteId
-        if (filters.siteId !== null && !availableSites.find(s => s.id === filters.siteId)) {
-            console.warn(`Saved siteId ${filters.siteId} not found in loaded data, resetting`);
-            validated.siteId = null;
-            needsUpdate = true;
-        }
-
-        // Validate equipeId
-        if (filters.equipeId !== null && !equipes.find(e => e.id === filters.equipeId)) {
-            console.warn(`Saved equipeId ${filters.equipeId} not found in loaded data, resetting`);
-            validated.equipeId = null;
-            needsUpdate = true;
-        }
-
-        if (needsUpdate) {
-            handleFiltersChange(validated);
-        }
-    }, [loading, clients, equipes, availableSites, filters, handleFiltersChange]);
+    // Toutes les tâches (pas de filtrage dans Planning, les filtres sont dans SuiviTaches)
+    const filteredTaches = taches;
 
     // ... (Data Loading & Navigation Effects - unchanged)
     useEffect(() => { loadStableData(); loadTaches(); }, []);
@@ -613,8 +461,11 @@ const Planning: FC = () => {
                     } else if (sitesData.results) {
                         console.log('sitesData.results exists');
 
-                        // Check if results.features exists (GeoJSON FeatureCollection inside results)
-                        if (sitesData.results.features && Array.isArray(sitesData.results.features)) {
+                        // Check if results is a FeatureCollection (has type and features properties)
+                        if (typeof sitesData.results === 'object' &&
+                            !Array.isArray(sitesData.results) &&
+                            'features' in sitesData.results &&
+                            Array.isArray(sitesData.results.features)) {
                             console.log('✓ sitesData.results.features is array (GeoJSON), length:', sitesData.results.features.length);
                             results = sitesData.results.features;
                         }
@@ -623,13 +474,13 @@ const Planning: FC = () => {
                             console.log('✓ sitesData.results is array, length:', sitesData.results.length);
                             results = sitesData.results;
                         }
-                        // Check if results is an object (convert to array) - LAST RESORT
-                        else if (typeof sitesData.results === 'object' && sitesData.results !== null) {
+                        // Unexpected format
+                        else {
                             console.log('⚠️ sitesData.results is object, keys:', Object.keys(sitesData.results));
                             console.log('This should not happen - unexpected format');
                             results = [];
                         }
-                    } else if (sitesData.features && Array.isArray(sitesData.features)) {
+                    } else if ('features' in sitesData && Array.isArray(sitesData.features)) {
                         console.log('✓ sitesData.features is array (GeoJSON at root), length:', sitesData.features.length);
                         results = sitesData.features;
                     }
@@ -680,7 +531,7 @@ const Planning: FC = () => {
                 tachesAvecClient.slice(0, 3).map(t => ({
                     tache_id: t.id,
                     client_id: t.client_detail?.utilisateur,
-                    client_nom: t.client_detail?.nom_structure
+                    client_nom: t.client_detail?.nomStructure
                 }))
             );
 
@@ -690,23 +541,74 @@ const Planning: FC = () => {
         }
     };
 
-    // ... (Keep handleExportPDF)
+    // PDF Export with programmatic rendering (Google Calendar style)
     const handleExportPDF = async () => {
         if (!calendarRef.current) return;
         setIsExporting(true);
+
         try {
-            const [html2canvasModule, jsPDFModule] = await Promise.all([import('html2canvas'), import('jspdf')]);
-            const html2canvas = html2canvasModule.default;
+            const jsPDFModule = await import('jspdf');
             const { jsPDF } = jsPDFModule;
-            const canvas = await html2canvas(calendarRef.current, { scale: 2, useCORS: true, logging: false, windowWidth: calendarRef.current.scrollWidth, windowHeight: calendarRef.current.scrollHeight });
-            const imgData = canvas.toDataURL('image/png');
+
             const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
             const pageWidth = pdf.internal.pageSize.getWidth();
             const pageHeight = pdf.internal.pageSize.getHeight();
-            pdf.setFillColor(245, 247, 250);
+
+            // Couleurs selon les statuts du backend (types/planning.ts)
+            const colors = {
+                // Statuts de tâches
+                blue: { r: 59, g: 130, b: 246 },           // #3b82f6 - PLANIFIEE
+                blueLight: { r: 219, g: 234, b: 254 },     // #dbeafe
+                blueDark: { r: 30, g: 64, b: 175 },        // #1e40af
+                gray: { r: 107, g: 114, b: 128 },          // #6b7280 - NON_DEBUTEE
+                grayLight: { r: 243, g: 244, b: 246 },     // #f3f4f6
+                grayDark: { r: 55, g: 65, b: 81 },         // #374151
+                orange: { r: 249, g: 115, b: 22 },         // #f97316 - EN_COURS
+                orangeLight: { r: 255, g: 237, b: 213 },   // #ffedd5
+                orangeDark: { r: 154, g: 52, b: 18 },      // #9a3412
+                green: { r: 34, g: 197, b: 94 },           // #22c55e - TERMINEE
+                greenLight: { r: 220, g: 252, b: 231 },    // #dcfce7
+                greenDark: { r: 22, g: 101, b: 52 },       // #166534
+                red: { r: 239, g: 68, b: 68 },             // #ef4444 - ANNULEE / Urgent
+                redLight: { r: 254, g: 226, b: 226 },      // #fee2e2
+                redDark: { r: 153, g: 27, b: 27 },         // #991b1b
+                // UI
+                emerald: { r: 16, g: 185, b: 129 },        // #10b981 - Accent GreenSIG
+                emeraldLight: { r: 209, g: 250, b: 229 },  // #d1fae5
+            };
+
+            // Helper pour obtenir la couleur selon le statut (conforme au backend)
+            const getTaskColor = (task: Tache) => {
+                // Priorité urgente (4-5) override le statut visuellement
+                if (task.priorite >= 4 && task.statut !== 'TERMINEE' && task.statut !== 'ANNULEE') {
+                    return { bg: colors.redLight, text: colors.redDark, border: colors.red };
+                }
+
+                switch (task.statut) {
+                    case 'PLANIFIEE':
+                        return { bg: colors.blueLight, text: colors.blueDark, border: colors.blue };
+                    case 'NON_DEBUTEE':
+                        return { bg: colors.grayLight, text: colors.grayDark, border: colors.gray };
+                    case 'EN_COURS':
+                        return { bg: colors.orangeLight, text: colors.orangeDark, border: colors.orange };
+                    case 'TERMINEE':
+                        return { bg: colors.greenLight, text: colors.greenDark, border: colors.green };
+                    case 'ANNULEE':
+                        return { bg: colors.redLight, text: colors.redDark, border: colors.red };
+                    default:
+                        return { bg: colors.grayLight, text: colors.grayDark, border: colors.gray };
+                }
+            };
+
+            // En-tête avec fond dégradé simulé
+            pdf.setFillColor(colors.grayLight.r, colors.grayLight.g, colors.grayLight.b);
             pdf.rect(0, 0, pageWidth, 25, 'F');
 
-            // Ajouter le logo GreenSIG en haut à gauche
+            // Ligne verte décorative en haut
+            pdf.setFillColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
+            pdf.rect(0, 0, pageWidth, 1, 'F');
+
+            // Logo
             try {
                 const logoResponse = await fetch('/logofinal.png');
                 if (logoResponse.ok) {
@@ -716,38 +618,307 @@ const Planning: FC = () => {
                         reader.onloadend = () => resolve(reader.result as string);
                         reader.readAsDataURL(logoBlob);
                     });
-                    // Ajouter le logo (30mm largeur x 15mm hauteur)
                     pdf.addImage(logoBase64, 'PNG', 14, 5, 30, 15);
                 }
             } catch (logoError) {
                 console.error('Erreur chargement logo:', logoError);
             }
 
-            pdf.setFontSize(22);
-            pdf.setTextColor(16, 185, 129);
-            pdf.text('GreenSIG', 50, 16);
-            pdf.setFontSize(14);
-            pdf.setTextColor(55, 65, 81);
+            pdf.setFontSize(16);
+            pdf.setTextColor(colors.grayDark.r, colors.grayDark.g, colors.grayDark.b);
             pdf.text('Planning des interventions', pageWidth - 14, 16, { align: 'right' });
-            const dateStr = new Date().toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
             pdf.setFontSize(10);
-            pdf.setTextColor(107, 114, 128);
+            pdf.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
+            pdf.text(`Période: ${dateLabel}`, pageWidth / 2, 16, { align: 'center' });
+
+            const dateStr = new Date().toLocaleDateString('fr-FR', {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            });
             pdf.text(`Exporté le ${dateStr}`, pageWidth - 14, 22, { align: 'right' });
-            const imgWidth = pageWidth - 20;
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            const maxHeight = pageHeight - 35;
-            let finalHeight = imgHeight;
-            let finalWidth = imgWidth;
-            if (imgHeight > maxHeight) {
-                const ratio = maxHeight / imgHeight;
-                finalHeight = maxHeight;
-                finalWidth = imgWidth * ratio;
+
+            // Date d'aujourd'hui pour mise en surbrillance
+            const today = new Date();
+
+            // Dessiner le calendrier selon la vue
+            if (currentView === 'month') {
+                const startY = 32;
+                const cellWidth = (pageWidth - 20) / 7;
+                const cellHeight = 26;
+                const headerHeight = 8;
+
+                // En-têtes des jours avec style amélioré
+                const dayNames = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'];
+                pdf.setFillColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
+                pdf.rect(10, startY, pageWidth - 20, headerHeight, 'F');
+
+                pdf.setFontSize(9);
+                pdf.setTextColor(255, 255, 255);
+                pdf.setFont('helvetica', 'bold');
+                dayNames.forEach((day, i) => {
+                    const x = 10 + (i * cellWidth) + (cellWidth / 2);
+                    pdf.text(day, x, startY + 5.5, { align: 'center' });
+                });
+
+                // Calculer les jours du mois
+                const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+                const startDate = new Date(firstDay);
+                startDate.setDate(startDate.getDate() - (startDate.getDay() === 0 ? 6 : startDate.getDay() - 1));
+
+                // Dessiner la grille et les tâches
+                for (let i = 0; i < 42; i++) {
+                    const date = new Date(startDate);
+                    date.setDate(date.getDate() + i);
+
+                    const currentRow = Math.floor(i / 7);
+                    const currentCol = i % 7;
+
+                    const x = 10 + (currentCol * cellWidth);
+                    const y = startY + headerHeight + (currentRow * cellHeight);
+
+                    const isCurrentMonth = date.getMonth() === currentDate.getMonth();
+                    const isToday = date.toDateString() === today.toDateString();
+
+                    // Fond de la cellule
+                    if (isToday) {
+                        pdf.setFillColor(colors.emeraldLight.r, colors.emeraldLight.g, colors.emeraldLight.b);
+                        pdf.rect(x, y, cellWidth, cellHeight, 'F');
+                    } else if (!isCurrentMonth) {
+                        pdf.setFillColor(250, 250, 252);
+                        pdf.rect(x, y, cellWidth, cellHeight, 'F');
+                    } else {
+                        pdf.setFillColor(255, 255, 255);
+                        pdf.rect(x, y, cellWidth, cellHeight, 'F');
+                    }
+
+                    // Bordure
+                    pdf.setDrawColor(220, 220, 220);
+                    pdf.setLineWidth(0.2);
+                    pdf.rect(x, y, cellWidth, cellHeight);
+
+                    // Numéro du jour
+                    if (isToday) {
+                        // Cercle vert pour aujourd'hui
+                        pdf.setFillColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
+                        pdf.circle(x + 5, y + 4, 3, 'F');
+                        pdf.setFontSize(8);
+                        pdf.setFont('helvetica', 'bold');
+                        pdf.setTextColor(255, 255, 255);
+                        pdf.text(date.getDate().toString(), x + 5, y + 5, { align: 'center' });
+                    } else {
+                        pdf.setFontSize(10);
+                        pdf.setFont('helvetica', 'bold');
+                        pdf.setTextColor(isCurrentMonth ? 50 : 180);
+                        pdf.text(date.getDate().toString(), x + 2.5, y + 5);
+                    }
+
+                    // Tâches du jour
+                    const dayTasks = filteredTaches.filter(t => {
+                        const taskDate = new Date(t.date_debut_planifiee);
+                        return taskDate.getDate() === date.getDate() &&
+                            taskDate.getMonth() === date.getMonth() &&
+                            taskDate.getFullYear() === date.getFullYear();
+                    }).sort((a, b) => new Date(a.date_debut_planifiee).getTime() - new Date(b.date_debut_planifiee).getTime());
+
+                    let taskY = y + 8;
+                    const maxTasksPerCell = 3;
+                    const taskHeight = 4.2;
+
+                    dayTasks.slice(0, maxTasksPerCell).forEach((task) => {
+                        const taskX = x + 0.8;
+                        const taskWidth = cellWidth - 1.6;
+                        const taskColor = getTaskColor(task);
+
+                        // Fond de la tâche avec couleur selon statut
+                        pdf.setFillColor(taskColor.bg.r, taskColor.bg.g, taskColor.bg.b);
+                        pdf.roundedRect(taskX, taskY, taskWidth, taskHeight, 0.8, 0.8, 'F');
+
+                        // Bordure gauche colorée (indicateur de statut)
+                        pdf.setFillColor(taskColor.border.r, taskColor.border.g, taskColor.border.b);
+                        pdf.rect(taskX, taskY + 0.3, 0.6, taskHeight - 0.6, 'F');
+
+                        // Texte de la tâche
+                        pdf.setFontSize(6.5);
+                        pdf.setFont('helvetica', task.statut === 'TERMINEE' ? 'normal' : 'bold');
+                        pdf.setTextColor(taskColor.text.r, taskColor.text.g, taskColor.text.b);
+
+                        const taskTime = format(new Date(task.date_debut_planifiee), 'HH:mm');
+                        const taskText = `${taskTime} ${task.type_tache_detail.nom_tache}`;
+
+                        // Tronquer si nécessaire
+                        const maxTextWidth = taskWidth - 2;
+                        let displayText = taskText;
+                        if (pdf.getTextWidth(taskText) > maxTextWidth) {
+                            let truncated = taskText;
+                            while (pdf.getTextWidth(truncated + '…') > maxTextWidth && truncated.length > 0) {
+                                truncated = truncated.slice(0, -1);
+                            }
+                            displayText = truncated + '…';
+                        }
+
+                        pdf.text(displayText, taskX + 1.2, taskY + 2.9);
+                        taskY += taskHeight + 0.6;
+                    });
+
+                    // Indicateur "+X autres"
+                    if (dayTasks.length > maxTasksPerCell) {
+                        pdf.setFontSize(6);
+                        pdf.setFont('helvetica', 'bold');
+                        pdf.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
+                        pdf.text(`+${dayTasks.length - maxTasksPerCell} autre${dayTasks.length - maxTasksPerCell > 1 ? 's' : ''}`, x + 2, taskY + 2);
+                    }
+                }
+            } else if (currentView === 'week') {
+                // Vue semaine
+                const startY = 32;
+                const timeColWidth = 15;
+                const cellWidth = (pageWidth - 20 - timeColWidth) / 7;
+                const headerHeight = 10;
+                const hourHeight = 12;
+                const startHour = 7;
+                const endHour = 19;
+
+                // En-têtes des jours avec dates
+                const weekStart = startOfWeek(currentDate, { locale: fr, weekStartsOn: 1 });
+                const dayNames = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'];
+
+                pdf.setFillColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
+                pdf.rect(10 + timeColWidth, startY, pageWidth - 20 - timeColWidth, headerHeight, 'F');
+
+                pdf.setFontSize(8);
+                pdf.setTextColor(255, 255, 255);
+                pdf.setFont('helvetica', 'bold');
+
+                for (let i = 0; i < 7; i++) {
+                    const dayDate = new Date(weekStart);
+                    dayDate.setDate(dayDate.getDate() + i);
+                    const x = 10 + timeColWidth + (i * cellWidth) + (cellWidth / 2);
+                    const isToday = dayDate.toDateString() === today.toDateString();
+
+                    if (isToday) {
+                        pdf.setFillColor(255, 255, 255);
+                        pdf.circle(x, startY + 5, 4, 'F');
+                        pdf.setTextColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
+                    } else {
+                        pdf.setTextColor(255, 255, 255);
+                    }
+                    pdf.text(`${dayNames[i]} ${dayDate.getDate()}`, x, startY + 6, { align: 'center' });
+                }
+
+                // Grille horaire
+                const gridStartY = startY + headerHeight;
+                for (let hour = startHour; hour <= endHour; hour++) {
+                    const y = gridStartY + (hour - startHour) * hourHeight;
+
+                    // Ligne de l'heure
+                    pdf.setDrawColor(230, 230, 230);
+                    pdf.setLineWidth(0.1);
+                    pdf.line(10, y, pageWidth - 10, y);
+
+                    // Label de l'heure
+                    pdf.setFontSize(7);
+                    pdf.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
+                    pdf.setFont('helvetica', 'normal');
+                    pdf.text(`${hour.toString().padStart(2, '0')}:00`, 12, y + 3);
+                }
+
+                // Bordures des colonnes
+                for (let i = 0; i <= 7; i++) {
+                    const x = 10 + timeColWidth + (i * cellWidth);
+                    pdf.setDrawColor(220, 220, 220);
+                    pdf.line(x, gridStartY, x, gridStartY + (endHour - startHour) * hourHeight);
+                }
+
+                // Dessiner les tâches de la semaine
+                for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+                    const dayDate = new Date(weekStart);
+                    dayDate.setDate(dayDate.getDate() + dayIndex);
+
+                    const dayTasks = filteredTaches.filter(t => {
+                        const taskDate = new Date(t.date_debut_planifiee);
+                        return taskDate.toDateString() === dayDate.toDateString();
+                    });
+
+                    dayTasks.forEach((task) => {
+                        const taskStart = new Date(task.date_debut_planifiee);
+                        const taskEnd = new Date(task.date_fin_planifiee);
+                        const startHourTask = taskStart.getHours() + taskStart.getMinutes() / 60;
+                        const endHourTask = taskEnd.getHours() + taskEnd.getMinutes() / 60;
+
+                        if (startHourTask >= startHour && startHourTask < endHour) {
+                            const x = 10 + timeColWidth + (dayIndex * cellWidth) + 1;
+                            const y = gridStartY + (startHourTask - startHour) * hourHeight;
+                            const height = Math.min((endHourTask - startHourTask) * hourHeight, (endHour - startHourTask) * hourHeight);
+                            const width = cellWidth - 2;
+
+                            const taskColor = getTaskColor(task);
+
+                            pdf.setFillColor(taskColor.bg.r, taskColor.bg.g, taskColor.bg.b);
+                            pdf.roundedRect(x, y, width, Math.max(height, 6), 1, 1, 'F');
+
+                            pdf.setFillColor(taskColor.border.r, taskColor.border.g, taskColor.border.b);
+                            pdf.rect(x, y + 0.5, 1, Math.max(height, 6) - 1, 'F');
+
+                            pdf.setFontSize(6);
+                            pdf.setFont('helvetica', 'bold');
+                            pdf.setTextColor(taskColor.text.r, taskColor.text.g, taskColor.text.b);
+
+                            const taskText = task.type_tache_detail.nom_tache;
+                            const maxTextWidth = width - 3;
+                            let displayText = taskText;
+                            if (pdf.getTextWidth(taskText) > maxTextWidth) {
+                                let truncated = taskText;
+                                while (pdf.getTextWidth(truncated + '…') > maxTextWidth && truncated.length > 0) {
+                                    truncated = truncated.slice(0, -1);
+                                }
+                                displayText = truncated + '…';
+                            }
+                            pdf.text(displayText, x + 2, y + 4);
+                        }
+                    });
+                }
             }
-            const xPos = (pageWidth - finalWidth) / 2;
-            pdf.addImage(imgData, 'PNG', xPos, 30, finalWidth, finalHeight);
-            pdf.setFontSize(8);
-            pdf.setTextColor(156, 163, 175);
-            pdf.text('Document généré automatiquement par GreenSIG', pageWidth / 2, pageHeight - 5, { align: 'center' });
+
+            // Légende en bas (conforme aux statuts du backend)
+            const legendY = pageHeight - 8;
+            pdf.setFontSize(7);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(colors.grayDark.r, colors.grayDark.g, colors.grayDark.b);
+            pdf.text('Statuts:', 10, legendY);
+
+            const legendItems = [
+                { label: 'Planifiée', color: colors.blue },
+                { label: 'Non débutée', color: colors.gray },
+                { label: 'En cours', color: colors.orange },
+                { label: 'Terminée', color: colors.green },
+                { label: 'Annulée', color: colors.red },
+            ];
+
+            let legendX = 26;
+            legendItems.forEach(item => {
+                pdf.setFillColor(item.color.r, item.color.g, item.color.b);
+                pdf.roundedRect(legendX, legendY - 2.5, 3, 3, 0.5, 0.5, 'F');
+                pdf.setFont('helvetica', 'normal');
+                pdf.setTextColor(colors.grayDark.r, colors.grayDark.g, colors.grayDark.b);
+                pdf.text(item.label, legendX + 4.5, legendY);
+                legendX += pdf.getTextWidth(item.label) + 10;
+            });
+
+            // Légende priorité urgente
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('|  Priorité:', legendX + 2, legendY);
+            legendX += pdf.getTextWidth('|  Priorité:') + 4;
+            pdf.setFillColor(colors.red.r, colors.red.g, colors.red.b);
+            pdf.roundedRect(legendX, legendY - 2.5, 3, 3, 0.5, 0.5, 'F');
+            pdf.setFont('helvetica', 'normal');
+            pdf.text('Haute/Urgent', legendX + 4.5, legendY);
+
+            // Pied de page (sur la même ligne que la légende, à droite)
+            pdf.setFontSize(6);
+            pdf.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
+            pdf.text('Document généré automatiquement par GreenSIG', pageWidth - 10, legendY, { align: 'right' });
+
             pdf.save(`planning_greensig_${new Date().toISOString().split('T')[0]}.pdf`);
         } catch (error) {
             console.error('Erreur export PDF:', error);
@@ -790,19 +961,14 @@ const Planning: FC = () => {
         const deletedId = tacheToDelete;
 
         try {
-            // Mise à jour optimiste : retirer la tâche de la liste AVANT l'appel API
-            setTaches(prev => prev.filter(t => t.id !== deletedId));
-            setTacheToDelete(null); // Fermer le modal immédiatement
-
-            // Appel API en arrière-plan
             await planningService.deleteTache(deletedId);
-
-            // Pas besoin de loadTaches() car on a déjà mis à jour l'état optimistiquement
+            setTaches(prev => prev.filter(t => t.id !== deletedId));
+            setTacheToDelete(null);
         } catch (err) {
             // En cas d'erreur, recharger pour restaurer l'état correct
             console.error('Erreur suppression tâche:', err);
             await loadTaches();
-            alert('Erreur lors de la suppression');
+            throw err; // Re-throw pour que le modal affiche l'erreur
         }
     };
     const handleResetCharge = async (tacheId: number) => { try { await planningService.resetCharge(tacheId); await loadTaches(); } catch (err) { alert('Erreur charge'); } };
@@ -877,7 +1043,7 @@ const Planning: FC = () => {
         const rect = target.getBoundingClientRect();
 
         console.log('📅 CALENDAR CLICK:', {
-            tache: event.resource.titre,
+            tache: event.resource.type_tache_detail?.nom_tache,
             clickPosition: {
                 mouseEvent: e.nativeEvent instanceof MouseEvent ? {
                     clientX: (e.nativeEvent as MouseEvent).clientX,
@@ -1028,17 +1194,8 @@ const Planning: FC = () => {
                     {viewMode === 'list' && <h2 className="text-xl font-normal text-gray-800">Agenda des tâches</h2>}
                 </div>
 
-                {/* CENTER: FILTRES */}
-                <div className="flex items-center justify-center flex-1">
-                    <PlanningFiltersComponent
-                        filters={filters}
-                        onFiltersChange={handleFiltersChange}
-                        clients={clients}
-                        sites={availableSites}
-                        equipes={equipes}
-                        disabled={loading}
-                    />
-                </div>
+                {/* CENTER: Spacer */}
+                <div className="flex-1" />
 
                 {/* RIGHT: View controls */}
                 <div className="flex items-center gap-3 w-full md:w-auto justify-end">
@@ -1146,7 +1303,7 @@ const Planning: FC = () => {
                                                         key={tache.id}
                                                         onClick={(e) => {
                                                             console.log('📋 AGENDA CLICK:', {
-                                                                tache: tache.titre,
+                                                                tache: tache.type_tache_detail?.nom_tache,
                                                                 clickPosition: {
                                                                     clientX: e.clientX,
                                                                     clientY: e.clientY,
@@ -1223,7 +1380,7 @@ const Planning: FC = () => {
 
                                                         {/* Status Badge */}
                                                         <div className="flex-shrink-0">
-                                                            <StatusBadge variant="default" status={tache.statut}>
+                                                            <StatusBadge status={tache.statut}>
                                                                 {STATUT_TACHE_LABELS[tache.statut]}
                                                             </StatusBadge>
                                                         </div>
@@ -1285,17 +1442,12 @@ const Planning: FC = () => {
 
             {/* Delete Confirmation Modal */}
             {tacheToDelete && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
-                        <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500"><Trash2 className="w-7 h-7" /></div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">Supprimer la tâche ?</h3>
-                        <p className="text-sm text-gray-500 mb-8">Cette action est irréversible.</p>
-                        <div className="flex gap-3">
-                            <button onClick={() => setTacheToDelete(null)} className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium">Annuler</button>
-                            <button onClick={confirmDelete} className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 font-medium">Supprimer</button>
-                        </div>
-                    </div>
-                </div>
+                <ConfirmDeleteModal
+                    title="Supprimer la tâche ?"
+                    message="Cette action est irréversible."
+                    onConfirm={confirmDelete}
+                    onCancel={() => setTacheToDelete(null)}
+                />
             )}
 
             {/* Quick Task Creator */}

@@ -356,9 +356,17 @@ export const MapPage: React.FC<MapPageProps> = ({
     const preSelected: InventoryObjectOption[] = [];
 
     if (object) {
-      // Only add if ID is numeric (skip sites or non-inventory items if needed)
       const objId = Number(object.id);
-      if (!isNaN(objId)) {
+
+      // Check if this is a Reclamation
+      if (object.type === 'Reclamation') {
+        // Link the task to this reclamation
+        // The site is determined from the reclamation itself in the backend
+        if (!isNaN(objId)) {
+          initialValues.reclamation = objId;
+        }
+      } else if (!isNaN(objId)) {
+        // Regular inventory object - add to pre-selected objects
         // Try to get superficie from attributes (various possible keys)
         const superficieStr = object.attributes?.['superficie_calculee']
           || object.attributes?.['Surface (m²)']
@@ -654,7 +662,6 @@ export const MapPage: React.FC<MapPageProps> = ({
       });
 
       const pdfBlob = await exportPDF({
-        title: 'Export Carte GreenSIG',
         mapImageBase64,
         visibleLayers,
         center: [center.lng, center.lat],
@@ -732,7 +739,7 @@ export const MapPage: React.FC<MapPageProps> = ({
   };
 
   // ✅ Handle object created successfully
-  const handleObjectCreated = (objectData: any) => {
+  const handleObjectCreated = (_objectData: any) => {
     showToast(`${pendingObjectType} créé avec succès!`, 'success');
     setShowCreateModal(false);
     clearDrawnGeometry();

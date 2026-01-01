@@ -240,7 +240,7 @@ const CompetenceMatrix: React.FC<CompetenceMatrixProps> = ({
                   className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden"
                 >
                   {/* Card Header */}
-                  <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-4 text-white">
+                  <div className="bg-emerald-900 p-4 text-white">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <h4 className="font-semibold text-lg">{op.fullName}</h4>

@@ -11,6 +11,7 @@ const OLMap = lazy(() => import('./components/OLMap').then(m => ({ default: m.OL
 const Inventory = lazy(() => import('./pages/Inventory'));
 const InventoryDetailPage = lazy(() => import('./pages/InventoryDetailPage'));
 const Reclamations = lazy(() => import('./pages/Reclamations'));
+const ReclamationDetailPage = lazy(() => import('./pages/ReclamationDetailPage'));
 const ReclamationsDashboard = lazy(() => import('./pages/ReclamationsDashboard'));
 const Teams = lazy(() => import('./pages/Teams'));
 const Planning = lazy(() => import('./pages/Planning'));
@@ -25,7 +26,8 @@ const Parametres = lazy(() => import('./pages/Parametres'));
 const Sites = lazy(() => import('./pages/Sites'));
 const SiteDetailPage = lazy(() => import('./pages/SiteDetailPage'));
 const Clients = lazy(() => import('./pages/Clients'));
-const ClientDetailPage = lazy(() => import('./pages/ClientDetailPage'));
+const StructureDetailPage = lazy(() => import('./pages/StructureDetailPage'));
+const ClientUserDetailPage = lazy(() => import('./pages/ClientUserDetailPage'));
 const OperateurDetailPage = lazy(() => import('./pages/OperateurDetailPage'));
 import { User, MapLayerType, Coordinates, OverlayState, MapObjectDetail, UserLocation, Measurement, MeasurementType } from './types';
 import { MAP_LAYERS } from './constants';
@@ -40,6 +42,7 @@ import { DrawingProvider } from './contexts/DrawingContext';
 import { SearchProvider } from './contexts/SearchContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import logger from './services/logger';
+import ConfirmDeleteModal from './components/modals/ConfirmDeleteModal';
 
 const PageLoadingFallback = () => (
   <div className="fixed inset-0 z-50">
@@ -85,6 +88,9 @@ function App() {
   const [measurementType, setMeasurementType] = useState<MeasurementType>('distance');
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [currentMeasurement, setCurrentMeasurement] = useState<Measurement | null>(null);
+
+  // Deletion modal state
+  const [itemToDelete, setItemToDelete] = useState<{ id: string; type: string } | null>(null);
 
   const mapRef = useRef<any>(null);
 
@@ -201,10 +207,13 @@ function App() {
   };
 
   const handleObjectDelete = async (objectId: string, objectType: string) => {
-    // Ask for confirmation
-    if (!window.confirm(`Êtes-vous sûr de vouloir supprimer cet objet (${objectType} #${objectId}) ?`)) {
-      return;
-    }
+    // Ask for confirmation via modal
+    setItemToDelete({ id: objectId, type: objectType });
+  };
+
+  const executeObjectDelete = async () => {
+    if (!itemToDelete) return;
+    const { id: objectId, type: objectType } = itemToDelete;
 
     try {
       await deleteInventoryItem(objectType, objectId);
@@ -327,13 +336,19 @@ function App() {
                           <Suspense fallback={<PageLoadingFallback />}><Clients /></Suspense>
                         </RequireRole>
                       } />
-                      <Route path="clients/:id" element={
+                      <Route path="structures/:id" element={
                         <RequireRole user={user} roles={['ADMIN']}>
-                          <Suspense fallback={<PageLoadingFallback />}><ClientDetailPage /></Suspense>
+                          <Suspense fallback={<PageLoadingFallback />}><StructureDetailPage /></Suspense>
+                        </RequireRole>
+                      } />
+                      <Route path="structures/:structureId/utilisateurs/:userId" element={
+                        <RequireRole user={user} roles={['ADMIN']}>
+                          <Suspense fallback={<PageLoadingFallback />}><ClientUserDetailPage /></Suspense>
                         </RequireRole>
                       } />
                       <Route path="interventions" element={<Navigate to="/reclamations" replace />} />
                       <Route path="reclamations" element={<Suspense fallback={<PageLoadingFallback />}><Reclamations /></Suspense>} />
+                      <Route path="reclamations/:id" element={<Suspense fallback={<PageLoadingFallback />}><ReclamationDetailPage /></Suspense>} />
                       <Route path="reclamations/stats" element={<Suspense fallback={<PageLoadingFallback />}><ReclamationsDashboard /></Suspense>} />
                       <Route path="teams" element={<Suspense fallback={<PageLoadingFallback />}><Teams /></Suspense>} />
                       <Route path="users" element={
@@ -378,8 +393,18 @@ function App() {
             </DrawingProvider>
           </SelectionProvider>
         </ToastProvider>
+        {itemToDelete && (
+          <ConfirmDeleteModal
+            title="Supprimer l'objet ?"
+            message={`Êtes-vous sûr de vouloir supprimer cet objet (${itemToDelete.type} #${itemToDelete.id}) ? Cette action est irréversible.`}
+            onConfirm={executeObjectDelete}
+            onCancel={() => setItemToDelete(null)}
+            confirmText="Supprimer"
+            cancelText="Annuler"
+          />
+        )}
       </ErrorBoundary>
-    </BrowserRouter>
+    </BrowserRouter >
   );
 }
 export default App;

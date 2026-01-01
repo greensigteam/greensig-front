@@ -145,7 +145,7 @@ const CreateAbsenceModal: React.FC<CreateAbsenceModalProps> = ({
     ...operateurs
       .filter(o => o.actif)
       .map(op => ({
-        value: op.utilisateur,
+        value: op.id,
         label: `${op.fullName} (${op.numeroImmatriculation})`
       }))
   ];

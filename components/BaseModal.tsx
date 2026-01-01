@@ -222,7 +222,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
         {showCloseButton && (
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 z-10 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            className="absolute top-4 right-4 z-10 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
             aria-label="Fermer la modale"
           >
             <X className="w-5 h-5" />
@@ -252,7 +252,7 @@ export const ModalHeader: React.FC<{
   icon?: React.ReactNode;
   className?: string;
 }> = ({ title, subtitle, icon, className = '' }) => (
-  <div className={`p-6 border-b border-gray-200 ${className}`}>
+  <div className={`p-6 border-b border-slate-200 ${className}`}>
     <div className="flex items-center gap-3">
       {icon && (
         <div className="p-3 rounded-full bg-emerald-100 flex-shrink-0">
@@ -260,9 +260,9 @@ export const ModalHeader: React.FC<{
         </div>
       )}
       <div className="flex-1 min-w-0">
-        <h2 className="text-xl font-bold text-gray-900 truncate">{title}</h2>
+        <h2 className="text-xl font-bold text-slate-900 truncate">{title}</h2>
         {subtitle && (
-          <p className="text-sm text-gray-500 mt-0.5 truncate">{subtitle}</p>
+          <p className="text-sm text-slate-500 mt-0.5 truncate">{subtitle}</p>
         )}
       </div>
     </div>
@@ -295,7 +295,7 @@ export const ModalFooter: React.FC<{
   children: React.ReactNode;
   className?: string;
 }> = ({ children, className = '' }) => (
-  <div className={`p-6 border-t border-gray-200 bg-gray-50 flex gap-3 ${className}`}>
+  <div className={`p-6 border-t border-slate-200 bg-slate-50 flex gap-3 ${className}`}>
     {children}
   </div>
 );

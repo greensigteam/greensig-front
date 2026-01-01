@@ -15,9 +15,16 @@ import {
   UtilisateurUpdate,
   ChangePassword,
   Role,
+  StructureClient,
+  StructureClientDetail,
+  StructureClientCreate,
+  StructureClientUpdate,
+  StructureClientFilters,
   Client,
+  ClientUser,
   ClientCreate,
   ClientUpdate,
+  ClientFilters,
   Competence,
   CompetenceOperateur,
   CompetenceOperateurCreate,
@@ -26,6 +33,7 @@ import {
   OperateurCreate,
   OperateurUpdate,
   SuperviseurList,
+  SuperviseurCreate,
   EquipeList,
   EquipeDetail,
   EquipeCreate,
@@ -205,8 +213,9 @@ export async function updateUtilisateur(
     body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
   });
 
-  // Invalider le cache
+  // Invalider les caches utilisateurs et clients
   await db.remove(cacheKeys.users());
+  await db.remove('clients');
   return result;
 }
 
@@ -244,7 +253,95 @@ export async function fetchRoles(): Promise<Role[]> {
 }
 
 // ============================================================================
-// CLIENTS
+// STRUCTURES CLIENTS
+// ============================================================================
+
+export async function fetchStructures(
+  filters: StructureClientFilters = {},
+  forceRefresh = false
+): Promise<PaginatedResponse<StructureClient>> {
+  const queryString = buildQueryParams(filters as Record<string, unknown>);
+  const cacheKey = queryString ? `structures:${queryString}` : 'structures';
+
+  if (!forceRefresh) {
+    const cached = await db.get<PaginatedResponse<StructureClient>>(cacheKey);
+    if (cached) {
+      logCache('[Cache HIT] Structures');
+      return cached;
+    }
+  }
+
+  logCache('[Cache MISS] Structures - Appel API');
+  const result = await fetchApi<PaginatedResponse<StructureClient>>(
+    `${USERS_API_URL}/structures/?${queryString}`
+  );
+  await db.set(cacheKey, result, cacheTTL.standard);
+  return result;
+}
+
+export async function fetchStructureById(id: number): Promise<StructureClientDetail> {
+  return fetchApi<StructureClientDetail>(`${USERS_API_URL}/structures/${id}/`);
+}
+
+export async function createStructure(data: StructureClientCreate): Promise<StructureClient> {
+  const result = await fetchApi<StructureClient>(`${USERS_API_URL}/structures/`, {
+    method: 'POST',
+    body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
+  });
+
+  // Invalider le cache
+  await db.invalidatePrefix('structures');
+  return result;
+}
+
+export async function updateStructure(
+  id: number,
+  data: StructureClientUpdate
+): Promise<StructureClient> {
+  const result = await fetchApi<StructureClient>(`${USERS_API_URL}/structures/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
+  });
+
+  // Invalider le cache
+  await db.invalidatePrefix('structures');
+  return result;
+}
+
+export async function deleteStructure(id: number): Promise<void> {
+  await fetchApi<void>(`${USERS_API_URL}/structures/${id}/`, {
+    method: 'DELETE'
+  });
+
+  // Invalider le cache
+  await db.invalidatePrefix('structures');
+  await db.remove('clients');
+}
+
+export async function fetchStructureUtilisateurs(structureId: number): Promise<ClientUser[]> {
+  return fetchApi<ClientUser[]>(`${USERS_API_URL}/structures/${structureId}/utilisateurs/`);
+}
+
+export async function addUserToStructure(
+  structureId: number,
+  userData: { email: string; nom: string; prenom: string; password: string }
+): Promise<Client> {
+  const result = await fetchApi<Client>(
+    `${USERS_API_URL}/structures/${structureId}/ajouter_utilisateur/`,
+    {
+      method: 'POST',
+      body: JSON.stringify(camelToSnake(userData as unknown as Record<string, unknown>))
+    }
+  );
+
+  // Invalider les caches
+  await db.invalidatePrefix('structures');
+  await db.remove('clients');
+  return result;
+}
+
+// ============================================================================
+// CLIENTS (Utilisateurs de structures)
 // ============================================================================
 
 export async function fetchClients(forceRefresh = false): Promise<PaginatedResponse<Client>> {
@@ -260,6 +357,24 @@ export async function fetchClients(forceRefresh = false): Promise<PaginatedRespo
   const result = await fetchApi<PaginatedResponse<Client>>(`${USERS_API_URL}/clients/`);
   await db.set('clients', result, cacheTTL.standard);
   return result;
+}
+
+/**
+ * Récupère un client par son ID utilisateur
+ * Utilise l'endpoint /clients/?utilisateur={id} pour filtrer
+ */
+export async function fetchClientByUserId(userId: number): Promise<Client | null> {
+  try {
+    // L'API supporte le filtre par utilisateur
+    const result = await fetchApi<PaginatedResponse<Client>>(`${USERS_API_URL}/clients/?utilisateur=${userId}`);
+    if (result.results && result.results.length > 0) {
+      return result.results[0] ?? null;
+    }
+    return null;
+  } catch (error) {
+    console.error('Erreur fetchClientByUserId:', error);
+    return null;
+  }
 }
 
 export async function createClient(data: ClientCreate): Promise<Client> {
@@ -516,48 +631,11 @@ export async function fetchOperateursDisponibles(): Promise<OperateurList[]> {
 }
 
 export async function fetchChefsPotentiels(): Promise<OperateurList[]> {
-  // Récupérer les opérateurs pouvant être chef d'équipe (par compétence "Gestion d'équipe")
-  // Note: Les chefs d'équipe sont des opérateurs (données RH), pas des utilisateurs
+  // Récupérer uniquement les opérateurs pouvant être chef d'équipe
+  // Les superviseurs sont des UTILISATEURS (comptes de connexion), pas des opérateurs (données RH)
+  // Ils ne doivent PAS apparaître dans cette liste
   const operateursRes = await fetchApi<OperateurList[]>(`${USERS_API_URL}/operateurs/chefs_potentiels/`);
-
-  // Les superviseurs (utilisateurs) ne sont PAS des opérateurs, donc on ne les inclut pas ici
-  const usersRes = await fetchApi<PaginatedResponse<Utilisateur>>(
-    `${USERS_API_URL}/utilisateurs/?role=SUPERVISEUR&actif=true`
-  ).catch(() => ({ count: 0, next: null, previous: null, results: [] } as PaginatedResponse<Utilisateur>));
-
-  const usersAsOperateurs: OperateurList[] = (usersRes && usersRes.results ? usersRes.results : []).map(u => ({
-    utilisateur: u.id,
-    email: u.email,
-    nom: u.nom,
-    prenom: u.prenom,
-    fullName: u.fullName || `${u.prenom} ${u.nom}`,
-    actif: u.actif,
-    numeroImmatriculation: '',
-    statut: null as any,
-    equipe: null as any,
-    equipeNom: null as any,
-    dateEmbauche: null as any,
-    telephone: '',
-    photo: null as any,
-    estChefEquipe: true,
-    estDisponible: false
-  }));
-
-  // Merge unique by `utilisateur` id
-  const merged: OperateurList[] = [];
-  const seen = new Set<number>();
-  for (const op of operateursRes) {
-    merged.push(op);
-    seen.add(op.utilisateur);
-  }
-  for (const u of usersAsOperateurs) {
-    if (!seen.has(u.utilisateur)) {
-      merged.push(u);
-      seen.add(u.utilisateur);
-    }
-  }
-
-  return merged;
+  return operateursRes;
 }
 
 export async function fetchCompetencesOperateur(
@@ -594,10 +672,62 @@ export async function affecterCompetence(
 // ============================================================================
 
 export async function fetchSuperviseurs(): Promise<PaginatedResponse<SuperviseurList>> {
-  // Récupérer les utilisateurs avec le rôle SUPERVISEUR
-  const result = await fetchApi<PaginatedResponse<SuperviseurList>>(
+  // D'abord essayer de récupérer depuis le modèle Superviseur
+  const superviseurResult = await fetchApi<PaginatedResponse<SuperviseurList>>(
     `${USERS_API_URL}/superviseurs/`
-  );
+  ).catch(() => ({ count: 0, next: null, previous: null, results: [] }));
+
+  // Ensuite récupérer les utilisateurs avec le rôle SUPERVISEUR
+  const usersResult = await fetchApi<PaginatedResponse<Utilisateur>>(
+    `${USERS_API_URL}/utilisateurs/?role=SUPERVISEUR&actif=true`
+  ).catch(() => ({ count: 0, next: null, previous: null, results: [] }));
+
+  // Fusionner les deux listes (éviter les doublons par email)
+  const seen = new Set<string>();
+  const merged: SuperviseurList[] = [];
+
+  // Ajouter d'abord les superviseurs du modèle Superviseur
+  for (const sup of superviseurResult.results) {
+    if (sup.email && !seen.has(sup.email)) {
+      seen.add(sup.email);
+      merged.push(sup);
+    }
+  }
+
+  // Ajouter les utilisateurs avec le rôle SUPERVISEUR qui ne sont pas déjà dans la liste
+  for (const user of usersResult.results) {
+    if (user.email && !seen.has(user.email)) {
+      seen.add(user.email);
+      merged.push({
+        utilisateur: user.id,
+        email: user.email,
+        nom: user.nom,
+        prenom: user.prenom,
+        fullName: user.fullName || `${user.prenom} ${user.nom}`,
+        actif: user.actif,
+        nombreEquipesGerees: 0
+      });
+    }
+  }
+
+  return {
+    count: merged.length,
+    next: null,
+    previous: null,
+    results: merged
+  };
+}
+
+export async function createSuperviseur(data: SuperviseurCreate): Promise<SuperviseurList> {
+  // Crée automatiquement : Utilisateur + Profil Superviseur + Rôle SUPERVISEUR
+  const result = await fetchApi<SuperviseurList>(`${USERS_API_URL}/superviseurs/`, {
+    method: 'POST',
+    body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
+  });
+
+  // Invalider les caches
+  await db.remove(cacheKeys.users());
+  await db.invalidatePrefix('superviseurs:');
   return result;
 }
 

@@ -472,50 +472,53 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     const reclamationsSource = new VectorSource();
     reclamationsSourceRef.current = reclamationsSource;
 
+    // Style function for reclamations (used by both layers)
+    const getReclamationStyle = (feature: Feature): Style | Style[] => {
+      const props = feature.getProperties();
+      const statut = props.statut || 'NOUVELLE';
+      const color = RECLAMATION_STATUS_COLORS[statut] || '#ef4444';
+      const geomType = feature.getGeometry()?.getType();
+
+      // Point: cercle avec icône d'alerte
+      if (geomType === 'Point') {
+        return new Style({
+          image: new CircleStyle({
+            radius: 12,
+            fill: new Fill({ color: color }),
+            stroke: new Stroke({ color: '#ffffff', width: 3 })
+          }),
+          text: new Text({
+            text: '!',
+            font: 'bold 14px sans-serif',
+            fill: new Fill({ color: '#ffffff' }),
+            offsetY: 1
+          })
+        });
+      } else {
+        // Polygon/LineString/Circle/MultiPolygon: contour coloré avec remplissage semi-transparent
+        return new Style({
+          fill: new Fill({ color: `${color}40` }), // 25% opacity
+          stroke: new Stroke({
+            color: color,
+            width: 3,
+            lineDash: [8, 4] // Ligne pointillée pour différencier des objets normaux
+          })
+        });
+      }
+    };
+
+    // Reclamations layer - renders all geometry types directly (no clustering)
     const reclamationsLayer = new VectorLayer({
       source: reclamationsSource,
-      zIndex: 100, // Au-dessus des objets mais en-dessous de la sélection
-      style: (feature) => {
-        const props = feature.getProperties();
-        const statut = props.statut || 'NOUVELLE';
-        const color = RECLAMATION_STATUS_COLORS[statut] || '#ef4444';
-        const geomType = feature.getGeometry()?.getType();
-
-        // Style de base avec bordure blanche pour plus de visibilité
-        if (geomType === 'Point') {
-          // Point: cercle avec icône d'alerte
-          return new Style({
-            image: new CircleStyle({
-              radius: 12,
-              fill: new Fill({ color: color }),
-              stroke: new Stroke({ color: '#ffffff', width: 3 })
-            }),
-            text: new Text({
-              text: '!',
-              font: 'bold 14px sans-serif',
-              fill: new Fill({ color: '#ffffff' }),
-              offsetY: 1
-            })
-          });
-        } else {
-          // Polygon/LineString: contour coloré avec remplissage semi-transparent
-          return new Style({
-            fill: new Fill({ color: `${color}40` }), // 25% opacity
-            stroke: new Stroke({
-              color: color,
-              width: 3,
-              lineDash: [8, 4] // Ligne pointillée pour différencier des objets normaux
-            })
-          });
-        }
-      }
+      zIndex: 25, // En-dessous des objets (50) mais au-dessus des sites (1)
+      style: (feature) => getReclamationStyle(feature as Feature)
     });
     reclamationsLayerRef.current = reclamationsLayer;
 
     // Create map (without hook layers to avoid "Duplicate item" error)
     const map = new Map({
       target: innerMapRef.current,
-      layers: [baseLayer, sitesLayer, dataLayer, reclamationsLayer, selectionLayer], // ✅ Réclamations ajoutée
+      layers: [baseLayer, sitesLayer, reclamationsLayer, dataLayer, selectionLayer], // ✅ Order: sites < reclamations < objects < selection
       overlays: [overlay], // ✅ Only our own overlay
       view: new View({
         center: fromLonLat([INITIAL_POSITION.lng, INITIAL_POSITION.lat]),
@@ -598,6 +601,11 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
 
   // Fetch Data Function - Unified endpoint with bbox
   const fetchData = async () => {
+    // ✅ Skip data fetch for mini-maps (they only display highlighted geometry)
+    if (isMiniMap) {
+      return;
+    }
+
     console.log('=== fetchData START (UNIFIED ENDPOINT) ===');
 
     if (!mapInstance.current || !dataLayerRef.current || !sitesLayerRef.current) {
@@ -606,8 +614,23 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
 
     try {
       const view = mapInstance.current.getView();
-      const extent = view.calculateExtent(mapInstance.current.getSize());
+      const mapSize = mapInstance.current.getSize();
+
+      // Skip if map size is invalid (not yet rendered)
+      if (!mapSize || mapSize[0] === 0 || mapSize[1] === 0) {
+        console.log('⚠️ Map size invalid, skipping fetch');
+        return;
+      }
+
+      const extent = view.calculateExtent(mapSize);
       const [west, south, east, north] = transformExtent(extent, 'EPSG:3857', 'EPSG:4326');
+
+      // Skip if bbox contains invalid values (NaN, Infinity)
+      if (!Number.isFinite(west) || !Number.isFinite(south) || !Number.isFinite(east) || !Number.isFinite(north)) {
+        console.log('⚠️ Invalid bbox coordinates, skipping fetch');
+        return;
+      }
+
       const zoom = Math.round(view.getZoom() || 10);
 
       // ✅ Use ref to get current value (avoids stale closure)
@@ -829,8 +852,20 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
 
     try {
       const view = mapInstance.current.getView();
-      const extent = view.calculateExtent(mapInstance.current.getSize());
+      const mapSize = mapInstance.current.getSize();
+
+      // Skip if map size is invalid (not yet rendered)
+      if (!mapSize || mapSize[0] === 0 || mapSize[1] === 0) {
+        return;
+      }
+
+      const extent = view.calculateExtent(mapSize);
       const [west, south, east, north] = transformExtent(extent, 'EPSG:3857', 'EPSG:4326');
+
+      // Skip if bbox contains invalid values (NaN, Infinity)
+      if (!Number.isFinite(west) || !Number.isFinite(south) || !Number.isFinite(east) || !Number.isFinite(north)) {
+        return;
+      }
 
       const data = await fetchReclamationsForMap({
         bbox: `${west},${south},${east},${north}`
@@ -858,6 +893,8 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
         feature.set('couleur_statut', feat.properties.couleur_statut);
         feature.set('urgence', feat.properties.urgence);
         feature.set('type_reclamation', feat.properties.type_reclamation);
+        feature.set('type_reclamation_symbole', feat.properties.type_reclamation_symbole);
+        feature.set('type_reclamation_categorie', feat.properties.type_reclamation_categorie);
         feature.set('description', feat.properties.description);
         feature.set('site_nom', feat.properties.site_nom);
         feature.set('id', feat.properties.id);

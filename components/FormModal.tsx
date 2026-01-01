@@ -174,8 +174,8 @@ export const FormModal: React.FC<FormModalProps> = ({
                 </div>
               )}
               <div>
-                <h2 className="text-xl font-bold text-gray-900">{title}</h2>
-                {subtitle && <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>}
+                <h2 className="text-xl font-bold text-slate-900">{title}</h2>
+                {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
               </div>
             </div>
             {!loading && (
@@ -185,7 +185,7 @@ export const FormModal: React.FC<FormModalProps> = ({
                 className="p-2 hover:bg-white/50 rounded-full transition-colors"
                 aria-label="Fermer"
               >
-                <X className="w-5 h-5 text-gray-500" />
+                <X className="w-5 h-5 text-slate-500" />
               </button>
             )}
           </div>
@@ -251,7 +251,7 @@ export const FormModal: React.FC<FormModalProps> = ({
                 type="button"
                 onClick={handleClose}
                 disabled={loading}
-                className={`${MODAL_DESIGN_TOKENS.buttons.paddingCompact} text-sm font-medium ${MODAL_DESIGN_TOKENS.buttons.secondary} transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500`}
+                className={`${MODAL_DESIGN_TOKENS.buttons.paddingCompact} text-sm font-medium ${MODAL_DESIGN_TOKENS.buttons.secondary} transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500`}
               >
                 {cancelLabel}
               </button>
@@ -301,14 +301,14 @@ export const FormField: React.FC<{
   icon?: React.ReactNode;
 }> = ({ label, required, error, hint, children, className = '', icon }) => (
   <div className={`space-y-1.5 ${className}`}>
-    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-      {icon && <span className="text-gray-400">{icon}</span>}
+    <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+      {icon && <span className="text-slate-400">{icon}</span>}
       {label}
       {required && <span className="text-red-500 ml-0.5" title="Champ obligatoire">*</span>}
     </label>
     {children}
     {hint && !error && (
-      <p className="text-xs text-gray-500">{hint}</p>
+      <p className="text-xs text-slate-500">{hint}</p>
     )}
     {error && (
       <p className="text-xs text-red-600 flex items-center gap-1 animate-in slide-in-from-top-1">
@@ -350,10 +350,10 @@ export const FormSection: React.FC<{
   className?: string;
 }> = ({ title, description, children, className = '' }) => (
   <div className={`space-y-4 ${className}`}>
-    <div className="border-b border-gray-200 pb-3">
-      <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+    <div className="border-b border-slate-200 pb-3">
+      <h3 className="text-base font-semibold text-slate-900">{title}</h3>
       {description && (
-        <p className="text-sm text-gray-500 mt-1">{description}</p>
+        <p className="text-sm text-slate-500 mt-1">{description}</p>
       )}
     </div>
     {children}
@@ -371,22 +371,22 @@ export const FormCheckbox: React.FC<{
   hint?: string;
   className?: string;
 }> = ({ label, checked, onChange, disabled, hint, className = '' }) => (
-  <div className={`flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors ${className}`}>
+  <div className={`flex items-start gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors ${className}`}>
     <div className="flex items-center h-5">
       <input
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
         disabled={disabled}
-        className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500 focus:ring-offset-0 disabled:opacity-50 cursor-pointer"
+        className="w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 focus:ring-offset-0 disabled:opacity-50 cursor-pointer"
       />
     </div>
     <div className="flex-1 text-sm">
-      <label className="font-medium text-gray-700 cursor-pointer select-none">
+      <label className="font-medium text-slate-700 cursor-pointer select-none">
         {label}
       </label>
       {hint && (
-        <p className="text-gray-500 mt-0.5">{hint}</p>
+        <p className="text-slate-500 mt-0.5">{hint}</p>
       )}
     </div>
   </div>
@@ -429,12 +429,12 @@ export const FormInput: React.FC<{
     max={max}
     step={step}
     className={`
-      w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900
-      placeholder:text-gray-400
+      w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900
+      placeholder:text-slate-400
       focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500
-      disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed
+      disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed
       transition-all duration-200 ease-in-out
-      shadow-sm hover:border-gray-400
+      shadow-sm hover:border-slate-400
       ${className}
     `}
   />
@@ -468,12 +468,12 @@ export const FormTextarea: React.FC<{
     required={required}
     rows={rows}
     className={`
-      w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900
-      placeholder:text-gray-400
+      w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900
+      placeholder:text-slate-400
       focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500
-      disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed
+      disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed
       transition-all duration-200 ease-in-out
-      shadow-sm hover:border-gray-400
+      shadow-sm hover:border-slate-400
       resize-none
       ${className}
     `}
@@ -507,11 +507,11 @@ export const FormSelect: React.FC<{
       disabled={disabled}
       required={required}
       className={`
-        w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900
+        w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900
         focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500
-        disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed
+        disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed
         transition-all duration-200 ease-in-out
-        shadow-sm hover:border-gray-400
+        shadow-sm hover:border-slate-400
         appearance-none
         ${className}
       `}
@@ -528,7 +528,7 @@ export const FormSelect: React.FC<{
       ))}
     </select>
     <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
       </svg>
     </div>
