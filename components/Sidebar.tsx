@@ -26,7 +26,7 @@ const viewToPath: Record<string, string> = {
   PLANNING: '/planning',
   RATIOS: '/ratios',
   INTERVENTIONS: '/reclamations',
-  CLAIMS: '/claims',
+  CLAIMS: '/suivi-taches',
   TEAMS: '/teams',
   REPORTING: '/reporting',
   MONTHLY_REPORT: '/monthly-report',
@@ -38,7 +38,7 @@ const viewToPath: Record<string, string> = {
   CLIENT_MAP: '/map', // CLIENT accède directement à la carte principale
   CLIENT_CLAIMS: '/reclamations',
   CLIENT_PLANNING: '/planning',
-  CLIENT_INTERVENTIONS: '/claims',
+  CLIENT_INTERVENTIONS: '/suivi-taches',
 };
 
 interface MenuItem {

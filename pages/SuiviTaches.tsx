@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    Calendar, Clock, Search, MapPin,
+    Calendar, MapPin, Building2, Users, ChevronDown,
     ChevronRight, Camera, Package, AlertCircle, Plus, Trash2,
-    Loader2, FileImage, Play, CheckCircle, XCircle, ThumbsUp, ThumbsDown, ShieldCheck
+    Loader2, FileImage, Play, CheckCircle, XCircle, ThumbsUp, ThumbsDown, ShieldCheck,
+    RefreshCw, Eye, Filter, X, Clock
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { planningService } from '../services/planningService';
 import { fetchCurrentUser, fetchAllSites, SiteFrontend } from '../services/api';
-import { fetchEquipes, fetchClients } from '../services/usersApi';
+import { fetchEquipes, fetchStructures } from '../services/usersApi';
 import {
     fetchPhotosParTache, createPhoto, deletePhoto,
     fetchConsommationsParTache, createConsommation, deleteConsommation,
@@ -14,36 +16,36 @@ import {
 } from '../services/suiviTachesApi';
 import { Tache, STATUT_TACHE_COLORS, PRIORITE_LABELS, ETAT_VALIDATION_COLORS, ETAT_VALIDATION_LABELS, PlanningFilters, EMPTY_PLANNING_FILTERS } from '../types/planning';
 import { PhotoList, ConsommationProduit, ProduitList } from '../types/suiviTaches';
-import { Client, EquipeList } from '../types/users';
-import LoadingWrapper from '../components/LoadingWrapper';
+import { StructureClient, EquipeList } from '../types/users';
+import { useSearch } from '../contexts/SearchContext';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
-import PlanningFiltersComponent from '../components/planning/PlanningFilters';
 
 // Helper pour construire l'URL complète des images
 const getFullImageUrl = (url: string | null): string => {
     if (!url) return '';
-    // Si l'URL est déjà absolue, la retourner telle quelle
     if (url.startsWith('http://') || url.startsWith('https://')) {
         return url;
     }
-    // Sinon, ajouter le préfixe du backend
     const backendUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:8000';
     return `${backendUrl}${url}`;
 };
 
 const SuiviTaches: React.FC = () => {
+    const navigate = useNavigate();
+    const { searchQuery, setPlaceholder } = useSearch();
+
     // State UI
     const [loadingTasks, setLoadingTasks] = useState(true);
     const [taches, setTaches] = useState<Tache[]>([]);
     const [selectedTache, setSelectedTache] = useState<Tache | null>(null);
-    const [searchQuery, setSearchQuery] = useState('');
 
     // State Filtres
     const [filters, setFilters] = useState<PlanningFilters>(EMPTY_PLANNING_FILTERS);
-    const [clients, setClients] = useState<Client[]>([]);
+    const [structures, setStructures] = useState<StructureClient[]>([]);
     const [equipes, setEquipes] = useState<EquipeList[]>([]);
     const [sites, setSites] = useState<SiteFrontend[]>([]);
     const [loadingFilters, setLoadingFilters] = useState(true);
+    const [showFilters, setShowFilters] = useState(false);
 
     // State Détail Tâche
     const [activeTab, setActiveTab] = useState<'info' | 'photos' | 'produits'>('info');
@@ -60,9 +62,8 @@ const SuiviTaches: React.FC = () => {
     // Type de photo sélectionné pour l'upload
     const [selectedPhotoType, setSelectedPhotoType] = useState<'AVANT' | 'APRES'>('AVANT');
 
-    // Rôle utilisateur (pour afficher les boutons de validation admin)
+    // Rôle utilisateur
     const [isAdmin, setIsAdmin] = useState(false);
-    // Mode lecture seule pour les clients
     const [isClientView, setIsClientView] = useState(false);
 
     // Modal de validation
@@ -94,7 +95,14 @@ const SuiviTaches: React.FC = () => {
     const [deletingPhotoId, setDeletingPhotoId] = useState<number | null>(null);
     const [deletingConsommationId, setDeletingConsommationId] = useState<number | null>(null);
 
-    // Chargement initial des tâches (filtrées automatiquement par le backend selon les permissions)
+
+    // Set search placeholder
+    useEffect(() => {
+        setPlaceholder('Rechercher une tâche...');
+    }, [setPlaceholder]);
+
+
+    // Chargement initial
     useEffect(() => {
         loadTaches();
         loadProduitsOptions();
@@ -102,16 +110,15 @@ const SuiviTaches: React.FC = () => {
         loadFilterData();
     }, []);
 
-    // Charger les données pour les filtres
     const loadFilterData = async () => {
         setLoadingFilters(true);
         try {
-            const [clientsRes, equipesRes, sitesArray] = await Promise.all([
-                fetchClients(),
+            const [structuresRes, equipesRes, sitesArray] = await Promise.all([
+                fetchStructures(),
                 fetchEquipes(),
-                fetchAllSites() // Retourne directement SiteFrontend[]
+                fetchAllSites()
             ]);
-            setClients(clientsRes.results || []);
+            setStructures(structuresRes.results || []);
             setEquipes(equipesRes.results || []);
             setSites(sitesArray.filter(s => s.actif));
         } catch (error) {
@@ -132,7 +139,6 @@ const SuiviTaches: React.FC = () => {
         }
     };
 
-    // Chargement détails quand une tâche est sélectionnée
     useEffect(() => {
         if (selectedTache) {
             loadTaskDetails(selectedTache.id);
@@ -143,7 +149,6 @@ const SuiviTaches: React.FC = () => {
     const loadTaches = async () => {
         setLoadingTasks(true);
         try {
-            // Le backend filtre automatiquement selon les permissions de l'utilisateur
             const response = await planningService.getTaches({ page: 1 });
             setTaches(response.results);
         } catch (error) {
@@ -181,7 +186,6 @@ const SuiviTaches: React.FC = () => {
     };
 
     // --- ACTIONS PHOTOS ---
-
     const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || !e.target.files.length || !selectedTache) return;
 
@@ -197,7 +201,6 @@ const SuiviTaches: React.FC = () => {
                     legende: file.name
                 });
             }
-            // Recharger les photos
             const updatedPhotos = await fetchPhotosParTache(selectedTache.id);
             setPhotos(updatedPhotos);
         } catch (error) {
@@ -205,7 +208,6 @@ const SuiviTaches: React.FC = () => {
             alert("Erreur lors de l'upload des photos");
         } finally {
             setUploadingPhoto(false);
-            // Reset input
             e.target.value = '';
         }
     };
@@ -217,12 +219,11 @@ const SuiviTaches: React.FC = () => {
             setDeletingPhotoId(null);
         } catch (error) {
             console.error("Erreur suppression photo", error);
-            throw error; // Re-throw pour que le modal affiche l'erreur
+            throw error;
         }
     };
 
     // --- ACTIONS CONSOMMATION ---
-
     const handleAddConsommation = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedTache || !newConsommation.produit || !newConsommation.quantite) return;
@@ -236,7 +237,6 @@ const SuiviTaches: React.FC = () => {
                 commentaire: newConsommation.commentaire
             });
 
-            // Reload & Reset
             const updatedConsos = await fetchConsommationsParTache(selectedTache.id);
             setConsommations(updatedConsos);
             setNewConsommation({ produit: '', quantite: '', unite: 'L', commentaire: '' });
@@ -253,40 +253,33 @@ const SuiviTaches: React.FC = () => {
             setDeletingConsommationId(null);
         } catch (error) {
             console.error("Erreur suppression consommation", error);
-            throw error; // Re-throw pour que le modal affiche l'erreur
+            throw error;
         }
     };
 
     // --- ACTIONS STATUT ---
-
-    // Ouvre le modal de confirmation
     const openConfirmModal = (type: 'start' | 'complete' | 'cancel') => {
         const configs = {
             start: {
                 title: 'Démarrer la tâche',
-                message: 'Êtes-vous sûr de vouloir démarrer cette tâche maintenant ? La date de début réelle sera enregistrée.',
+                message: 'Êtes-vous sûr de vouloir démarrer cette tâche maintenant ?',
                 icon: 'play' as const
             },
             complete: {
                 title: 'Terminer la tâche',
-                message: 'Êtes-vous sûr de vouloir marquer cette tâche comme terminée ? La date de fin réelle sera enregistrée.',
+                message: 'Êtes-vous sûr de vouloir marquer cette tâche comme terminée ?',
                 icon: 'check' as const
             },
             cancel: {
                 title: 'Annuler la tâche',
-                message: 'Êtes-vous sûr de vouloir annuler cette tâche ? Cette action peut être irréversible.',
+                message: 'Êtes-vous sûr de vouloir annuler cette tâche ?',
                 icon: 'x' as const
             }
         };
 
-        setConfirmModal({
-            isOpen: true,
-            type,
-            ...configs[type]
-        });
+        setConfirmModal({ isOpen: true, type, ...configs[type] });
     };
 
-    // Exécute l'action confirmée
     const executeConfirmedAction = async () => {
         if (!selectedTache || !confirmModal) return;
 
@@ -297,15 +290,9 @@ const SuiviTaches: React.FC = () => {
             let nouveauStatut: 'EN_COURS' | 'TERMINEE' | 'ANNULEE';
 
             switch (confirmModal.type) {
-                case 'start':
-                    nouveauStatut = 'EN_COURS';
-                    break;
-                case 'complete':
-                    nouveauStatut = 'TERMINEE';
-                    break;
-                case 'cancel':
-                    nouveauStatut = 'ANNULEE';
-                    break;
+                case 'start': nouveauStatut = 'EN_COURS'; break;
+                case 'complete': nouveauStatut = 'TERMINEE'; break;
+                case 'cancel': nouveauStatut = 'ANNULEE'; break;
             }
 
             const updatedTache = await planningService.changeStatut(selectedTache.id, nouveauStatut);
@@ -313,14 +300,13 @@ const SuiviTaches: React.FC = () => {
             setTaches(prev => prev.map(t => t.id === updatedTache.id ? updatedTache : t));
         } catch (error) {
             console.error("Erreur changement statut", error);
-            alert("Erreur lors du changement de statut de la tâche");
+            alert("Erreur lors du changement de statut");
         } finally {
             setChangingStatut(false);
         }
     };
 
     // --- VALIDATION ADMIN ---
-
     const openValidationModal = (type: 'VALIDEE' | 'REJETEE') => {
         setValidationModal({ isOpen: true, type });
         setValidationComment('');
@@ -342,24 +328,21 @@ const SuiviTaches: React.FC = () => {
             setValidationComment('');
         } catch (error) {
             console.error("Erreur validation", error);
-            alert("Erreur lors de la validation de la tâche");
+            alert("Erreur lors de la validation");
         } finally {
             setValidating(false);
         }
     };
 
-    // --- RENDER ---
-
-    // Sites filtrés par client sélectionné
+    // --- FILTRES ---
+    // Note: clientId in filters represents structure_client_id (organization)
     const filteredSites = useMemo(() => {
         if (filters.clientId === null) return sites;
-        return sites.filter(s => s.client === filters.clientId);
+        return sites.filter(s => s.structure_client === filters.clientId);
     }, [sites, filters.clientId]);
 
-    // Tâches filtrées
     const filteredTaches = useMemo(() => {
         return taches.filter(t => {
-            // Filtre texte (recherche)
             const teamNames = t.equipes_detail?.length > 0
                 ? t.equipes_detail.map((e: any) => e.nom_equipe || e.nomEquipe).join(' ')
                 : (t.equipe_detail as any)?.nom_equipe || t.equipe_detail?.nomEquipe || '';
@@ -370,28 +353,33 @@ const SuiviTaches: React.FC = () => {
 
             if (!matchesSearch) return false;
 
-            // Filtre par client (via client_detail de la tâche)
             if (filters.clientId !== null) {
-                const tacheClientId = t.client_detail?.utilisateur;
-                if (tacheClientId !== filters.clientId) return false;
+                // Filter by structure_client (organization)
+                // Check direct structure_client on task first
+                const tacheStructureId = t.structure_client_detail?.id;
+                if (tacheStructureId === filters.clientId) {
+                    // Direct match - continue to other filters
+                } else {
+                    // Fallback: check if any object's site belongs to this structure
+                    const siteIds = t.objets_detail?.map(obj => obj.site) || [];
+                    const matchingSites = sites.filter(s =>
+                        s.structure_client === filters.clientId &&
+                        siteIds.includes(Number(s.id))
+                    );
+                    if (matchingSites.length === 0) return false;
+                }
             }
 
-            // Filtre par site (via objets_detail - les objets sont liés aux sites)
             if (filters.siteId !== null) {
-                // Comparaison en nombre car obj.site peut être number ou string
-                const hasSite = t.objets_detail?.some(obj =>
-                    Number(obj.site) === filters.siteId
-                );
+                const hasSite = t.objets_detail?.some(obj => obj.site === filters.siteId);
                 if (!hasSite) return false;
             }
 
-            // Filtre par équipe
             if (filters.equipeId !== null) {
                 const tacheEquipeIds = t.equipes_detail?.map((e: any) => e.id) || [];
                 if (!tacheEquipeIds.includes(filters.equipeId)) return false;
             }
 
-            // Filtre par statut
             if (filters.statuts.length > 0) {
                 if (!filters.statuts.includes(t.statut)) return false;
             }
@@ -400,686 +388,656 @@ const SuiviTaches: React.FC = () => {
         });
     }, [taches, searchQuery, filters]);
 
+    const activeFiltersCount = useMemo(() => {
+        let count = 0;
+        if (filters.clientId !== null) count++;
+        if (filters.siteId !== null) count++;
+        if (filters.equipeId !== null) count++;
+        if (filters.statuts.length > 0) count++;
+        return count;
+    }, [filters]);
+
+    const clearFilters = () => {
+        setFilters(EMPTY_PLANNING_FILTERS);
+    };
+
+    // --- RENDER ---
     return (
-        <div className="flex h-full bg-gray-50 overflow-hidden">
-            {/* LISTE DES TACHES (SIDEBAR GAUCHE) */}
-            <div className={`w-full md:w-1/3 min-w-[320px] max-w-md bg-white border-r border-slate-200 flex flex-col ${selectedTache ? 'hidden md:flex' : 'flex'}`}>
-                <div className="p-4 border-b border-slate-100 space-y-4">
-                    <h1 className="text-xl font-bold text-slate-800">Journal de tâches</h1>
-
-                    {/* Filtres */}
-                    <PlanningFiltersComponent
-                        filters={filters}
-                        onFiltersChange={setFilters}
-                        clients={clients}
-                        sites={filteredSites.map(s => ({ id: parseInt(s.id), name: s.name }))}
-                        equipes={equipes}
-                        disabled={loadingFilters}
-                    />
-
-                    {/* Recherche */}
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input
-                            type="text"
-                            placeholder="Rechercher une tâche..."
-                            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                        />
-                    </div>
-
-                    {/* Compteur de résultats */}
-                    <div className="text-xs text-slate-500">
-                        {filteredTaches.length} tâche{filteredTaches.length > 1 ? 's' : ''}
-                        {filteredTaches.length !== taches.length && ` sur ${taches.length}`}
-                    </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto">
-                    {loadingTasks ? (
-                        <div className="flex justify-center p-8"><Loader2 className="w-6 h-6 animate-spin text-emerald-600" /></div>
-                    ) : (
-                        <div className="divide-y divide-gray-100">
-                            {filteredTaches.map(tache => (
-                                <div
-                                    key={tache.id}
-                                    onClick={() => setSelectedTache(tache)}
-                                    className={`p-4 cursor-pointer transition-colors hover:bg-gray-50 ${selectedTache?.id === tache.id ? 'bg-emerald-50 border-l-4 border-emerald-500' : 'border-l-4 border-transparent'}`}
-                                >
-                                    <div className="flex justify-between items-start mb-1">
-                                        <h3 className="font-semibold text-gray-900">{tache.type_tache_detail?.nom_tache || 'Tâche sans nom'}</h3>
-                                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUT_TACHE_COLORS[tache.statut]?.bg} ${STATUT_TACHE_COLORS[tache.statut]?.text}`}>
-                                            {tache.statut}
-                                        </span>
-                                    </div>
-                                    <div className="text-sm text-gray-500 flex items-center gap-2 mb-1">
-                                        <Calendar className="w-3 h-3" />
-                                        {new Date(tache.date_debut_planifiee).toLocaleDateString()}
-                                        <Clock className="w-3 h-3 ml-2" />
-                                        {new Date(tache.date_debut_planifiee).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </div>
-                                    <div className="text-sm text-gray-500 flex items-center gap-2">
-                                        <MapPin className="w-3 h-3" />
-                                        <span className="truncate">Équipe: {
-                                            tache.equipes_detail?.length > 0
-                                                ? tache.equipes_detail.map((e: any) => e.nom_equipe || e.nomEquipe).join(', ')
-                                                : (tache.equipe_detail as any)?.nom_equipe || tache.equipe_detail?.nomEquipe || 'N/A'
-                                        }</span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+        <div className="h-full flex flex-col bg-slate-50 overflow-hidden">
+            {/* Toolbar */}
+            <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-3 shrink-0 overflow-x-auto">
+                {/* Filter Toggle Button */}
+                <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`relative p-2.5 rounded-lg transition-all duration-200 shrink-0 ${
+                        showFilters || activeFiltersCount > 0
+                            ? 'bg-emerald-600 text-white shadow-md'
+                            : 'bg-white text-slate-700 border border-slate-300 hover:border-slate-400 shadow-sm'
+                    }`}
+                    title="Filtres"
+                >
+                    <Filter className="w-4 h-4" />
+                    {activeFiltersCount > 0 && (
+                        <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold shadow">
+                            {activeFiltersCount}
+                        </span>
                     )}
-                </div>
+                </button>
+
+                {/* Inline Filters */}
+                {showFilters && (
+                    <>
+                        <div className="h-8 w-px bg-slate-200 shrink-0"></div>
+
+                        {/* Structure Client Filter (Organization) */}
+                        <div className="relative shrink-0">
+                            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                            <select
+                                value={filters.clientId ?? ''}
+                                onChange={e => setFilters({ ...filters, clientId: e.target.value ? Number(e.target.value) : null })}
+                                className="appearance-none pl-9 pr-8 py-2 border-2 border-slate-200 rounded-lg text-sm font-medium text-slate-700 bg-white hover:border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]"
+                                disabled={loadingFilters}
+                            >
+                                <option value="">Organisation</option>
+                                {structures.map(s => (
+                                    <option key={s.id} value={s.id}>{s.nom}</option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
+
+                        {/* Site Filter */}
+                        <div className="relative shrink-0">
+                            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                            <select
+                                value={filters.siteId ?? ''}
+                                onChange={e => setFilters({ ...filters, siteId: e.target.value ? Number(e.target.value) : null })}
+                                className="appearance-none pl-9 pr-8 py-2 border-2 border-slate-200 rounded-lg text-sm font-medium text-slate-700 bg-white hover:border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]"
+                                disabled={loadingFilters}
+                            >
+                                <option value="">Site</option>
+                                {filteredSites.map(s => (
+                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
+
+                        {/* Equipe Filter */}
+                        <div className="relative shrink-0">
+                            <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                            <select
+                                value={filters.equipeId ?? ''}
+                                onChange={e => setFilters({ ...filters, equipeId: e.target.value ? Number(e.target.value) : null })}
+                                className="appearance-none pl-9 pr-8 py-2 border-2 border-slate-200 rounded-lg text-sm font-medium text-slate-700 bg-white hover:border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]"
+                                disabled={loadingFilters}
+                            >
+                                <option value="">Équipe</option>
+                                {equipes.map(e => (
+                                    <option key={e.id} value={e.id}>{e.nomEquipe}</option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
+
+                        {/* Statut Filter */}
+                        <div className="relative shrink-0">
+                            <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                            <select
+                                value={filters.statuts.length === 1 ? filters.statuts[0] : ''}
+                                onChange={e => setFilters({ ...filters, statuts: e.target.value ? [e.target.value as any] : [] })}
+                                className="appearance-none pl-9 pr-8 py-2 border-2 border-slate-200 rounded-lg text-sm font-medium text-slate-700 bg-white hover:border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[130px]"
+                            >
+                                <option value="">Statut</option>
+                                <option value="PLANIFIEE">Planifiée</option>
+                                <option value="EN_COURS">En cours</option>
+                                <option value="TERMINEE">Terminée</option>
+                                <option value="ANNULEE">Annulée</option>
+                            </select>
+                            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
+
+                        {/* Reset Filters */}
+                        {activeFiltersCount > 0 && (
+                            <button
+                                onClick={clearFilters}
+                                className="p-2.5 rounded-lg text-red-600 hover:bg-red-50 transition-all duration-200 border border-red-200 hover:border-red-300 shadow-sm shrink-0"
+                                title="Réinitialiser les filtres"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        )}
+                    </>
+                )}
+
+                {/* Spacer */}
+                <div className="flex-1"></div>
+
+                {/* Count */}
+                <span className="text-sm text-slate-500 shrink-0">
+                    {filteredTaches.length} tâche{filteredTaches.length > 1 ? 's' : ''}
+                </span>
+
+                {/* Refresh Button */}
+                <button
+                    onClick={() => loadTaches()}
+                    disabled={loadingTasks}
+                    className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+                    title="Actualiser"
+                >
+                    <RefreshCw className={`w-5 h-5 ${loadingTasks ? 'animate-spin' : ''}`} />
+                </button>
             </div>
 
-            {/* DETAIL TACHE (MAIN CONTENT) */}
-            <div className={`flex-1 flex flex-col bg-gray-50 relative ${!selectedTache ? 'hidden md:flex' : 'flex'}`}>
-                {selectedTache ? (
-                    <>
-                        {/* Header Détail */}
-                        <div className="bg-white border-b border-gray-200 p-4 shadow-sm flex-shrink-0">
-                            <button onClick={() => setSelectedTache(null)} className="md:hidden text-gray-500 mb-2 flex items-center gap-1">
-                                <ChevronRight className="w-4 h-4 rotate-180" /> Retour
-                            </button>
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <h2 className="text-2xl font-bold text-gray-900">{selectedTache.type_tache_detail?.nom_tache}</h2>
-                                    <p className="text-gray-500 flex items-center gap-2 mt-1 flex-wrap">
-                                        <span className="bg-gray-100 px-2 py-0.5 rounded text-sm text-gray-700">#{selectedTache.id}</span>
-                                        <span>Priorité: {PRIORITE_LABELS[selectedTache.priorite]}</span>
-                                        <span className={`px-2 py-0.5 rounded text-sm font-medium ${STATUT_TACHE_COLORS[selectedTache.statut]?.bg} ${STATUT_TACHE_COLORS[selectedTache.statut]?.text}`}>
+            {/* Main Content */}
+            <div className="flex-1 flex overflow-hidden">
+                {/* Left Panel: Task List */}
+                <div className={`${selectedTache ? 'hidden lg:flex' : 'flex'} flex-1 flex-col`}>
+                    <div className="flex-1 overflow-y-auto p-4">
+                            {loadingTasks ? (
+                                <div className="flex justify-center p-12">
+                                    <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+                                </div>
+                            ) : filteredTaches.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                                    <Calendar className="w-12 h-12 mb-4 text-slate-300" />
+                                    <p className="text-lg font-medium">Aucune tâche trouvée</p>
+                                </div>
+                            ) : (
+                                <div className="grid gap-3">
+                                    {filteredTaches.map(tache => (
+                                        <div
+                                            key={tache.id}
+                                            onClick={() => setSelectedTache(tache)}
+                                            className={`bg-white rounded-xl border p-4 cursor-pointer transition-all hover:shadow-md ${selectedTache?.id === tache.id
+                                                ? 'border-emerald-500 ring-2 ring-emerald-500/20'
+                                                : 'border-slate-200 hover:border-slate-300'
+                                                }`}
+                                        >
+                                            <div className="flex justify-between items-start mb-2">
+                                                <h3 className="font-semibold text-slate-800">
+                                                    {tache.type_tache_detail?.nom_tache || 'Tâche sans nom'}
+                                                </h3>
+                                                <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUT_TACHE_COLORS[tache.statut]?.bg} ${STATUT_TACHE_COLORS[tache.statut]?.text}`}>
+                                                    {tache.statut.replace('_', ' ')}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-4 text-sm text-slate-500">
+                                                <span className="flex items-center gap-1">
+                                                    <Calendar className="w-3.5 h-3.5" />
+                                                    {new Date(tache.date_debut_planifiee).toLocaleDateString()}
+                                                </span>
+                                                <span className="flex items-center gap-1 truncate max-w-[200px]" title={
+                                                    tache.objets_detail?.length
+                                                        ? tache.objets_detail.map(o => o.site_nom || 'Site inconnu').join(', ')
+                                                        : 'Aucune localisation'
+                                                }>
+                                                    <MapPin className="w-3.5 h-3.5 shrink-0" />
+                                                    {tache.objets_detail?.length
+                                                        ? (tache.objets_detail[0]?.site_nom || 'Site') + (tache.objets_detail.length > 1 ? ` (+${tache.objets_detail.length - 1})` : '')
+                                                        : 'Non localisé'
+                                                    }
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                </div>
+
+                {/* Right Panel: Task Detail */}
+                {selectedTache && (
+                    <div className="w-full lg:w-[500px] xl:w-[600px] bg-white border-l border-slate-200 flex flex-col overflow-hidden">
+                        {/* Detail Header */}
+                        <div className="p-4 border-b border-slate-100 shrink-0">
+                            <div className="flex items-start justify-between mb-3">
+                                <div className="flex-1 min-w-0">
+                                    <button
+                                        onClick={() => setSelectedTache(null)}
+                                        className="lg:hidden text-slate-500 mb-2 flex items-center gap-1 text-sm"
+                                    >
+                                        <ChevronRight className="w-4 h-4 rotate-180" /> Retour
+                                    </button>
+                                    <h2 className="text-lg font-bold text-slate-800 truncate">
+                                        {selectedTache.type_tache_detail?.nom_tache}
+                                    </h2>
+                                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                        <span className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-600">
+                                            #{selectedTache.id}
+                                        </span>
+                                        <span className={`text-xs px-2 py-0.5 rounded font-medium ${STATUT_TACHE_COLORS[selectedTache.statut]?.bg} ${STATUT_TACHE_COLORS[selectedTache.statut]?.text}`}>
                                             {selectedTache.statut}
                                         </span>
-                                        {/* Badge état de validation - visible uniquement pour les tâches terminées */}
                                         {selectedTache.statut === 'TERMINEE' && (
-                                            <span className={`px-2 py-0.5 rounded text-sm font-medium flex items-center gap-1 ${ETAT_VALIDATION_COLORS[selectedTache.etat_validation]?.bg} ${ETAT_VALIDATION_COLORS[selectedTache.etat_validation]?.text}`}>
+                                            <span className={`text-xs px-2 py-0.5 rounded font-medium flex items-center gap-1 ${ETAT_VALIDATION_COLORS[selectedTache.etat_validation]?.bg} ${ETAT_VALIDATION_COLORS[selectedTache.etat_validation]?.text}`}>
                                                 <ShieldCheck className="w-3 h-3" />
                                                 {ETAT_VALIDATION_LABELS[selectedTache.etat_validation]}
                                             </span>
                                         )}
-                                    </p>
+                                    </div>
                                 </div>
-                                <div className="flex gap-2">
-                                    {/* Mode consultation pour les clients */}
-                                    {isClientView ? (
-                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm">
-                                            <AlertCircle className="w-4 h-4" />
-                                            <span>Mode consultation</span>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            {/* Bouton Démarrer - visible si PLANIFIEE ou NON_DEBUTEE */}
-                                            {(selectedTache.statut === 'PLANIFIEE' || selectedTache.statut === 'NON_DEBUTEE') && (
-                                                <button
-                                                    onClick={() => openConfirmModal('start')}
-                                                    disabled={changingStatut}
-                                                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
-                                                >
-                                                    {changingStatut ? (
-                                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                                    ) : (
-                                                        <Play className="w-4 h-4" />
-                                                    )}
-                                                    Démarrer
-                                                </button>
-                                            )}
 
-                                            {/* Bouton Terminer - visible si EN_COURS */}
-                                            {selectedTache.statut === 'EN_COURS' && (
+                                {/* Action Buttons */}
+                                {!isClientView && (
+                                    <div className="flex gap-2 shrink-0">
+                                        {(selectedTache.statut === 'PLANIFIEE' || selectedTache.statut === 'NON_DEBUTEE') && (
+                                            <button
+                                                onClick={() => openConfirmModal('start')}
+                                                disabled={changingStatut}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm disabled:opacity-50"
+                                            >
+                                                {changingStatut ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                                                Démarrer
+                                            </button>
+                                        )}
+                                        {selectedTache.statut === 'EN_COURS' && (
+                                            <button
+                                                onClick={() => openConfirmModal('complete')}
+                                                disabled={changingStatut}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-50"
+                                            >
+                                                {changingStatut ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                                                Terminer
+                                            </button>
+                                        )}
+                                        {isAdmin && selectedTache.statut === 'TERMINEE' && selectedTache.etat_validation === 'EN_ATTENTE' && (
+                                            <>
                                                 <button
-                                                    onClick={() => openConfirmModal('complete')}
-                                                    disabled={changingStatut}
-                                                    title="Terminer la tâche"
-                                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                                                    onClick={() => openValidationModal('VALIDEE')}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm"
                                                 >
-                                                    {changingStatut ? (
-                                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                                    ) : (
-                                                        <CheckCircle className="w-4 h-4" />
-                                                    )}
-                                                    Terminer
+                                                    <ThumbsUp className="w-4 h-4" />
+                                                    Valider
                                                 </button>
-                                            )}
-
-                                            {/* Bouton Annuler - visible si pas encore TERMINEE ou ANNULEE */}
-                                            {selectedTache.statut !== 'TERMINEE' && selectedTache.statut !== 'ANNULEE' && (
                                                 <button
-                                                    onClick={() => openConfirmModal('cancel')}
-                                                    disabled={changingStatut}
-                                                    className="flex items-center gap-2 px-3 py-2 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
-                                                    title="Annuler la tâche"
+                                                    onClick={() => openValidationModal('REJETEE')}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
                                                 >
-                                                    {changingStatut ? (
-                                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                                    ) : (
-                                                        <XCircle className="w-4 h-4" />
-                                                    )}
+                                                    <ThumbsDown className="w-4 h-4" />
+                                                    Rejeter
                                                 </button>
-                                            )}
-
-                                            {/* Boutons de validation ADMIN - visibles uniquement pour les tâches terminées en attente */}
-                                            {isAdmin && selectedTache.statut === 'TERMINEE' && selectedTache.etat_validation === 'EN_ATTENTE' && (
-                                                <>
-                                                    <button
-                                                        onClick={() => openValidationModal('VALIDEE')}
-                                                        disabled={validating}
-                                                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
-                                                    >
-                                                        {validating ? (
-                                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                                        ) : (
-                                                            <ThumbsUp className="w-4 h-4" />
-                                                        )}
-                                                        Valider
-                                                    </button>
-                                                    <button
-                                                        onClick={() => openValidationModal('REJETEE')}
-                                                        disabled={validating}
-                                                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-                                                    >
-                                                        {validating ? (
-                                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                                        ) : (
-                                                            <ThumbsDown className="w-4 h-4" />
-                                                        )}
-                                                        Rejeter
-                                                    </button>
-                                                </>
-                                            )}
-                                        </>
-                                    )}
-                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
-                            {/* Onglets */}
-                            <div className="flex gap-6 mt-6 border-b border-gray-100">
+                            {/* Tabs */}
+                            <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
                                 <button
                                     onClick={() => setActiveTab('info')}
-                                    className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'info' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                                    className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === 'info' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                 >
                                     Informations
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('photos')}
-                                    className={`pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'photos' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                                    className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center justify-center gap-1.5 ${activeTab === 'photos' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                 >
                                     <Camera className="w-4 h-4" /> Photos ({photos.length})
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('produits')}
-                                    className={`pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'produits' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                                    className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center justify-center gap-1.5 ${activeTab === 'produits' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                 >
                                     <Package className="w-4 h-4" /> Produits ({consommations.length})
                                 </button>
                             </div>
                         </div>
 
-                        {/* Contenu Onglets */}
-                        <div className="flex-1 overflow-y-auto p-4 md:p-6">
-
+                        {/* Tab Content */}
+                        <div className="flex-1 overflow-y-auto p-4">
                             {activeTab === 'info' && (
-                                <div className="space-y-6 max-w-3xl">
-                                    <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                                        <h3 className="text-lg font-semibold mb-4 text-gray-800">Détails de l'intervention</h3>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
+                                <div className="space-y-4">
+                                    {/* Organisation et Localisation */}
+                                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                        <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                            <MapPin className="w-4 h-4 text-emerald-600" />
+                                            Localisation
+                                        </h3>
+
+                                        {/* Organisation */}
+                                        {selectedTache.structure_client_detail && (
+                                            <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-200">
+                                                <Building2 className="w-4 h-4 text-slate-400" />
+                                                <span className="text-sm font-medium text-slate-800">
+                                                    {selectedTache.structure_client_detail.nom}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* Sites et Sous-sites */}
+                                        {selectedTache.objets_detail && selectedTache.objets_detail.length > 0 ? (
+                                            <div className="space-y-2">
+                                                {selectedTache.objets_detail.map((obj, idx) => (
+                                                    <div key={idx} className="flex items-center gap-2 text-sm">
+                                                        <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></div>
+                                                        <span className="font-medium text-slate-800">{obj.site_nom || `Site #${obj.site}`}</span>
+                                                        {obj.sous_site && obj.sous_site_nom && (
+                                                            <>
+                                                                <ChevronRight className="w-3 h-3 text-slate-400" />
+                                                                <span className="text-slate-600">{obj.sous_site_nom}</span>
+                                                            </>
+                                                        )}
+                                                        {obj.nom_type && (
+                                                            <span className="text-slate-400 ml-auto">({obj.nom_type})</span>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-slate-500 italic">Aucun objet d'inventaire associé</p>
+                                        )}
+                                    </div>
+
+                                    {/* Dates */}
+                                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                        <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                            <Calendar className="w-4 h-4 text-emerald-600" />
+                                            Planning
+                                        </h3>
+                                        <div className="grid grid-cols-2 gap-3 text-sm">
                                             <div>
-                                                <label className="text-xs font-semibold text-gray-500 uppercase">Site / Zone</label>
-                                                {selectedTache.objets_detail && selectedTache.objets_detail.length > 0 ? (
-                                                    selectedTache.objets_detail.map((obj, idx) => (
-                                                        <div key={idx} className="flex flex-col mt-1">
-                                                            <span className="text-gray-900 font-medium leading-tight">{obj.site}</span>
-                                                            <span className="text-sm text-gray-500">{obj.sous_site}</span>
-                                                        </div>
-                                                    ))
-                                                ) : (
-                                                    <p className="text-gray-900 mt-1">-</p>
-                                                )}
+                                                <span className="text-slate-500">Début prévu</span>
+                                                <p className="font-medium text-slate-800">
+                                                    {new Date(selectedTache.date_debut_planifiee).toLocaleString()}
+                                                </p>
                                             </div>
                                             <div>
-                                                <label className="text-xs font-semibold text-gray-500 uppercase">Date Début Planifiée</label>
-                                                <p className="text-gray-900">{new Date(selectedTache.date_debut_planifiee).toLocaleString()}</p>
-                                            </div>
-                                            <div>
-                                                <label className="text-xs font-semibold text-gray-500 uppercase">Date Fin Planifiée</label>
-                                                <p className="text-gray-900">{new Date(selectedTache.date_fin_planifiee).toLocaleString()}</p>
+                                                <span className="text-slate-500">Fin prévue</span>
+                                                <p className="font-medium text-slate-800">
+                                                    {new Date(selectedTache.date_fin_planifiee).toLocaleString()}
+                                                </p>
                                             </div>
                                             {selectedTache.date_debut_reelle && (
                                                 <div>
-                                                    <label className="text-xs font-semibold text-emerald-600 uppercase">Date Début Réelle</label>
-                                                    <p className="text-gray-900">{new Date(selectedTache.date_debut_reelle).toLocaleString()}</p>
+                                                    <span className="text-emerald-600">Début réel</span>
+                                                    <p className="font-medium text-slate-800">
+                                                        {new Date(selectedTache.date_debut_reelle).toLocaleString()}
+                                                    </p>
                                                 </div>
                                             )}
                                             {selectedTache.date_fin_reelle && (
                                                 <div>
-                                                    <label className="text-xs font-semibold text-blue-600 uppercase">Date Fin Réelle</label>
-                                                    <p className="text-gray-900">{new Date(selectedTache.date_fin_reelle).toLocaleString()}</p>
+                                                    <span className="text-blue-600">Fin réelle</span>
+                                                    <p className="font-medium text-slate-800">
+                                                        {new Date(selectedTache.date_fin_reelle).toLocaleString()}
+                                                    </p>
                                                 </div>
                                             )}
-                                            <div className="col-span-2">
-                                                <label className="text-xs font-semibold text-gray-500 uppercase">Description</label>
-                                                <p className="text-gray-900 mt-1">{selectedTache.description_travaux || 'Aucune description'}</p>
-                                            </div>
                                         </div>
                                     </div>
+
+                                    {/* Description */}
+                                    {selectedTache.description_travaux && (
+                                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                            <h3 className="text-sm font-semibold text-slate-700 mb-2">Description</h3>
+                                            <p className="text-sm text-slate-600">{selectedTache.description_travaux}</p>
+                                        </div>
+                                    )}
+
+                                    {/* Réclamation liée */}
                                     {selectedTache.reclamation_numero && (
                                         <div className="bg-orange-50 rounded-xl p-4 border border-orange-100 flex items-start gap-3">
-                                            <AlertCircle className="w-5 h-5 text-orange-500 mt-0.5" />
+                                            <AlertCircle className="w-5 h-5 text-orange-500 mt-0.5 shrink-0" />
                                             <div>
-                                                <h4 className="font-semibold text-orange-800">Lié à une réclamation</h4>
-                                                <p className="text-sm text-orange-700">Réclamation #{selectedTache.reclamation_numero}</p>
+                                                <h4 className="font-semibold text-orange-800 text-sm">Lié à une réclamation</h4>
+                                                <p className="text-sm text-orange-700">#{selectedTache.reclamation_numero}</p>
                                             </div>
                                         </div>
                                     )}
-                                    {/* Photos Section in Info Tab */}
-                                    <div className="mt-8 pt-6 border-t border-gray-100">
-                                        <h3 className="text-lg font-semibold mb-4 text-gray-800 flex items-center gap-2">
-                                            <Camera className="w-5 h-5 text-gray-500" />
-                                            Photos de l'intervention
-                                        </h3>
-                                        {photos.length > 0 ? (
-                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                                {photos.map(photo => {
-                                                    const imageUrl = getFullImageUrl(photo.url_fichier);
-                                                    return (
-                                                        <div key={photo.id} className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200 group">
-                                                            <img
-                                                                src={imageUrl}
-                                                                alt={photo.legende || 'Photo'}
-                                                                className="w-full h-full object-cover"
-                                                                onError={(e) => {
-                                                                    (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5Y2EzYWYiIHN0cm9rZS13aWR0aD0iMiI+PHJlY3QgeD0iMyIgeT0iMyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiByeD0iMiIvPjxjaXJjbGUgY3g9IjguNSIgY3k9IjguNSIgcj0iMS41Ii8+PHBhdGggZD0ibTIxIDE1LTUtNUw1IDIxIi8+PC9zdmc+';
-                                                                }}
-                                                            />
-                                                            {/* Badge type photo */}
-                                                            <span className={`absolute top-2 left-2 text-xs px-2 py-0.5 rounded-full ${photo.type_photo === 'AVANT'
-                                                                ? 'bg-amber-500/80 text-white'
-                                                                : 'bg-emerald-500/80 text-white'
-                                                                }`}>
-                                                                {photo.type_photo_display}
-                                                            </span>
-                                                            <a
-                                                                href={imageUrl}
-                                                                target="_blank"
-                                                                rel="noreferrer"
-                                                                className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-all opacity-0 group-hover:opacity-100"
-                                                            >
-                                                                <Search className="w-6 h-6 text-white drop-shadow-md" />
-                                                            </a>
-                                                        </div>
-                                                    );
-                                                })}
+
+                                    {/* Photos preview */}
+                                    {photos.length > 0 && (
+                                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                            <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                                <Camera className="w-4 h-4 text-emerald-600" />
+                                                Photos ({photos.length})
+                                            </h3>
+                                            <div className="grid grid-cols-4 gap-2">
+                                                {photos.slice(0, 4).map(photo => (
+                                                    <div key={photo.id} className="aspect-square rounded-lg overflow-hidden bg-slate-200">
+                                                        <img
+                                                            src={getFullImageUrl(photo.url_fichier)}
+                                                            alt={photo.legende || 'Photo'}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    </div>
+                                                ))}
                                             </div>
-                                        ) : (
-                                            <p className="text-gray-500 text-sm italic">Aucune photo pour l'instant.</p>
-                                        )}
-                                    </div>
+                                            {photos.length > 4 && (
+                                                <button
+                                                    onClick={() => setActiveTab('photos')}
+                                                    className="mt-2 text-sm text-emerald-600 hover:underline"
+                                                >
+                                                    Voir toutes les photos
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
-                            {activeTab === 'photos' && (() => {
-                                // Compter les photos par type
-                                const photosAvant = photos.filter(p => p.type_photo === 'AVANT').length;
-                                const photosApres = photos.filter(p => p.type_photo === 'APRES').length;
-                                const MAX_PHOTOS_PAR_TYPE = 3;
-                                const canAddAvant = photosAvant < MAX_PHOTOS_PAR_TYPE;
-                                const canAddApres = photosApres < MAX_PHOTOS_PAR_TYPE;
-                                const canAddSelected = selectedPhotoType === 'AVANT' ? canAddAvant : canAddApres;
-                                const currentCount = selectedPhotoType === 'AVANT' ? photosAvant : photosApres;
+                            {activeTab === 'photos' && (
+                                <div className="space-y-4">
+                                    {/* Upload Zone */}
+                                    {!isClientView && (
+                                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                            <div className="flex gap-2 mb-3">
+                                                <button
+                                                    onClick={() => setSelectedPhotoType('AVANT')}
+                                                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${selectedPhotoType === 'AVANT'
+                                                        ? 'bg-amber-100 text-amber-800 border-2 border-amber-300'
+                                                        : 'bg-white text-slate-600 border border-slate-200'
+                                                        }`}
+                                                >
+                                                    Avant
+                                                </button>
+                                                <button
+                                                    onClick={() => setSelectedPhotoType('APRES')}
+                                                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${selectedPhotoType === 'APRES'
+                                                        ? 'bg-emerald-100 text-emerald-800 border-2 border-emerald-300'
+                                                        : 'bg-white text-slate-600 border border-slate-200'
+                                                        }`}
+                                                >
+                                                    Après
+                                                </button>
+                                            </div>
+                                            <input
+                                                type="file"
+                                                id="photo-upload"
+                                                multiple
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={handlePhotoUpload}
+                                                disabled={uploadingPhoto}
+                                            />
+                                            <label
+                                                htmlFor="photo-upload"
+                                                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors"
+                                            >
+                                                {uploadingPhoto ? (
+                                                    <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
+                                                ) : (
+                                                    <>
+                                                        <Camera className="w-8 h-8 text-slate-400 mb-2" />
+                                                        <span className="text-sm text-slate-600">Cliquez pour ajouter des photos</span>
+                                                    </>
+                                                )}
+                                            </label>
+                                        </div>
+                                    )}
 
-                                return (
-                                    <div className="space-y-6">
-                                        {/* Sélecteur de type de photo avec compteurs et zone d'upload - masqués pour les clients */}
-                                        {!isClientView && (
-                                            <>
-                                                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-                                                    <label className="block text-sm font-medium text-gray-700 mb-3">Type de photo à ajouter (max 3 par type)</label>
-                                                    <div className="flex gap-3">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setSelectedPhotoType('AVANT')}
-                                                            className={`flex-1 flex flex-col items-center gap-1 px-4 py-3 rounded-xl font-medium transition-all ${selectedPhotoType === 'AVANT'
-                                                                ? 'bg-amber-100 text-amber-800 border-2 border-amber-400 shadow-sm'
-                                                                : 'bg-gray-50 text-gray-600 border-2 border-transparent hover:bg-gray-100'
-                                                                }`}
-                                                        >
-                                                            <div className="flex items-center gap-2">
-                                                                <Camera className="w-5 h-5" />
-                                                                <span>Avant intervention</span>
-                                                            </div>
-                                                            <div className={`text-xs px-2 py-0.5 rounded-full ${canAddAvant
-                                                                ? 'bg-amber-200 text-amber-800'
-                                                                : 'bg-red-100 text-red-600'
-                                                                }`}>
-                                                                {photosAvant}/{MAX_PHOTOS_PAR_TYPE}
-                                                            </div>
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setSelectedPhotoType('APRES')}
-                                                            className={`flex-1 flex flex-col items-center gap-1 px-4 py-3 rounded-xl font-medium transition-all ${selectedPhotoType === 'APRES'
-                                                                ? 'bg-emerald-100 text-emerald-800 border-2 border-emerald-400 shadow-sm'
-                                                                : 'bg-gray-50 text-gray-600 border-2 border-transparent hover:bg-gray-100'
-                                                                }`}
-                                                        >
-                                                            <div className="flex items-center gap-2">
-                                                                <CheckCircle className="w-5 h-5" />
-                                                                <span>Après intervention</span>
-                                                            </div>
-                                                            <div className={`text-xs px-2 py-0.5 rounded-full ${canAddApres
-                                                                ? 'bg-emerald-200 text-emerald-800'
-                                                                : 'bg-red-100 text-red-600'
-                                                                }`}>
-                                                                {photosApres}/{MAX_PHOTOS_PAR_TYPE}
-                                                            </div>
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                {/* Upload Zone */}
-                                                <div className={`bg-white rounded-xl shadow-sm border-2 border-dashed p-8 text-center transition-colors ${!canAddSelected
-                                                    ? 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
-                                                    : selectedPhotoType === 'AVANT'
-                                                        ? 'border-amber-300 hover:bg-gray-50'
-                                                        : 'border-emerald-300 hover:bg-gray-50'
-                                                    }`}>
-                                                    <input
-                                                        type="file"
-                                                        id="photo-upload"
-                                                        multiple
-                                                        accept="image/*"
-                                                        className="hidden"
-                                                        onChange={handlePhotoUpload}
-                                                        disabled={uploadingPhoto || !canAddSelected}
+                                    {/* Photos Grid */}
+                                    {loadingPhotos ? (
+                                        <div className="flex justify-center py-8">
+                                            <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                                        </div>
+                                    ) : photos.length === 0 ? (
+                                        <div className="text-center py-8 text-slate-400">
+                                            <FileImage className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                                            <p className="text-sm">Aucune photo</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {photos.map(photo => (
+                                                <div key={photo.id} className="relative group aspect-square rounded-xl overflow-hidden bg-slate-100 border border-slate-200">
+                                                    <img
+                                                        src={getFullImageUrl(photo.url_fichier)}
+                                                        alt={photo.legende || 'Photo'}
+                                                        className="w-full h-full object-cover"
                                                     />
-                                                    <label
-                                                        htmlFor="photo-upload"
-                                                        className={`flex flex-col items-center ${canAddSelected ? 'cursor-pointer' : 'cursor-not-allowed'}`}
-                                                    >
-                                                        {uploadingPhoto ? (
-                                                            <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mb-3" />
-                                                        ) : !canAddSelected ? (
-                                                            <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3 bg-gray-200 text-gray-400">
-                                                                <XCircle className="w-6 h-6" />
-                                                            </div>
-                                                        ) : (
-                                                            <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${selectedPhotoType === 'AVANT'
-                                                                ? 'bg-amber-100 text-amber-600'
-                                                                : 'bg-emerald-100 text-emerald-600'
-                                                                }`}>
-                                                                <Camera className="w-6 h-6" />
-                                                            </div>
+                                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                                        <a
+                                                            href={getFullImageUrl(photo.url_fichier)}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="p-2 bg-white/20 hover:bg-white/40 rounded-full text-white"
+                                                        >
+                                                            <Eye className="w-5 h-5" />
+                                                        </a>
+                                                        {!isClientView && (
+                                                            <button
+                                                                onClick={() => setDeletingPhotoId(photo.id)}
+                                                                className="p-2 bg-red-500/80 hover:bg-red-600 rounded-full text-white"
+                                                            >
+                                                                <Trash2 className="w-5 h-5" />
+                                                            </button>
                                                         )}
-                                                        {canAddSelected ? (
-                                                            <>
-                                                                <span className="text-lg font-medium text-gray-900">
-                                                                    Ajouter des photos {selectedPhotoType === 'AVANT' ? 'avant' : 'après'} intervention
-                                                                </span>
-                                                                <span className="text-sm text-gray-500 mt-1">Cliquez pour parcourir (JPG, PNG)</span>
-                                                                <span className={`text-xs mt-2 px-3 py-1 rounded-full ${selectedPhotoType === 'AVANT'
-                                                                    ? 'bg-amber-100 text-amber-700'
-                                                                    : 'bg-emerald-100 text-emerald-700'
-                                                                    }`}>
-                                                                    {currentCount}/{MAX_PHOTOS_PAR_TYPE} photos
-                                                                </span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <span className="text-lg font-medium text-gray-500">
-                                                                    Limite atteinte
-                                                                </span>
-                                                                <span className="text-sm text-gray-400 mt-1">
-                                                                    Maximum {MAX_PHOTOS_PAR_TYPE} photos {selectedPhotoType === 'AVANT' ? 'avant' : 'après'} intervention
-                                                                </span>
-                                                                <span className="text-xs mt-2 px-3 py-1 rounded-full bg-red-100 text-red-600">
-                                                                    {currentCount}/{MAX_PHOTOS_PAR_TYPE} photos
-                                                                </span>
-                                                            </>
-                                                        )}
-                                                    </label>
+                                                    </div>
+                                                    <span className={`absolute top-2 left-2 text-xs px-2 py-0.5 rounded-full ${photo.type_photo === 'AVANT' ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                                                        {photo.type_photo_display}
+                                                    </span>
                                                 </div>
-                                            </>
-                                        )}
-
-                                        {/* Gallery */}
-                                        {loadingPhotos ? (
-                                            <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-gray-400" /></div>
-                                        ) : photos.length === 0 ? (
-                                            <div className="text-center py-12 text-gray-400">
-                                                <FileImage className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                                                <p>Aucune photo pour cette intervention</p>
-                                            </div>
-                                        ) : (
-                                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                                {photos.map(photo => {
-                                                    const imageUrl = getFullImageUrl(photo.url_fichier);
-                                                    return (
-                                                        <div key={photo.id} className="group relative aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
-                                                            <img
-                                                                src={imageUrl}
-                                                                alt={photo.legende || 'Photo'}
-                                                                className="w-full h-full object-cover"
-                                                                onError={(e) => {
-                                                                    // Fallback en cas d'erreur de chargement
-                                                                    (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5Y2EzYWYiIHN0cm9rZS13aWR0aD0iMiI+PHJlY3QgeD0iMyIgeT0iMyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiByeD0iMiIvPjxjaXJjbGUgY3g9IjguNSIgY3k9IjguNSIgcj0iMS41Ii8+PHBhdGggZD0ibTIxIDE1LTUtNUw1IDIxIi8+PC9zdmc+';
-                                                                }}
-                                                            />
-                                                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                                                <a
-                                                                    href={imageUrl}
-                                                                    target="_blank"
-                                                                    rel="noreferrer"
-                                                                    className="p-2 bg-white/20 hover:bg-white/40 rounded-full text-white backdrop-blur-sm"
-                                                                >
-                                                                    <Search className="w-5 h-5" />
-                                                                </a>
-                                                                {!isClientView && (
-                                                                    <button
-                                                                        onClick={() => setDeletingPhotoId(photo.id)}
-                                                                        className="p-2 bg-red-500/80 hover:bg-red-600 rounded-full text-white backdrop-blur-sm"
-                                                                    >
-                                                                        <Trash2 className="w-5 h-5" />
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
-                                                                <span className={`text-xs px-2 py-0.5 rounded-full ${photo.type_photo === 'AVANT'
-                                                                    ? 'bg-amber-500/80 text-white'
-                                                                    : 'bg-emerald-500/80 text-white'
-                                                                    }`}>
-                                                                    {photo.type_photo_display}
-                                                                </span>
-                                                                <p className="text-gray-300 text-[10px] mt-1">{new Date(photo.date_prise).toLocaleDateString()}</p>
-                                                            </div>
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })()}
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             {activeTab === 'produits' && (
-                                <div className="space-y-6">
-                                    {/* Form Ajout - masqué pour les clients */}
+                                <div className="space-y-4">
+                                    {/* Add Form */}
                                     {!isClientView && (
-                                        <form onSubmit={handleAddConsommation} className="bg-white rounded-xl shadow-sm p-4 border border-gray-200 flex flex-col md:flex-row gap-4 items-end">
-                                            <div className="flex-1 w-full">
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Produit</label>
-                                                <select
-                                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                                    value={newConsommation.produit}
-                                                    onChange={e => setNewConsommation({ ...newConsommation, produit: e.target.value })}
-                                                    required
-                                                >
-                                                    <option value="">Sélectionner un produit...</option>
-                                                    {produitsOptions.map(p => (
-                                                        <option key={p.id} value={p.id}>{p.nom_produit}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div className="w-full md:w-32">
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Quantité</label>
+                                        <form onSubmit={handleAddConsommation} className="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-3">
+                                            <select
+                                                value={newConsommation.produit}
+                                                onChange={e => setNewConsommation({ ...newConsommation, produit: e.target.value })}
+                                                className="w-full p-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500"
+                                                required
+                                            >
+                                                <option value="">Sélectionner un produit...</option>
+                                                {produitsOptions.map(p => (
+                                                    <option key={p.id} value={p.id}>{p.nom_produit}</option>
+                                                ))}
+                                            </select>
+                                            <div className="flex gap-2">
                                                 <input
                                                     type="number"
                                                     step="0.01"
                                                     min="0.01"
-                                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                                                    placeholder="Quantité"
+                                                    className="flex-1 p-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500"
                                                     value={newConsommation.quantite}
                                                     onChange={e => setNewConsommation({ ...newConsommation, quantite: e.target.value })}
                                                     required
                                                 />
-                                            </div>
-                                            <div className="w-full md:w-24">
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Unité</label>
                                                 <select
-                                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                                                    className="w-24 p-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500"
                                                     value={newConsommation.unite}
                                                     onChange={e => setNewConsommation({ ...newConsommation, unite: e.target.value })}
                                                 >
-                                                    <option value="L">Litres (L)</option>
-                                                    <option value="ml">Millilitres (ml)</option>
-                                                    <option value="kg">Kilogrammes (kg)</option>
-                                                    <option value="g">Grammes (g)</option>
+                                                    <option value="L">L</option>
+                                                    <option value="ml">ml</option>
+                                                    <option value="kg">kg</option>
+                                                    <option value="g">g</option>
                                                 </select>
                                             </div>
                                             <button
                                                 type="submit"
-                                                className="w-full md:w-auto px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center justify-center gap-2"
-                                                disabled={loadingConsommations}
+                                                className="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium flex items-center justify-center gap-2"
                                             >
                                                 <Plus className="w-4 h-4" /> Ajouter
                                             </button>
                                         </form>
                                     )}
 
-                                    {/* Liste Consommations */}
-                                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                                        <table className="w-full text-left">
-                                            <thead className="bg-gray-50 border-b border-gray-100">
-                                                <tr>
-                                                    <th className="p-4 py-3 text-xs font-semibold text-gray-500 uppercase">Produit</th>
-                                                    <th className="p-4 py-3 text-xs font-semibold text-gray-500 uppercase">Quantité</th>
+                                    {/* Consommations List */}
+                                    {loadingConsommations ? (
+                                        <div className="flex justify-center py-8">
+                                            <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                                        </div>
+                                    ) : consommations.length === 0 ? (
+                                        <div className="text-center py-8 text-slate-400">
+                                            <Package className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                                            <p className="text-sm">Aucun produit consommé</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {consommations.map(conso => (
+                                                <div key={conso.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200">
+                                                    <div>
+                                                        <p className="font-medium text-slate-800 text-sm">{conso.produit_nom}</p>
+                                                        <p className="text-slate-500 text-xs">{conso.quantite_utilisee} {conso.unite}</p>
+                                                    </div>
                                                     {!isClientView && (
-                                                        <th className="p-4 py-3 text-xs font-semibold text-gray-500 uppercase text-right">Actions</th>
+                                                        <button
+                                                            onClick={() => setDeletingConsommationId(conso.id)}
+                                                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
                                                     )}
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-50">
-                                                {consommations.length === 0 ? (
-                                                    <tr>
-                                                        <td colSpan={isClientView ? 2 : 3} className="p-6 text-center text-gray-500">Aucun produit consommé enregistré.</td>
-                                                    </tr>
-                                                ) : (
-                                                    consommations.map(conso => (
-                                                        <tr key={conso.id} className="hover:bg-gray-50">
-                                                            <td className="p-4 font-medium text-gray-900">{conso.produit_nom}</td>
-                                                            <td className="p-4 text-gray-600">{conso.quantite_utilisee} {conso.unite}</td>
-                                                            {!isClientView && (
-                                                                <td className="p-4 text-right">
-                                                                    <button
-                                                                        onClick={() => setDeletingConsommationId(conso.id)}
-                                                                        className="text-gray-400 hover:text-red-500 p-1"
-                                                                    >
-                                                                        <Trash2 className="w-4 h-4" />
-                                                                    </button>
-                                                                </td>
-                                                            )}
-                                                        </tr>
-                                                    ))
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             )}
+                        </div>
+                    </div>
+                )}
 
+                {/* Empty State when no task selected */}
+                {!selectedTache && !loadingTasks && filteredTaches.length > 0 && (
+                    <div className="hidden lg:flex flex-1 items-center justify-center text-slate-400 p-8">
+                        <div className="text-center">
+                            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Eye className="w-8 h-8 text-slate-300" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-slate-700 mb-2">Sélectionnez une tâche</h3>
+                            <p className="text-sm">Cliquez sur une tâche pour voir les détails</p>
                         </div>
-                    </>
-                ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-gray-400 p-8">
-                        <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                            <Clock className="w-10 h-10 text-gray-300" />
-                        </div>
-                        <h2 className="text-xl font-semibold text-gray-700 mb-2">Sélectionnez une intervention</h2>
-                        <p className="text-center max-w-sm">
-                            Cliquez sur une tâche dans la liste de gauche pour saisir le rapport d'intervention (photos, produits).
-                        </p>
                     </div>
                 )}
             </div>
 
-            {/* Modal de confirmation */}
+            {/* Modals */}
             {confirmModal?.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-                        {/* Header avec icône */}
-                        <div className={`p-6 text-center ${confirmModal.type === 'start' ? 'bg-emerald-50' :
-                            confirmModal.type === 'complete' ? 'bg-blue-50' : 'bg-red-50'
-                            }`}>
-                            <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 ${confirmModal.type === 'start' ? 'bg-emerald-100' :
-                                confirmModal.type === 'complete' ? 'bg-blue-100' : 'bg-red-100'
-                                }`}>
-                                {confirmModal.icon === 'play' && (
-                                    <Play className="w-8 h-8 text-emerald-600" />
-                                )}
-                                {confirmModal.icon === 'check' && (
-                                    <CheckCircle className="w-8 h-8 text-blue-600" />
-                                )}
-                                {confirmModal.icon === 'x' && (
-                                    <XCircle className="w-8 h-8 text-red-600" />
-                                )}
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                        <div className={`p-6 text-center ${confirmModal.type === 'start' ? 'bg-emerald-50' : confirmModal.type === 'complete' ? 'bg-blue-50' : 'bg-red-50'}`}>
+                            <div className={`w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-4 ${confirmModal.type === 'start' ? 'bg-emerald-100' : confirmModal.type === 'complete' ? 'bg-blue-100' : 'bg-red-100'}`}>
+                                {confirmModal.icon === 'play' && <Play className="w-7 h-7 text-emerald-600" />}
+                                {confirmModal.icon === 'check' && <CheckCircle className="w-7 h-7 text-blue-600" />}
+                                {confirmModal.icon === 'x' && <XCircle className="w-7 h-7 text-red-600" />}
                             </div>
-                            <h3 className={`text-xl font-bold ${confirmModal.type === 'start' ? 'text-emerald-900' :
-                                confirmModal.type === 'complete' ? 'text-blue-900' : 'text-red-900'
-                                }`}>
-                                {confirmModal.title}
-                            </h3>
+                            <h3 className="text-lg font-bold text-slate-800">{confirmModal.title}</h3>
                         </div>
-
-                        {/* Corps du message */}
                         <div className="p-6">
-                            <p className="text-gray-600 text-center mb-6">
-                                {confirmModal.message}
-                            </p>
-
-                            {/* Informations sur la tâche */}
-                            {selectedTache && (
-                                <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
-                                            <Calendar className="w-5 h-5 text-gray-500" />
-                                        </div>
-                                        <div>
-                                            <p className="font-semibold text-gray-900">{selectedTache.type_tache_detail?.nom_tache}</p>
-                                            <p className="text-sm text-gray-500">#{selectedTache.id}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Boutons d'action */}
+                            <p className="text-slate-600 text-center mb-6">{confirmModal.message}</p>
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => setConfirmModal(null)}
-                                    className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                                    className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200"
                                 >
                                     Annuler
                                 </button>
                                 <button
                                     onClick={executeConfirmedAction}
-                                    className={`flex-1 px-4 py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 ${confirmModal.type === 'start'
-                                        ? 'bg-emerald-600 text-white hover:bg-emerald-700' :
-                                        confirmModal.type === 'complete'
-                                            ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                            : 'bg-red-600 text-white hover:bg-red-700'
-                                        }`}
+                                    className={`flex-1 px-4 py-2.5 rounded-xl font-medium text-white ${confirmModal.type === 'start' ? 'bg-emerald-600 hover:bg-emerald-700' : confirmModal.type === 'complete' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'}`}
                                 >
-                                    {confirmModal.icon === 'play' && <Play className="w-4 h-4" />}
-                                    {confirmModal.icon === 'check' && <CheckCircle className="w-4 h-4" />}
-                                    {confirmModal.icon === 'x' && <XCircle className="w-4 h-4" />}
                                     Confirmer
                                 </button>
                             </div>
@@ -1088,7 +1046,6 @@ const SuiviTaches: React.FC = () => {
                 </div>
             )}
 
-            {/* Modal de suppression photo */}
             {deletingPhotoId && (
                 <ConfirmDeleteModal
                     title="Supprimer cette photo ?"
@@ -1098,7 +1055,6 @@ const SuiviTaches: React.FC = () => {
                 />
             )}
 
-            {/* Modal de suppression consommation */}
             {deletingConsommationId && (
                 <ConfirmDeleteModal
                     title="Supprimer cette consommation ?"
@@ -1108,92 +1064,40 @@ const SuiviTaches: React.FC = () => {
                 />
             )}
 
-            {/* Modal de validation ADMIN */}
             {validationModal?.isOpen && selectedTache && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-                        {/* Header avec icône */}
-                        <div className={`p-6 text-center ${validationModal.type === 'VALIDEE' ? 'bg-emerald-50' : 'bg-red-50'
-                            }`}>
-                            <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 ${validationModal.type === 'VALIDEE' ? 'bg-emerald-100' : 'bg-red-100'
-                                }`}>
-                                {validationModal.type === 'VALIDEE' ? (
-                                    <ThumbsUp className="w-8 h-8 text-emerald-600" />
-                                ) : (
-                                    <ThumbsDown className="w-8 h-8 text-red-600" />
-                                )}
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                        <div className={`p-6 text-center ${validationModal.type === 'VALIDEE' ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                            <div className={`w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-4 ${validationModal.type === 'VALIDEE' ? 'bg-emerald-100' : 'bg-red-100'}`}>
+                                {validationModal.type === 'VALIDEE' ? <ThumbsUp className="w-7 h-7 text-emerald-600" /> : <ThumbsDown className="w-7 h-7 text-red-600" />}
                             </div>
-                            <h3 className={`text-xl font-bold ${validationModal.type === 'VALIDEE' ? 'text-emerald-900' : 'text-red-900'
-                                }`}>
+                            <h3 className="text-lg font-bold text-slate-800">
                                 {validationModal.type === 'VALIDEE' ? 'Valider la tâche' : 'Rejeter la tâche'}
                             </h3>
                         </div>
-
-                        {/* Corps */}
                         <div className="p-6">
-                            <p className="text-gray-600 text-center mb-4">
-                                {validationModal.type === 'VALIDEE'
-                                    ? 'Confirmez-vous que cette tâche a été correctement réalisée ?'
-                                    : 'Indiquez la raison du rejet de cette tâche.'}
-                            </p>
-
-                            {/* Informations sur la tâche */}
-                            <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
-                                        <Calendar className="w-5 h-5 text-gray-500" />
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold text-gray-900">{selectedTache.type_tache_detail?.nom_tache}</p>
-                                        <p className="text-sm text-gray-500">#{selectedTache.id}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Champ commentaire */}
-                            <div className="mb-6">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Commentaire {validationModal.type === 'REJETEE' && <span className="text-red-500">*</span>}
-                                </label>
-                                <textarea
-                                    value={validationComment}
-                                    onChange={(e) => setValidationComment(e.target.value)}
-                                    placeholder={validationModal.type === 'VALIDEE'
-                                        ? 'Commentaire optionnel...'
-                                        : 'Raison du rejet...'}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
-                                    rows={3}
-                                    required={validationModal.type === 'REJETEE'}
-                                />
-                            </div>
-
-                            {/* Boutons d'action */}
+                            <textarea
+                                value={validationComment}
+                                onChange={(e) => setValidationComment(e.target.value)}
+                                placeholder={validationModal.type === 'VALIDEE' ? 'Commentaire optionnel...' : 'Raison du rejet...'}
+                                className="w-full p-3 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 resize-none mb-4"
+                                rows={3}
+                                required={validationModal.type === 'REJETEE'}
+                            />
                             <div className="flex gap-3">
                                 <button
-                                    onClick={() => {
-                                        setValidationModal(null);
-                                        setValidationComment('');
-                                    }}
+                                    onClick={() => { setValidationModal(null); setValidationComment(''); }}
                                     disabled={validating}
-                                    className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
+                                    className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 disabled:opacity-50"
                                 >
                                     Annuler
                                 </button>
                                 <button
                                     onClick={handleValidation}
                                     disabled={validating || (validationModal.type === 'REJETEE' && !validationComment.trim())}
-                                    className={`flex-1 px-4 py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${validationModal.type === 'VALIDEE'
-                                        ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                                        : 'bg-red-600 text-white hover:bg-red-700'
-                                        }`}
+                                    className={`flex-1 px-4 py-2.5 rounded-xl font-medium text-white disabled:opacity-50 flex items-center justify-center gap-2 ${validationModal.type === 'VALIDEE' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}
                                 >
-                                    {validating ? (
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                    ) : validationModal.type === 'VALIDEE' ? (
-                                        <ThumbsUp className="w-4 h-4" />
-                                    ) : (
-                                        <ThumbsDown className="w-4 h-4" />
-                                    )}
+                                    {validating && <Loader2 className="w-4 h-4 animate-spin" />}
                                     {validationModal.type === 'VALIDEE' ? 'Valider' : 'Rejeter'}
                                 </button>
                             </div>

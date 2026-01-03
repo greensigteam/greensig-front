@@ -51,6 +51,11 @@ export function clearAuthTokens() {
 export async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
   let token = localStorage.getItem('token');
 
+  // Debug: afficher si le token est présent
+  if (!token) {
+    console.warn('[apiFetch] No token in localStorage for request:', url);
+  }
+
   // Premiere tentative
   let response = await fetch(url, {
     ...options,

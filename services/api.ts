@@ -2,7 +2,6 @@
  * Service API pour communication avec le backend Django
  *
  * Base URL configurée via .env (VITE_API_BASE_URL)
- * Avec cache Dexie pour optimiser les performances
  */
 
 export const hasExistingToken = () => {
@@ -10,7 +9,6 @@ export const hasExistingToken = () => {
 };
 
 import logger from './logger';
-import { db, cacheKeys, cacheTTL } from './db';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
@@ -99,6 +97,7 @@ export interface SiteGeoJSON {
     superviseur_nom?: string
     adresse?: string
     superficie_totale?: number
+    superficie_calculee?: number
     actif: boolean
     date_debut_contrat?: string
     date_fin_contrat?: string
@@ -257,21 +256,10 @@ function transformSiteToFrontend(site: SiteGeoJSON, index: number): SiteFrontend
 
 /**
  * Charge tous les sites depuis l'API et les transforme en format frontend
- * Utilise Dexie (IndexedDB) avec cache de 15 minutes
  * Le backend filtre automatiquement selon les permissions de l'utilisateur
  */
-export async function fetchAllSites(forceRefresh = false): Promise<SiteFrontend[]> {
-  // Vérifier le cache Dexie
-  if (!forceRefresh) {
-    const cached = await db.get<SiteFrontend[]>(cacheKeys.sites());
-    if (cached) {
-      logger.info(`[Cache HIT] Sites depuis Dexie: ${cached.length}`);
-      return cached;
-    }
-  }
-
+export async function fetchAllSites(): Promise<SiteFrontend[]> {
   try {
-    logger.info('[Cache MISS] Sites - Appel API');
     // Charger depuis l'API (filtré automatiquement par permissions)
     const allSites: SiteGeoJSON[] = []
     let page = 1
@@ -298,26 +286,17 @@ export async function fetchAllSites(forceRefresh = false): Promise<SiteFrontend[
 
     const transformedSites = allSites.map((site, index) => transformSiteToFrontend(site, index))
 
-    // Sauvegarder dans le cache Dexie
-    await db.set(cacheKeys.sites(), transformedSites, cacheTTL.standard);
-
     logger.info(`Sites chargés depuis API: ${transformedSites.length}`);
     return transformedSites
 
   } catch (error) {
     logger.error('Erreur fetchAllSites:', error)
-    // Fallback: retourner le cache même expiré
-    const cached = await db.get<SiteFrontend[]>(cacheKeys.sites());
-    if (cached) {
-      logger.warn('[Fallback] Utilisation du cache expiré suite à une erreur API');
-      return cached;
-    }
     throw error
   }
 }
 
 /**
- * Recherche un site par ID (utilise le cache)
+ * Recherche un site par ID
  */
 export async function getSiteById(id: string): Promise<SiteFrontend | undefined> {
   const sites = await fetchAllSites()
@@ -325,7 +304,7 @@ export async function getSiteById(id: string): Promise<SiteFrontend | undefined>
 }
 
 /**
- * Recherche des sites par catégorie (utilise le cache)
+ * Recherche des sites par catégorie
  */
 export async function getSitesByCategory(category: SiteFrontend['category']): Promise<SiteFrontend[]> {
   const sites = await fetchAllSites()
@@ -346,15 +325,6 @@ export async function searchSites(query: string): Promise<SiteFrontend[]> {
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     return searchText.includes(normalizedQuery)
   })
-}
-
-/**
- * Vide le cache des sites (utile après une modification)
- */
-export async function clearSitesCache() {
-  await db.invalidatePrefix(cacheKeys.prefixes.sites);
-  await db.remove(cacheKeys.sites());
-  logger.info('[Cache] Sites cache cleared');
 }
 
 // Anciennes fonctions conservées pour compatibilité
@@ -521,9 +491,6 @@ export async function updateSite(id: number, data: UpdateSiteData): Promise<Site
 
     const result = await handleResponse<any>(response)
 
-    // Invalidate sites cache
-    await clearSitesCache();
-
     // Transform to SiteFrontend format
     const coords = result.geometry?.coordinates?.[0]?.[0] || [0, 0]
     return {
@@ -561,9 +528,6 @@ export async function deleteSite(id: number): Promise<void> {
     if (!response.ok && response.status !== 204) {
       throw new Error('Erreur lors de la suppression du site')
     }
-
-    // Invalidate sites cache
-    await clearSitesCache();
   } catch (error) {
     logger.error('Erreur deleteSite:', error)
     throw error

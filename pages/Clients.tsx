@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
     Users, RefreshCw, Edit2, Trash2, MoreVertical, Plus, Building2,
     Mail, Phone, MapPin, ChevronLeft, ChevronRight,
-    AlertCircle, CheckCircle, Loader2, Download
+    AlertCircle, CheckCircle, Loader2, Upload, Link as LinkIcon
 } from 'lucide-react';
 import { fetchStructures, updateStructure, deleteStructure, createStructure } from '../services/usersApi';
 import type { StructureClient, StructureClientCreate, StructureClientUpdate } from '../types/users';
@@ -103,13 +103,17 @@ interface StructureModalProps {
 const StructureModal: React.FC<StructureModalProps> = ({ isOpen, onClose, onSave, structure }) => {
     const { showToast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [logoMode, setLogoMode] = useState<'upload' | 'url'>('upload');
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [logoPreview, setLogoPreview] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [formData, setFormData] = useState<StructureClientCreate>({
         nom: '',
         adresse: '',
         telephone: '',
         contactPrincipal: '',
         emailFacturation: '',
-        logo: ''
+        logoUrl: ''
     });
 
     useEffect(() => {
@@ -120,8 +124,17 @@ const StructureModal: React.FC<StructureModalProps> = ({ isOpen, onClose, onSave
                 telephone: structure.telephone || '',
                 contactPrincipal: structure.contactPrincipal || '',
                 emailFacturation: structure.emailFacturation || '',
-                logo: structure.logo || ''
+                logoUrl: structure.logoUrl || ''
             });
+            // Si la structure a un logo existant
+            if (structure.logoDisplay) {
+                setLogoPreview(structure.logoDisplay);
+                setLogoMode(structure.logo ? 'upload' : 'url');
+            } else {
+                setLogoPreview(null);
+                setLogoMode('upload');
+            }
+            setLogoFile(null);
         } else {
             setFormData({
                 nom: '',
@@ -129,10 +142,28 @@ const StructureModal: React.FC<StructureModalProps> = ({ isOpen, onClose, onSave
                 telephone: '',
                 contactPrincipal: '',
                 emailFacturation: '',
-                logo: ''
+                logoUrl: ''
             });
+            setLogoFile(null);
+            setLogoPreview(null);
+            setLogoMode('upload');
         }
     }, [structure, isOpen]);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setLogoFile(file);
+            // Creer une preview
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setLogoPreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+            // Vider l'URL si on upload un fichier
+            setFormData({ ...formData, logoUrl: '' });
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -143,11 +174,16 @@ const StructureModal: React.FC<StructureModalProps> = ({ isOpen, onClose, onSave
 
         setIsSubmitting(true);
         try {
+            const dataToSend: StructureClientCreate = {
+                ...formData,
+                logo: logoFile || undefined
+            };
+
             if (structure) {
-                await updateStructure(structure.id, formData as StructureClientUpdate);
+                await updateStructure(structure.id, dataToSend as StructureClientUpdate);
                 showToast('Structure mise a jour', 'success');
             } else {
-                await createStructure(formData);
+                await createStructure(dataToSend);
                 showToast('Structure creee', 'success');
             }
             onSave();
@@ -232,18 +268,98 @@ const StructureModal: React.FC<StructureModalProps> = ({ isOpen, onClose, onSave
                             placeholder="facturation@exemple.com"
                         />
                     </div>
+
+                    {/* Logo Section */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            URL du logo
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Logo
                         </label>
-                        <input
-                            type="url"
-                            value={formData.logo || ''}
-                            onChange={(e) => setFormData({ ...formData, logo: e.target.value })}
-                            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                            placeholder="https://exemple.com/logo.png"
-                        />
+
+                        {/* Toggle Upload/URL */}
+                        <div className="flex items-center gap-2 mb-3">
+                            <button
+                                type="button"
+                                onClick={() => setLogoMode('upload')}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                                    logoMode === 'upload'
+                                        ? 'bg-emerald-100 text-emerald-700 font-medium'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                }`}
+                            >
+                                <Upload className="w-4 h-4" />
+                                Uploader
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setLogoMode('url')}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                                    logoMode === 'url'
+                                        ? 'bg-emerald-100 text-emerald-700 font-medium'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                }`}
+                            >
+                                <LinkIcon className="w-4 h-4" />
+                                URL externe
+                            </button>
+                        </div>
+
+                        {logoMode === 'upload' ? (
+                            <div className="space-y-3">
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleFileChange}
+                                    className="hidden"
+                                />
+                                <div
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/50 transition-colors"
+                                >
+                                    {logoPreview ? (
+                                        <div className="flex items-center gap-4">
+                                            <img
+                                                src={logoPreview}
+                                                alt="Preview"
+                                                className="w-16 h-16 rounded-lg object-cover"
+                                            />
+                                            <div className="text-left">
+                                                <p className="text-sm font-medium text-gray-700">
+                                                    {logoFile?.name || 'Logo actuel'}
+                                                </p>
+                                                <p className="text-xs text-gray-500">
+                                                    Cliquez pour changer
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="py-2">
+                                            <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+                                            <p className="text-sm text-gray-600">
+                                                Cliquez pour selectionner une image
+                                            </p>
+                                            <p className="text-xs text-gray-400 mt-1">
+                                                PNG, JPG, GIF jusqu'a 5MB
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            <input
+                                type="text"
+                                value={formData.logoUrl || ''}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, logoUrl: e.target.value });
+                                    setLogoFile(null);
+                                    setLogoPreview(e.target.value || null);
+                                }}
+                                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                placeholder="https://exemple.com/logo.png"
+                            />
+                        )}
                     </div>
+
                     <div className="flex justify-end gap-3 pt-4 border-t">
                         <button
                             type="button"
@@ -488,9 +604,9 @@ export default function Clients() {
                                         className="hover:bg-gray-50 transition-colors group"
                                     >
                                         <td className="px-6 py-4">
-                                            {structure.logo ? (
+                                            {structure.logoDisplay ? (
                                                 <img
-                                                    src={structure.logo}
+                                                    src={structure.logoDisplay}
                                                     className="w-10 h-10 rounded-full object-cover ring-2 ring-gray-100"
                                                     alt={structure.nom}
                                                 />

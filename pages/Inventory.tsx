@@ -13,6 +13,11 @@ import { EquipeList } from '../types/users';
 import { useToast } from '../contexts/ToastContext';
 import { useSearch } from '../contexts/SearchContext';
 import LoadingScreen from '../components/LoadingScreen';
+import { User } from '../types';
+
+interface InventoryProps {
+  user: User;
+}
 
 // Types de végétation et hydrologie pour les filtres
 const VEGETATION_TYPES = ['Arbre', 'Palmier', 'Gazon', 'Arbuste', 'Vivace', 'Cactus', 'Graminee'];
@@ -178,8 +183,9 @@ const ExportDropdown = ({ onExportCSV, onExportExcel, onPrint }: { onExportCSV: 
 };
 
 // Main Inventory Component
-const Inventory: React.FC = () => {
+const Inventory: React.FC<InventoryProps> = ({ user }) => {
   const navigate = useNavigate();
+  const isClient = user.role === 'CLIENT';
   const { showToast } = useToast();
   const { searchQuery, setPlaceholder } = useSearch();
 
@@ -1234,16 +1240,16 @@ const Inventory: React.FC = () => {
             {/* Divider */}
             <div className="h-6 w-px bg-slate-200 flex-shrink-0"></div>
 
-            {/* Incompatibility warning - compact */}
-            {!isTaskCompatible && !compatibilityLoading && (
+            {/* Incompatibility warning - compact (hidden for clients) */}
+            {!isClient && !isTaskCompatible && !compatibilityLoading && (
               <div className="flex items-center gap-1.5 px-2 py-1 bg-red-50 border border-red-200 rounded-lg flex-shrink-0">
                 <Ban className="w-3.5 h-3.5 text-red-500" />
                 <span className="text-xs text-red-700 whitespace-nowrap">Types incompatibles</span>
               </div>
             )}
 
-            {/* Compatibility info - compact */}
-            {isTaskCompatible && applicableTasksCount !== null && !compatibilityLoading && (
+            {/* Compatibility info - compact (hidden for clients) */}
+            {!isClient && isTaskCompatible && applicableTasksCount !== null && !compatibilityLoading && (
               <div className="flex items-center gap-1 px-2 py-1 bg-emerald-50 border border-emerald-200 rounded-lg flex-shrink-0">
                 <span className="text-xs text-emerald-700 whitespace-nowrap">
                   ✓ {applicableTasksCount} tâche{applicableTasksCount > 1 ? 's' : ''}
@@ -1294,25 +1300,27 @@ const Inventory: React.FC = () => {
                 Carte
               </button>
 
-              {/* Create task */}
-              <button
-                onClick={handleOpenTaskModal}
-                disabled={!isTaskCompatible || compatibilityLoading || modalLoading}
-                className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 text-sm font-medium shadow-sm whitespace-nowrap ${
-                  !isTaskCompatible || compatibilityLoading || modalLoading
-                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                }`}
-              >
-                {compatibilityLoading || modalLoading ? (
-                  <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <ClipboardList className="w-4 h-4" />
-                    Tâche
-                  </>
-                )}
-              </button>
+              {/* Create task - Hidden for clients */}
+              {!isClient && (
+                <button
+                  onClick={handleOpenTaskModal}
+                  disabled={!isTaskCompatible || compatibilityLoading || modalLoading}
+                  className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 text-sm font-medium shadow-sm whitespace-nowrap ${
+                    !isTaskCompatible || compatibilityLoading || modalLoading
+                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  }`}
+                >
+                  {compatibilityLoading || modalLoading ? (
+                    <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <ClipboardList className="w-4 h-4" />
+                      Tâche
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -10,7 +10,8 @@ import {
     ClipboardList,
     Star,
     Eye,
-    X
+    X,
+    Info
 } from 'lucide-react';
 import { Reclamation } from '../types/reclamations';
 import {
@@ -441,7 +442,7 @@ const ReclamationDetailPage: React.FC = () => {
                                     onClick={handleCloturer}
                                     disabled={reclamation.taches_liees_details?.some((t: any) => t.statut !== 'TERMINEE')}
                                     className={`px-4 py-2 text-white rounded-lg font-medium flex items-center gap-2 text-sm transition-all ${reclamation.taches_liees_details?.some((t: any) => t.statut !== 'TERMINEE')
-                                        ? 'bg-gray-400 cursor-not-allowed opacity-60'
+                                        ? 'bg-slate-400 cursor-not-allowed opacity-60'
                                         : 'bg-blue-600 hover:bg-blue-700'
                                         }`}
                                     title={reclamation.taches_liees_details?.some((t: any) => t.statut !== 'TERMINEE')
@@ -481,37 +482,42 @@ const ReclamationDetailPage: React.FC = () => {
                     {/* Main Content */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Informations principales */}
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                            <h2 className="text-lg font-semibold text-slate-800 mb-4">Informations</h2>
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+                            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <Info className="w-5 h-5 text-emerald-600" />
+                                Informations
+                            </h2>
                             <div className="grid grid-cols-2 gap-6">
-                                <div>
-                                    <h4 className="text-xs font-semibold uppercase text-gray-500 mb-1">Type</h4>
-                                    <p className="font-medium text-gray-900 flex items-center gap-2">
+                                <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                                    <dt className="text-xs font-medium text-slate-500 mb-1">Type</dt>
+                                    <dd className="font-semibold text-slate-800 flex items-center gap-2">
                                         <Tag className="w-4 h-4 text-emerald-600" />
                                         {reclamation.type_reclamation_nom}
-                                    </p>
+                                    </dd>
                                 </div>
-                                <div>
-                                    <h4 className="text-xs font-semibold uppercase text-gray-500 mb-1">Urgence</h4>
-                                    <span
-                                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                                        style={{
-                                            backgroundColor: (reclamation.urgence_couleur || '#ccc') + '20',
-                                            color: reclamation.urgence_couleur || '#666'
-                                        }}
-                                    >
-                                        {reclamation.urgence_niveau}
-                                    </span>
+                                <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                                    <dt className="text-xs font-medium text-slate-500 mb-1">Urgence</dt>
+                                    <dd>
+                                        <span
+                                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                            style={{
+                                                backgroundColor: (reclamation.urgence_couleur || '#ccc') + '20',
+                                                color: reclamation.urgence_couleur || '#666'
+                                            }}
+                                        >
+                                            {reclamation.urgence_niveau}
+                                        </span>
+                                    </dd>
                                 </div>
-                                <div>
-                                    <h4 className="text-xs font-semibold uppercase text-gray-500 mb-1">Localisation</h4>
-                                    <p className="font-medium text-gray-900 flex items-center gap-2">
-                                        <MapPin className="w-4 h-4 text-gray-400" />
+                                <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                                    <dt className="text-xs font-medium text-slate-500 mb-1">Localisation</dt>
+                                    <dd className="font-semibold text-slate-800 flex items-center gap-2">
+                                        <MapPin className="w-4 h-4 text-slate-400" />
                                         {reclamation.site_nom || '-'} / {reclamation.zone_nom || '-'}
-                                    </p>
+                                    </dd>
                                 </div>
-                                <div>
-                                    <h4 className="text-xs font-semibold uppercase text-gray-500 mb-1">Statut</h4>
+                                <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                                    <dt className="text-xs font-medium text-slate-500 mb-1">Statut</dt>
                                     <span
                                         className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium"
                                         style={{
@@ -522,9 +528,9 @@ const ReclamationDetailPage: React.FC = () => {
                                         {reclamation.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'En attente validation' : reclamation.statut.toLowerCase().replace('_', ' ')}
                                     </span>
                                 </div>
-                                <div>
-                                    <h4 className="text-xs font-semibold uppercase text-gray-500 mb-1">Date de constatation</h4>
-                                    <p className="font-medium text-gray-900 flex items-center gap-2">
+                                <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                                    <dt className="text-xs font-medium text-slate-500 mb-1">Date de constatation</dt>
+                                    <dd className="font-semibold text-slate-800 flex items-center gap-2">
                                         <Calendar className="w-4 h-4 text-orange-500" />
                                         {formatLocalDate(reclamation.date_constatation, {
                                             day: 'numeric',
@@ -533,13 +539,13 @@ const ReclamationDetailPage: React.FC = () => {
                                             hour: '2-digit',
                                             minute: '2-digit'
                                         })}
-                                    </p>
+                                    </dd>
                                 </div>
-                                <div>
-                                    <h4 className="text-xs font-semibold uppercase text-gray-500 mb-1">Créé par</h4>
-                                    <p className="font-medium text-gray-900">
+                                <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                                    <dt className="text-xs font-medium text-slate-500 mb-1">Créé par</dt>
+                                    <dd className="font-semibold text-slate-800">
                                         {reclamation.createur_nom || 'Anonyme'}
-                                    </p>
+                                    </dd>
                                 </div>
                             </div>
 
@@ -555,44 +561,44 @@ const ReclamationDetailPage: React.FC = () => {
                         </div>
 
                         {/* Description */}
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                            <h2 className="text-lg font-semibold text-slate-800 mb-4">Description</h2>
-                            <p className="text-gray-700 whitespace-pre-line">{reclamation.description}</p>
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+                            <h2 className="text-lg font-bold text-slate-800 mb-4">Description</h2>
+                            <p className="text-slate-700 whitespace-pre-line">{reclamation.description}</p>
                         </div>
 
                         {/* Dates clés + Interventions + Satisfaction en grille */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             {/* Dates clés */}
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                                <h2 className="text-lg font-semibold text-slate-800 mb-4">Dates clés</h2>
+                            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+                                <h2 className="text-lg font-bold text-slate-800 mb-4">Dates clés</h2>
                                 <div className="space-y-3">
                                     <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                                        <span className="text-sm text-gray-500">Prise en compte</span>
-                                        <span className="text-sm font-medium text-gray-800">
+                                        <span className="text-sm text-slate-500">Prise en compte</span>
+                                        <span className="text-sm font-medium text-slate-800">
                                             {reclamation.date_prise_en_compte
                                                 ? new Date(reclamation.date_prise_en_compte).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
                                                 : '-'}
                                         </span>
                                     </div>
                                     <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                                        <span className="text-sm text-gray-500">Début traitement</span>
-                                        <span className="text-sm font-medium text-gray-800">
+                                        <span className="text-sm text-slate-500">Début traitement</span>
+                                        <span className="text-sm font-medium text-slate-800">
                                             {reclamation.date_debut_traitement
                                                 ? new Date(reclamation.date_debut_traitement).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
                                                 : '-'}
                                         </span>
                                     </div>
                                     <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                                        <span className="text-sm text-gray-500">Résolution</span>
-                                        <span className="text-sm font-medium text-emerald-700">
+                                        <span className="text-sm text-slate-500">Résolution</span>
+                                        <span className="text-sm font-medium text-emerald-600">
                                             {reclamation.date_resolution
                                                 ? new Date(reclamation.date_resolution).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
                                                 : '-'}
                                         </span>
                                     </div>
                                     <div className="flex justify-between items-center py-2">
-                                        <span className="text-sm text-gray-500">Clôture réelle</span>
-                                        <span className="text-sm font-medium text-gray-800">
+                                        <span className="text-sm text-slate-500">Clôture réelle</span>
+                                        <span className="text-sm font-medium text-slate-800">
                                             {reclamation.date_cloture_reelle
                                                 ? new Date(reclamation.date_cloture_reelle).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
                                                 : '-'}
@@ -602,8 +608,8 @@ const ReclamationDetailPage: React.FC = () => {
                             </div>
 
                             {/* Interventions liées */}
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                                <h2 className="text-lg font-semibold text-slate-800 mb-4">Interventions liées</h2>
+                            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+                                <h2 className="text-lg font-bold text-slate-800 mb-4">Interventions liées</h2>
                                 {reclamation.taches_liees_details && reclamation.taches_liees_details.length > 0 ? (
                                     <div className="space-y-3">
                                         {reclamation.taches_liees_details.map((t: any) => (
@@ -613,8 +619,8 @@ const ReclamationDetailPage: React.FC = () => {
                                                         <ClipboardList className="w-4 h-4 text-purple-600" />
                                                     </div>
                                                     <div>
-                                                        <p className="text-sm font-medium text-gray-900">{t.type_tache}</p>
-                                                        <p className="text-xs text-gray-500">{t.equipe || 'Équipe non assignée'}</p>
+                                                        <p className="text-sm font-medium text-slate-800">{t.type_tache}</p>
+                                                        <p className="text-xs text-slate-500">{t.equipe || 'Équipe non assignée'}</p>
                                                     </div>
                                                 </div>
                                                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${t.statut === 'TERMINEE' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
@@ -624,46 +630,46 @@ const ReclamationDetailPage: React.FC = () => {
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-gray-400 italic">Aucune intervention liée</p>
+                                    <p className="text-sm text-slate-400 italic">Aucune intervention liée</p>
                                 )}
                             </div>
 
                             {/* Satisfaction */}
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                                <h2 className="text-lg font-semibold text-slate-800 mb-4">Évaluation client</h2>
+                            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+                                <h2 className="text-lg font-bold text-slate-800 mb-4">Évaluation client</h2>
                                 {reclamation.satisfaction ? (
                                     <div className="text-center">
                                         <div className="flex justify-center gap-1 mb-2">
                                             {[1, 2, 3, 4, 5].map((star) => (
                                                 <Star
                                                     key={star}
-                                                    className={`w-6 h-6 ${star <= (reclamation.satisfaction?.note ?? 0) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
+                                                    className={`w-6 h-6 ${star <= (reclamation.satisfaction?.note ?? 0) ? 'text-yellow-400 fill-yellow-400' : 'text-slate-300'}`}
                                                 />
                                             ))}
                                         </div>
-                                        <p className="text-2xl font-bold text-gray-800">{reclamation.satisfaction?.note ?? 0}/5</p>
+                                        <p className="text-2xl font-bold text-slate-800">{reclamation.satisfaction?.note ?? 0}/5</p>
                                         {reclamation.satisfaction?.commentaire && (
-                                            <p className="mt-3 text-sm text-gray-600 italic">"{reclamation.satisfaction.commentaire}"</p>
+                                            <p className="mt-3 text-sm text-slate-600 italic">"{reclamation.satisfaction.commentaire}"</p>
                                         )}
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-gray-400 italic text-center">Non évaluée</p>
+                                    <p className="text-sm text-slate-400 italic text-center">Non évaluée</p>
                                 )}
                             </div>
                         </div>
 
                         {/* Photos */}
                         {((reclamation.photos && reclamation.photos.length > 0) || (reclamation.photos_taches && reclamation.photos_taches.length > 0)) && (
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                                <h2 className="text-lg font-semibold text-slate-800 mb-4">Photos</h2>
+                            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+                                <h2 className="text-lg font-bold text-slate-800 mb-4">Photos</h2>
 
                                 {reclamation.photos && reclamation.photos.length > 0 && (
                                     <div className="mb-6">
-                                        <h4 className="text-xs font-semibold uppercase text-gray-500 mb-3">Photos initiales</h4>
+                                        <h4 className="text-xs font-medium text-slate-500 mb-3">Photos initiales</h4>
                                         <div className="flex gap-3 overflow-x-auto pb-2">
                                             {reclamation.photos.map((p, i) => (
                                                 <div key={i} className="relative group cursor-pointer shrink-0" onClick={() => setSelectedPhoto(p.url_fichier)}>
-                                                    <img src={p.url_fichier} alt={`Photo ${i}`} className="h-32 w-44 object-cover rounded-lg border border-gray-200 hover:border-emerald-500 transition-colors" />
+                                                    <img src={p.url_fichier} alt={`Photo ${i}`} className="h-32 w-44 object-cover rounded-lg border border-slate-200 hover:border-emerald-500 transition-colors" />
                                                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 rounded-lg flex items-center justify-center transition-all">
                                                         <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100" />
                                                     </div>
@@ -675,11 +681,11 @@ const ReclamationDetailPage: React.FC = () => {
 
                                 {reclamation.photos_taches && reclamation.photos_taches.length > 0 && (
                                     <div>
-                                        <h4 className="text-xs font-semibold uppercase text-gray-500 mb-3">Photos des travaux</h4>
+                                        <h4 className="text-xs font-medium text-slate-500 mb-3">Photos des travaux</h4>
                                         <div className="flex gap-3 overflow-x-auto pb-2">
                                             {reclamation.photos_taches.map((p, i) => (
                                                 <div key={i} className="relative group cursor-pointer shrink-0" onClick={() => setSelectedPhoto(p.url_fichier)}>
-                                                    <img src={p.url_fichier} alt={`Photo travaux ${i}`} className="h-32 w-44 object-cover rounded-lg border border-gray-200 hover:border-blue-500 transition-colors" />
+                                                    <img src={p.url_fichier} alt={`Photo travaux ${i}`} className="h-32 w-44 object-cover rounded-lg border border-slate-200 hover:border-blue-500 transition-colors" />
                                                     <div className="absolute inset-x-0 bottom-0 bg-black/50 text-xs text-white p-1.5 text-center rounded-b-lg">
                                                         {new Date(p.date_prise).toLocaleDateString('fr-FR')}
                                                     </div>
@@ -692,8 +698,8 @@ const ReclamationDetailPage: React.FC = () => {
                         )}
 
                         {/* Timeline */}
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                            <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+                            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
                                 <Clock className="w-5 h-5 text-emerald-600" />
                                 Suivi de traitement
                             </h2>
@@ -713,9 +719,9 @@ const ReclamationDetailPage: React.FC = () => {
 
                     {/* Sidebar - Carte */}
                     <div className="space-y-6">
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                            <div className="p-4 border-b border-slate-200">
-                                <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                            <div className="p-4 border-b border-slate-100">
+                                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                                     <MapPin className="w-5 h-5 text-emerald-600" />
                                     Localisation sur carte
                                 </h2>
@@ -744,7 +750,7 @@ const ReclamationDetailPage: React.FC = () => {
                                     }
                                     return (
                                         <div className="h-full flex items-center justify-center bg-slate-50">
-                                            <p className="text-gray-400 text-sm">Aucune localisation disponible</p>
+                                            <p className="text-slate-400 text-sm">Aucune localisation disponible</p>
                                         </div>
                                     );
                                 })()}

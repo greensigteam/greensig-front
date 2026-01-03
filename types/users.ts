@@ -138,7 +138,9 @@ export interface StructureClient {
   telephone: string;
   contactPrincipal: string;
   emailFacturation: string;
-  logo: string | null;
+  logo: string | null;        // Fichier uploadé (chemin relatif)
+  logoUrl: string | null;     // URL externe
+  logoDisplay: string | null; // URL finale à afficher (fichier ou URL)
   actif: boolean;
   dateCreation: string;
   utilisateursCount: number;
@@ -155,7 +157,8 @@ export interface StructureClientCreate {
   telephone?: string;
   contactPrincipal?: string;
   emailFacturation?: string;
-  logo?: string;
+  logo?: File | null;        // Fichier uploadé
+  logoUrl?: string | null;   // URL externe
   actif?: boolean;
 }
 
@@ -165,7 +168,8 @@ export interface StructureClientUpdate {
   telephone?: string;
   contactPrincipal?: string;
   emailFacturation?: string;
-  logo?: string;
+  logo?: File | null;        // Fichier uploadé
+  logoUrl?: string | null;   // URL externe
   actif?: boolean;
 }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, Edit, Trash2, X, Gauge, Filter, Eye, Clock, Calendar, Info } from 'lucide-react';
+import { Search, Edit, Trash2, X, Gauge, Filter, Eye, Clock, Calendar, Info } from 'lucide-react';
 import { planningService } from '../services/planningService';
 import LoadingScreen from '../components/LoadingScreen';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
@@ -194,7 +194,11 @@ const RatioFormModal: React.FC<RatioFormModalProps> = ({ ratio, typesTaches, onC
 // MAIN COMPONENT
 // ============================================================================
 
-const RatiosProductivite: React.FC = () => {
+interface RatiosProductiviteProps {
+  triggerCreate?: number;
+}
+
+const RatiosProductivite: React.FC<RatiosProductiviteProps> = ({ triggerCreate }) => {
     const [ratios, setRatios] = useState<RatioProductivite[]>([]);
     const [typesTaches, setTypesTaches] = useState<TypeTache[]>([]);
     const [loading, setLoading] = useState(true);
@@ -212,6 +216,14 @@ const RatiosProductivite: React.FC = () => {
     useEffect(() => {
         loadData();
     }, []);
+
+    // Handle external trigger to open create modal
+    useEffect(() => {
+        if (triggerCreate && triggerCreate > 0) {
+            setSelectedRatio(null);
+            setShowForm(true);
+        }
+    }, [triggerCreate]);
 
     const loadData = async () => {
         try {
@@ -292,26 +304,6 @@ const RatiosProductivite: React.FC = () => {
 
     return (
         <div className="p-4 sm:p-6 h-full flex flex-col">
-            {/* Header */}
-            <div className="mb-6 flex justify-between items-start">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        <Gauge className="w-6 h-6 text-emerald-600" />
-                        Ratios de productivité
-                    </h1>
-                    <p className="text-gray-500 mt-1">
-                        Configurez les ratios pour le calcul automatique des charges de travail
-                    </p>
-                </div>
-                <button
-                    onClick={() => { setSelectedRatio(null); setShowForm(true); }}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
-                >
-                    <Plus className="w-4 h-4" />
-                    Nouveau ratio
-                </button>
-            </div>
-
             {/* Filters */}
             <div className="mb-6 flex flex-col sm:flex-row gap-4">
                 <div className="relative flex-1 max-w-md">

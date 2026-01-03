@@ -5,9 +5,10 @@ import {
     ChevronLeft, ChevronRight, Building2, User, Mail, Phone, MapPin, Shield, Calendar,
     Package, MapPin as MapPinIcon, ClipboardList, Edit, Loader2, AlertCircle,
     Plus, X as XIcon, Search, Users, UserPlus,
-    MoreVertical, UserX, UserCheck
+    MoreVertical, UserX, UserCheck, Upload, Link as LinkIcon
 } from 'lucide-react';
-import { fetchStructureById, fetchStructureUtilisateurs, addUserToStructure, updateStructure, deleteClient } from '../services/usersApi';
+import { fetchStructureById, fetchStructureUtilisateurs, addUserToStructure, updateStructure, deleteClient, fetchOrphanClients, assignClientToStructure } from '../services/usersApi';
+import type { Client } from '../types/users';
 import { fetchAllSites, SiteFrontend, updateSite } from '../services/api';
 import { planningService } from '../services/planningService';
 import { fetchClientInventoryStats } from '../services/clientInventoryService';
@@ -271,12 +272,12 @@ const OngletGeneral: React.FC<{ structure: StructureClientDetail }> = ({ structu
                 </div>
 
                 {/* LOGO */}
-                {structure.logo && (
+                {structure.logoDisplay && (
                     <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
                         <h2 className="text-sm font-bold text-slate-800 mb-4">Logo de l'organisation</h2>
                         <div className="flex items-center justify-center p-4 bg-slate-50 rounded-lg border border-slate-100">
                             <img
-                                src={structure.logo}
+                                src={structure.logoDisplay}
                                 alt={structure.nom}
                                 className="max-w-full max-h-32 object-contain"
                             />
@@ -1211,6 +1212,12 @@ export default function StructureDetailPage() {
     const [showAddUserModal, setShowAddUserModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
 
+    // Modale pour affecter des clients orphelins
+    const [showOrphanModal, setShowOrphanModal] = useState(false);
+    const [orphanClients, setOrphanClients] = useState<Client[]>([]);
+    const [isLoadingOrphans, setIsLoadingOrphans] = useState(false);
+    const [orphanSearchQuery, setOrphanSearchQuery] = useState('');
+
     // Fonction pour changer d'onglet et mettre à jour l'URL
     const setActiveTab = useCallback((tab: TabType) => {
         setActiveTabState(tab);
@@ -1240,8 +1247,18 @@ export default function StructureDetailPage() {
         loadStructure();
     }, [id]);
 
+    // Reset tab data when navigating to a different structure
+    useEffect(() => {
+        console.log('[StructureDetail] ID changed to:', id, '- resetting all tab data');
+        setUtilisateurs([]);
+        setSites([]);
+        setInventoryStats(null);
+        setTaches([]);
+    }, [id]);
+
     // Lazy load tab data
     useEffect(() => {
+        console.log('[StructureDetail] Lazy load check - activeTab:', activeTab, 'structure:', structure?.id, 'taches.length:', taches.length);
         if (!structure) return;
 
         if (activeTab === 'utilisateurs' && utilisateurs.length === 0 && !isLoadingUsers) {
@@ -1254,20 +1271,22 @@ export default function StructureDetailPage() {
             loadInventoryStats();
         }
         if (activeTab === 'interventions' && taches.length === 0 && !isLoadingTaches) {
+            console.log('[StructureDetail] Triggering loadTaches for structure:', id);
             loadTaches();
         }
     }, [activeTab, structure]);
 
     const loadStructure = async () => {
-        if (!id) {
-            showToast('ID structure manquant', 'error');
+        const numericId = Number(id);
+        if (!id || isNaN(numericId)) {
+            showToast('ID structure invalide', 'error');
             navigate('/clients');
             return;
         }
 
         setIsLoading(true);
         try {
-            const data = await fetchStructureById(Number(id));
+            const data = await fetchStructureById(numericId);
             setStructure(data);
             // Pre-load utilisateurs from structure detail
             if (data.utilisateurs) {
@@ -1293,11 +1312,51 @@ export default function StructureDetailPage() {
         }
     };
 
+    const loadOrphanClients = async () => {
+        setIsLoadingOrphans(true);
+        try {
+            const orphans = await fetchOrphanClients();
+            setOrphanClients(orphans);
+        } catch (error: any) {
+            console.error('Erreur chargement clients orphelins:', error);
+            setOrphanClients([]);
+        } finally {
+            setIsLoadingOrphans(false);
+        }
+    };
+
+    const handleAssignOrphan = async (clientId: number) => {
+        try {
+            await assignClientToStructure(clientId, Number(id));
+            showToast('Utilisateur affecté avec succès', 'success');
+            setShowOrphanModal(false);
+            setOrphanSearchQuery('');
+            // Recharger les utilisateurs de la structure
+            loadUtilisateurs();
+            // Retirer le client de la liste des orphelins
+            setOrphanClients(prev => prev.filter(c => c.utilisateur !== clientId));
+        } catch (error: any) {
+            showToast('Erreur lors de l\'affectation', 'error');
+        }
+    };
+
+    // Charger les orphelins quand la modale s'ouvre
+    useEffect(() => {
+        if (showOrphanModal && orphanClients.length === 0) {
+            loadOrphanClients();
+        }
+    }, [showOrphanModal]);
+
+    const filteredOrphans = orphanClients.filter(c =>
+        c.nom?.toLowerCase().includes(orphanSearchQuery.toLowerCase()) ||
+        c.prenom?.toLowerCase().includes(orphanSearchQuery.toLowerCase()) ||
+        c.email?.toLowerCase().includes(orphanSearchQuery.toLowerCase())
+    );
+
     const loadSites = async () => {
         setIsLoadingSites(true);
         try {
-            // Force refresh pour obtenir les donnees a jour avec structure_client
-            const allSites = await fetchAllSites(true);
+            const allSites = await fetchAllSites();
             const structureId = Number(id);
             const structureSites = allSites.filter(s => s.structure_client === structureId);
             setSites(structureSites);
@@ -1328,11 +1387,11 @@ export default function StructureDetailPage() {
     const loadTaches = async () => {
         setIsLoadingTaches(true);
         try {
-            const response = await planningService.getTaches();
-            const allTaches = response.results || [];
-            // Filtrer par structure_client
-            const structureTaches = allTaches.filter(t => t.structure_client_detail?.id === Number(id));
-            setTaches(structureTaches);
+            // Utiliser le filtre backend pour optimiser la requête
+            console.log('[StructureDetail] Loading taches for structure_client_id:', id);
+            const response = await planningService.getTaches({ structure_client_id: Number(id) });
+            console.log('[StructureDetail] Got', response.results?.length || 0, 'taches');
+            setTaches(response.results || []);
         } catch (error: any) {
             showToast('Erreur lors du chargement des taches', 'error');
         } finally {
@@ -1352,9 +1411,9 @@ export default function StructureDetailPage() {
                         <ChevronLeft className="w-6 h-6" />
                     </Link>
                     <div className="flex items-center gap-3">
-                        {structure.logo ? (
+                        {structure.logoDisplay ? (
                             <img
-                                src={structure.logo}
+                                src={structure.logoDisplay}
                                 className="w-12 h-12 rounded-full object-cover ring-2 ring-emerald-200"
                                 alt={structure.nom}
                             />
@@ -1434,13 +1493,23 @@ export default function StructureDetailPage() {
                     </div>
 
                     {activeTab === 'utilisateurs' && (
-                        <button
-                            onClick={() => setShowAddUserModal(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm text-sm font-medium"
-                        >
-                            <UserPlus className="w-4 h-4" />
-                            Ajouter un utilisateur
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setShowOrphanModal(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors shadow-sm text-sm font-medium"
+                                title="Affecter un utilisateur client existant sans organisation"
+                            >
+                                <Users className="w-4 h-4" />
+                                Affecter un existant
+                            </button>
+                            <button
+                                onClick={() => setShowAddUserModal(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm text-sm font-medium"
+                            >
+                                <UserPlus className="w-4 h-4" />
+                                Créer un utilisateur
+                            </button>
+                        </div>
                     )}
 
                     {activeTab === 'sites' && (
@@ -1493,6 +1562,99 @@ export default function StructureDetailPage() {
                     }}
                 />
             )}
+
+            {/* Modal Affecter clients orphelins */}
+            {showOrphanModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+                        <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-amber-50">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-amber-100">
+                                    <Users className="w-5 h-5 text-amber-600" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-bold text-slate-800">Affecter un utilisateur existant</h2>
+                                    <p className="text-sm text-slate-500">Utilisateurs clients sans organisation</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setShowOrphanModal(false);
+                                    setOrphanSearchQuery('');
+                                }}
+                                className="p-2 hover:bg-amber-100 rounded-lg"
+                            >
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="p-4 border-b">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Rechercher par nom, prénom ou email..."
+                                    value={orphanSearchQuery}
+                                    onChange={(e) => setOrphanSearchQuery(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {isLoadingOrphans ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
+                                    <span className="ml-2 text-gray-500">Chargement...</span>
+                                </div>
+                            ) : filteredOrphans.length === 0 ? (
+                                <div className="text-center py-8 text-gray-500">
+                                    <Users className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                                    <p>
+                                        {orphanSearchQuery
+                                            ? 'Aucun utilisateur trouvé pour cette recherche'
+                                            : 'Aucun utilisateur client sans organisation'}
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {filteredOrphans.map((client) => (
+                                        <button
+                                            key={client.utilisateur}
+                                            onClick={() => handleAssignOrphan(client.utilisateur)}
+                                            className="w-full p-4 border rounded-lg hover:border-amber-500 hover:bg-amber-50 transition-all text-left group"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex-1">
+                                                    <div className="font-medium text-gray-900 group-hover:text-amber-700">
+                                                        {client.prenom} {client.nom}
+                                                    </div>
+                                                    <div className="text-sm text-gray-500 mt-1">
+                                                        {client.email}
+                                                    </div>
+                                                </div>
+                                                <Plus className="w-5 h-5 text-gray-400 group-hover:text-amber-600" />
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-4 border-t bg-gray-50 flex justify-end">
+                            <button
+                                onClick={() => {
+                                    setShowOrphanModal(false);
+                                    setOrphanSearchQuery('');
+                                }}
+                                className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
+                            >
+                                Fermer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -1508,15 +1670,51 @@ const EditStructureModal: React.FC<{
 }> = ({ structure, onClose, onSaved }) => {
     const { showToast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Determine initial logo mode based on existing data
+    const getInitialLogoMode = (): 'upload' | 'url' => {
+        // If there's an uploaded logo (starts with /media/), default to upload mode
+        // If there's only logoUrl, default to url mode
+        if (structure.logoUrl) return 'url';
+        return 'upload';
+    };
+
+    const [logoMode, setLogoMode] = useState<'upload' | 'url'>(getInitialLogoMode());
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [logoUrl, setLogoUrl] = useState(structure.logoUrl || '');
+    const [logoPreview, setLogoPreview] = useState<string | null>(structure.logoDisplay || null);
+
     const [formData, setFormData] = useState({
         nom: structure.nom,
         adresse: structure.adresse || '',
         telephone: structure.telephone || '',
         contactPrincipal: structure.contactPrincipal || '',
         emailFacturation: structure.emailFacturation || '',
-        logo: structure.logo || '',
         actif: structure.actif
     });
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setLogoFile(file);
+            // Create preview
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setLogoPreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleRemoveLogo = () => {
+        setLogoFile(null);
+        setLogoPreview(null);
+        setLogoUrl('');
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -1527,7 +1725,24 @@ const EditStructureModal: React.FC<{
 
         setIsSubmitting(true);
         try {
-            await updateStructure(structure.id, formData);
+            const updateData: any = {
+                nom: formData.nom,
+                adresse: formData.adresse,
+                telephone: formData.telephone,
+                contactPrincipal: formData.contactPrincipal,
+                emailFacturation: formData.emailFacturation,
+                actif: formData.actif
+            };
+
+            if (logoMode === 'upload' && logoFile) {
+                updateData.logo = logoFile;
+                updateData.logoUrl = null;
+            } else if (logoMode === 'url') {
+                updateData.logo = null;
+                updateData.logoUrl = logoUrl || null;
+            }
+
+            await updateStructure(structure.id, updateData);
             showToast('Structure mise à jour', 'success');
             onSaved();
         } catch (error: any) {
@@ -1607,26 +1822,103 @@ const EditStructureModal: React.FC<{
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-800"
                         />
                     </div>
+
+                    {/* Logo section with toggle */}
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">
-                            URL du logo
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                            Logo
                         </label>
-                        <input
-                            type="url"
-                            value={formData.logo}
-                            onChange={(e) => setFormData({ ...formData, logo: e.target.value })}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-800"
-                        />
+                        {/* Toggle buttons */}
+                        <div className="flex gap-2 mb-3">
+                            <button
+                                type="button"
+                                onClick={() => setLogoMode('upload')}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                    logoMode === 'upload'
+                                        ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
+                                        : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
+                                }`}
+                            >
+                                <Upload className="w-4 h-4" />
+                                Upload
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setLogoMode('url')}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                    logoMode === 'url'
+                                        ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
+                                        : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
+                                }`}
+                            >
+                                <LinkIcon className="w-4 h-4" />
+                                URL
+                            </button>
+                        </div>
+
+                        {logoMode === 'upload' ? (
+                            <div className="space-y-3">
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleFileChange}
+                                    className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                                />
+                                {logoPreview && (
+                                    <div className="relative inline-block">
+                                        <img
+                                            src={logoPreview}
+                                            alt="Preview"
+                                            className="h-20 w-auto object-contain rounded-lg border border-slate-200"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleRemoveLogo}
+                                            className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                                        >
+                                            <XIcon className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                <input
+                                    type="text"
+                                    value={logoUrl}
+                                    onChange={(e) => {
+                                        setLogoUrl(e.target.value);
+                                        setLogoPreview(e.target.value || null);
+                                    }}
+                                    placeholder="https://exemple.com/logo.png"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-800"
+                                />
+                                {logoUrl && (
+                                    <div className="relative inline-block">
+                                        <img
+                                            src={logoUrl}
+                                            alt="Preview"
+                                            className="h-20 w-auto object-contain rounded-lg border border-slate-200"
+                                            onError={(e) => {
+                                                (e.target as HTMLImageElement).style.display = 'none';
+                                            }}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
+
                     <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100">
                         <input
                             type="checkbox"
-                            id="actif"
+                            id="actif-edit"
                             checked={formData.actif}
                             onChange={(e) => setFormData({ ...formData, actif: e.target.checked })}
                             className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 border-slate-300"
                         />
-                        <label htmlFor="actif" className="text-sm text-slate-700 font-medium">
+                        <label htmlFor="actif-edit" className="text-sm text-slate-700 font-medium">
                             Structure active
                         </label>
                     </div>

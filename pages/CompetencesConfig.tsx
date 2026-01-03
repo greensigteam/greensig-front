@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, Edit2, Trash2, Award, X } from 'lucide-react';
+import { Search, Edit2, Trash2, Award, X } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { useSearch } from '../contexts/SearchContext';
 import { useToast } from '../contexts/ToastContext';
@@ -28,7 +28,11 @@ import {
  * Page de configuration des compétences (Admin only)
  * Gère le CRUD complet des compétences : création, édition, suppression, ordre d'affichage
  */
-const CompetencesConfig: React.FC = () => {
+interface CompetencesConfigProps {
+  triggerCreate?: number;
+}
+
+const CompetencesConfig: React.FC<CompetencesConfigProps> = ({ triggerCreate }) => {
   const { searchQuery, setPlaceholder } = useSearch();
   const { showToast } = useToast();
 
@@ -63,6 +67,14 @@ const CompetencesConfig: React.FC = () => {
     loadData();
     loadCurrentUser();
   }, []);
+
+  // Handle external trigger to open create modal
+  useEffect(() => {
+    if (triggerCreate && triggerCreate > 0) {
+      setEditingCompetence(null);
+      setShowCompetenceModal(true);
+    }
+  }, [triggerCreate]);
 
   const loadCurrentUser = async () => {
     try {
@@ -192,31 +204,6 @@ const CompetencesConfig: React.FC = () => {
 
   return (
     <div className="p-4 sm:p-6 h-full flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="mb-6 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-              <Award className="w-7 h-7 text-emerald-600" />
-              Configuration des Compétences
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Gérez les compétences disponibles dans le système
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              setEditingCompetence(null);
-              setShowCompetenceModal(true);
-            }}
-            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium shadow-sm"
-          >
-            <Plus className="w-5 h-5" />
-            Nouvelle compétence
-          </button>
-        </div>
-      </div>
-
       {/* Filters Bar */}
       <div className="mb-4 flex items-center gap-3 flex-shrink-0">
         <div className="flex items-center gap-2">

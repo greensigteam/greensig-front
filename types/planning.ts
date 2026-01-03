@@ -105,10 +105,12 @@ export interface RatioProductiviteCreate {
 
 export interface ObjetSimple {
     id: number;
-    site: string;
-    sous_site: string;
-    nom_type: string;
-    display: string;
+    site: number;           // Site FK (ID)
+    site_nom: string;       // Site name
+    sous_site: number | null;  // SousSite FK (ID)
+    sous_site_nom?: string;    // SousSite name (if available)
+    nom_type?: string;         // Object type name (optional, from get_nom_type)
+    display?: string;          // Display string (optional)
 }
 
 export interface ParticipationTache {
@@ -139,6 +141,7 @@ export interface Tache {
 
     // Relations détaillées
     client_detail: Client | null;
+    structure_client_detail: { id: number; nom: string; actif: boolean } | null;
     type_tache_detail: TypeTache;
     equipe_detail: EquipeList | null; // Legacy single team (backwards compatibility)
     equipes_detail: EquipeList[]; // Multi-teams (US-PLAN-013)

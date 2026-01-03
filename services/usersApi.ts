@@ -3,12 +3,6 @@
 // Service pour les appels API vers le backend api_users
 // ============================================================================
 
-// Logging conditionnel (désactivé en production)
-const DEBUG_CACHE = import.meta.env.DEV && false; // Mettre à true pour debug cache
-const logCache = (...args: unknown[]) => {
-  if (DEBUG_CACHE) console.log(...args);
-};
-
 import {
   Utilisateur,
   UtilisateurCreate,
@@ -65,21 +59,6 @@ import {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 const USERS_API_URL = `${API_BASE_URL}/users`;
-
-// Import Dexie cache
-import { db, cacheKeys, cacheTTL } from './db';
-
-// ============================================================================
-// CACHE HELPERS - Utilise Dexie (IndexedDB)
-// ============================================================================
-
-export async function invalidateCache(keyPrefix?: string): Promise<void> {
-  if (keyPrefix) {
-    await db.invalidatePrefix(keyPrefix);
-  } else {
-    await db.clearAll();
-  }
-}
 
 // ============================================================================
 // UTILITAIRES
@@ -194,38 +173,26 @@ export async function fetchUtilisateurById(id: number): Promise<Utilisateur> {
 }
 
 export async function createUtilisateur(data: UtilisateurCreate): Promise<Utilisateur> {
-  const result = await fetchApi<Utilisateur>(`${USERS_API_URL}/utilisateurs/`, {
+  return fetchApi<Utilisateur>(`${USERS_API_URL}/utilisateurs/`, {
     method: 'POST',
     body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
   });
-
-  // Invalider le cache
-  await db.remove(cacheKeys.users());
-  return result;
 }
 
 export async function updateUtilisateur(
   id: number,
   data: UtilisateurUpdate
 ): Promise<Utilisateur> {
-  const result = await fetchApi<Utilisateur>(`${USERS_API_URL}/utilisateurs/${id}/`, {
+  return fetchApi<Utilisateur>(`${USERS_API_URL}/utilisateurs/${id}/`, {
     method: 'PATCH',
     body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
   });
-
-  // Invalider les caches utilisateurs et clients
-  await db.remove(cacheKeys.users());
-  await db.remove('clients');
-  return result;
 }
 
 export async function deleteUtilisateur(id: number): Promise<void> {
   await fetchApi<void>(`${USERS_API_URL}/utilisateurs/${id}/`, {
     method: 'DELETE'
   });
-
-  // Invalider le cache
-  await db.remove(cacheKeys.users());
 }
 
 export async function changePassword(
@@ -257,26 +224,12 @@ export async function fetchRoles(): Promise<Role[]> {
 // ============================================================================
 
 export async function fetchStructures(
-  filters: StructureClientFilters = {},
-  forceRefresh = false
+  filters: StructureClientFilters = {}
 ): Promise<PaginatedResponse<StructureClient>> {
   const queryString = buildQueryParams(filters as Record<string, unknown>);
-  const cacheKey = queryString ? `structures:${queryString}` : 'structures';
-
-  if (!forceRefresh) {
-    const cached = await db.get<PaginatedResponse<StructureClient>>(cacheKey);
-    if (cached) {
-      logCache('[Cache HIT] Structures');
-      return cached;
-    }
-  }
-
-  logCache('[Cache MISS] Structures - Appel API');
-  const result = await fetchApi<PaginatedResponse<StructureClient>>(
+  return fetchApi<PaginatedResponse<StructureClient>>(
     `${USERS_API_URL}/structures/?${queryString}`
   );
-  await db.set(cacheKey, result, cacheTTL.standard);
-  return result;
 }
 
 export async function fetchStructureById(id: number): Promise<StructureClientDetail> {
@@ -284,38 +237,87 @@ export async function fetchStructureById(id: number): Promise<StructureClientDet
 }
 
 export async function createStructure(data: StructureClientCreate): Promise<StructureClient> {
-  const result = await fetchApi<StructureClient>(`${USERS_API_URL}/structures/`, {
-    method: 'POST',
-    body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
-  });
+  // Si un fichier logo est fourni, utiliser FormData
+  if (data.logo instanceof File) {
+    const formData = new FormData();
+    formData.append('nom', data.nom);
+    if (data.adresse) formData.append('adresse', data.adresse);
+    if (data.telephone) formData.append('telephone', data.telephone);
+    if (data.contactPrincipal) formData.append('contact_principal', data.contactPrincipal);
+    if (data.emailFacturation) formData.append('email_facturation', data.emailFacturation);
+    formData.append('logo', data.logo);
 
-  // Invalider le cache
-  await db.invalidatePrefix('structures');
-  return result;
+    // Utiliser apiFetch pour garantir le token JWT et le refresh automatique
+    const { apiFetch } = await import('./apiFetch');
+    const response = await apiFetch(`${USERS_API_URL}/structures/`, {
+      method: 'POST',
+      body: formData
+      // Note: Ne pas mettre Content-Type, le navigateur le définit automatiquement avec boundary pour FormData
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(JSON.stringify(errorData));
+    }
+    return snakeToCamel(await response.json()) as StructureClient;
+  }
+
+  // Sinon, utiliser JSON avec logo_url
+  const cleanData: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (key === 'logo') continue; // Ignorer logo (fichier) si null
+    cleanData[key] = value === '' ? null : value;
+  }
+  return fetchApi<StructureClient>(`${USERS_API_URL}/structures/`, {
+    method: 'POST',
+    body: JSON.stringify(camelToSnake(cleanData))
+  });
 }
 
 export async function updateStructure(
   id: number,
   data: StructureClientUpdate
 ): Promise<StructureClient> {
-  const result = await fetchApi<StructureClient>(`${USERS_API_URL}/structures/${id}/`, {
-    method: 'PATCH',
-    body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
-  });
+  // Si un fichier logo est fourni, utiliser FormData
+  if (data.logo instanceof File) {
+    const formData = new FormData();
+    if (data.nom) formData.append('nom', data.nom);
+    if (data.adresse) formData.append('adresse', data.adresse);
+    if (data.telephone) formData.append('telephone', data.telephone);
+    if (data.contactPrincipal) formData.append('contact_principal', data.contactPrincipal);
+    if (data.emailFacturation) formData.append('email_facturation', data.emailFacturation);
+    if (data.actif !== undefined) formData.append('actif', String(data.actif));
+    formData.append('logo', data.logo);
 
-  // Invalider le cache
-  await db.invalidatePrefix('structures');
-  return result;
+    // Utiliser apiFetch pour garantir le token JWT et le refresh automatique
+    const { apiFetch } = await import('./apiFetch');
+    const response = await apiFetch(`${USERS_API_URL}/structures/${id}/`, {
+      method: 'PATCH',
+      body: formData
+      // Note: Ne pas mettre Content-Type, le navigateur le définit automatiquement avec boundary pour FormData
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(JSON.stringify(errorData));
+    }
+    return snakeToCamel(await response.json()) as StructureClient;
+  }
+
+  // Sinon, utiliser JSON avec logo_url
+  const cleanData: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (key === 'logo') continue; // Ignorer logo (fichier) si null
+    cleanData[key] = value === '' ? null : value;
+  }
+  return fetchApi<StructureClient>(`${USERS_API_URL}/structures/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(camelToSnake(cleanData))
+  });
 }
 
 export async function deleteStructure(id: number): Promise<void> {
   await fetchApi<void>(`${USERS_API_URL}/structures/${id}/`, {
     method: 'DELETE'
   });
-
-  // Invalider le cache
-  await db.invalidatePrefix('structures');
-  await db.remove('clients');
 }
 
 export async function fetchStructureUtilisateurs(structureId: number): Promise<ClientUser[]> {
@@ -326,37 +328,21 @@ export async function addUserToStructure(
   structureId: number,
   userData: { email: string; nom: string; prenom: string; password: string }
 ): Promise<Client> {
-  const result = await fetchApi<Client>(
+  return fetchApi<Client>(
     `${USERS_API_URL}/structures/${structureId}/ajouter_utilisateur/`,
     {
       method: 'POST',
       body: JSON.stringify(camelToSnake(userData as unknown as Record<string, unknown>))
     }
   );
-
-  // Invalider les caches
-  await db.invalidatePrefix('structures');
-  await db.remove('clients');
-  return result;
 }
 
 // ============================================================================
 // CLIENTS (Utilisateurs de structures)
 // ============================================================================
 
-export async function fetchClients(forceRefresh = false): Promise<PaginatedResponse<Client>> {
-  if (!forceRefresh) {
-    const cached = await db.get<PaginatedResponse<Client>>('clients');
-    if (cached) {
-      logCache('[Cache HIT] Clients');
-      return cached;
-    }
-  }
-
-  logCache('[Cache MISS] Clients - Appel API');
-  const result = await fetchApi<PaginatedResponse<Client>>(`${USERS_API_URL}/clients/`);
-  await db.set('clients', result, cacheTTL.standard);
-  return result;
+export async function fetchClients(): Promise<PaginatedResponse<Client>> {
+  return fetchApi<PaginatedResponse<Client>>(`${USERS_API_URL}/clients/`);
 }
 
 /**
@@ -365,12 +351,9 @@ export async function fetchClients(forceRefresh = false): Promise<PaginatedRespo
  */
 export async function fetchClientByUserId(userId: number): Promise<Client | null> {
   try {
-    // L'API supporte le filtre par utilisateur
-    const result = await fetchApi<PaginatedResponse<Client>>(`${USERS_API_URL}/clients/?utilisateur=${userId}`);
-    if (result.results && result.results.length > 0) {
-      return result.results[0] ?? null;
-    }
-    return null;
+    // Accès direct via l'endpoint /clients/{id}/ car utilisateur est la PK du modèle Client
+    const result = await fetchApi<Client>(`${USERS_API_URL}/clients/${userId}/`);
+    return result;
   } catch (error) {
     console.error('Erreur fetchClientByUserId:', error);
     return null;
@@ -378,8 +361,6 @@ export async function fetchClientByUserId(userId: number): Promise<Client | null
 }
 
 export async function createClient(data: ClientCreate): Promise<Client> {
-  let result: Client;
-
   // Si le logo est présent et est une data URL base64, utiliser FormData
   if (data.logo && typeof data.logo === 'string' && data.logo.startsWith('data:')) {
     const formData = new FormData();
@@ -413,31 +394,22 @@ export async function createClient(data: ClientCreate): Promise<Client> {
     }
 
     const responseData = await response.json();
-    result = snakeToCamel<Client>(responseData);
+    return snakeToCamel<Client>(responseData);
   } else {
     // Si pas de logo, utiliser JSON standard
-    result = await fetchApi<Client>(`${USERS_API_URL}/clients/`, {
+    return fetchApi<Client>(`${USERS_API_URL}/clients/`, {
       method: 'POST',
       body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
     });
   }
-
-  // Invalider le cache
-  await db.remove('clients');
-  return result;
 }
 
 export async function updateClient(
   id: number,
   data: ClientUpdate
 ): Promise<Client> {
-  logCache('📤 updateClient appelé:', { id, data, hasLogo: !!data.logo, logoType: typeof data.logo });
-
-  let result: Client;
-
   // Si le logo est présent et est une data URL base64, utiliser FormData
   if (data.logo && typeof data.logo === 'string' && data.logo.startsWith('data:')) {
-    logCache('✅ Utilisation de FormData pour upload logo');
     const formData = new FormData();
 
     // Convertir base64 en Blob
@@ -461,36 +433,50 @@ export async function updateClient(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
-      console.error('❌ Erreur FormData:', { status: response.status, statusText: response.statusText, errorData });
+      console.error('Erreur FormData:', { status: response.status, statusText: response.statusText, errorData });
       throw new ApiError(response.status, response.statusText, errorData);
     }
 
     const responseData = await response.json();
-    result = snakeToCamel<Client>(responseData);
+    return snakeToCamel<Client>(responseData);
   } else {
     // Si pas de logo ou logo === undefined (suppression), utiliser JSON standard
-    logCache('📝 Utilisation de JSON standard (pas de logo ou logo non modifié)');
     const payload = camelToSnake(data as unknown as Record<string, unknown>);
-    logCache('📝 Payload JSON:', payload);
 
-    result = await fetchApi<Client>(`${USERS_API_URL}/clients/${id}/`, {
+    return fetchApi<Client>(`${USERS_API_URL}/clients/${id}/`, {
       method: 'PATCH',
       body: JSON.stringify(payload)
     });
   }
-
-  // Invalider le cache
-  await db.remove('clients');
-  return result;
 }
 
 export async function deleteClient(id: number): Promise<void> {
   await fetchApi<void>(`${USERS_API_URL}/clients/${id}/`, {
     method: 'DELETE'
   });
+}
 
-  // Invalider le cache
-  await db.remove('clients');
+/**
+ * Récupère les clients sans structure (orphelins)
+ */
+export async function fetchOrphanClients(): Promise<Client[]> {
+  const response = await fetchApi<PaginatedResponse<Client>>(
+    `${USERS_API_URL}/clients/?structure__isnull=true`
+  );
+  return response.results || [];
+}
+
+/**
+ * Affecte un client à une structure
+ */
+export async function assignClientToStructure(
+  clientId: number,
+  structureId: number
+): Promise<Client> {
+  return fetchApi<Client>(`${USERS_API_URL}/clients/${clientId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify({ structure_id: structureId })
+  });
 }
 
 // ============================================================================
@@ -500,24 +486,10 @@ export async function deleteClient(id: number): Promise<void> {
 export async function fetchCompetences(
   filters: CompetenceFilters = {}
 ): Promise<Competence[]> {
-  // Cache uniquement sans filtres
-  const hasFilters = Object.keys(filters).length > 0;
-
-  if (!hasFilters) {
-    const cached = await db.get<Competence[]>(cacheKeys.competences());
-    if (cached) {
-      logCache('[Cache HIT] Compétences');
-      return cached;
-    }
-  }
-
-  logCache('[Cache MISS] Compétences - Appel API');
   const queryString = buildQueryParams(filters as Record<string, unknown>);
   const response = await fetchApi<PaginatedResponse<Competence>>(
     `${USERS_API_URL}/competences/?${queryString}`
   );
-
-  if (!hasFilters) await db.set(cacheKeys.competences(), response.results, cacheTTL.static);
   return response.results;
 }
 
@@ -528,9 +500,6 @@ export async function createCompetence(
     method: 'POST',
     body: JSON.stringify(camelToSnake(data as Record<string, unknown>))
   });
-
-  // Invalider le cache
-  await db.remove(cacheKeys.competences());
   return result;
 }
 
@@ -542,17 +511,11 @@ export async function updateCompetence(
     method: 'PATCH',
     body: JSON.stringify(camelToSnake(data as Record<string, unknown>))
   });
-
-  // Invalider le cache
-  await db.remove(cacheKeys.competences());
   return result;
 }
 
 export async function deleteCompetence(id: number): Promise<void> {
   await fetchApi<void>(`${USERS_API_URL}/competences/${id}/`, { method: 'DELETE' });
-
-  // Invalider le cache
-  await db.remove(cacheKeys.competences());
 }
 
 // ============================================================================
@@ -562,24 +525,10 @@ export async function deleteCompetence(id: number): Promise<void> {
 export async function fetchOperateurs(
   filters: OperateurFilters = {}
 ): Promise<PaginatedResponse<OperateurList>> {
-  // Improved cache: also cache paginated results with a unique key
   const queryString = buildQueryParams(filters as Record<string, unknown>);
-  const cacheKey = queryString ? `operateurs:${queryString}` : cacheKeys.operateurs();
-
-  const cached = await db.get<PaginatedResponse<OperateurList>>(cacheKey);
-  if (cached) {
-    logCache('[Cache HIT] Opérateurs', queryString || 'no filters');
-    return cached;
-  }
-
-  logCache('[Cache MISS] Opérateurs - Appel API', queryString || 'no filters');
   const result = await fetchApi<PaginatedResponse<OperateurList>>(
     `${USERS_API_URL}/operateurs/?${queryString}`
   );
-
-  // Cache with shorter TTL for paginated results (2 minutes instead of 5)
-  const ttl = Object.keys(filters).length > 0 ? 120000 : cacheTTL.standard;
-  await db.set(cacheKey, result, ttl);
   return result;
 }
 
@@ -592,9 +541,6 @@ export async function createOperateur(data: OperateurCreate): Promise<OperateurL
     method: 'POST',
     body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
   });
-
-  // Invalider le cache
-  await db.remove(cacheKeys.operateurs());
   return result;
 }
 
@@ -606,10 +552,6 @@ export async function updateOperateur(
     method: 'PATCH',
     body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
   });
-
-  // Invalider le cache (y compris toutes les pages mises en cache)
-  await db.remove(cacheKeys.operateur(id));
-  await db.invalidatePrefix('operateurs:');
   return result;
 }
 
@@ -617,10 +559,6 @@ export async function deleteOperateur(id: number): Promise<void> {
   await fetchApi<void>(`${USERS_API_URL}/operateurs/${id}/`, {
     method: 'DELETE'
   });
-
-  // Invalider le cache (y compris toutes les pages mises en cache)
-  await db.remove(cacheKeys.operateur(id));
-  await db.invalidatePrefix('operateurs:');
 }
 
 export async function fetchOperateursDisponibles(): Promise<OperateurList[]> {
@@ -661,9 +599,6 @@ export async function affecterCompetence(
       })
     }
   );
-
-  // Invalider le cache des opérateurs (y compris toutes les pages)
-  await db.invalidatePrefix('operateurs:');
   return result;
 }
 
@@ -724,10 +659,6 @@ export async function createSuperviseur(data: SuperviseurCreate): Promise<Superv
     method: 'POST',
     body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
   });
-
-  // Invalider les caches
-  await db.remove(cacheKeys.users());
-  await db.invalidatePrefix('superviseurs:');
   return result;
 }
 
@@ -736,35 +667,12 @@ export async function createSuperviseur(data: SuperviseurCreate): Promise<Superv
 // ============================================================================
 
 export async function fetchEquipes(
-  filters: EquipeFilters = {},
-  forceRefresh = false
+  filters: EquipeFilters = {}
 ): Promise<PaginatedResponse<EquipeList>> {
-  // Improved cache: also cache paginated results with a unique key
   const queryString = buildQueryParams(filters as Record<string, unknown>);
-  const cacheKey = queryString ? `equipes:${queryString}` : cacheKeys.equipes();
-
-  console.log('[fetchEquipes] Filters:', filters);
-  console.log('[fetchEquipes] Query string:', queryString);
-  console.log('[fetchEquipes] Full URL:', `${USERS_API_URL}/equipes/?${queryString}`);
-
-  if (!forceRefresh) {
-    const cached = await db.get<PaginatedResponse<EquipeList>>(cacheKey);
-    if (cached) {
-      logCache('[Cache HIT] Équipes', queryString || 'no filters');
-      console.log('[fetchEquipes] Returning cached result:', cached.results.length, 'teams');
-      return cached;
-    }
-  }
-
-  logCache('[Cache MISS] Équipes - Appel API', queryString || 'no filters');
   const result = await fetchApi<PaginatedResponse<EquipeList>>(
     `${USERS_API_URL}/equipes/?${queryString}`
   );
-  console.log('[fetchEquipes] API returned:', result.results.length, 'teams');
-
-  // Cache with shorter TTL for paginated results (2 minutes instead of 5)
-  const ttl = Object.keys(filters).length > 0 ? 120000 : cacheTTL.standard;
-  await db.set(cacheKey, result, ttl);
   return result;
 }
 
@@ -777,9 +685,6 @@ export async function createEquipe(data: EquipeCreate): Promise<EquipeList> {
     method: 'POST',
     body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
   });
-
-  // Invalider le cache des équipes (y compris toutes les pages)
-  await db.invalidatePrefix('equipes:');
   return result;
 }
 
@@ -791,9 +696,6 @@ export async function updateEquipe(
     method: 'PATCH',
     body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
   });
-
-  // Invalider le cache des équipes (y compris toutes les pages)
-  await db.invalidatePrefix('equipes:');
   return result;
 }
 
@@ -801,10 +703,6 @@ export async function deleteEquipe(id: number): Promise<void> {
   await fetchApi<void>(`${USERS_API_URL}/equipes/${id}/`, {
     method: 'DELETE'
   });
-
-  // Invalider le cache des équipes et opérateurs (y compris toutes les pages)
-  await db.invalidatePrefix('equipes:');
-  await db.invalidatePrefix('operateurs:');
 }
 
 export async function fetchEquipeMembres(equipeId: number): Promise<OperateurList[]> {
@@ -824,10 +722,6 @@ export async function affecterMembres(
       body: JSON.stringify({ operateurs: data.operateurs })
     }
   );
-
-  // Invalider le cache des équipes et opérateurs (y compris toutes les pages)
-  await db.invalidatePrefix('equipes:');
-  await db.invalidatePrefix('operateurs:');
   return result;
 }
 
@@ -848,10 +742,6 @@ export async function retirerMembre(
       body: JSON.stringify({ operateur_id: operateurId })
     }
   );
-
-  // Invalider le cache des équipes et opérateurs (y compris toutes les pages)
-  await db.invalidatePrefix('equipes:');
-  await db.invalidatePrefix('operateurs:');
   return result;
 }
 
@@ -862,24 +752,10 @@ export async function retirerMembre(
 export async function fetchAbsences(
   filters: AbsenceFilters = {}
 ): Promise<PaginatedResponse<Absence>> {
-  // Improved cache: also cache paginated results with a unique key
   const queryString = buildQueryParams(filters as Record<string, unknown>);
-  const cacheKey = queryString ? `absences:${queryString}` : cacheKeys.absences();
-
-  const cached = await db.get<PaginatedResponse<Absence>>(cacheKey);
-  if (cached) {
-    logCache('[Cache HIT] Absences', queryString || 'no filters');
-    return cached;
-  }
-
-  logCache('[Cache MISS] Absences - Appel API', queryString || 'no filters');
   const result = await fetchApi<PaginatedResponse<Absence>>(
     `${USERS_API_URL}/absences/?${queryString}`
   );
-
-  // Cache with shorter TTL for paginated results (1 minute for absences - more dynamic data)
-  const ttl = Object.keys(filters).length > 0 ? 60000 : cacheTTL.dynamic;
-  await db.set(cacheKey, result, ttl);
   return result;
 }
 
@@ -892,9 +768,6 @@ export async function createAbsence(data: AbsenceCreate): Promise<Absence> {
     method: 'POST',
     body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
   });
-
-  // Invalider le cache (y compris toutes les pages)
-  await db.invalidatePrefix('absences:');
   return result;
 }
 
@@ -906,9 +779,6 @@ export async function validerAbsence(
     method: 'POST',
     body: JSON.stringify({ commentaire })
   });
-
-  // Invalider le cache (y compris toutes les pages)
-  await db.invalidatePrefix('absences:');
   return result;
 }
 
@@ -920,9 +790,6 @@ export async function refuserAbsence(
     method: 'POST',
     body: JSON.stringify({ commentaire })
   });
-
-  // Invalider le cache (y compris toutes les pages)
-  await db.invalidatePrefix('absences:');
   return result;
 }
 
@@ -942,9 +809,6 @@ export async function updateAbsence(
     method: 'PATCH',
     body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
   });
-
-  // Invalider le cache (y compris toutes les pages)
-  await db.invalidatePrefix('absences:');
   return result;
 }
 
@@ -952,9 +816,6 @@ export async function annulerAbsence(id: number): Promise<Absence> {
   const result = await fetchApi<Absence>(`${USERS_API_URL}/absences/${id}/annuler/`, {
     method: 'POST'
   });
-
-  // Invalider le cache (y compris toutes les pages)
-  await db.invalidatePrefix('absences:');
   return result;
 }
 
@@ -990,9 +851,6 @@ export async function attribuerRole(utilisateurId: string, roleId: string): Prom
       body: JSON.stringify({ role_id: roleId })
     }
   );
-
-  // Invalider le cache des utilisateurs
-  await db.remove(cacheKeys.users());
   return result;
 }
 
@@ -1005,9 +863,6 @@ export async function retirerRole(utilisateurId: string, roleId: string): Promis
       body: JSON.stringify({ role_id: roleId })
     }
   );
-
-  // Invalider le cache des utilisateurs
-  await db.remove(cacheKeys.users());
   return result;
 }
 

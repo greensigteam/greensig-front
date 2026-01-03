@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getSiteById, fetchAllSites, SiteFrontend, deleteSite, updateSite, apiFetch, fetchCurrentUser } from '../services/api';
-import { fetchClients, fetchEquipes, fetchSuperviseurs, updateEquipe } from '../services/usersApi';
-import type { Client, EquipeList, SuperviseurList } from '../types/users';
+import { fetchStructures, fetchEquipes, fetchSuperviseurs, updateEquipe } from '../services/usersApi';
+import type { StructureClient, EquipeList, SuperviseurList } from '../types/users';
 import { OLMap } from '../components/OLMap';
 import { MAP_LAYERS } from '../constants';
 import { useToast } from '../contexts/ToastContext';
@@ -141,7 +141,7 @@ const SiteDetailPage: React.FC = () => {
 
     // Client assignment modal
     const [showAssignClientModal, setShowAssignClientModal] = useState(false);
-    const [clients, setClients] = useState<Client[]>([]);
+    const [clients, setClients] = useState<StructureClient[]>([]);
     const [isLoadingClients, setIsLoadingClients] = useState(false);
     const [clientSearchQuery, setClientSearchQuery] = useState('');
 
@@ -301,7 +301,7 @@ const SiteDetailPage: React.FC = () => {
     const loadClients = async () => {
         setIsLoadingClients(true);
         try {
-            const data = await fetchClients();
+            const data = await fetchStructures();
             setClients(data.results || []);
         } catch (error: any) {
             showToast('Erreur lors du chargement des clients', 'error');
@@ -310,10 +310,10 @@ const SiteDetailPage: React.FC = () => {
         }
     };
 
-    const handleAssignClient = async (clientId: number) => {
+    const handleAssignClient = async (structureId: number) => {
         if (!site) return;
         try {
-            await updateSite(Number(site.id), { client: clientId });
+            await updateSite(Number(site.id), { structure_client: structureId });
             showToast('Client assigné avec succès', 'success');
             setRefreshKey(prev => prev + 1); // Trigger reload
             setShowAssignClientModal(false);
@@ -324,9 +324,9 @@ const SiteDetailPage: React.FC = () => {
     };
 
     const filteredClients = clients.filter(c =>
-        c.nomStructure?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
         c.nom?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
-        c.email?.toLowerCase().includes(clientSearchQuery.toLowerCase())
+        c.contactPrincipal?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+        c.emailFacturation?.toLowerCase().includes(clientSearchQuery.toLowerCase())
     );
 
     // Load superviseurs when modal opens
@@ -523,11 +523,11 @@ const SiteDetailPage: React.FC = () => {
                                                     // If current user is the owner client, display "Vous-même"
                                                     if (currentUser &&
                                                         currentUser.roles?.includes('CLIENT') &&
-                                                        currentUser.client_id &&
-                                                        currentUser.client_id === site.client) {
+                                                        currentUser.structure_client_id &&
+                                                        currentUser.structure_client_id === site.structure_client) {
                                                         return 'Vous-même';
                                                     }
-                                                    return site.client_nom || 'Non assigné';
+                                                    return site.structure_client_nom || 'Non assigné';
                                                 })()}
                                             </div>
                                             {currentUser?.roles?.includes('ADMIN') && (
@@ -1147,20 +1147,22 @@ const SiteDetailPage: React.FC = () => {
                                 </div>
                             ) : (
                                 <div className="space-y-2">
-                                    {filteredClients.map((client) => (
+                                    {filteredClients.map((structure) => (
                                         <button
-                                            key={client.utilisateur}
-                                            onClick={() => handleAssignClient(client.utilisateur)}
+                                            key={structure.id}
+                                            onClick={() => handleAssignClient(structure.id)}
                                             className="w-full p-4 border rounded-lg hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left group"
                                         >
                                             <div className="flex items-center justify-between">
                                                 <div className="flex-1">
                                                     <div className="font-medium text-gray-900 group-hover:text-emerald-700">
-                                                        {client.nomStructure}
+                                                        {structure.nom}
                                                     </div>
-                                                    <div className="text-sm text-gray-500 mt-1">
-                                                        {client.nom} {client.prenom} • {client.email}
-                                                    </div>
+                                                    {(structure.contactPrincipal || structure.emailFacturation) && (
+                                                        <div className="text-sm text-gray-500 mt-1">
+                                                            {structure.contactPrincipal}{structure.contactPrincipal && structure.emailFacturation ? ' • ' : ''}{structure.emailFacturation}
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 <Plus className="w-5 h-5 text-gray-400 group-hover:text-emerald-600" />
                                             </div>

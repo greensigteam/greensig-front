@@ -7,8 +7,6 @@ import {
     SatisfactionCreate,
     ReclamationStats
 } from '../types/reclamations';
-import { db, cacheKeys, cacheTTL } from './db';
-
 const API_BASE_URL = '/api/reclamations';
 
 // ============================================================================
@@ -107,9 +105,6 @@ export const createReclamation = async (data: ReclamationCreate): Promise<Reclam
         body: JSON.stringify(data)
     });
     const result = await handleResponse<Reclamation>(response);
-
-    // Invalider le cache des réclamations
-    await db.remove(cacheKeys.reclamations());
     return result;
 };
 
@@ -127,10 +122,6 @@ export const updateReclamation = async (id: number, data: Partial<ReclamationCre
         body: JSON.stringify(data)
     });
     const result = await handleResponse<Reclamation>(response);
-
-    // Invalider le cache des réclamations
-    await db.remove(cacheKeys.reclamations());
-    await db.remove(cacheKeys.reclamation(id));
     return result;
 };
 
@@ -147,10 +138,6 @@ export const deleteReclamation = async (id: number): Promise<void> => {
     if (!response.ok) {
         throw new Error('Erreur lors de la suppression');
     }
-
-    // Invalider le cache des réclamations
-    await db.remove(cacheKeys.reclamations());
-    await db.remove(cacheKeys.reclamation(id));
 };
 
 export const assignReclamation = async (id: number, equipeId: number): Promise<Reclamation> => {
@@ -160,10 +147,6 @@ export const assignReclamation = async (id: number, equipeId: number): Promise<R
         body: JSON.stringify({ equipe_id: equipeId })
     });
     const result = await handleResponse<Reclamation>(response);
-
-    // Invalider le cache des réclamations
-    await db.remove(cacheKeys.reclamations());
-    await db.remove(cacheKeys.reclamation(id));
     return result;
 };
 
@@ -231,10 +214,6 @@ export const cloturerReclamation = async (id: number): Promise<Reclamation> => {
         headers: getAuthHeaders()
     });
     const result = await handleResponse<any>(response);
-
-    // Invalider le cache des réclamations
-    await db.remove(cacheKeys.reclamations());
-    await db.remove(cacheKeys.reclamation(id));
     return result.reclamation || result;
 };
 
@@ -244,10 +223,6 @@ export const validerCloture = async (id: number): Promise<Reclamation> => {
         headers: getAuthHeaders()
     });
     const result = await handleResponse<any>(response);
-
-    // Invalider le cache des réclamations
-    await db.remove(cacheKeys.reclamations());
-    await db.remove(cacheKeys.reclamation(id));
     return result.reclamation || result;
 };
 
@@ -262,12 +237,6 @@ export const createSatisfaction = async (data: SatisfactionCreate): Promise<Sati
         body: JSON.stringify(data)
     });
     const result = await handleResponse<SatisfactionClient>(response);
-
-    // Invalider le cache des réclamations (car la satisfaction affecte la réclamation)
-    await db.remove(cacheKeys.reclamations());
-    if (data.reclamation) {
-        await db.remove(cacheKeys.reclamation(data.reclamation));
-    }
     return result;
 };
 

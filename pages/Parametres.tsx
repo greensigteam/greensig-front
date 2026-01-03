@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Users as UsersIcon, Award, Gauge } from 'lucide-react';
+import { Users as UsersIcon, Award, Gauge, UserPlus, Plus } from 'lucide-react';
 
 // Import des composants de configuration
 import CompetencesConfig from './CompetencesConfig';
@@ -16,86 +16,89 @@ type ParametresTab = 'utilisateurs' | 'competences' | 'ratios';
 
 const Parametres: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ParametresTab>('utilisateurs');
+  const [createTrigger, setCreateTrigger] = useState(0);
+
+  const handleCreate = () => {
+    setCreateTrigger(prev => prev + 1);
+  };
 
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-gray-50">
-      {/* Header */}
-      <div className="px-4 sm:px-6 pt-6 pb-4 bg-white border-b border-gray-200 flex-shrink-0">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2.5 bg-emerald-100 rounded-lg">
-            <Settings className="w-6 h-6 text-emerald-700" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Paramètres & Configuration</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Gérez les paramètres système et les référentiels de données
-            </p>
-          </div>
-        </div>
-
-        {/* Tabs Navigation */}
-        <div className="flex gap-1 mt-4 border-b border-gray-200">
-          <button
-            onClick={() => setActiveTab('utilisateurs')}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              activeTab === 'utilisateurs'
-                ? 'border-emerald-500 text-emerald-700 bg-emerald-50'
-                : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-            }`}
-          >
-            <span className="flex items-center gap-2">
+    <div className="p-6 space-y-6">
+      {/* Toolbar avec Tabs et Action Button */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg w-fit">
+            <button
+              onClick={() => setActiveTab('utilisateurs')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${
+                activeTab === 'utilisateurs'
+                  ? 'bg-white text-slate-800 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-800'
+              }`}
+            >
               <UsersIcon className="w-4 h-4" />
               Utilisateurs
-            </span>
-          </button>
-          <button
-            onClick={() => setActiveTab('competences')}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              activeTab === 'competences'
-                ? 'border-emerald-500 text-emerald-700 bg-emerald-50'
-                : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-            }`}
-          >
-            <span className="flex items-center gap-2">
+            </button>
+            <button
+              onClick={() => setActiveTab('competences')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${
+                activeTab === 'competences'
+                  ? 'bg-white text-slate-800 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-800'
+              }`}
+            >
               <Award className="w-4 h-4" />
               Compétences
-            </span>
-          </button>
-          <button
-            onClick={() => setActiveTab('ratios')}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              activeTab === 'ratios'
-                ? 'border-emerald-500 text-emerald-700 bg-emerald-50'
-                : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-            }`}
-          >
-            <span className="flex items-center gap-2">
+            </button>
+            <button
+              onClick={() => setActiveTab('ratios')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${
+                activeTab === 'ratios'
+                  ? 'bg-white text-slate-800 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-800'
+              }`}
+            >
               <Gauge className="w-4 h-4" />
               Ratios de productivité
-            </span>
-          </button>
+            </button>
+          </div>
+
+          {/* Action Buttons */}
+          {activeTab === 'utilisateurs' && (
+            <button
+              onClick={handleCreate}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+            >
+              <UserPlus className="w-4 h-4" />
+              Nouvel utilisateur
+            </button>
+          )}
+          {activeTab === 'competences' && (
+            <button
+              onClick={handleCreate}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              Nouvelle compétence
+            </button>
+          )}
+          {activeTab === 'ratios' && (
+            <button
+              onClick={handleCreate}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              Nouveau ratio
+            </button>
+          )}
         </div>
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 min-h-0 overflow-hidden">
-        {activeTab === 'utilisateurs' && (
-          <div className="h-full">
-            <Users />
-          </div>
-        )}
-
-        {activeTab === 'competences' && (
-          <div className="h-full">
-            <CompetencesConfig />
-          </div>
-        )}
-
-        {activeTab === 'ratios' && (
-          <div className="h-full">
-            <RatiosProductivite />
-          </div>
-        )}
+      <div className="min-h-0">
+        {activeTab === 'utilisateurs' && <Users triggerCreate={createTrigger} />}
+        {activeTab === 'competences' && <CompetencesConfig triggerCreate={createTrigger} />}
+        {activeTab === 'ratios' && <RatiosProductivite triggerCreate={createTrigger} />}
       </div>
     </div>
   );
