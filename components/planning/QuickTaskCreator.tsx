@@ -296,6 +296,13 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
         return [...new Set(availableObjects.map(o => o.etat).filter(Boolean))].sort();
     }, [availableObjects]);
 
+    // Filter equipes by selected site
+    const filteredEquipes = useMemo(() => {
+        if (!selectedSite) return equipes;
+        // Filter equipes assigned to the selected site
+        return equipes.filter(e => e.siteNom === selectedSite.name);
+    }, [equipes, selectedSite]);
+
     const handleSelectType = (type: TypeTache) => {
         setSelectedType(type);
         setCompletedSteps(prev => [...new Set([...prev, 'type'])]);
@@ -837,38 +844,50 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Équipes assignées (optionnel)
+                                        {selectedSite && filteredEquipes.length < equipes.length && (
+                                            <span className="ml-2 text-xs text-blue-600 font-normal">
+                                                ({filteredEquipes.length} équipe{filteredEquipes.length > 1 ? 's' : ''} sur ce site)
+                                            </span>
+                                        )}
                                     </label>
-                                    <div className="space-y-2">
-                                        {equipes.map(equipe => {
-                                            const isSelected = selectedEquipes.includes(equipe.id);
-                                            return (
-                                                <button
-                                                    key={equipe.id}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        if (isSelected) {
-                                                            setSelectedEquipes(prev => prev.filter(id => id !== equipe.id));
-                                                        } else {
-                                                            setSelectedEquipes(prev => [...prev, equipe.id]);
-                                                        }
-                                                    }}
-                                                    className={`w-full p-3 border-2 rounded-lg transition-all text-left flex items-center justify-between ${
-                                                        isSelected
-                                                            ? 'border-emerald-500 bg-emerald-50'
-                                                            : 'border-gray-200 bg-white hover:border-gray-300'
-                                                    }`}
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <Users className={`w-5 h-5 ${isSelected ? 'text-emerald-600' : 'text-gray-400'}`} />
-                                                        <span className={`font-medium ${isSelected ? 'text-emerald-900' : 'text-gray-700'}`}>
-                                                            {equipe.nomEquipe}
-                                                        </span>
-                                                    </div>
-                                                    {isSelected && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
+                                    {filteredEquipes.length === 0 ? (
+                                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+                                            Aucune équipe n'est affectée au site "{selectedSite?.name}".
+                                            Vous pouvez créer la tâche sans équipe ou affecter une équipe à ce site depuis la page Équipes.
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {filteredEquipes.map(equipe => {
+                                                const isSelected = selectedEquipes.includes(equipe.id);
+                                                return (
+                                                    <button
+                                                        key={equipe.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (isSelected) {
+                                                                setSelectedEquipes(prev => prev.filter(id => id !== equipe.id));
+                                                            } else {
+                                                                setSelectedEquipes(prev => [...prev, equipe.id]);
+                                                            }
+                                                        }}
+                                                        className={`w-full p-3 border-2 rounded-lg transition-all text-left flex items-center justify-between ${
+                                                            isSelected
+                                                                ? 'border-emerald-500 bg-emerald-50'
+                                                                : 'border-gray-200 bg-white hover:border-gray-300'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <Users className={`w-5 h-5 ${isSelected ? 'text-emerald-600' : 'text-gray-400'}`} />
+                                                            <span className={`font-medium ${isSelected ? 'text-emerald-900' : 'text-gray-700'}`}>
+                                                                {equipe.nomEquipe}
+                                                            </span>
+                                                        </div>
+                                                        {isSelected && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Priorité */}

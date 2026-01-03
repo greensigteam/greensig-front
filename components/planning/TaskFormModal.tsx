@@ -325,13 +325,25 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
     const lockedSite = useMemo(() => {
         // Priority: siteFilter > selectedObjects
         if (siteFilter) {
-            return siteFilter.name;
+            return { id: siteFilter.id, name: siteFilter.name };
         }
         if (selectedObjects.length > 0) {
-            return selectedObjects[0].site;
+            // Find site ID from available objects
+            const firstObj = availableObjects.find(o => o.site === selectedObjects[0].site);
+            return { id: (firstObj as any)?.siteId || null, name: selectedObjects[0].site };
         }
         return null;
-    }, [selectedObjects, siteFilter]);
+    }, [selectedObjects, siteFilter, availableObjects]);
+
+    // Filter equipes by site when a site is locked
+    const filteredEquipes = useMemo(() => {
+        if (!lockedSite) {
+            return equipes;
+        }
+        // Filter by site name (siteNom) since we have the site name from objects
+        const filtered = equipes.filter(e => e.siteNom === lockedSite.name);
+        return filtered;
+    }, [equipes, lockedSite]);
 
     // Validation state
     const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
@@ -513,7 +525,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
 
         // If a site is locked (objects already selected), filter by that site
         if (lockedSite) {
-            filtered = filtered.filter(o => o.site === lockedSite);
+            filtered = filtered.filter(o => o.site === lockedSite.name);
         }
 
         // Then apply search query filter
@@ -772,12 +784,23 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-2">
                                 Équipes
+                                {lockedSite && filteredEquipes.length < equipes.length && (
+                                    <span className="ml-2 text-xs text-blue-600 font-normal">
+                                        ({filteredEquipes.length} équipe{filteredEquipes.length > 1 ? 's' : ''} sur ce site)
+                                    </span>
+                                )}
                             </label>
                             <MultiEquipeSelector
                                 values={formData.equipes_ids || []}
-                                equipes={equipes}
+                                equipes={filteredEquipes}
                                 onChange={(ids) => setFormData({ ...formData, equipes_ids: ids })}
                             />
+                            {lockedSite && filteredEquipes.length === 0 && (
+                                <p className="text-xs text-amber-600 mt-1">
+                                    Aucune équipe n'est affectée au site "{lockedSite.name}".
+                                    Vous pouvez créer la tâche sans équipe ou affecter une équipe à ce site depuis la page Équipes.
+                                </p>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -949,8 +972,8 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                 <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-3">
                                     <div className="flex items-center gap-2 text-sm text-blue-700">
                                         <MapPin className="w-4 h-4" />
-                                        <span>Site : <strong>{lockedSite}</strong></span>
-                                        <span className="text-blue-500 text-xs">(seuls les objets de ce site sont affichés)</span>
+                                        <span>Site : <strong>{lockedSite.name}</strong></span>
+                                        <span className="text-blue-500 text-xs">(seuls les objets et équipes de ce site sont affichés)</span>
                                     </div>
                                     {/* Ne pas afficher le bouton "Changer de site" si le site est verrouillé par siteFilter */}
                                     {!siteFilter && selectedObjects.length > 0 && (
@@ -1010,7 +1033,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                                 {objectSearchQuery
                                                     ? 'Aucun résultat pour cette recherche'
                                                     : lockedSite
-                                                        ? `Aucun autre objet disponible sur le site "${lockedSite}"`
+                                                        ? `Aucun autre objet disponible sur le site "${lockedSite.name}"`
                                                         : 'Aucun objet disponible'}
                                             </div>
                                         ) : (

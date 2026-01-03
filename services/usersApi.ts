@@ -248,12 +248,11 @@ export async function createStructure(data: StructureClientCreate): Promise<Stru
     formData.append('logo', data.logo);
 
     // Utiliser apiFetch pour garantir le token JWT et le refresh automatique
-    const { apiFetch } = await import('./apiFetch');
-    const response = await apiFetch(`${USERS_API_URL}/structures/`, {
+    const response = await import('./apiFetch').then(m => m.apiFetch(`${USERS_API_URL}/structures/`, {
       method: 'POST',
       body: formData
       // Note: Ne pas mettre Content-Type, le navigateur le définit automatiquement avec boundary pour FormData
-    });
+    }));
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(JSON.stringify(errorData));
@@ -289,12 +288,11 @@ export async function updateStructure(
     formData.append('logo', data.logo);
 
     // Utiliser apiFetch pour garantir le token JWT et le refresh automatique
-    const { apiFetch } = await import('./apiFetch');
-    const response = await apiFetch(`${USERS_API_URL}/structures/${id}/`, {
+    const response = await import('./apiFetch').then(m => m.apiFetch(`${USERS_API_URL}/structures/${id}/`, {
       method: 'PATCH',
       body: formData
       // Note: Ne pas mettre Content-Type, le navigateur le définit automatiquement avec boundary pour FormData
-    });
+    }));
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(JSON.stringify(errorData));

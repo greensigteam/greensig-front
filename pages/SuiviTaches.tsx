@@ -3,7 +3,7 @@ import {
     Calendar, MapPin, Building2, Users, ChevronDown,
     ChevronRight, Camera, Package, AlertCircle, Plus, Trash2,
     Loader2, FileImage, Play, CheckCircle, XCircle, ThumbsUp, ThumbsDown, ShieldCheck,
-    RefreshCw, Eye, Filter, X, Clock
+    RefreshCw, Eye, Filter, X, Clock, Pencil
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { planningService } from '../services/planningService';
@@ -14,11 +14,12 @@ import {
     fetchConsommationsParTache, createConsommation, deleteConsommation,
     fetchProduitsActifs
 } from '../services/suiviTachesApi';
-import { Tache, STATUT_TACHE_COLORS, PRIORITE_LABELS, ETAT_VALIDATION_COLORS, ETAT_VALIDATION_LABELS, PlanningFilters, EMPTY_PLANNING_FILTERS } from '../types/planning';
+import { Tache, TacheCreate, TypeTache, STATUT_TACHE_COLORS, PRIORITE_LABELS, ETAT_VALIDATION_COLORS, ETAT_VALIDATION_LABELS, PlanningFilters, EMPTY_PLANNING_FILTERS } from '../types/planning';
 import { PhotoList, ConsommationProduit, ProduitList } from '../types/suiviTaches';
 import { StructureClient, EquipeList } from '../types/users';
 import { useSearch } from '../contexts/SearchContext';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
+import TaskFormModal from '../components/planning/TaskFormModal';
 
 // Helper pour construire l'URL complète des images
 const getFullImageUrl = (url: string | null): string => {
@@ -95,6 +96,10 @@ const SuiviTaches: React.FC = () => {
     const [deletingPhotoId, setDeletingPhotoId] = useState<number | null>(null);
     const [deletingConsommationId, setDeletingConsommationId] = useState<number | null>(null);
 
+    // Edit modal state
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [typesTaches, setTypesTaches] = useState<TypeTache[]>([]);
+    const [loadingTypesTaches, setLoadingTypesTaches] = useState(false);
 
     // Set search placeholder
     useEffect(() => {
@@ -164,6 +169,37 @@ const SuiviTaches: React.FC = () => {
             setProduitsOptions(data);
         } catch (error) {
             console.error("Erreur chargement produits", error);
+        }
+    };
+
+    const loadTypesTaches = async () => {
+        if (typesTaches.length > 0) return; // Already loaded
+        setLoadingTypesTaches(true);
+        try {
+            const response = await planningService.getTypesTaches();
+            setTypesTaches(response.results || response);
+        } catch (error) {
+            console.error("Erreur chargement types de tâches", error);
+        } finally {
+            setLoadingTypesTaches(false);
+        }
+    };
+
+    const openEditModal = async () => {
+        await loadTypesTaches();
+        setShowEditModal(true);
+    };
+
+    const handleTaskUpdate = async (data: TacheCreate) => {
+        if (!selectedTache) return;
+        try {
+            const updatedTache = await planningService.updateTache(selectedTache.id, data);
+            setSelectedTache(updatedTache);
+            setTaches(prev => prev.map(t => t.id === updatedTache.id ? updatedTache : t));
+            setShowEditModal(false);
+        } catch (error) {
+            console.error("Erreur mise à jour tâche", error);
+            throw error;
         }
     };
 
@@ -621,6 +657,18 @@ const SuiviTaches: React.FC = () => {
                                 {/* Action Buttons */}
                                 {!isClientView && (
                                     <div className="flex gap-2 shrink-0">
+                                        {/* Edit Button */}
+                                        {(selectedTache.statut === 'PLANIFIEE' || selectedTache.statut === 'NON_DEBUTEE') && (
+                                            <button
+                                                onClick={openEditModal}
+                                                disabled={loadingTypesTaches}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 text-sm disabled:opacity-50"
+                                                title="Modifier la tâche"
+                                            >
+                                                {loadingTypesTaches ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />}
+                                                Modifier
+                                            </button>
+                                        )}
                                         {(selectedTache.statut === 'PLANIFIEE' || selectedTache.statut === 'NON_DEBUTEE') && (
                                             <button
                                                 onClick={() => openConfirmModal('start')}
@@ -767,6 +815,55 @@ const SuiviTaches: React.FC = () => {
                                                 </div>
                                             )}
                                         </div>
+                                    </div>
+
+                                    {/* Équipes assignées */}
+                                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                        <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                            <Users className="w-4 h-4 text-emerald-600" />
+                                            Équipes assignées
+                                        </h3>
+                                        {(selectedTache.equipes_detail && selectedTache.equipes_detail.length > 0) ? (
+                                            <div className="space-y-2">
+                                                {selectedTache.equipes_detail.map((equipe: any) => (
+                                                    <div key={equipe.id} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-slate-200">
+                                                        <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                                                            <Users className="w-4 h-4 text-emerald-600" />
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <p className="text-sm font-medium text-slate-800">
+                                                                {equipe.nom_equipe || equipe.nomEquipe}
+                                                            </p>
+                                                            {equipe.site_nom && (
+                                                                <p className="text-xs text-slate-500 flex items-center gap-1">
+                                                                    <MapPin className="w-3 h-3" />
+                                                                    {equipe.site_nom}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        {equipe.nombre_membres !== undefined && (
+                                                            <span className="text-xs text-slate-400">
+                                                                {equipe.nombre_membres} membre{equipe.nombre_membres > 1 ? 's' : ''}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : selectedTache.equipe_detail ? (
+                                            // Legacy single team support
+                                            <div className="flex items-center gap-3 p-2 bg-white rounded-lg border border-slate-200">
+                                                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                                                    <Users className="w-4 h-4 text-emerald-600" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <p className="text-sm font-medium text-slate-800">
+                                                        {(selectedTache.equipe_detail as any).nom_equipe || selectedTache.equipe_detail.nomEquipe}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-slate-500 italic">Aucune équipe assignée</p>
+                                        )}
                                     </div>
 
                                     {/* Description */}
@@ -1104,6 +1201,18 @@ const SuiviTaches: React.FC = () => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Edit Task Modal */}
+            {showEditModal && selectedTache && (
+                <TaskFormModal
+                    isOpen={showEditModal}
+                    onClose={() => setShowEditModal(false)}
+                    onSubmit={handleTaskUpdate}
+                    typesTaches={typesTaches}
+                    equipes={equipes}
+                    editingTask={selectedTache}
+                />
             )}
         </div>
     );
