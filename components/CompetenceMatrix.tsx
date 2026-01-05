@@ -26,6 +26,7 @@ interface CompetenceMatrixProps {
   itemsPerPage?: number;
   viewMode: ViewMode;
   isEditMode: boolean;
+  isReadOnly?: boolean;
   niveauFilter: NiveauCompetence | '';
   categorieFilter: string;
   onViewModeChange: (mode: ViewMode) => void;
@@ -43,6 +44,7 @@ const CompetenceMatrix: React.FC<CompetenceMatrixProps> = ({
   itemsPerPage,
   viewMode,
   isEditMode,
+  isReadOnly = false,
   niveauFilter,
   categorieFilter,
   onViewModeChange,
@@ -50,6 +52,8 @@ const CompetenceMatrix: React.FC<CompetenceMatrixProps> = ({
   onNiveauFilterChange,
   onCategorieFilterChange
 }) => {
+  // Effective edit mode - disabled if read-only
+  const effectiveEditMode = isEditMode && !isReadOnly;
   const [operateursDetails, setOperateursDetails] = useState<Map<number, OperateurDetail>>(new Map());
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
@@ -301,7 +305,7 @@ const CompetenceMatrix: React.FC<CompetenceMatrixProps> = ({
 
                           {isUpdating ? (
                             <div className="w-4 h-4 border-2 border-emerald-600/30 border-t-emerald-600 rounded-full animate-spin" />
-                          ) : isEditMode ? (
+                          ) : effectiveEditMode ? (
                             // Edit Mode: Select dropdown
                             <select
                               value={currentNiveau || ''}
@@ -410,7 +414,7 @@ const CompetenceMatrix: React.FC<CompetenceMatrixProps> = ({
                             <div className="flex items-center justify-center py-1">
                               <div className="w-5 h-5 border-2 border-emerald-600/30 border-t-emerald-600 rounded-full animate-spin" />
                             </div>
-                          ) : isEditMode ? (
+                          ) : effectiveEditMode ? (
                             // Edit Mode: Modern Select dropdown
                             <select
                               value={currentNiveau || ''}

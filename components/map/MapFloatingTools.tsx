@@ -19,6 +19,7 @@ import {
   FileOutput,
   AlertTriangle,
   Target,
+  Lock,
 } from 'lucide-react';
 import { Measurement, MeasurementType, DrawingMode } from '../../types';
 import { useDrawing, getObjectTypesByGeometry } from '../../contexts/DrawingContext';
@@ -433,18 +434,30 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
             </div>
           </div>
 
-          {!currentUser?.roles?.includes('CLIENT') && (
-            <div className="mb-3">
+          <div className="mb-3">
               <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Données</div>
               <div className="flex gap-2">
-                <button
-                  onClick={onImport}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 bg-slate-50 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 rounded-lg transition-colors text-xs font-medium border border-transparent hover:border-emerald-200"
-                  title="Importer des données"
-                >
-                  <FolderInput className="w-3.5 h-3.5" />
-                  Importer
-                </button>
+                {/* Import button - disabled for CLIENT with tooltip (backend: CanImportData) */}
+                {(() => {
+                  const canImport = !currentUser?.roles?.includes('CLIENT');
+                  return (
+                    <button
+                      onClick={canImport ? onImport : undefined}
+                      className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium border ${
+                        canImport
+                          ? 'bg-slate-50 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 border-transparent hover:border-emerald-200 cursor-pointer'
+                          : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                      }`}
+                      title={canImport ? "Importer des données" : "Import réservé aux administrateurs et superviseurs"}
+                      aria-disabled={!canImport}
+                    >
+                      {!canImport && <Lock className="w-3 h-3" />}
+                      <FolderInput className="w-3.5 h-3.5" />
+                      Importer
+                    </button>
+                  );
+                })()}
+                {/* Export button - visible for all (backend: CanExportData allows all authenticated users) */}
                 <button
                   onClick={onExport}
                   className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 bg-slate-50 hover:bg-blue-50 hover:text-blue-700 text-slate-600 rounded-lg transition-colors text-xs font-medium border border-transparent hover:border-blue-200"
@@ -455,7 +468,6 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
                 </button>
               </div>
             </div>
-          )}
 
           <div className="mb-3">
             <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Historique</div>

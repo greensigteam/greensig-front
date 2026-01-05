@@ -39,6 +39,7 @@ const viewToPath: Record<string, string> = {
   CLIENT_CLAIMS: '/reclamations',
   CLIENT_PLANNING: '/planning',
   CLIENT_INTERVENTIONS: '/suivi-taches',
+  CLIENT_TEAMS: '/teams',
 };
 
 interface MenuItem {
@@ -91,16 +92,15 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'INTERVENTIONS', label: 'Réclamations', icon: AlertCircle, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'CLAIMS', label: 'Suivi des Tâches', icon: ClipboardList, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'TEAMS', label: 'RH', icon: Users, roles: ['ADMIN', 'SUPERVISEUR'] },
-    { id: 'REPORTING', label: 'Rapports', icon: BarChart3, roles: ['ADMIN'] },
+    { id: 'REPORTING', label: 'Rapports', icon: BarChart3, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'PARAMETRES', label: 'Paramètres', icon: Settings, roles: ['ADMIN'] },
-    // Client specific menu items
+    // Client specific menu items (accès limité - lecture seule via backend filtering)
     { id: 'CLIENT_MAP', label: 'Carte', icon: MapIcon, roles: ['CLIENT'] },
-    { id: 'SITES', label: 'Mes sites', icon: MapPin, roles: ['CLIENT'] },
     { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['CLIENT'] },
     { id: 'CLIENT_CLAIMS', label: 'Réclamations', icon: AlertCircle, roles: ['CLIENT'] },
     { id: 'CLIENT_INTERVENTIONS', label: 'Suivi des Tâches', icon: ClipboardList, roles: ['CLIENT'] },
     { id: 'CLIENT_PLANNING', label: 'Planning', icon: Calendar, roles: ['CLIENT'] },
-    { id: 'TEAMS', label: 'RH', icon: Users, roles: ['CLIENT'] },
+    { id: 'CLIENT_TEAMS', label: 'Équipes', icon: Users, roles: ['CLIENT'] },
   ];
 
   // Filter entries based on role

@@ -915,26 +915,28 @@ const Teams: React.FC = () => {
           {/* Competences Tab Controls - Simplified */}
           {activeTab === 'competences' && (
             <>
-              {/* Edit Mode Toggle */}
-              <button
-                onClick={() => setMatrixEditMode(!matrixEditMode)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${matrixEditMode
-                  ? 'bg-orange-500 text-white shadow-md hover:bg-orange-600'
-                  : 'bg-emerald-600 text-white shadow-md hover:bg-emerald-700'
-                  }`}
-              >
-                {matrixEditMode ? (
-                  <>
-                    <Eye className="w-4 h-4" />
-                    <span className="hidden sm:inline">Consultation</span>
-                  </>
-                ) : (
-                  <>
-                    <Edit3 className="w-4 h-4" />
-                    <span className="hidden sm:inline">Édition</span>
-                  </>
-                )}
-              </button>
+              {/* Edit Mode Toggle - Hidden for read-only users */}
+              {!isReadOnly && (
+                <button
+                  onClick={() => setMatrixEditMode(!matrixEditMode)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${matrixEditMode
+                    ? 'bg-orange-500 text-white shadow-md hover:bg-orange-600'
+                    : 'bg-emerald-600 text-white shadow-md hover:bg-emerald-700'
+                    }`}
+                >
+                  {matrixEditMode ? (
+                    <>
+                      <Eye className="w-4 h-4" />
+                      <span className="hidden sm:inline">Consultation</span>
+                    </>
+                  ) : (
+                    <>
+                      <Edit3 className="w-4 h-4" />
+                      <span className="hidden sm:inline">Édition</span>
+                    </>
+                  )}
+                </button>
+              )}
 
               {/* View Mode Toggle */}
               <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
@@ -1763,6 +1765,7 @@ const Teams: React.FC = () => {
             searchQuery={debouncedSearchQuery}
             viewMode={matrixViewMode}
             isEditMode={matrixEditMode}
+            isReadOnly={isReadOnly}
             niveauFilter={matrixNiveauFilter}
             categorieFilter={matrixCategorieFilter}
             onViewModeChange={setMatrixViewMode}
