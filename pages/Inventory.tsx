@@ -12,6 +12,7 @@ import { TypeTache, TacheCreate } from '../types/planning';
 import { EquipeList } from '../types/users';
 import { useToast } from '../contexts/ToastContext';
 import { useSearch } from '../contexts/SearchContext';
+import { usePermissions } from '../hooks/usePermissions';
 import LoadingScreen from '../components/LoadingScreen';
 import { User } from '../types';
 
@@ -186,6 +187,7 @@ const ExportDropdown = ({ onExportCSV, onExportExcel, onPrint }: { onExportCSV: 
 const Inventory: React.FC<InventoryProps> = ({ user }) => {
   const navigate = useNavigate();
   const isClient = user.role === 'CLIENT';
+  const permissions = usePermissions(user);
   const { showToast } = useToast();
   const { searchQuery, setPlaceholder } = useSearch();
 
@@ -1234,16 +1236,16 @@ const Inventory: React.FC<InventoryProps> = ({ user }) => {
             {/* Divider */}
             <div className="h-6 w-px bg-slate-200 flex-shrink-0"></div>
 
-            {/* Incompatibility warning - compact (hidden for clients) */}
-            {!isClient && !isTaskCompatible && !compatibilityLoading && (
+            {/* Incompatibility warning - compact (only for users who can create tasks) */}
+            {permissions.canCreateTask && !isTaskCompatible && !compatibilityLoading && (
               <div className="flex items-center gap-1.5 px-2 py-1 bg-red-50 border border-red-200 rounded-lg flex-shrink-0">
                 <Ban className="w-3.5 h-3.5 text-red-500" />
                 <span className="text-xs text-red-700 whitespace-nowrap">Types incompatibles</span>
               </div>
             )}
 
-            {/* Compatibility info - compact (hidden for clients) */}
-            {!isClient && isTaskCompatible && applicableTasksCount !== null && !compatibilityLoading && (
+            {/* Compatibility info - compact (only for users who can create tasks) */}
+            {permissions.canCreateTask && isTaskCompatible && applicableTasksCount !== null && !compatibilityLoading && (
               <div className="flex items-center gap-1 px-2 py-1 bg-emerald-50 border border-emerald-200 rounded-lg flex-shrink-0">
                 <span className="text-xs text-emerald-700 whitespace-nowrap">
                   ✓ {applicableTasksCount} tâche{applicableTasksCount > 1 ? 's' : ''}
@@ -1294,8 +1296,8 @@ const Inventory: React.FC<InventoryProps> = ({ user }) => {
                 Carte
               </button>
 
-              {/* Create task - Hidden for clients */}
-              {!isClient && (
+              {/* Create task - Only for ADMIN and SUPERVISEUR */}
+              {permissions.canCreateTask && (
                 <button
                   onClick={handleOpenTaskModal}
                   disabled={!isTaskCompatible || compatibilityLoading || modalLoading}

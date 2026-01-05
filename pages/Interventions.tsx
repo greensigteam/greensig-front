@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Calendar, Clock, MapPin, Users, Play, CheckCircle, XCircle } from 'lucide-react';
 import { StatusBadge } from '../components/StatusBadge';
 import { PhotoUpload } from '../components/PhotoUpload';
+import { usePermissions } from '../hooks/usePermissions';
+import type { User } from '../types';
 import {
   MOCK_INTERVENTIONS,
   Intervention,

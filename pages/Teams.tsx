@@ -75,6 +75,8 @@ import {
 
 import EditUserModal from '../components/EditUserModal';
 import LoadingScreen from '../components/LoadingScreen';
+import { usePermissions } from '../hooks/usePermissions';
+import type { User, Role } from '../types';
 
 // API
 import {
@@ -218,9 +220,17 @@ const Teams: React.FC = () => {
   // Helpers rôles
   const isAdmin = !!currentUser?.roles?.includes('ADMIN');
   const isChefEquipe = !!currentUser?.roles?.includes('SUPERVISEUR');
-  const isChefEquipeOnly = isChefEquipe && !isAdmin;
   const isClient = !!currentUser?.roles?.includes('CLIENT');
-  const isReadOnly = isChefEquipeOnly || isClient; // SUPERVISEUR et CLIENT en lecture seule
+  const isReadOnly = isClient; // Seul CLIENT est en lecture seule (SUPERVISEUR a accès complet RH)
+
+  // Convert Utilisateur to User type for usePermissions
+  const tempUser: User | null = currentUser ? {
+    id: String(currentUser.id),
+    name: currentUser.nom || '',
+    email: currentUser.email,
+    role: (currentUser.roles?.[0] || 'CLIENT') as Role
+  } : null;
+  const permissions = usePermissions(tempUser);
 
   // Debounce search query (300ms delay)
   useEffect(() => {
@@ -568,25 +578,28 @@ const Teams: React.FC = () => {
       label: 'Actions',
       render: (e) => (
         <div className="flex gap-1">
-          {!isReadOnly && (
-            <>
-              <button
-                className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-                title="Modifier"
-                onClick={(ev) => { ev.stopPropagation(); setEditEquipe(e); }}
-              >
-                <Edit2 className="w-4 h-4" />
-              </button>
-              <button
-                className="p-1 text-red-600 hover:bg-red-100 rounded"
-                title="Supprimer"
-                onClick={(ev) => { ev.stopPropagation(); setDeleteEquipeId(e.id); }}
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </>
+          {/* Edit button - ADMIN or SUPERVISEUR (if owns team) */}
+          {permissions.canEditTeam(e) && (
+            <button
+              className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+              title="Modifier"
+              onClick={(ev) => { ev.stopPropagation(); setEditEquipe(e); }}
+            >
+              <Edit2 className="w-4 h-4" />
+            </button>
           )}
-          {isReadOnly && (
+          {/* Delete button - ADMIN only */}
+          {permissions.canDeleteTeam(e) && (
+            <button
+              className="p-1 text-red-600 hover:bg-red-100 rounded"
+              title="Supprimer"
+              onClick={(ev) => { ev.stopPropagation(); setDeleteEquipeId(e.id); }}
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+          {/* View button - For users who can't edit */}
+          {!permissions.canEditTeam(e) && !permissions.canDeleteTeam(e) && (
             <button
               className="p-1 text-gray-600 hover:bg-gray-100 rounded"
               title="Voir détails"
@@ -628,25 +641,28 @@ const Teams: React.FC = () => {
       label: 'Actions',
       render: (o) => (
         <div className="flex gap-1">
-          {!isReadOnly && (
-            <>
-              <button
-                className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-                title="Modifier"
-                onClick={(ev) => { ev.stopPropagation(); setEditingOperateur(o); }}
-              >
-                <Edit2 className="w-4 h-4" />
-              </button>
-              <button
-                className="p-1 text-red-600 hover:bg-red-100 rounded"
-                title="Supprimer"
-                onClick={(ev) => { ev.stopPropagation(); setDeleteOperateurId(o.id); }}
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </>
+          {/* Edit button - ADMIN or SUPERVISEUR (if owns operator) */}
+          {permissions.canEditOperateur(o) && (
+            <button
+              className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+              title="Modifier"
+              onClick={(ev) => { ev.stopPropagation(); setEditingOperateur(o); }}
+            >
+              <Edit2 className="w-4 h-4" />
+            </button>
           )}
-          {isReadOnly && (
+          {/* Delete button - ADMIN only */}
+          {permissions.canDeleteOperateur(o) && (
+            <button
+              className="p-1 text-red-600 hover:bg-red-100 rounded"
+              title="Supprimer"
+              onClick={(ev) => { ev.stopPropagation(); setDeleteOperateurId(o.id); }}
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+          {/* View button - For users who can't edit */}
+          {!permissions.canEditOperateur(o) && !permissions.canDeleteOperateur(o) && (
             <button
               className="p-1 text-gray-600 hover:bg-gray-100 rounded"
               title="Voir détails"
@@ -773,45 +789,46 @@ const Teams: React.FC = () => {
             <Eye className="w-4 h-4" />
           </button>
 
-          {!isReadOnly && (
+          {/* Edit button - ADMIN or SUPERVISEUR (if owns absence) */}
+          {permissions.canValidateAbsence(a) && (a.statut === 'DEMANDEE' || a.statut === 'VALIDEE') && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setEditingAbsence(a); }}
+              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-sm border border-blue-200"
+              title="Modifier"
+            >
+              <Edit2 className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Validate/Refuse buttons - ADMIN or SUPERVISEUR (if owns absence) */}
+          {permissions.canValidateAbsence(a) && a.statut === 'DEMANDEE' && (
             <>
-              {(a.statut === 'DEMANDEE' || a.statut === 'VALIDEE') && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); setEditingAbsence(a); }}
-                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-sm border border-blue-200"
-                  title="Modifier"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
-              )}
-              {a.statut === 'DEMANDEE' && (
-                <>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleValiderAbsence(a.id); }}
-                    className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors shadow-sm border border-green-200"
-                    title="Valider"
-                  >
-                    <Check className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleRefuserAbsence(a.id); }}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors shadow-sm border border-red-200"
-                    title="Refuser"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </>
-              )}
-              {(a.statut === 'DEMANDEE' || a.statut === 'VALIDEE') && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); setDeleteAbsenceId(a.id); }}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors shadow-sm border border-red-200"
-                  title="Supprimer (annuler)"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
+              <button
+                onClick={(e) => { e.stopPropagation(); handleValiderAbsence(a.id); }}
+                className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors shadow-sm border border-green-200"
+                title="Valider"
+              >
+                <Check className="w-4 h-4" />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleRefuserAbsence(a.id); }}
+                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors shadow-sm border border-red-200"
+                title="Refuser"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </>
+          )}
+
+          {/* Delete button - ADMIN or SUPERVISEUR (if owns absence) */}
+          {permissions.canValidateAbsence(a) && (a.statut === 'DEMANDEE' || a.statut === 'VALIDEE') && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setDeleteAbsenceId(a.id); }}
+              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors shadow-sm border border-red-200"
+              title="Supprimer (annuler)"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           )}
         </div>
       ),
@@ -915,8 +932,8 @@ const Teams: React.FC = () => {
           {/* Competences Tab Controls - Simplified */}
           {activeTab === 'competences' && (
             <>
-              {/* Edit Mode Toggle - Hidden for read-only users */}
-              {!isReadOnly && (
+              {/* Edit Mode Toggle - Only ADMIN can edit competence matrix */}
+              {permissions.isAdmin && (
                 <button
                   onClick={() => setMatrixEditMode(!matrixEditMode)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${matrixEditMode
@@ -1252,8 +1269,8 @@ const Teams: React.FC = () => {
                 Rafraîchir
               </button>
 
-              {/* Create Button */}
-              {!isReadOnly && (
+              {/* Create Button - ADMIN and SUPERVISEUR can create absences */}
+              {permissions.canCreateAbsence && (
                 <button
                   onClick={handleOpenCreateAbsence}
                   className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm"
@@ -1278,8 +1295,8 @@ const Teams: React.FC = () => {
                 Rafraîchir
               </button>
 
-              {/* Create Button */}
-              {!isReadOnly && (
+              {/* Create Button - Only ADMIN can create teams */}
+              {permissions.canCreateTeam && (
                 <button
                   onClick={handleOpenCreateTeam}
                   className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm"
@@ -1541,8 +1558,8 @@ const Teams: React.FC = () => {
                 Rafraîchir
               </button>
 
-              {/* Create Button */}
-              {!isReadOnly && (
+              {/* Create Button - Only ADMIN can create operators */}
+              {permissions.canCreateOperateur && (
                 <button
                   onClick={() => setShowCreateOperateur(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm"

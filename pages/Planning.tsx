@@ -22,6 +22,8 @@ import {
     PRIORITE_LABELS
 } from '../types/planning';
 import { EquipeList, Client } from '../types/users';
+import { usePermissions } from '../hooks/usePermissions';
+import type { User, Role } from '../types';
 import TaskFormModal, { InventoryObjectOption } from '../components/planning/TaskFormModal';
 import QuickTaskCreator from '../components/planning/QuickTaskCreator';
 import { StatusBadge } from '../components/StatusBadge';
@@ -308,8 +310,12 @@ const Planning: FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [isReadOnly, setIsReadOnly] = useState(false);
     const [_isClientView, setIsClientView] = useState(false);
+
+    // Use permissions hook
+    const permissions = usePermissions(currentUser);
     const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
 
     // Popover State
@@ -367,6 +373,16 @@ const Planning: FC = () => {
                 nom: c.nomStructure
             })));
             setClients(clientsArray);
+
+            // Convert userData to User type and store it
+            const user: User = {
+                id: String(userData.id),
+                name: userData.nom || '',
+                email: userData.email,
+                role: (userData.roles?.[0] || 'CLIENT') as Role
+            };
+            setCurrentUser(user);
+
             const roles = userData.roles || [];
             // Selon matrice permissions : seul CLIENT est en lecture seule
             // SUPERVISEUR peut créer/modifier/supprimer des tâches sur ses équipes
@@ -1561,8 +1577,8 @@ const Planning: FC = () => {
                 </div>
             )}
 
-            {/* Create/Edit Modal */}
-            {showCreateForm && !isReadOnly && (
+            {/* Create/Edit Modal - Only ADMIN and SUPERVISEUR can create/edit tasks */}
+            {showCreateForm && permissions.canCreateTask && (
                 <TaskFormModal
                     tache={tacheToEdit || undefined}
                     initialValues={initialTaskValues}
@@ -1585,8 +1601,8 @@ const Planning: FC = () => {
                 />
             )}
 
-            {/* Quick Task Creator */}
-            {showQuickCreator && !isReadOnly && (
+            {/* Quick Task Creator - Only ADMIN and SUPERVISEUR */}
+            {showQuickCreator && permissions.canCreateTask && (
                 <QuickTaskCreator
                     isOpen={showQuickCreator}
                     onClose={() => setShowQuickCreator(false)}

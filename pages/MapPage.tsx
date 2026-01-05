@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { X, AlertTriangle } from 'lucide-react';
 import { VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND } from '../constants';
-import { MapLayerType, Coordinates, OverlayState, MapObjectDetail, Measurement, MeasurementType, SearchSuggestion } from '../types';
+import { MapLayerType, Coordinates, OverlayState, MapObjectDetail, Measurement, MeasurementType, SearchSuggestion, User, Role } from '../types';
 import { MOCK_SITES } from '../services/mockData';
 import { searchObjects, geoJSONToLatLng, fetchAllSites, SiteFrontend, exportPDF, downloadBlob, deleteInventoryItem, ImportExecuteResponse } from '../services/api';
 import { useSearch } from '../contexts/SearchContext';
@@ -11,6 +11,7 @@ import { useMapContext } from '../contexts/MapContext';
 import { useToast } from '../contexts/ToastContext';
 import { useSelection } from '../contexts/SelectionContext';
 import { useDrawing } from '../contexts/DrawingContext';
+import { usePermissions } from '../hooks/usePermissions';
 import logger from '../services/logger';
 
 // ✅ IMPORT SUB-COMPONENTS
@@ -150,6 +151,10 @@ export const MapPage: React.FC<MapPageProps> = ({
 
   // ✅ USE NAVIGATE - For page navigation
   const navigate = useNavigate();
+
+  // ✅ USE PERMISSIONS - Role-based access control
+  const tempUser: User | null = userRole ? { id: '1', name: 'User', email: 'user@example.com', role: userRole as Role } : null;
+  const permissions = usePermissions(tempUser);
   const location = useLocation();
 
   // ✅ USE SELECTION - For multi-object selection
@@ -1009,8 +1014,8 @@ export const MapPage: React.FC<MapPageProps> = ({
         />
       )}
 
-      {/* 7. Create Object Modal */}
-      {showCreateModal && pendingObjectType && drawnGeometry && (
+      {/* 7. Create Object Modal - Only ADMIN and SUPERVISEUR can create */}
+      {showCreateModal && pendingObjectType && drawnGeometry && permissions.canCreateInventoryItem && (
         <CreateObjectModal
           isOpen={showCreateModal}
           onClose={handleCreateModalClose}
@@ -1021,12 +1026,14 @@ export const MapPage: React.FC<MapPageProps> = ({
         />
       )}
 
-      {/* 8. Import Wizard Modal */}
-      <ImportWizard
-        isOpen={showImportWizard}
-        onClose={() => setShowImportWizard(false)}
-        onSuccess={handleImportSuccess}
-      />
+      {/* 8. Import Wizard Modal - Only ADMIN and SUPERVISEUR can import */}
+      {permissions.canImport && (
+        <ImportWizard
+          isOpen={showImportWizard}
+          onClose={() => setShowImportWizard(false)}
+          onSuccess={handleImportSuccess}
+        />
+      )}
 
       {/* 9. Export Panel Modal */}
       <ExportPanel
@@ -1053,9 +1060,9 @@ export const MapPage: React.FC<MapPageProps> = ({
         onSiteHover={handleSiteHover}
         onSiteSelect={handleSiteSelect}
         onViewSite={handleViewSite}
-        // Only ADMIN and SUPERVISEUR can create/edit sites
-        onCreateSite={userRole !== 'CLIENT' ? handleCreateSite : undefined}
-        onEditSite={userRole !== 'CLIENT' ? setEditingSite : undefined}
+        // Only ADMIN can create sites, ADMIN and SUPERVISEUR can edit their sites
+        onCreateSite={permissions.canCreateSite ? handleCreateSite : undefined}
+        onEditSite={permissions.isAdmin || permissions.isSuperviseur ? setEditingSite : undefined}
         onToggle={setIsCarouselOpen}
       />
 
