@@ -96,7 +96,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
       closeOnOutsideClick={!loading}
       closeOnEscape={!loading}
       showCloseButton={false}
-      zIndex={60}
+      zIndex={9999}
     >
       <div className="p-6 flex flex-col items-center text-center">
         {/* Icon */}

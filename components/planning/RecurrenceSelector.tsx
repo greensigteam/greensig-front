@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type FC } from 'react';
-import { addDays, addWeeks, addMonths } from 'date-fns';
+import { addDays, addWeeks, addMonths, format } from 'date-fns';
 import { Repeat, ChevronDown, X } from 'lucide-react';
 import { FrequenceRecurrence } from '../../types/planning';
 
@@ -310,7 +310,7 @@ export const RecurrenceSelector: FC<RecurrenceSelectorProps> = ({
                                             name="end-type"
                                             checked={!!customParams.date_fin}
                                             onChange={() => {
-                                                const defaultEndDate = addDays(new Date(startDate), 7).toISOString().slice(0, 10);
+                                                const defaultEndDate = format(addDays(new Date(startDate), 7), 'yyyy-MM-dd');
                                                 setCustomParams({ ...customParams, date_fin: defaultEndDate, nombre_occurrences: undefined });
                                             }}
                                             className="w-4 h-4 text-emerald-600"

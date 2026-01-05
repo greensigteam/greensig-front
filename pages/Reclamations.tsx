@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Search, AlertCircle, Eye, Edit2, Trash2, X, Tag, MapPin, ClipboardList, Calendar, Clock, Users, Star, TrendingUp } from 'lucide-react';
-import { Reclamation, TypeReclamation, Urgence, ReclamationCreate } from '../types/reclamations';
+import { AlertCircle, Edit2, Trash2, X, MapPin, ClipboardList, Calendar, TrendingUp, RefreshCw, Loader2, Settings, MoreVertical, Clock, Star, BarChart3, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useSearch } from '../contexts/SearchContext';
+import { Reclamation, TypeReclamation, Urgence, ReclamationCreate, ReclamationStats } from '../types/reclamations';
 import {
     fetchReclamations,
     fetchTypesReclamations,
@@ -11,34 +13,27 @@ import {
     deleteReclamation,
     updateReclamation,
     uploadPhoto,
-    assignReclamation,
-    cloturerReclamation,
-    validerCloture,
-    createSatisfaction
+    fetchReclamationStats
 } from '../services/reclamationsApi';
 import { planningService } from '../services/planningService';
 import { fetchEquipes, fetchCurrentUser } from '../services/usersApi';
 import { TypeTache, TacheCreate, PRIORITE_LABELS, Tache, STATUT_TACHE_COLORS } from '../types/planning';
 import { EquipeList, Utilisateur } from '../types/users';
 import { PhotoUpload } from '../components/shared/PhotoUpload';
-import { SatisfactionForm } from '../components/SatisfactionForm';
 import TaskFormModal from '../components/planning/TaskFormModal';
-import { utcToLocalInput, localInputToUTC, formatLocalDate } from '../utils/dateHelpers';
+import { utcToLocalInput, localInputToUTC } from '../utils/dateHelpers';
+import { format } from 'date-fns';
 import LoadingScreen from '../components/LoadingScreen';
 
 import ConfirmModal from '../components/ConfirmModal';
-import { ReclamationTimeline } from '../components/ReclamationTimeline';
-import OLMap from '../components/OLMap';
-import { MapLayerType } from '../types';
-import { RECLAMATION_STATUS_COLORS } from '../constants';
+import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 
 const Reclamations: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { searchQuery, setPlaceholder } = useSearch();
     const [reclamations, setReclamations] = useState<Reclamation[]>([]);
     const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
     const [currentUser, setCurrentUser] = useState<Utilisateur | null>(null);
 
     // Helpers rôles
@@ -47,15 +42,17 @@ const Reclamations: React.FC = () => {
     const isChefEquipe = !!currentUser?.roles?.includes('SUPERVISEUR');
 
     // UI State
-    const [activeTab, setActiveTab] = useState<'reclamations' | 'taches'>('reclamations');
+    const [activeTab, setActiveTab] = useState<'reclamations' | 'taches' | 'stats'>('reclamations');
     const [tachesLiees, setTachesLiees] = useState<Tache[]>([]);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [selectedReclamation, setSelectedReclamation] = useState<Reclamation | null>(null);
     const [editingId, setEditingId] = useState<number | null>(null);
+    const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
+    const actionsMenuRef = useRef<HTMLDivElement>(null);
+    const [rowMenuOpen, setRowMenuOpen] = useState<number | null>(null);
 
-    // Assignation
-    const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-    const [assignEquipeId, setAssignEquipeId] = useState<number | ''>('');
+    // Stats
+    const [stats, setStats] = useState<ReclamationStats | null>(null);
+    const [statsLoading, setStatsLoading] = useState(false);
 
     // Referentiels Réclamation
     const [types, setTypes] = useState<TypeReclamation[]>([]);
@@ -75,9 +72,6 @@ const Reclamations: React.FC = () => {
     const [existingPhotos, setExistingPhotos] = useState<any[]>([]);
     const [preSelectedSiteName, setPreSelectedSiteName] = useState<string | null>(null);
 
-    // User 6.6.13 - Satisfaction
-    const [showSatisfactionForm, setShowSatisfactionForm] = useState(false);
-    const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
     // Modal de confirmation/notification
     const [modalConfig, setModalConfig] = useState<{
@@ -94,15 +88,40 @@ const Reclamations: React.FC = () => {
         variant: 'info'
     });
 
-    // Debounce search term (300ms delay)
+    // Delete confirmation state
+    const [deletingReclamationId, setDeletingReclamationId] = useState<number | null>(null);
+
+    // Pagination Reclamations
+    const [currentPageRec, setCurrentPageRec] = useState(1);
+    const [itemsPerPageRec, setItemsPerPageRec] = useState(10);
+
+    // Pagination Taches
+    const [currentPageTache, setCurrentPageTache] = useState(1);
+    const [itemsPerPageTache, setItemsPerPageTache] = useState(10);
+
+    // Set search placeholder
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setDebouncedSearchTerm(searchTerm);
-        }, 300);
-        return () => clearTimeout(timer);
-    }, [searchTerm]);
+        setPlaceholder('Rechercher une réclamation par numéro, description...');
+    }, [setPlaceholder]);
+
+    // Close menus when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (actionsMenuRef.current && !actionsMenuRef.current.contains(event.target as Node)) {
+                setActionsMenuOpen(false);
+            }
+            // Close row menu if clicking outside any row menu
+            const target = event.target as HTMLElement;
+            if (!target.closest('[data-row-menu]')) {
+                setRowMenuOpen(null);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     // Initialiser date_constatation avec la date actuelle lors de l'ouverture du modal en mode création
+    // On utilise toISOString() pour stocker en UTC, puis utcToLocalInput() convertit en heure locale pour l'affichage
     useEffect(() => {
         if (isCreateModalOpen && !editingId && !formData.date_constatation) {
             setFormData(prev => ({
@@ -115,6 +134,31 @@ const Reclamations: React.FC = () => {
     useEffect(() => {
         loadData();
     }, []);
+
+    // Load stats when stats tab is selected
+    useEffect(() => {
+        if (activeTab === 'stats' && !stats && !statsLoading) {
+            loadStats();
+        }
+    }, [activeTab]);
+
+    const loadStats = async () => {
+        setStatsLoading(true);
+        try {
+            const data = await fetchReclamationStats({});
+            setStats(data);
+        } catch (error) {
+            console.error('Erreur chargement stats:', error);
+        } finally {
+            setStatsLoading(false);
+        }
+    };
+
+    // Reset pages on search or filter change
+    useEffect(() => {
+        setCurrentPageRec(1);
+        setCurrentPageTache(1);
+    }, [searchQuery, activeTab]);
 
     // Handle navigation from MapPage with site pre-selected
     useEffect(() => {
@@ -134,23 +178,9 @@ const Reclamations: React.FC = () => {
             navigate(location.pathname, { replace: true, state: {} });
         }
 
-        // Ouvrir une réclamation spécifique depuis la carte
+        // Ouvrir une réclamation spécifique depuis la carte - naviguer vers la page de détails
         if (state?.openReclamationId) {
-            const recId = Number(state.openReclamationId);
-
-            // Charger les détails complets (comme handleDetails)
-            const openReclamation = async () => {
-                try {
-                    const fullRec = await fetchReclamationById(recId);
-                    setSelectedReclamation(fullRec);
-                } catch (error) {
-                    console.error('Erreur chargement réclamation:', error);
-                }
-                // Clear the navigation state
-                navigate(location.pathname, { replace: true, state: {} });
-            };
-
-            openReclamation();
+            navigate(`/reclamations/${state.openReclamationId}`, { replace: true });
         }
     }, [location.state, navigate]);
 
@@ -254,37 +284,27 @@ const Reclamations: React.FC = () => {
     };
 
     const handleDelete = (id: number) => {
-        setModalConfig({
-            isOpen: true,
-            title: 'Supprimer la réclamation ?',
-            message: 'Êtes-vous sûr de vouloir supprimer cette réclamation ?',
-            variant: 'danger',
-            confirmLabel: 'Supprimer',
-            onConfirm: async () => {
-                try {
-                    await deleteReclamation(id);
-                    setReclamations(prev => prev.filter(r => r.id !== id));
-                    setModalConfig(prev => ({ ...prev, isOpen: false }));
-                    // Feedback différé
-                    setTimeout(() => {
-                        setModalConfig({ isOpen: true, title: 'Succès', message: 'Réclamation supprimée.', variant: 'success', onConfirm: () => setModalConfig(p => ({ ...p, isOpen: false })) });
-                    }, 300);
-                } catch (error) {
-                    console.error(error);
-                    setModalConfig({ isOpen: true, title: 'Erreur', message: "Impossible de supprimer la réclamation.", variant: 'danger' });
-                }
-            }
-        });
+        setDeletingReclamationId(id);
     };
 
-    const handleDetails = async (id: number) => {
+    const confirmDeleteReclamation = async () => {
+        if (!deletingReclamationId) return;
         try {
-            const fullRec = await fetchReclamationById(id);
-            setSelectedReclamation(fullRec);
+            await deleteReclamation(deletingReclamationId);
+            setReclamations(prev => prev.filter(r => r.id !== deletingReclamationId));
+            setDeletingReclamationId(null);
+            // Feedback différé
+            setTimeout(() => {
+                setModalConfig({ isOpen: true, title: 'Succès', message: 'Réclamation supprimée.', variant: 'success', onConfirm: () => setModalConfig(p => ({ ...p, isOpen: false })) });
+            }, 300);
         } catch (error) {
             console.error(error);
-            setModalConfig({ isOpen: true, title: 'Erreur', message: "Impossible de charger les détails.", variant: 'danger' });
+            throw error;
         }
+    };
+
+    const handleDetails = (id: number) => {
+        navigate(`/reclamations/${id}`);
     };
 
     const handleEdit = async (id: number) => {
@@ -303,145 +323,6 @@ const Reclamations: React.FC = () => {
         } catch (error) {
             console.error(error);
             setModalConfig({ isOpen: true, title: 'Erreur', message: "Impossible de charger pour édition.", variant: 'danger' });
-        }
-    };
-
-    const openAssignModal = () => {
-        if (!selectedReclamation) return;
-        setAssignEquipeId(selectedReclamation.equipe_affectee || '');
-        setIsAssignModalOpen(true);
-    };
-
-    const handleAssignSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!selectedReclamation || !assignEquipeId) return;
-
-        try {
-            const updatedRec = await assignReclamation(selectedReclamation.id, Number(assignEquipeId));
-
-            // Update local state
-            setSelectedReclamation(updatedRec);
-            setReclamations(prev => prev.map(r => r.id === updatedRec.id ? updatedRec : r));
-
-            // Rafraîchir les réclamations sur la carte (changement de statut)
-            window.dispatchEvent(new Event('refresh-reclamations'));
-
-            setIsAssignModalOpen(false);
-            setModalConfig({
-                isOpen: true,
-                title: 'Succès',
-                message: "Réclamation affectée à l'équipe avec succès.",
-                variant: 'success',
-                onConfirm: () => setModalConfig(p => ({ ...p, isOpen: false }))
-            });
-        } catch (error) {
-            console.error(error);
-            setModalConfig({
-                isOpen: true,
-                title: 'Erreur',
-                message: "Impossible d'affecter l'équipe.",
-                variant: 'danger'
-            });
-        }
-    };
-
-    // User 6.6.12 - Clôture (Admin/Superviseur propose la clôture)
-    const handleCloturer = async () => {
-        if (!selectedReclamation) return;
-
-        // Vérification du statut des tâches
-        const hasUnfinishedTasks = selectedReclamation.taches_liees_details?.some((t: any) => t.statut !== 'TERMINEE');
-        if (hasUnfinishedTasks) {
-            setModalConfig({
-                isOpen: true,
-                title: 'Impossible de proposer la clôture',
-                message: 'Toutes les tâches associées doivent être terminées avant de proposer la clôture.',
-                variant: 'danger'
-            });
-            return;
-        }
-
-        try {
-            const updatedRec = await cloturerReclamation(selectedReclamation.id);
-
-            // Update local state
-            setSelectedReclamation(updatedRec);
-            setReclamations(prev => prev.map(r => r.id === updatedRec.id ? updatedRec : r));
-
-            setModalConfig({
-                isOpen: true,
-                title: 'Succès',
-                message: 'Clôture proposée avec succès. En attente de validation par le créateur.',
-                variant: 'success'
-            });
-        } catch (error: any) {
-            console.error(error);
-            setModalConfig({
-                isOpen: true,
-                title: 'Erreur',
-                message: error.message || 'Erreur lors de la proposition de clôture.',
-                variant: 'danger'
-            });
-        }
-    };
-
-    // User 6.6.12bis - Validation de clôture par le créateur
-    const handleValiderCloture = async () => {
-        if (!selectedReclamation) return;
-
-        try {
-            const updatedRec = await validerCloture(selectedReclamation.id);
-
-            // Update local state
-            setSelectedReclamation(updatedRec);
-            setReclamations(prev => prev.map(r => r.id === updatedRec.id ? updatedRec : r));
-
-            // Rafraîchir les réclamations sur la carte (la réclamation clôturée disparaîtra)
-            window.dispatchEvent(new Event('refresh-reclamations'));
-
-            setModalConfig({
-                isOpen: true,
-                title: 'Succès',
-                message: 'Clôture validée avec succès. La réclamation est définitivement clôturée.',
-                variant: 'success'
-            });
-        } catch (error: any) {
-            console.error(error);
-            setModalConfig({
-                isOpen: true,
-                title: 'Erreur',
-                message: error.message || 'Erreur lors de la validation de la clôture.',
-                variant: 'danger'
-            });
-        }
-    };
-
-    // User 6.6.13 - Satisfaction
-    const handleSatisfactionSubmit = async (data: { reclamation: number; note: number; commentaire?: string }) => {
-        try {
-            await createSatisfaction(data);
-            setShowSatisfactionForm(false);
-
-            // Recharger la réclamation pour afficher la satisfaction
-            if (selectedReclamation) {
-                const updatedRec = await fetchReclamationById(selectedReclamation.id);
-                setSelectedReclamation(updatedRec);
-            }
-
-            setModalConfig({
-                isOpen: true,
-                title: 'Merci !',
-                message: 'Votre évaluation a été enregistrée avec succès.',
-                variant: 'success'
-            });
-        } catch (error: any) {
-            console.error(error);
-            setModalConfig({
-                isOpen: true,
-                title: 'Erreur',
-                message: error.message || 'Erreur lors de l\'enregistrement.',
-                variant: 'danger'
-            });
         }
     };
 
@@ -466,8 +347,8 @@ const Reclamations: React.FC = () => {
             id_client: reclamation.client || null,
             priorite: 3,
             commentaires: `Tâche liée à la réclamation ${reclamation.numero_reclamation}`,
-            date_debut_planifiee: new Date().toISOString().slice(0, 16),
-            date_fin_planifiee: new Date(Date.now() + 3600000).toISOString().slice(0, 16),
+            date_debut_planifiee: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+            date_fin_planifiee: format(new Date(Date.now() + 3600000), "yyyy-MM-dd'T'HH:mm"),
             reclamation: reclamation.id,
         });
 
@@ -491,8 +372,8 @@ const Reclamations: React.FC = () => {
                 ...data,
                 reclamation: reclamationTargetForTask?.id,
                 // Conversion Dates ISO
-                date_debut_planifiee: new Date(data.date_debut_planifiee).toISOString(),
-                date_fin_planifiee: new Date(data.date_fin_planifiee).toISOString(),
+                date_debut_planifiee: localInputToUTC(data.date_debut_planifiee) || data.date_debut_planifiee,
+                date_fin_planifiee: localInputToUTC(data.date_fin_planifiee) || data.date_fin_planifiee,
             };
 
             await planningService.createTache(payload);
@@ -527,102 +408,170 @@ const Reclamations: React.FC = () => {
     };
 
 
-    const filteredReclamations = useMemo(() => reclamations.filter(r =>
-        r.numero_reclamation?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-        r.description?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
-    ), [reclamations, debouncedSearchTerm]);
+    const filteredReclamations = useMemo(() => {
+        if (!searchQuery) return reclamations;
+        const query = searchQuery.toLowerCase();
+        return reclamations.filter(r =>
+            r.numero_reclamation?.toLowerCase().includes(query) ||
+            r.description?.toLowerCase().includes(query) ||
+            r.site_nom?.toLowerCase().includes(query) ||
+            r.type_reclamation_nom?.toLowerCase().includes(query)
+        );
+    }, [reclamations, searchQuery]);
 
-    const filteredTaches = useMemo(() => tachesLiees.filter(t =>
-        t.type_tache_detail.nom_tache.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-        ((t.client_detail as any)?.nom_structure || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-        t.description_travaux?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
-    ), [tachesLiees, debouncedSearchTerm]);
+    const filteredTaches = useMemo(() => {
+        if (!searchQuery) return tachesLiees;
+        const query = searchQuery.toLowerCase();
+        return tachesLiees.filter(t =>
+            t.type_tache_detail.nom_tache.toLowerCase().includes(query) ||
+            ((t.client_detail as any)?.nom_structure || '').toLowerCase().includes(query) ||
+            t.description_travaux?.toLowerCase().includes(query)
+        );
+    }, [tachesLiees, searchQuery]);
+
+    // Pagination calculations
+    const totalPagesRec = Math.ceil(filteredReclamations.length / itemsPerPageRec);
+    const startIndexRec = (currentPageRec - 1) * itemsPerPageRec;
+    const paginatedReclamations = filteredReclamations.slice(startIndexRec, startIndexRec + itemsPerPageRec);
+
+    const totalPagesTache = Math.ceil(filteredTaches.length / itemsPerPageTache);
+    const startIndexTache = (currentPageTache - 1) * itemsPerPageTache;
+    const paginatedTaches = filteredTaches.slice(startIndexTache, startIndexTache + itemsPerPageTache);
 
     return (
-        <div className="p-6 space-y-6 bg-slate-50 min-h-screen">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <AlertCircle className="w-8 h-8 text-emerald-600" />
-                        Réclamations
-                    </h1>
-                    <div className="flex gap-6 mt-4 border-b border-gray-200">
-                        <button onClick={() => setActiveTab('reclamations')} className={`pb-2 px-1 text-sm font-medium transition-colors border-b-2 ${activeTab === 'reclamations' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                            Réclamations ({filteredReclamations.length})
-                        </button>
-                        {!isClient && (
-                            <button onClick={() => setActiveTab('taches')} className={`pb-2 px-1 text-sm font-medium transition-colors border-b-2 ${activeTab === 'taches' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                                Tâches liées ({filteredTaches.length})
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-3 w-full md:w-auto mt-auto">
-                    <div className="relative flex-1 md:w-64">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Rechercher..."
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                        />
-                    </div>
-
-
+        <div className="p-6 space-y-6">
+            {/* Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                {/* Left: Tab Filters */}
+                <div className="flex items-center bg-slate-100 p-1 rounded-lg">
+                    <button
+                        onClick={() => setActiveTab('reclamations')}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === 'reclamations'
+                            ? 'bg-white text-emerald-700 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-700'
+                            }`}
+                    >
+                        Réclamations ({filteredReclamations.length})
+                    </button>
                     {!isClient && (
                         <button
-                            onClick={() => navigate('/reclamations/stats')}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                            onClick={() => setActiveTab('taches')}
+                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === 'taches'
+                                ? 'bg-white text-purple-700 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700'
+                                }`}
                         >
-                            <TrendingUp className="w-5 h-5" />
-                            <span className="hidden sm:inline">Statistiques</span>
+                            Tâches liées ({filteredTaches.length})
                         </button>
                     )}
+                    {!isClient && (
+                        <button
+                            onClick={() => setActiveTab('stats')}
+                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === 'stats'
+                                ? 'bg-white text-blue-700 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700'
+                                }`}
+                        >
+                            <span className="flex items-center gap-1.5">
+                                <BarChart3 className="w-4 h-4" />
+                                Statistiques
+                            </span>
+                        </button>
+                    )}
+                </div>
+
+                {/* Right: Actions */}
+                <div className="flex items-center gap-3">
+                    {activeTab !== 'stats' && (
+                        <span className="text-sm text-slate-500 hidden sm:inline-block">
+                            {activeTab === 'reclamations'
+                                ? `${filteredReclamations.length} réclamation${filteredReclamations.length > 1 ? 's' : ''}`
+                                : `${filteredTaches.length} tâche${filteredTaches.length > 1 ? 's' : ''}`
+                            }
+                        </span>
+                    )}
+
+
+
+                    {/* Actions Dropdown */}
+                    <div className="relative" ref={actionsMenuRef}>
+                        <button
+                            onClick={() => setActionsMenuOpen(!actionsMenuOpen)}
+                            className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                            title="Plus d'actions"
+                        >
+                            <MoreVertical className="w-5 h-5" />
+                        </button>
+
+                        {actionsMenuOpen && (
+                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-200 py-1 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                                <button
+                                    onClick={() => {
+                                        loadData();
+                                        if (activeTab === 'stats') {
+                                            setStats(null);
+                                            loadStats();
+                                        }
+                                        setActionsMenuOpen(false);
+                                    }}
+                                    disabled={loading || statsLoading}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                                >
+                                    <RefreshCw className={`w-4 h-4 text-slate-400 ${loading || statsLoading ? 'animate-spin' : ''}`} />
+                                    Actualiser
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
             {/* Table Reclamations */}
             {activeTab === 'reclamations' && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead className="bg-gray-50/50 border-b border-gray-100">
-                                <tr>
-                                    <th className="p-4 py-3 font-semibold text-sm text-gray-600">Numéro</th>
-                                    <th className="p-4 py-3 font-semibold text-sm text-gray-600">Type</th>
-                                    <th className="p-4 py-3 font-semibold text-sm text-gray-600">Urgence</th>
-                                    <th className="p-4 py-3 font-semibold text-sm text-gray-600">Site / Zone</th>
-                                    <th className="p-4 py-3 font-semibold text-sm text-gray-600">Créé par</th>
-                                    <th className="p-4 py-3 font-semibold text-sm text-gray-600">Date création</th>
-                                    <th className="p-4 py-3 font-semibold text-sm text-gray-600">Statut</th>
-                                    <th className="p-4 py-3 font-semibold text-sm text-gray-600">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {loading ? (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-visible">
+                    {loading ? (
+                        <div className="flex items-center justify-center py-12">
+                            <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+                        </div>
+                    ) : filteredReclamations.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                            <AlertCircle className="w-12 h-12 mb-4 text-slate-300" />
+                            <p className="text-lg font-medium">Aucune réclamation trouvée</p>
+                            <p className="text-sm">
+                                {searchQuery ? 'Essayez avec d\'autres termes de recherche' : 'Aucune réclamation enregistrée'}
+                            </p>
+                        </div>
+                    ) : (
+                        <>
+                            <table className="w-full">
+                                <thead className="bg-slate-50 border-b border-slate-100 rounded-t-xl">
                                     <tr>
-                                        <td colSpan={7}>
-                                            <div className="fixed inset-0 z-50">
-                                                <LoadingScreen isLoading={true} loop={true} minDuration={0} />
-                                            </div>
-                                        </td>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider first:rounded-tl-xl">Numéro</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Urgence</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Site / Zone</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Créé par</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Statut</th>
+                                        <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider rounded-tr-xl">
+                                            <Settings className="w-4 h-4 ml-auto text-slate-400" />
+                                        </th>
                                     </tr>
-                                ) : filteredReclamations.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={7} className="p-8 text-center text-gray-500 bg-gray-50/30">
-                                            Aucune réclamation trouvée
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    filteredReclamations.map(rec => (
-                                        <tr key={rec.id} className="hover:bg-blue-50/30 transition-colors group">
-                                            <td className="p-4 text-sm font-medium text-slate-700">{rec.numero_reclamation}</td>
-                                            <td className="p-4 text-sm text-slate-600">{rec.type_reclamation_nom}</td>
-                                            <td className="p-4">
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {paginatedReclamations.map(rec => (
+                                        <tr
+                                            key={rec.id}
+                                            onClick={() => handleDetails(rec.id)}
+                                            className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                                        >
+                                            <td className="px-6 py-4">
+                                                <span className="text-sm font-medium text-slate-800">{rec.numero_reclamation}</span>
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-slate-600">{rec.type_reclamation_nom}</td>
+                                            <td className="px-6 py-4">
                                                 <span
-                                                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                                    className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
                                                     style={{
                                                         backgroundColor: (rec.urgence_couleur || '#ccc') + '20',
                                                         color: rec.urgence_couleur || '#666'
@@ -631,151 +580,464 @@ const Reclamations: React.FC = () => {
                                                     {rec.urgence_niveau}
                                                 </span>
                                             </td>
-                                            <td className="p-4 text-sm text-slate-600">
+                                            <td className="px-6 py-4">
                                                 <div className="flex flex-col">
-                                                    <span className="font-medium">{rec.site_nom}</span>
-                                                    <span className="text-xs text-gray-400">{rec.zone_nom}</span>
+                                                    <span className="text-sm font-medium text-slate-800">{rec.site_nom}</span>
+                                                    {rec.zone_nom && <span className="text-xs text-slate-400">{rec.zone_nom}</span>}
                                                 </div>
                                             </td>
-                                            <td className="p-4 text-sm text-slate-600">
-                                                {rec.createur_nom || 'Anonyme'}
+                                            <td className="px-6 py-4 text-sm text-slate-600">
+                                                {rec.createur_nom || <span className="text-slate-400 italic">Anonyme</span>}
                                             </td>
-                                            <td className="p-4 text-sm text-slate-600">
+                                            <td className="px-6 py-4 text-sm text-slate-600">
                                                 {new Date(rec.date_creation).toLocaleDateString('fr-FR')}
                                             </td>
-                                            <td className="p-4">
+                                            <td className="px-6 py-4">
                                                 <span className={`
-                                                inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium capitalize
-                                                ${rec.statut === 'NOUVELLE' ? 'bg-blue-100 text-blue-800' :
-                                                        rec.statut === 'RESOLUE' ? 'bg-green-100 text-green-800' :
-                                                            rec.statut === 'EN_COURS' ? 'bg-yellow-100 text-yellow-800' :
-                                                                rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'bg-orange-100 text-orange-800' :
-                                                                    rec.statut === 'CLOTUREE' ? 'bg-purple-100 text-purple-800' :
-                                                                        'bg-gray-100 text-gray-800'}
-                                            `}>
-                                                    {rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'En attente validation' : rec.statut.toLowerCase().replace('_', ' ')}
+                                                    inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium
+                                                    ${rec.statut === 'NOUVELLE' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
+                                                        rec.statut === 'RESOLUE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                                                            rec.statut === 'EN_COURS' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                                                                rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'bg-orange-50 text-orange-700 border border-orange-100' :
+                                                                    rec.statut === 'CLOTUREE' ? 'bg-slate-100 text-slate-600 border border-slate-200' :
+                                                                        'bg-slate-100 text-slate-600 border border-slate-200'}
+                                                `}>
+                                                    <div className={`w-1.5 h-1.5 rounded-full ${rec.statut === 'NOUVELLE' ? 'bg-blue-500' :
+                                                        rec.statut === 'RESOLUE' ? 'bg-emerald-500' :
+                                                            rec.statut === 'EN_COURS' ? 'bg-amber-500' :
+                                                                rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'bg-orange-500' :
+                                                                    'bg-slate-400'
+                                                        }`} />
+                                                    {rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'Validation' : rec.statut.toLowerCase().replace('_', ' ')}
                                                 </span>
                                             </td>
-                                            <td className="p-4">
-                                                <div className="flex gap-2">
-                                                    {!isClient && !isChefEquipe && (
+                                            <td className="px-6 py-4">
+                                                <div className="flex justify-end" data-row-menu>
+                                                    <div className="relative">
                                                         <button
-                                                            onClick={() => handleOpenTaskModal(rec)}
-                                                            disabled={rec.statut === 'CLOTUREE'}
-                                                            className={`p-1 rounded ${rec.statut === 'CLOTUREE'
-                                                                ? 'text-gray-400 cursor-not-allowed'
-                                                                : 'text-purple-600 hover:bg-purple-50'}`}
-                                                            title={rec.statut === 'CLOTUREE' ? "Réclamation clôturée" : "Créer une tâche"}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setRowMenuOpen(rowMenuOpen === rec.id ? null : rec.id);
+                                                            }}
+                                                            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                                                         >
-                                                            <ClipboardList className="w-4 h-4" />
+                                                            <MoreVertical className="w-4 h-4" />
                                                         </button>
-                                                    )}
-                                                    <button
-                                                        onClick={() => handleDetails(rec.id)}
-                                                        className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                                                        title="Voir détails"
-                                                    >
-                                                        <Eye className="w-4 h-4" />
-                                                    </button>
-                                                    {!isClient && (isAdmin || (rec.createur === currentUser?.id)) && (
-                                                        <>
-                                                            <button
-                                                                onClick={() => handleEdit(rec.id)}
-                                                                className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"
-                                                                title="Modifier"
-                                                            >
-                                                                <Edit2 className="w-4 h-4" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDelete(rec.id)}
-                                                                className="p-1 text-red-600 hover:bg-red-50 rounded"
-                                                                title="Supprimer"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
-                                                        </>
-                                                    )}
+
+                                                        {rowMenuOpen === rec.id && (
+                                                            <div className="absolute right-0 mt-1 w-44 bg-white rounded-xl shadow-lg border border-slate-200 py-1 z-[60] animate-in fade-in slide-in-from-top-2 duration-150">
+                                                                {!isClient && !isChefEquipe && rec.statut !== 'CLOTUREE' && (
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleOpenTaskModal(rec);
+                                                                            setRowMenuOpen(null);
+                                                                        }}
+                                                                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                                                                    >
+                                                                        <ClipboardList className="w-4 h-4 text-purple-500" />
+                                                                        Créer une tâche
+                                                                    </button>
+                                                                )}
+
+                                                                {!isClient && (isAdmin || (rec.createur === currentUser?.id)) && (
+                                                                    <>
+                                                                        <div className="my-1 border-t border-slate-100" />
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleEdit(rec.id);
+                                                                                setRowMenuOpen(null);
+                                                                            }}
+                                                                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                                                                        >
+                                                                            <Edit2 className="w-4 h-4 text-emerald-500" />
+                                                                            Modifier
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleDelete(rec.id);
+                                                                                setRowMenuOpen(null);
+                                                                            }}
+                                                                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                                                        >
+                                                                            <Trash2 className="w-4 h-4" />
+                                                                            Supprimer
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </td>
                                         </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                    ))}
+                                </tbody>
+                            </table>
+
+                            {/* Pagination Reclamations */}
+                            <div className="sticky bottom-0 bg-white border-t border-slate-200 px-6 py-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="text-sm text-slate-600">
+                                        Affichage {startIndexRec + 1} à {Math.min(startIndexRec + itemsPerPageRec, filteredReclamations.length)} sur {filteredReclamations.length}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => setCurrentPageRec(1)}
+                                            disabled={currentPageRec === 1}
+                                            className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <ChevronsLeft className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentPageRec(p => Math.max(1, p - 1))}
+                                            disabled={currentPageRec === 1}
+                                            className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <ChevronLeft className="w-4 h-4" />
+                                        </button>
+                                        <span className="px-3 py-1 text-sm text-slate-600">Page {currentPageRec} sur {totalPagesRec > 0 ? totalPagesRec : 1}</span>
+                                        <button
+                                            onClick={() => setCurrentPageRec(p => Math.min(totalPagesRec, p + 1))}
+                                            disabled={currentPageRec === totalPagesRec || totalPagesRec === 0}
+                                            className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <ChevronRight className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentPageRec(totalPagesRec)}
+                                            disabled={currentPageRec === totalPagesRec || totalPagesRec === 0}
+                                            className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <ChevronsRight className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
             )}
 
             {/* Table TACHES LIEES */}
             {activeTab === 'taches' && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead className="bg-purple-50/50 border-b border-purple-100">
-                                <tr>
-                                    <th className="p-4 py-3 font-semibold text-sm text-gray-600">Type Tâche</th>
-                                    <th className="p-4 py-3 font-semibold text-sm text-gray-600">Réclamation liée</th>
-                                    <th className="p-4 py-3 font-semibold text-sm text-gray-600">Equipe</th>
-                                    <th className="p-4 py-3 font-semibold text-sm text-gray-600">Dates</th>
-                                    <th className="p-4 py-3 font-semibold text-sm text-gray-600">Priorité</th>
-                                    <th className="p-4 py-3 font-semibold text-sm text-gray-600">Statut</th>
-                                    <th className="p-4 py-3 font-semibold text-sm text-gray-600 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-purple-50">
-                                {filteredTaches.length === 0 ? (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                    {loading ? (
+                        <div className="flex items-center justify-center py-12">
+                            <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+                        </div>
+                    ) : filteredTaches.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                            <ClipboardList className="w-12 h-12 mb-4 text-slate-300" />
+                            <p className="text-lg font-medium">Aucune tâche liée trouvée</p>
+                            <p className="text-sm">
+                                {searchQuery ? 'Essayez avec d\'autres termes de recherche' : 'Aucune tâche liée à une réclamation'}
+                            </p>
+                        </div>
+                    ) : (
+                        <>
+                            <table className="w-full">
+                                <thead className="bg-slate-50 border-b border-slate-100">
                                     <tr>
-                                        <td colSpan={7} className="p-8 text-center text-gray-500">
-                                            Aucune tâche liée trouvée.
-                                        </td>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Type Tâche</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Réclamation</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Equipe</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Dates</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Priorité</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Statut</th>
+                                        <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                            <Settings className="w-4 h-4 ml-auto text-slate-400" />
+                                        </th>
                                     </tr>
-                                ) : (
-                                    filteredTaches.map(t => {
-                                        const statutColors = STATUT_TACHE_COLORS[t.statut] || { bg: 'bg-gray-100', text: 'text-gray-800' };
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {paginatedTaches.map(t => {
+                                        const statutColors = STATUT_TACHE_COLORS[t.statut] || { bg: 'bg-slate-100', text: 'text-slate-800' };
                                         return (
-                                            <tr key={t.id} className="hover:bg-purple-50/20 transition-colors">
-                                                <td className="p-4 font-medium text-slate-700">{t.type_tache_detail.nom_tache}</td>
-                                                <td className="p-4 text-sm text-slate-600">
+                                            <tr key={t.id} className="hover:bg-slate-50 transition-colors group">
+                                                <td className="px-6 py-4">
+                                                    <span className="text-sm font-medium text-slate-800">{t.type_tache_detail.nom_tache}</span>
+                                                </td>
+                                                <td className="px-6 py-4">
                                                     {t.reclamation_numero ? (
-                                                        <span className="flex items-center gap-1 font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded">
+                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-100">
                                                             <AlertCircle className="w-3 h-3" />
                                                             {t.reclamation_numero}
                                                         </span>
-                                                    ) : <span className="text-gray-400">-</span>}
+                                                    ) : <span className="text-slate-400">-</span>}
                                                 </td>
-                                                <td className="p-4 text-sm text-slate-600">
+                                                <td className="px-6 py-4 text-sm text-slate-600">
                                                     {t.equipes_detail && t.equipes_detail.length > 0
                                                         ? t.equipes_detail.map(eq => eq.nomEquipe).join(', ')
                                                         : (t.equipe_detail as any)?.nomEquipe || (t.equipe_detail as any)?.nom_equipe || '-'}
                                                 </td>
-                                                <td className="p-4 text-sm text-slate-600">
-                                                    Du {new Date(t.date_debut_planifiee).toLocaleDateString()} au {new Date(t.date_fin_planifiee).toLocaleDateString()}
+                                                <td className="px-6 py-4">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-sm text-slate-600">
+                                                            {new Date(t.date_debut_planifiee).toLocaleDateString('fr-FR')}
+                                                        </span>
+                                                        <span className="text-xs text-slate-400">
+                                                            → {new Date(t.date_fin_planifiee).toLocaleDateString('fr-FR')}
+                                                        </span>
+                                                    </div>
                                                 </td>
-                                                <td className="p-4 text-sm text-slate-600">{PRIORITE_LABELS[t.priorite]}</td>
-                                                <td className="p-4">
-                                                    <span className={`px-2 py-1 rounded text-xs font-medium ${statutColors.bg} ${statutColors.text}`}>
-                                                        {t.statut}
+                                                <td className="px-6 py-4">
+                                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${t.priorite >= 4 ? 'bg-red-50 text-red-700 border border-red-100' :
+                                                        t.priorite === 3 ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                                                            'bg-slate-100 text-slate-600 border border-slate-200'
+                                                        }`}>
+                                                        {PRIORITE_LABELS[t.priorite]}
                                                     </span>
                                                 </td>
-                                                <td className="p-4 text-right">
-                                                    <button
-                                                        onClick={() => navigate(`/planning?date=${t.date_debut_planifiee?.split('T')[0] || ''}`)}
-                                                        className="p-1 text-purple-600 hover:bg-purple-50 rounded transition-colors"
-                                                        title="Voir dans l'agenda"
-                                                    >
-                                                        <Calendar className="w-4 h-4" />
-                                                    </button>
+                                                <td className="px-6 py-4">
+                                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statutColors.bg} ${statutColors.text}`}>
+                                                        <div className={`w-1.5 h-1.5 rounded-full ${t.statut === 'PLANIFIEE' ? 'bg-blue-500' :
+                                                            t.statut === 'EN_COURS' ? 'bg-amber-500' :
+                                                                t.statut === 'TERMINEE' ? 'bg-emerald-500' :
+                                                                    t.statut === 'ANNULEE' ? 'bg-red-500' :
+                                                                        'bg-slate-400'
+                                                            }`} />
+                                                        {t.statut.toLowerCase().replace('_', ' ')}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex justify-end">
+                                                        <button
+                                                            onClick={() => navigate(`/planning?date=${t.date_debut_planifiee?.split('T')[0] || ''}`)}
+                                                            className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                                                            title="Voir dans l'agenda"
+                                                        >
+                                                            <Calendar className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         )
-                                    })
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                    })}
+                                </tbody>
+                            </table>
+
+                            {/* Pagination Taches */}
+                            <div className="sticky bottom-0 bg-white border-t border-slate-200 px-6 py-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="text-sm text-slate-600">
+                                        Affichage {startIndexTache + 1} à {Math.min(startIndexTache + itemsPerPageTache, filteredTaches.length)} sur {filteredTaches.length}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => setCurrentPageTache(1)}
+                                            disabled={currentPageTache === 1}
+                                            className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <ChevronsLeft className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentPageTache(p => Math.max(1, p - 1))}
+                                            disabled={currentPageTache === 1}
+                                            className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <ChevronLeft className="w-4 h-4" />
+                                        </button>
+                                        <span className="px-3 py-1 text-sm text-slate-600">Page {currentPageTache} sur {totalPagesTache > 0 ? totalPagesTache : 1}</span>
+                                        <button
+                                            onClick={() => setCurrentPageTache(p => Math.min(totalPagesTache, p + 1))}
+                                            disabled={currentPageTache === totalPagesTache || totalPagesTache === 0}
+                                            className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <ChevronRight className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentPageTache(totalPagesTache)}
+                                            disabled={currentPageTache === totalPagesTache || totalPagesTache === 0}
+                                            className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <ChevronsRight className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
             )}
 
+            {/* Stats Tab Content */}
+            {activeTab === 'stats' && (
+                <div className="space-y-6">
+                    {statsLoading ? (
+                        <div className="flex items-center justify-center py-12">
+                            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                        </div>
+                    ) : !stats ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                            <AlertCircle className="w-12 h-12 mb-4 text-slate-300" />
+                            <p className="text-lg font-medium">Impossible de charger les statistiques</p>
+                        </div>
+                    ) : (
+                        <>
+                            {/* KPI Cards */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                {/* Total */}
+                                <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+                                    <div className="text-sm font-medium text-slate-500 mb-1">Total Réclamations</div>
+                                    <div className="flex items-end justify-between relative z-10">
+                                        <div className="text-3xl font-bold text-slate-800">{stats.total}</div>
+                                    </div>
+                                    <div className="absolute top-4 right-4 p-2 bg-slate-50 rounded-lg">
+                                        <AlertCircle className="w-5 h-5 text-blue-500" />
+                                    </div>
+                                </div>
+
+                                {/* Délai moyen */}
+                                <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+                                    <div className="text-sm font-medium text-slate-500 mb-1">Délai Moyen</div>
+                                    <div className="flex items-end justify-between relative z-10">
+                                        <div className="text-3xl font-bold text-slate-800">
+                                            {stats.delai_moyen_heures !== undefined ? `${Math.round(stats.delai_moyen_heures)}h` : 'N/A'}
+                                        </div>
+                                    </div>
+                                    <div className="absolute top-4 right-4 p-2 bg-slate-50 rounded-lg">
+                                        <Clock className="w-5 h-5 text-emerald-500" />
+                                    </div>
+                                </div>
+
+                                {/* Satisfaction */}
+                                <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+                                    <div className="text-sm font-medium text-slate-500 mb-1">Satisfaction Moyenne</div>
+                                    <div className="flex items-end justify-between relative z-10">
+                                        <div className="text-3xl font-bold text-slate-800">
+                                            {stats.satisfaction_moyenne !== undefined ? `${stats.satisfaction_moyenne.toFixed(1)}/5` : 'N/A'}
+                                        </div>
+                                        {stats.nombre_evaluations !== undefined && stats.nombre_evaluations > 0 && (
+                                            <div className="text-xs text-slate-400">
+                                                {stats.nombre_evaluations} avis
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="absolute top-4 right-4 p-2 bg-slate-50 rounded-lg">
+                                        <Star className="w-5 h-5 text-yellow-500" />
+                                    </div>
+                                </div>
+
+                                {/* Taux résolution */}
+                                <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+                                    <div className="text-sm font-medium text-slate-500 mb-1">Taux de Résolution</div>
+                                    <div className="flex items-end justify-between relative z-10">
+                                        <div className="text-3xl font-bold text-slate-800">
+                                            {stats.total > 0
+                                                ? Math.round(((stats.par_statut['RESOLUE'] || 0) + (stats.par_statut['CLOTUREE'] || 0)) / stats.total * 100)
+                                                : 0}%
+                                        </div>
+                                    </div>
+                                    <div className="absolute top-4 right-4 p-2 bg-slate-50 rounded-lg">
+                                        <TrendingUp className="w-5 h-5 text-purple-500" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Charts Grid */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {/* Répartition par Statut (Pie Chart) */}
+                                <div className="bg-white rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow overflow-hidden">
+                                    <div className="p-6 border-b border-slate-100">
+                                        <h3 className="font-bold text-lg text-slate-800">Répartition par Statut</h3>
+                                    </div>
+                                    <div className="p-6">
+                                        <ResponsiveContainer width="100%" height={280}>
+                                            <PieChart>
+                                                <Pie
+                                                    data={Object.entries(stats.par_statut).map(([statut, count]) => ({
+                                                        name: statut === 'PRISE_EN_COMPTE' ? 'Prise en compte' :
+                                                            statut === 'EN_COURS' ? 'En cours' :
+                                                                statut.charAt(0) + statut.slice(1).toLowerCase(),
+                                                        value: count
+                                                    }))}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    labelLine={false}
+                                                    label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                                    outerRadius={80}
+                                                    fill="#8884d8"
+                                                    dataKey="value"
+                                                >
+                                                    {Object.keys(stats.par_statut).map((_entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'][index % 6]} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+
+                                {/* Répartition par Type (Bar Chart) */}
+                                <div className="bg-white rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow overflow-hidden">
+                                    <div className="p-6 border-b border-slate-100">
+                                        <h3 className="font-bold text-lg text-slate-800">Répartition par Type</h3>
+                                    </div>
+                                    <div className="p-6">
+                                        <ResponsiveContainer width="100%" height={280}>
+                                            <BarChart data={stats.par_type.map((item) => ({
+                                                name: item.type_reclamation__nom_reclamation,
+                                                count: item.count
+                                            }))}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                                                <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} tick={{ fontSize: 12 }} />
+                                                <YAxis tick={{ fontSize: 12 }} />
+                                                <Tooltip />
+                                                <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+
+                                {/* Répartition par Urgence */}
+                                <div className="bg-white rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow overflow-hidden">
+                                    <div className="p-6 border-b border-slate-100">
+                                        <h3 className="font-bold text-lg text-slate-800">Répartition par Urgence</h3>
+                                    </div>
+                                    <div className="p-6">
+                                        <ResponsiveContainer width="100%" height={280}>
+                                            <BarChart data={stats.par_urgence.map((item) => ({
+                                                name: item.urgence__niveau_urgence,
+                                                count: item.count
+                                            }))} layout="vertical">
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                                                <XAxis type="number" tick={{ fontSize: 12 }} />
+                                                <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
+                                                <Tooltip />
+                                                <Bar dataKey="count" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+
+                                {/* Répartition par Zone */}
+                                {stats.par_zone && stats.par_zone.length > 0 && (
+                                    <div className="bg-white rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow overflow-hidden">
+                                        <div className="p-6 border-b border-slate-100">
+                                            <h3 className="font-bold text-lg text-slate-800">Répartition par Zone</h3>
+                                        </div>
+                                        <div className="p-6">
+                                            <ResponsiveContainer width="100%" height={280}>
+                                                <BarChart data={stats.par_zone}>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                                                    <XAxis dataKey="zone__nom" angle={-45} textAnchor="end" height={100} tick={{ fontSize: 12 }} />
+                                                    <YAxis tick={{ fontSize: 12 }} />
+                                                    <Tooltip />
+                                                    <Bar dataKey="count" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    )}
+                </div>
+            )}
 
             {/* Modal Création Tâche (Intervention) - Utilise le même formulaire que Planning */}
             {isTaskModalOpen && (
@@ -793,11 +1055,11 @@ const Reclamations: React.FC = () => {
             {isCreateModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-                        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 shrink-0">
+                        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
                             <h2 className="text-lg font-bold text-slate-800">
                                 {editingId ? 'Modifier la Réclamation' : 'Nouvelle Réclamation'}
                             </h2>
-                            <button onClick={closeCreateModal} className="text-gray-400 hover:text-red-500">
+                            <button onClick={closeCreateModal} className="text-slate-400 hover:text-red-500 transition-colors">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
@@ -814,11 +1076,11 @@ const Reclamations: React.FC = () => {
                                     </div>
                                 )}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Type de réclamation <span className="text-red-500">*</span></label>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Type de réclamation <span className="text-red-500">*</span></label>
                                     <select
                                         required
                                         value={formData.type_reclamation || ''}
-                                        className="w-full rounded-lg border-gray-300 border p-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                                        className="w-full rounded-lg border-slate-300 border p-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
                                         onChange={e => setFormData({ ...formData, type_reclamation: Number(e.target.value) })}
                                     >
                                         <option value="">Sélectionner un type...</option>
@@ -827,7 +1089,7 @@ const Reclamations: React.FC = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Urgence <span className="text-red-500">*</span></label>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Urgence <span className="text-red-500">*</span></label>
                                     <div className="grid grid-cols-2 gap-2">
                                         {urgences.map(u => (
                                             <button
@@ -838,7 +1100,7 @@ const Reclamations: React.FC = () => {
                                                     flex items-center justify-center p-2 rounded-lg border text-sm font-medium transition-all
                                                     ${formData.urgence === u.id
                                                         ? 'border-emerald-500 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500'
-                                                        : 'border-gray-200 hover:border-gray-300 text-gray-600'}
+                                                        : 'border-slate-200 hover:border-slate-300 text-slate-600'}
                                                 `}
                                             >
                                                 {u.niveau_urgence}
@@ -848,28 +1110,28 @@ const Reclamations: React.FC = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Description <span className="text-red-500">*</span></label>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Description <span className="text-red-500">*</span></label>
                                     <textarea
                                         required
                                         rows={4}
                                         value={formData.description || ''}
-                                        className="w-full rounded-lg border-gray-300 border p-3 focus:ring-2 focus:ring-emerald-500 outline-none"
+                                        className="w-full rounded-lg border-slate-300 border p-3 focus:ring-2 focus:ring-emerald-500 outline-none"
                                         placeholder="Décrivez le problème..."
                                         onChange={e => setFormData({ ...formData, description: e.target.value })}
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">
                                         Date de constatation <span className="text-red-500">*</span>
                                     </label>
                                     <div className="relative">
-                                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                         <input
                                             type="datetime-local"
                                             required
                                             value={utcToLocalInput(formData.date_constatation)}
-                                            className="w-full pl-10 pr-4 py-2.5 rounded-lg border-gray-300 border focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                                            className="w-full pl-10 pr-4 py-2.5 rounded-lg border-slate-300 border focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
                                             onChange={e => {
                                                 const utcValue = localInputToUTC(e.target.value);
                                                 setFormData({ ...formData, date_constatation: utcValue || undefined });
@@ -884,13 +1146,13 @@ const Reclamations: React.FC = () => {
                                             step="60"
                                         />
                                     </div>
-                                    <p className="text-xs text-gray-500 mt-1">Date et heure où le problème a été constaté</p>
+                                    <p className="text-xs text-slate-500 mt-1">Date et heure où le problème a été constaté</p>
                                 </div>
 
                                 {/* Section Photos Existantes (Edition) */}
                                 {existingPhotos.length > 0 && (
-                                    <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
-                                        <label className="block text-xs font-semibold text-gray-500 uppercase mb-2">
+                                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                                        <label className="block text-xs font-semibold text-slate-500 uppercase mb-2">
                                             Photos existantes
                                         </label>
                                         <div className="flex gap-2 overflow-x-auto">
@@ -899,7 +1161,7 @@ const Reclamations: React.FC = () => {
                                                     <img
                                                         src={p.url_fichier}
                                                         alt={p.legende || 'Photo'}
-                                                        className="h-20 w-20 object-cover rounded-md border border-gray-200"
+                                                        className="h-20 w-20 object-cover rounded-md border border-slate-200"
                                                     />
                                                 </div>
                                             ))}
@@ -908,7 +1170,7 @@ const Reclamations: React.FC = () => {
                                 )}
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">
                                         {editingId ? 'Ajouter des photos' : 'Photos (optionnel)'}
                                     </label>
                                     <PhotoUpload
@@ -918,11 +1180,11 @@ const Reclamations: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="p-4 border-t border-gray-100 shrink-0 bg-gray-50 flex gap-3">
+                            <div className="p-4 border-t border-slate-100 shrink-0 bg-slate-50 flex gap-3">
                                 <button
                                     type="button"
                                     onClick={closeCreateModal}
-                                    className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+                                    className="flex-1 px-4 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium transition-colors"
                                 >
                                     Annuler
                                 </button>
@@ -940,350 +1202,6 @@ const Reclamations: React.FC = () => {
 
 
 
-            {/* Modal Détails */}
-            {selectedReclamation && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-                        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 shrink-0">
-                            <div>
-                                <h2 className="text-lg font-bold text-slate-800">
-                                    {selectedReclamation.numero_reclamation}
-                                </h2>
-                                <p className="text-sm text-gray-500">Créée le {new Date(selectedReclamation.date_creation).toLocaleDateString('fr-FR')}</p>
-                            </div>
-                            <button onClick={() => setSelectedReclamation(null)} className="text-gray-400 hover:text-red-500">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        <div className="p-6 overflow-y-auto">
-                            <div className="grid grid-cols-2 gap-6 mb-6">
-                                <div>
-                                    <h4 className="text-xs font-semibold uppercase text-gray-500 mb-1">Type</h4>
-                                    <p className="font-medium text-gray-900 flex items-center gap-2">
-                                        <Tag className="w-4 h-4 text-emerald-600" />
-                                        {selectedReclamation.type_reclamation_nom}
-                                    </p>
-                                </div>
-                                <div>
-                                    <h4 className="text-xs font-semibold uppercase text-gray-500 mb-1">Urgence</h4>
-                                    <span
-                                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                                        style={{
-                                            backgroundColor: (selectedReclamation.urgence_couleur || '#ccc') + '20',
-                                            color: selectedReclamation.urgence_couleur || '#666'
-                                        }}
-                                    >
-                                        {selectedReclamation.urgence_niveau}
-                                    </span>
-                                </div>
-                                <div>
-                                    <h4 className="text-xs font-semibold uppercase text-gray-500 mb-1">Localisation</h4>
-                                    <p className="font-medium text-gray-900 flex items-center gap-2">
-                                        <MapPin className="w-4 h-4 text-gray-400" />
-                                        {selectedReclamation.site_nom || '-'} / {selectedReclamation.zone_nom || '-'}
-                                    </p>
-                                </div>
-                                <div>
-                                    <h4 className="text-xs font-semibold uppercase text-gray-500 mb-1">Statut</h4>
-                                    <span className="font-medium text-gray-900">
-                                        {selectedReclamation.statut}
-                                    </span>
-                                </div>
-                                <div>
-                                    <h4 className="text-xs font-semibold uppercase text-gray-500 mb-1">Date de constatation</h4>
-                                    <p className="font-medium text-gray-900 flex items-center gap-2">
-                                        <Calendar className="w-4 h-4 text-orange-500" />
-                                        {formatLocalDate(selectedReclamation.date_constatation, {
-                                            day: 'numeric',
-                                            month: 'long',
-                                            year: 'numeric',
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                        })}
-                                    </p>
-                                </div>
-                                {selectedReclamation.justification_rejet && (
-                                    <div className="col-span-2 bg-red-50 p-3 rounded-lg border border-red-100">
-                                        <h4 className="text-xs font-semibold uppercase text-red-600 mb-1 flex items-center gap-1">
-                                            <AlertCircle className="w-3 h-3" />
-                                            Réponse Administrateur
-                                        </h4>
-                                        <p className="text-sm text-red-800 italic">{selectedReclamation.justification_rejet}</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Localisation sur carte */}
-                            <div className="mb-6">
-                                <h4 className="text-xs font-semibold uppercase text-gray-500 mb-2">Localisation sur carte</h4>
-                                <div className="h-64 w-full rounded-xl overflow-hidden border border-gray-200 shadow-inner relative">
-                                    {selectedReclamation.localisation?.coordinates ? (
-                                        <OLMap
-                                            activeLayer={{ id: MapLayerType.PLAN, name: 'Plan', url: 'https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png', attribution: '&copy; OpenStreetMap' }}
-                                            targetLocation={{
-                                                coordinates: {
-                                                    lng: selectedReclamation.localisation.coordinates[0],
-                                                    lat: selectedReclamation.localisation.coordinates[1]
-                                                },
-                                                zoom: 18
-                                            }}
-                                            highlightedGeometry={{
-                                                type: 'Feature',
-                                                geometry: selectedReclamation.localisation,
-                                                properties: {
-                                                    id: selectedReclamation.id,
-                                                    object_type: 'Reclamation',
-                                                    numero_reclamation: selectedReclamation.numero_reclamation,
-                                                    couleur_statut: RECLAMATION_STATUS_COLORS[selectedReclamation.statut] || '#6b7280'
-                                                }
-                                            }}
-                                            isMiniMap={true}
-                                        />
-                                    ) : (
-                                        <div className="absolute inset-0 flex items-center justify-center bg-gray-50 text-gray-400 text-sm">
-                                            Coordonnées non disponibles
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Dates clés */}
-                            <div className="grid grid-cols-2 gap-4 mb-6 bg-emerald-50/30 p-4 rounded-xl border border-emerald-100/50">
-                                <div>
-                                    <h4 className="text-[10px] font-bold uppercase text-emerald-700/60 mb-1">Prise en compte</h4>
-                                    <p className="text-sm font-medium text-gray-800">
-                                        {selectedReclamation.date_prise_en_compte ? new Date(selectedReclamation.date_prise_en_compte).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}
-                                    </p>
-                                </div>
-                                <div>
-                                    <h4 className="text-[10px] font-bold uppercase text-emerald-700/60 mb-1">Début traitement</h4>
-                                    <p className="text-sm font-medium text-gray-800">
-                                        {selectedReclamation.date_debut_traitement ? new Date(selectedReclamation.date_debut_traitement).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}
-                                    </p>
-                                </div>
-                                <div>
-                                    <h4 className="text-[10px] font-bold uppercase text-emerald-700/60 mb-1">Résolution</h4>
-                                    <p className="text-sm font-medium text-gray-800 text-emerald-700">
-                                        {selectedReclamation.date_resolution ? new Date(selectedReclamation.date_resolution).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}
-                                    </p>
-                                </div>
-                                <div>
-                                    <h4 className="text-[10px] font-bold uppercase text-emerald-700/60 mb-1">Clôture réelle</h4>
-                                    <p className="text-sm font-medium text-gray-800">
-                                        {selectedReclamation.date_cloture_reelle ? new Date(selectedReclamation.date_cloture_reelle).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Interventions liées */}
-                            {selectedReclamation.taches_liees_details && selectedReclamation.taches_liees_details.length > 0 && (
-                                <div className="mb-6">
-                                    <h4 className="text-xs font-semibold uppercase text-gray-500 mb-2">Intervention(s) liée(s)</h4>
-                                    <div className="space-y-2">
-                                        {selectedReclamation.taches_liees_details.map((t: any) => (
-                                            <div key={t.id} className="flex items-center justify-between p-2 bg-white border border-gray-100 rounded-lg shadow-sm">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="p-2 bg-purple-50 rounded-lg">
-                                                        <ClipboardList className="w-4 h-4 text-purple-600" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-medium text-gray-900">{t.type_tache}</p>
-                                                        <p className="text-[10px] text-gray-500">{t.equipe || 'Équipe non assignée'}</p>
-                                                    </div>
-                                                </div>
-                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${t.statut === 'TERMINEE' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                                                    {t.statut}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-
-                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 mb-6">
-                                <h4 className="text-xs font-semibold uppercase text-gray-500 mb-2">Description</h4>
-                                <p className="text-gray-700 whitespace-pre-line">{selectedReclamation.description}</p>
-                            </div>
-
-                            {/* Photos initiales */}
-                            {selectedReclamation.photos && selectedReclamation.photos.length > 0 ? (
-                                <div className="mb-6">
-                                    <h4 className="text-xs font-semibold uppercase text-gray-500 mb-2">Photos jointes (Initiales)</h4>
-                                    <div className="flex gap-2 overflow-x-auto pb-2">
-                                        {selectedReclamation.photos.map((p, i) => (
-                                            <div key={i} className="relative group cursor-pointer" onClick={() => setSelectedPhoto(p.url_fichier)}>
-                                                <img src={p.url_fichier} alt={`Photo ${i}`} className="h-24 w-32 object-cover rounded-lg border border-gray-200 hover:border-emerald-500 transition-colors" />
-                                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 rounded-lg flex items-center justify-center transition-all">
-                                                    <Eye className="w-5 h-5 text-white opacity-0 group-hover:opacity-100" />
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="mb-4">
-                                    <p className="text-xs text-gray-400 italic">Aucune photo jointe au dépôt.</p>
-                                </div>
-                            )}
-
-                            {/* Photos d'intervention */}
-                            {selectedReclamation.photos_taches && selectedReclamation.photos_taches.length > 0 && (
-                                <div className="mb-6">
-                                    <h4 className="text-xs font-semibold uppercase text-gray-500 mb-2">Photos des travaux</h4>
-                                    <div className="flex gap-2 overflow-x-auto pb-2">
-                                        {selectedReclamation.photos_taches.map((p, i) => (
-                                            <div key={i} className="relative group cursor-pointer" onClick={() => setSelectedPhoto(p.url_fichier)}>
-                                                <img src={p.url_fichier} alt={`Photo travaux ${i}`} className="h-24 w-32 object-cover rounded-lg border border-gray-200 hover:border-blue-500 transition-colors" />
-                                                <div className="absolute inset-x-0 bottom-0 bg-black/40 text-[10px] text-white p-1 text-center rounded-b-lg">
-                                                    {new Date(p.date_prise).toLocaleDateString('fr-FR')}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                            {/* TIME LINE (SUIVI) */}
-                            <div className="mt-8 border-t border-gray-100 pt-6">
-                                <h4 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                    <Clock className="w-5 h-5 text-emerald-600" />
-                                    Suivi de traitement
-                                </h4>
-                                <ReclamationTimeline
-                                    historique={selectedReclamation.historique || []}
-                                    photos={selectedReclamation.photos || []}
-                                    photosTaches={selectedReclamation.photos_taches || []}
-                                    satisfaction={selectedReclamation.satisfaction}
-                                    canEvaluate={
-                                        (selectedReclamation.statut === 'CLOTUREE' || selectedReclamation.statut === 'RESOLUE') &&
-                                        !selectedReclamation.satisfaction
-                                    }
-                                    onEvaluate={() => setShowSatisfactionForm(true)}
-                                />
-                            </div>
-
-                            <div className="flex justify-end pt-4 gap-3">
-                                {isAdmin && selectedReclamation.statut !== 'CLOTUREE' && (
-                                    <button
-                                        onClick={() => {
-                                            const rec = selectedReclamation;
-                                            setSelectedReclamation(null);
-                                            navigate('/planning', {
-                                                state: {
-                                                    createTaskFromReclamation: true,
-                                                    reclamation: rec
-                                                }
-                                            });
-                                        }}
-                                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-2"
-                                    >
-                                        <ClipboardList className="w-4 h-4" />
-                                        Créer une tâche
-                                    </button>
-                                )}
-                                {/* User 6.6.12.3 - Bouton Proposer clôture (Admin/Superviseur uniquement) */}
-                                {selectedReclamation.statut !== 'CLOTUREE' && selectedReclamation.statut !== 'REJETEE' && selectedReclamation.statut !== 'EN_ATTENTE_VALIDATION_CLOTURE' && !isClient && (
-                                    <button
-                                        onClick={handleCloturer}
-                                        disabled={selectedReclamation.taches_liees_details?.some((t: any) => t.statut !== 'TERMINEE')}
-                                        className={`px-4 py-2 text-white rounded-lg font-medium flex items-center gap-2 transition-all ${selectedReclamation.taches_liees_details?.some((t: any) => t.statut !== 'TERMINEE')
-                                            ? 'bg-gray-400 cursor-not-allowed opacity-60'
-                                            : 'bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg'
-                                            }`}
-                                        title={selectedReclamation.taches_liees_details?.some((t: any) => t.statut !== 'TERMINEE')
-                                            ? "Certaines tâches ne sont pas terminées"
-                                            : "Proposer la clôture de la réclamation"}
-                                    >
-                                        <Clock className="w-4 h-4" />
-                                        Proposer clôture
-                                    </button>
-                                )}
-                                {/* User 6.6.12bis - Bouton Valider clôture (créateur uniquement) */}
-                                {selectedReclamation.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' && currentUser && selectedReclamation.createur === currentUser.id && (
-                                    <button
-                                        onClick={handleValiderCloture}
-                                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-2 shadow-md hover:shadow-lg animate-pulse"
-                                    >
-                                        <Star className="w-4 h-4" />
-                                        Valider clôture
-                                    </button>
-                                )}
-                                {/* User 6.6.13 - Bouton Évaluer (créateur uniquement après clôture) */}
-                                {currentUser && selectedReclamation.createur === currentUser.id && selectedReclamation.statut === 'CLOTUREE' && !selectedReclamation.satisfaction && (
-                                    <button
-                                        onClick={() => setShowSatisfactionForm(true)}
-                                        className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 font-medium flex items-center gap-2"
-                                    >
-                                        <Star className="w-4 h-4" />
-                                        Évaluer
-                                    </button>
-                                )}
-                                <button
-                                    onClick={() => setSelectedReclamation(null)}
-                                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
-                                >
-                                    Fermer
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )
-            }
-
-            {/* Modal Assignation Equipe (Moved to end for stacking context) */}
-            {isAssignModalOpen && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                                <Users className="w-5 h-5 text-purple-600" />
-                                Affecter une équipe
-                            </h2>
-                            <button onClick={() => setIsAssignModalOpen(false)} className="text-gray-400 hover:text-red-500">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <form onSubmit={handleAssignSubmit} className="p-6 space-y-4">
-                            <div className="bg-blue-50 p-3 rounded-lg text-sm text-blue-800 mb-2">
-                                Réc. <strong>{selectedReclamation?.numero_reclamation}</strong>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Choisir une équipe</label>
-                                <select
-                                    required
-                                    value={assignEquipeId}
-                                    onChange={e => setAssignEquipeId(Number(e.target.value))}
-                                    className="w-full rounded-lg border-gray-300 border p-2.5 focus:ring-2 focus:ring-purple-500 outline-none"
-                                >
-                                    <option value="">Sélectionner...</option>
-                                    {equipes.filter(e => e.actif).map(e => (
-                                        <option key={e.id} value={e.id}>{e.nomEquipe}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="pt-2 flex gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsAssignModalOpen(false)}
-                                    className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
-                                >
-                                    Annuler
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
-                                >
-                                    Valider
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
 
             <ConfirmModal
                 isOpen={modalConfig.isOpen}
@@ -1298,38 +1216,16 @@ const Reclamations: React.FC = () => {
                 onCancel={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}
             />
 
-            {/* User 6.6.13 - Formulaire Satisfaction */}
-            {showSatisfactionForm && selectedReclamation && (
-                <SatisfactionForm
-                    reclamationId={selectedReclamation.id}
-                    reclamationNumero={selectedReclamation.numero_reclamation}
-                    onSubmit={handleSatisfactionSubmit}
-                    onClose={() => setShowSatisfactionForm(false)}
+            {/* Delete Confirmation Modal */}
+            {deletingReclamationId && (
+                <ConfirmDeleteModal
+                    title="Supprimer la réclamation ?"
+                    message="Cette action est irréversible."
+                    onConfirm={confirmDeleteReclamation}
+                    onCancel={() => setDeletingReclamationId(null)}
                 />
             )}
 
-            {/* Modal de prévisualisation Photo */}
-            {selectedPhoto && (
-                <div
-                    className="fixed inset-0 z-[999] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200"
-                    onClick={() => setSelectedPhoto(null)}
-                >
-                    <button
-                        className="absolute top-6 right-6 text-white hover:text-gray-300 transition-colors"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedPhoto(null);
-                        }}
-                    >
-                        <X className="w-8 h-8" />
-                    </button>
-                    <img
-                        src={selectedPhoto}
-                        alt="Aperçu"
-                        className="max-w-full max-h-full object-contain rounded shadow-2xl animate-in zoom-in-95 duration-300"
-                    />
-                </div>
-            )}
         </div >
     );
 };

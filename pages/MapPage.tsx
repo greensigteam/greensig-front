@@ -172,18 +172,18 @@ export const MapPage: React.FC<MapPageProps> = ({
   } = useDrawing();
 
   // ✅ USE SEARCH CONTEXT
-  const { 
-    searchQuery, 
-    setSearchQuery, 
-    searchSuggestions, 
-    showSuggestions, 
-    setShowSuggestions, 
-    isSearching, 
-    setIsSearching, 
-    searchResult, 
-    setSearchResult: setGlobalSearchResult, 
-    searchContainerRef, 
-    handleSuggestionClick: hookHandleSuggestionClick, 
+  const {
+    searchQuery,
+    setSearchQuery,
+    searchSuggestions,
+    showSuggestions,
+    setShowSuggestions,
+    isSearching,
+    setIsSearching,
+    searchResult,
+    setSearchResult: setGlobalSearchResult,
+    searchContainerRef,
+    handleSuggestionClick: hookHandleSuggestionClick,
     setPlaceholder,
     selectedSuggestion,
     setSelectedSuggestion,
@@ -356,9 +356,17 @@ export const MapPage: React.FC<MapPageProps> = ({
     const preSelected: InventoryObjectOption[] = [];
 
     if (object) {
-      // Only add if ID is numeric (skip sites or non-inventory items if needed)
       const objId = Number(object.id);
-      if (!isNaN(objId)) {
+
+      // Check if this is a Reclamation
+      if (object.type === 'Reclamation') {
+        // Link the task to this reclamation
+        // The site is determined from the reclamation itself in the backend
+        if (!isNaN(objId)) {
+          initialValues.reclamation = objId;
+        }
+      } else if (!isNaN(objId)) {
+        // Regular inventory object - add to pre-selected objects
         // Try to get superficie from attributes (various possible keys)
         const superficieStr = object.attributes?.['superficie_calculee']
           || object.attributes?.['Surface (m²)']
@@ -497,7 +505,7 @@ export const MapPage: React.FC<MapPageProps> = ({
   }, [requestGeolocation, setIsSearching]);
 
   // ========== SEARCH HANDLER ==========
-  
+
   // ✅ Memoize to prevent MapSearchBar re-renders
   const handleSearch = useCallback(async () => {
     if (!searchQuery || searchQuery.trim().length < 2) return;
@@ -509,7 +517,7 @@ export const MapPage: React.FC<MapPageProps> = ({
     if (selectedSuggestion && selectedSuggestion.coordinates) {
       // 1. Zoom to location
       setTargetLocation({ coordinates: selectedSuggestion.coordinates, zoom: 18 });
-      
+
       // 2. Set search result for highlighting
       setGlobalSearchResult({
         name: selectedSuggestion.name,
@@ -653,12 +661,49 @@ export const MapPage: React.FC<MapPageProps> = ({
         visibleLayers[backendKey] = value;
       });
 
+      // Collect site names based on current map viewport
+      const siteNames: string[] = [];
+
+      // If a site is selected, use it
+      if (selectedObject && selectedObject.type === 'Site' && selectedObject.title) {
+        siteNames.push(selectedObject.title);
+      } else if (sites.length > 0 && zoom >= 12) {
+        // Calculate approximate viewport bounds based on zoom level
+        // Rough approximation: at zoom 15, viewport is ~0.01 degrees
+        // Each zoom level halves the viewport size
+        const viewportSize = 0.16 / Math.pow(2, zoom - 12); // Degrees of lat/lng visible
+
+        const bounds = {
+          north: center.lat + viewportSize / 2,
+          south: center.lat - viewportSize / 2,
+          east: center.lng + viewportSize / 2,
+          west: center.lng - viewportSize / 2
+        };
+
+        // Find all sites within the viewport
+        const sitesInViewport = sites
+          .filter(site => {
+            if (!site.coordinates) return false;
+            return (
+              site.coordinates.lat >= bounds.south &&
+              site.coordinates.lat <= bounds.north &&
+              site.coordinates.lng >= bounds.west &&
+              site.coordinates.lng <= bounds.east
+            );
+          })
+          .slice(0, 5); // Limit to 5 sites
+
+        if (sitesInViewport.length > 0) {
+          siteNames.push(...sitesInViewport.map(s => s.name));
+        }
+      }
+
       const pdfBlob = await exportPDF({
-        title: 'Export Carte GreenSIG',
         mapImageBase64,
         visibleLayers,
         center: [center.lng, center.lat],
-        zoom
+        zoom,
+        siteNames
       });
 
       const date = new Date().toISOString().split('T')[0];
@@ -732,7 +777,7 @@ export const MapPage: React.FC<MapPageProps> = ({
   };
 
   // ✅ Handle object created successfully
-  const handleObjectCreated = (objectData: any) => {
+  const handleObjectCreated = (_objectData: any) => {
     showToast(`${pendingObjectType} créé avec succès!`, 'success');
     setShowCreateModal(false);
     clearDrawnGeometry();
@@ -1008,8 +1053,9 @@ export const MapPage: React.FC<MapPageProps> = ({
         onSiteHover={handleSiteHover}
         onSiteSelect={handleSiteSelect}
         onViewSite={handleViewSite}
-        onCreateSite={handleCreateSite}
-        onEditSite={setEditingSite}
+        // Only ADMIN and SUPERVISEUR can create/edit sites
+        onCreateSite={userRole !== 'CLIENT' ? handleCreateSite : undefined}
+        onEditSite={userRole !== 'CLIENT' ? setEditingSite : undefined}
         onToggle={setIsCarouselOpen}
       />
 

@@ -11,6 +11,7 @@ const OLMap = lazy(() => import('./components/OLMap').then(m => ({ default: m.OL
 const Inventory = lazy(() => import('./pages/Inventory'));
 const InventoryDetailPage = lazy(() => import('./pages/InventoryDetailPage'));
 const Reclamations = lazy(() => import('./pages/Reclamations'));
+const ReclamationDetailPage = lazy(() => import('./pages/ReclamationDetailPage'));
 const ReclamationsDashboard = lazy(() => import('./pages/ReclamationsDashboard'));
 const Teams = lazy(() => import('./pages/Teams'));
 const Planning = lazy(() => import('./pages/Planning'));
@@ -18,13 +19,17 @@ const RatiosProductivite = lazy(() => import('./pages/RatiosProductivite'));
 const SuiviTaches = lazy(() => import('./pages/SuiviTaches'));
 const Produits = lazy(() => import('./pages/Produits'));
 const Reporting = lazy(() => import('./pages/Reporting'));
+const MonthlyReport = lazy(() => import('./pages/MonthlyReport'));
+const WeeklyReport = lazy(() => import('./pages/WeeklyReport'));
 const Users = lazy(() => import('./pages/Users'));
 const Parametres = lazy(() => import('./pages/Parametres'));
 const Sites = lazy(() => import('./pages/Sites'));
 const SiteDetailPage = lazy(() => import('./pages/SiteDetailPage'));
 const Clients = lazy(() => import('./pages/Clients'));
-const ClientDetailPage = lazy(() => import('./pages/ClientDetailPage'));
+const StructureDetailPage = lazy(() => import('./pages/StructureDetailPage'));
+const ClientUserDetailPage = lazy(() => import('./pages/ClientUserDetailPage'));
 const OperateurDetailPage = lazy(() => import('./pages/OperateurDetailPage'));
+const Notifications = lazy(() => import('./pages/Notifications'));
 import { User, MapLayerType, Coordinates, OverlayState, MapObjectDetail, UserLocation, Measurement, MeasurementType } from './types';
 import { MAP_LAYERS } from './constants';
 import { hasExistingToken, fetchCurrentUser, updateInventoryItem, deleteInventoryItem } from './services/api';
@@ -36,8 +41,11 @@ import { ToastProvider } from './contexts/ToastContext';
 import { SelectionProvider } from './contexts/SelectionContext';
 import { DrawingProvider } from './contexts/DrawingContext';
 import { SearchProvider } from './contexts/SearchContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import ErrorBoundary from './components/ErrorBoundary';
+import { ApiErrorListener } from './components/ApiErrorListener';
 import logger from './services/logger';
+import ConfirmDeleteModal from './components/modals/ConfirmDeleteModal';
 
 const PageLoadingFallback = () => (
   <div className="fixed inset-0 z-50">
@@ -83,6 +91,9 @@ function App() {
   const [measurementType, setMeasurementType] = useState<MeasurementType>('distance');
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [currentMeasurement, setCurrentMeasurement] = useState<Measurement | null>(null);
+
+  // Deletion modal state
+  const [itemToDelete, setItemToDelete] = useState<{ id: string; type: string } | null>(null);
 
   const mapRef = useRef<any>(null);
 
@@ -199,10 +210,13 @@ function App() {
   };
 
   const handleObjectDelete = async (objectId: string, objectType: string) => {
-    // Ask for confirmation
-    if (!window.confirm(`Êtes-vous sûr de vouloir supprimer cet objet (${objectType} #${objectId}) ?`)) {
-      return;
-    }
+    // Ask for confirmation via modal
+    setItemToDelete({ id: objectId, type: objectType });
+  };
+
+  const executeObjectDelete = async () => {
+    if (!itemToDelete) return;
+    const { id: objectId, type: objectType } = itemToDelete;
 
     try {
       await deleteInventoryItem(objectType, objectId);
@@ -239,11 +253,13 @@ function App() {
     <BrowserRouter>
       <ErrorBoundary>
         <ToastProvider>
+          <ApiErrorListener />
           <SelectionProvider maxSelections={100}>
             <DrawingProvider>
               <SearchProvider>
-                <MapProvider>
-                  <Routes>
+                <NotificationProvider user={user}>
+                  <MapProvider>
+                    <Routes>
                     <Route
                       path="/"
                       element={
@@ -316,24 +332,42 @@ function App() {
                     >
                       <Route index element={<Navigate to={user.role === 'CLIENT' ? '/client/map' : '/dashboard'} replace />} />
                       <Route path="dashboard" element={<Dashboard />} />
-                      <Route path="inventory" element={<Suspense fallback={<PageLoadingFallback />}><Inventory /></Suspense>} />
+                      <Route path="inventory" element={<Suspense fallback={<PageLoadingFallback />}><Inventory user={user} /></Suspense>} />
                       <Route path="inventory/:objectType/:objectId" element={<Suspense fallback={<PageLoadingFallback />}><InventoryDetailPage /></Suspense>} />
-                      <Route path="sites" element={<Suspense fallback={<PageLoadingFallback />}><Sites /></Suspense>} />
-                      <Route path="sites/:id" element={<Suspense fallback={<PageLoadingFallback />}><SiteDetailPage /></Suspense>} />
+                      <Route path="sites" element={
+                        <RequireRole user={user} roles={['ADMIN', 'SUPERVISEUR']}>
+                          <Suspense fallback={<PageLoadingFallback />}><Sites /></Suspense>
+                        </RequireRole>
+                      } />
+                      <Route path="sites/:id" element={
+                        <RequireRole user={user} roles={['ADMIN', 'SUPERVISEUR', 'CLIENT']}>
+                          <Suspense fallback={<PageLoadingFallback />}><SiteDetailPage /></Suspense>
+                        </RequireRole>
+                      } />
                       <Route path="clients" element={
                         <RequireRole user={user} roles={['ADMIN']}>
                           <Suspense fallback={<PageLoadingFallback />}><Clients /></Suspense>
                         </RequireRole>
                       } />
-                      <Route path="clients/:id" element={
+                      <Route path="structures/:id" element={
                         <RequireRole user={user} roles={['ADMIN']}>
-                          <Suspense fallback={<PageLoadingFallback />}><ClientDetailPage /></Suspense>
+                          <Suspense fallback={<PageLoadingFallback />}><StructureDetailPage /></Suspense>
+                        </RequireRole>
+                      } />
+                      <Route path="structures/:structureId/utilisateurs/:userId" element={
+                        <RequireRole user={user} roles={['ADMIN']}>
+                          <Suspense fallback={<PageLoadingFallback />}><ClientUserDetailPage /></Suspense>
                         </RequireRole>
                       } />
                       <Route path="interventions" element={<Navigate to="/reclamations" replace />} />
                       <Route path="reclamations" element={<Suspense fallback={<PageLoadingFallback />}><Reclamations /></Suspense>} />
+                      <Route path="reclamations/:id" element={<Suspense fallback={<PageLoadingFallback />}><ReclamationDetailPage /></Suspense>} />
                       <Route path="reclamations/stats" element={<Suspense fallback={<PageLoadingFallback />}><ReclamationsDashboard /></Suspense>} />
-                      <Route path="teams" element={<Suspense fallback={<PageLoadingFallback />}><Teams /></Suspense>} />
+                      <Route path="teams" element={
+                        <RequireRole user={user} roles={['ADMIN', 'SUPERVISEUR', 'CLIENT']}>
+                          <Suspense fallback={<PageLoadingFallback />}><Teams /></Suspense>
+                        </RequireRole>
+                      } />
                       <Route path="users" element={
                         <RequireRole user={user} roles={['ADMIN']}>
                           <Suspense fallback={<PageLoadingFallback />}><Users /></Suspense>
@@ -347,27 +381,53 @@ function App() {
 
                       <Route path="planning" element={<Suspense fallback={<PageLoadingFallback />}><Planning /></Suspense>} />
                       <Route path="ratios" element={<Suspense fallback={<PageLoadingFallback />}><RatiosProductivite /></Suspense>} />
-                      <Route path="claims" element={<Suspense fallback={<PageLoadingFallback />}><SuiviTaches /></Suspense>} />
+                      <Route path="suivi-taches" element={<Suspense fallback={<PageLoadingFallback />}><SuiviTaches /></Suspense>} />
                       <Route path="products" element={<Suspense fallback={<PageLoadingFallback />}><Produits /></Suspense>} />
-                      <Route path="reporting" element={<Suspense fallback={<PageLoadingFallback />}><Reporting /></Suspense>} />
+                      <Route path="reporting" element={
+                        <RequireRole user={user} roles={['ADMIN', 'SUPERVISEUR']}>
+                          <Suspense fallback={<PageLoadingFallback />}><Reporting /></Suspense>
+                        </RequireRole>
+                      } />
+                      <Route path="monthly-report" element={
+                        <RequireRole user={user} roles={['ADMIN']}>
+                          <Suspense fallback={<PageLoadingFallback />}><MonthlyReport /></Suspense>
+                        </RequireRole>
+                      } />
+                      <Route path="weekly-report" element={
+                        <RequireRole user={user} roles={['ADMIN']}>
+                          <Suspense fallback={<PageLoadingFallback />}><WeeklyReport /></Suspense>
+                        </RequireRole>
+                      } />
                       <Route path="parametres" element={
                         <RequireRole user={user} roles={['ADMIN']}>
                           <Suspense fallback={<PageLoadingFallback />}><Parametres /></Suspense>
                         </RequireRole>
                       } />
+                      <Route path="notifications" element={<Suspense fallback={<PageLoadingFallback />}><Notifications user={user} /></Suspense>} />
                       <Route path="client" element={<Navigate to="/client/map" replace />} />
                       <Route path="client/map" element={null} />
                       {/* Add a /map route if you want a dedicated map view without the panel */}
                       <Route path="map" element={null} />
                     </Route>
-                  </Routes>
-                </MapProvider>
+                    </Routes>
+                  </MapProvider>
+                </NotificationProvider>
               </SearchProvider>
             </DrawingProvider>
           </SelectionProvider>
         </ToastProvider>
+        {itemToDelete && (
+          <ConfirmDeleteModal
+            title="Supprimer l'objet ?"
+            message={`Êtes-vous sûr de vouloir supprimer cet objet (${itemToDelete.type} #${itemToDelete.id}) ? Cette action est irréversible.`}
+            onConfirm={executeObjectDelete}
+            onCancel={() => setItemToDelete(null)}
+            confirmText="Supprimer"
+            cancelText="Annuler"
+          />
+        )}
       </ErrorBoundary>
-    </BrowserRouter>
+    </BrowserRouter >
   );
 }
 export default App;

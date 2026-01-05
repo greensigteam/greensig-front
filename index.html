@@ -63,6 +63,23 @@
       background: #94a3b8;
     }
 
+    /* Fix: Force visible text color for select options */
+    select option {
+      color: #1f2937 !important; /* gray-800 */
+      background-color: white !important;
+    }
+
+    select option:hover,
+    select option:focus {
+      background-color: #f3f4f6 !important; /* gray-100 */
+      color: #1f2937 !important;
+    }
+
+    select option:checked {
+      background-color: #d1fae5 !important; /* emerald-100 */
+      color: #1f2937 !important;
+    }
+
 
 
     /* Loading Spinner Styles */

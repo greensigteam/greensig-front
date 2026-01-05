@@ -26,6 +26,7 @@ interface CompetenceMatrixProps {
   itemsPerPage?: number;
   viewMode: ViewMode;
   isEditMode: boolean;
+  isReadOnly?: boolean;
   niveauFilter: NiveauCompetence | '';
   categorieFilter: string;
   onViewModeChange: (mode: ViewMode) => void;
@@ -43,6 +44,7 @@ const CompetenceMatrix: React.FC<CompetenceMatrixProps> = ({
   itemsPerPage,
   viewMode,
   isEditMode,
+  isReadOnly = false,
   niveauFilter,
   categorieFilter,
   onViewModeChange,
@@ -50,6 +52,8 @@ const CompetenceMatrix: React.FC<CompetenceMatrixProps> = ({
   onNiveauFilterChange,
   onCategorieFilterChange
 }) => {
+  // Effective edit mode - disabled if read-only
+  const effectiveEditMode = isEditMode && !isReadOnly;
   const [operateursDetails, setOperateursDetails] = useState<Map<number, OperateurDetail>>(new Map());
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
@@ -240,7 +244,7 @@ const CompetenceMatrix: React.FC<CompetenceMatrixProps> = ({
                   className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden"
                 >
                   {/* Card Header */}
-                  <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-4 text-white">
+                  <div className="bg-emerald-900 p-4 text-white">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <h4 className="font-semibold text-lg">{op.fullName}</h4>
@@ -301,7 +305,7 @@ const CompetenceMatrix: React.FC<CompetenceMatrixProps> = ({
 
                           {isUpdating ? (
                             <div className="w-4 h-4 border-2 border-emerald-600/30 border-t-emerald-600 rounded-full animate-spin" />
-                          ) : isEditMode ? (
+                          ) : effectiveEditMode ? (
                             // Edit Mode: Select dropdown
                             <select
                               value={currentNiveau || ''}
@@ -352,11 +356,12 @@ const CompetenceMatrix: React.FC<CompetenceMatrixProps> = ({
 
         {/* Table View - Modern Design */}
         {viewMode === 'table' && (
-          <div className="overflow-auto rounded-lg border border-gray-200">
+          <div className="overflow-auto rounded-lg border border-gray-200 max-h-[calc(100vh-400px)]">
             <table className="w-full border-collapse min-w-max">
-              <thead className="sticky top-0 bg-gradient-to-b from-gray-100 to-gray-50 z-10 shadow-sm">
-                <tr>
-                  <th className="border-r border-gray-300 px-4 py-3 text-left text-sm font-bold text-gray-800 sticky left-0 z-20 min-w-[200px] bg-gradient-to-b from-gray-100 to-gray-50">
+              <thead className="sticky top-0 z-20">
+                <tr className="bg-gray-100">
+                  {/* Sticky corner cell - both top and left */}
+                  <th className="border-r border-b border-gray-300 px-4 py-3 text-left text-sm font-bold text-gray-800 sticky left-0 top-0 z-30 min-w-[220px] bg-gray-100 shadow-[2px_2px_4px_rgba(0,0,0,0.1)]">
                     <div className="flex items-center gap-2">
                       <div className="w-1 h-6 bg-emerald-600 rounded-full"></div>
                       Opérateur
@@ -365,7 +370,7 @@ const CompetenceMatrix: React.FC<CompetenceMatrixProps> = ({
                   {filteredCompetences.map(comp => (
                     <th
                       key={comp.id}
-                      className="border-l border-gray-200 px-3 py-3 text-center text-xs font-semibold text-gray-700 min-w-[140px] hover:bg-gray-200 transition-colors"
+                      className="border-l border-b border-gray-200 px-3 py-3 text-center text-xs font-semibold text-gray-700 min-w-[140px] bg-gray-100 hover:bg-gray-200 transition-colors"
                       title={comp.description || comp.nomCompetence}
                     >
                       <div className="truncate max-w-[140px] font-bold text-gray-800">{comp.nomCompetence}</div>
@@ -378,14 +383,15 @@ const CompetenceMatrix: React.FC<CompetenceMatrixProps> = ({
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {visibleOperateurs.map((op, idx) => (
-                  <tr key={op.id} className={`transition-all duration-150 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-emerald-50 hover:shadow-md`}>
-                    <td className="border-r border-gray-300 px-4 py-3 sticky left-0 z-10 bg-inherit">
+                  <tr key={op.id} className={`transition-all duration-150 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-emerald-50`}>
+                    {/* Sticky operator name column */}
+                    <td className={`border-r border-gray-300 px-4 py-3 sticky left-0 z-10 shadow-[2px_0_4px_rgba(0,0,0,0.05)] ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-bold text-sm shadow-md flex-shrink-0">
                           {op.fullName.split(' ').map(n => n[0]).join('').substring(0, 2)}
                         </div>
-                        <div>
-                          <div className="font-semibold text-gray-900 text-sm">{op.fullName}</div>
+                        <div className="min-w-0">
+                          <div className="font-semibold text-gray-900 text-sm truncate">{op.fullName}</div>
                           <div className="text-xs text-gray-500 flex items-center gap-1">
                             <span className="px-1.5 py-0.5 bg-gray-200 rounded text-[10px] font-mono">
                               {op.numeroImmatriculation}
@@ -408,7 +414,7 @@ const CompetenceMatrix: React.FC<CompetenceMatrixProps> = ({
                             <div className="flex items-center justify-center py-1">
                               <div className="w-5 h-5 border-2 border-emerald-600/30 border-t-emerald-600 rounded-full animate-spin" />
                             </div>
-                          ) : isEditMode ? (
+                          ) : effectiveEditMode ? (
                             // Edit Mode: Modern Select dropdown
                             <select
                               value={currentNiveau || ''}

@@ -74,7 +74,7 @@ export async function fetchClientInventoryStats(clientId: number): Promise<Inven
  * Calcule les statistiques d'inventaire côté client
  * Attention: Effectue de nombreuses requêtes (potentiellement lent)
  */
-async function computeInventoryStatsClientSide(clientId: number): Promise<InventoryStats> {
+async function computeInventoryStatsClientSide(structureClientId: number): Promise<InventoryStats> {
     const stats: InventoryStats = {
         totalObjets: 0,
         vegetation: {
@@ -89,9 +89,9 @@ async function computeInventoryStatsClientSide(clientId: number): Promise<Invent
     };
 
     try {
-        // 1. Récupérer tous les sites du client
-        const allSites = await fetchAllSites();
-        const clientSites = allSites.filter(s => s.client === clientId);
+        // 1. Récupérer tous les sites de la structure client
+        const allSites = await fetchAllSites(true); // Force refresh
+        const clientSites = allSites.filter(s => s.structure_client === structureClientId);
 
         if (clientSites.length === 0) {
             return stats; // Pas de sites = pas d'objets

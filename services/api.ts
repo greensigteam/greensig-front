@@ -2,7 +2,6 @@
  * Service API pour communication avec le backend Django
  *
  * Base URL configurée via .env (VITE_API_BASE_URL)
- * Avec cache Dexie pour optimiser les performances
  */
 
 export const hasExistingToken = () => {
@@ -10,9 +9,31 @@ export const hasExistingToken = () => {
 };
 
 import logger from './logger';
-import { db, cacheKeys, cacheTTL } from './db';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+
+// ==============================================================================
+// GESTION DES ERREURS D'AUTORISATION (403)
+// ==============================================================================
+
+// Événement personnalisé pour les erreurs 403 (accès refusé)
+export const API_FORBIDDEN_EVENT = 'api:forbidden';
+
+export interface ApiForbiddenEventDetail {
+  url: string;
+  message: string;
+}
+
+/**
+ * Émet un événement 403 que les composants React peuvent écouter
+ * pour afficher un toast d'erreur
+ */
+function emitForbiddenError(url: string, message: string) {
+  const event = new CustomEvent<ApiForbiddenEventDetail>(API_FORBIDDEN_EVENT, {
+    detail: { url, message }
+  });
+  window.dispatchEvent(event);
+}
 
 // Wrapper fetch pour ajouter automatiquement le token
 export async function apiFetch(url: string, options: RequestInit = {}) {
@@ -36,6 +57,19 @@ export async function apiFetch(url: string, options: RequestInit = {}) {
     console.warn('Token invalide ou expiré, redirection login...');
     localStorage.removeItem('token');
     window.location.href = '/';
+  }
+
+  if (response.status === 403) {
+    // Accès refusé - permissions insuffisantes
+    console.warn('Accès refusé (403):', url);
+    let errorMessage = 'Accès refusé - Vous n\'avez pas les permissions nécessaires';
+    try {
+      const errorData = await response.clone().json();
+      errorMessage = errorData.detail || errorData.message || errorMessage;
+    } catch {
+      // Ignore JSON parse errors
+    }
+    emitForbiddenError(url, errorMessage);
   }
 
   return response;
@@ -91,12 +125,15 @@ export interface SiteGeoJSON {
   properties: {
     nom_site: string
     code_site: string
-    client: number
+    client?: number
     client_nom?: string
+    structure_client?: number
+    structure_client_nom?: string
     superviseur?: number
     superviseur_nom?: string
     adresse?: string
     superficie_totale?: number
+    superficie_calculee?: number
     actif: boolean
     date_debut_contrat?: string
     date_fin_contrat?: string
@@ -129,6 +166,8 @@ export interface SiteFrontend {
   code_site?: string
   client?: number
   client_nom?: string
+  structure_client?: number
+  structure_client_nom?: string
   superviseur?: number
   superviseur_nom?: string
   adresse?: string
@@ -237,6 +276,8 @@ function transformSiteToFrontend(site: SiteGeoJSON, index: number): SiteFrontend
     code_site: site.properties.code_site,
     client: site.properties.client,
     client_nom: site.properties.client_nom,
+    structure_client: site.properties.structure_client,
+    structure_client_nom: site.properties.structure_client_nom,
     superviseur: site.properties.superviseur,
     superviseur_nom: site.properties.superviseur_nom,
     adresse: site.properties.adresse,
@@ -251,21 +292,10 @@ function transformSiteToFrontend(site: SiteGeoJSON, index: number): SiteFrontend
 
 /**
  * Charge tous les sites depuis l'API et les transforme en format frontend
- * Utilise Dexie (IndexedDB) avec cache de 15 minutes
  * Le backend filtre automatiquement selon les permissions de l'utilisateur
  */
-export async function fetchAllSites(forceRefresh = false): Promise<SiteFrontend[]> {
-  // Vérifier le cache Dexie
-  if (!forceRefresh) {
-    const cached = await db.get<SiteFrontend[]>(cacheKeys.sites());
-    if (cached) {
-      logger.info(`[Cache HIT] Sites depuis Dexie: ${cached.length}`);
-      return cached;
-    }
-  }
-
+export async function fetchAllSites(): Promise<SiteFrontend[]> {
   try {
-    logger.info('[Cache MISS] Sites - Appel API');
     // Charger depuis l'API (filtré automatiquement par permissions)
     const allSites: SiteGeoJSON[] = []
     let page = 1
@@ -292,26 +322,17 @@ export async function fetchAllSites(forceRefresh = false): Promise<SiteFrontend[
 
     const transformedSites = allSites.map((site, index) => transformSiteToFrontend(site, index))
 
-    // Sauvegarder dans le cache Dexie
-    await db.set(cacheKeys.sites(), transformedSites, cacheTTL.standard);
-
     logger.info(`Sites chargés depuis API: ${transformedSites.length}`);
     return transformedSites
 
   } catch (error) {
     logger.error('Erreur fetchAllSites:', error)
-    // Fallback: retourner le cache même expiré
-    const cached = await db.get<SiteFrontend[]>(cacheKeys.sites());
-    if (cached) {
-      logger.warn('[Fallback] Utilisation du cache expiré suite à une erreur API');
-      return cached;
-    }
     throw error
   }
 }
 
 /**
- * Recherche un site par ID (utilise le cache)
+ * Recherche un site par ID
  */
 export async function getSiteById(id: string): Promise<SiteFrontend | undefined> {
   const sites = await fetchAllSites()
@@ -319,7 +340,7 @@ export async function getSiteById(id: string): Promise<SiteFrontend | undefined>
 }
 
 /**
- * Recherche des sites par catégorie (utilise le cache)
+ * Recherche des sites par catégorie
  */
 export async function getSitesByCategory(category: SiteFrontend['category']): Promise<SiteFrontend[]> {
   const sites = await fetchAllSites()
@@ -340,15 +361,6 @@ export async function searchSites(query: string): Promise<SiteFrontend[]> {
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     return searchText.includes(normalizedQuery)
   })
-}
-
-/**
- * Vide le cache des sites (utile après une modification)
- */
-export async function clearSitesCache() {
-  await db.invalidatePrefix(cacheKeys.prefixes.sites);
-  await db.remove(cacheKeys.sites());
-  logger.info('[Cache] Sites cache cleared');
 }
 
 // Anciennes fonctions conservées pour compatibilité
@@ -490,6 +502,7 @@ export interface UpdateSiteData {
   nom_site?: string
   code_site?: string
   client?: number
+  structure_client?: number | null
   superviseur?: number | null
   adresse?: string
   superficie_totale?: number | null
@@ -514,9 +527,6 @@ export async function updateSite(id: number, data: UpdateSiteData): Promise<Site
 
     const result = await handleResponse<any>(response)
 
-    // Invalidate sites cache
-    await clearSitesCache();
-
     // Transform to SiteFrontend format
     const coords = result.geometry?.coordinates?.[0]?.[0] || [0, 0]
     return {
@@ -529,6 +539,8 @@ export async function updateSite(id: number, data: UpdateSiteData): Promise<Site
       code_site: result.properties?.code_site,
       client: result.properties?.client,
       client_nom: result.properties?.client_nom,
+      structure_client: result.properties?.structure_client,
+      structure_client_nom: result.properties?.structure_client_nom,
       superviseur: result.properties?.superviseur,
       superviseur_nom: result.properties?.superviseur_nom,
       adresse: result.properties?.adresse,
@@ -552,9 +564,6 @@ export async function deleteSite(id: number): Promise<void> {
     if (!response.ok && response.status !== 204) {
       throw new Error('Erreur lors de la suppression du site')
     }
-
-    // Invalidate sites cache
-    await clearSitesCache();
   } catch (error) {
     logger.error('Erreur deleteSite:', error)
     throw error
@@ -800,11 +809,11 @@ export async function fetchStatistics(): Promise<Statistics> {
 // ==============================================================================
 
 export interface ExportPDFRequest {
-  title: string
   mapImageBase64: string
   visibleLayers: Record<string, boolean>
   center: [number, number]  // [lng, lat]
   zoom: number
+  siteNames?: string[]  // Optional: Names of visible sites
 }
 
 export async function exportPDF(data: ExportPDFRequest): Promise<Blob> {

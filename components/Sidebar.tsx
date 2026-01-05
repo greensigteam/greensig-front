@@ -26,9 +26,11 @@ const viewToPath: Record<string, string> = {
   PLANNING: '/planning',
   RATIOS: '/ratios',
   INTERVENTIONS: '/reclamations',
-  CLAIMS: '/claims',
+  CLAIMS: '/suivi-taches',
   TEAMS: '/teams',
   REPORTING: '/reporting',
+  MONTHLY_REPORT: '/monthly-report',
+  WEEKLY_REPORT: '/weekly-report',
   CLIENT_PORTAL: '/client',
   USERS: '/users',
   PARAMETRES: '/parametres',
@@ -36,7 +38,8 @@ const viewToPath: Record<string, string> = {
   CLIENT_MAP: '/map', // CLIENT accède directement à la carte principale
   CLIENT_CLAIMS: '/reclamations',
   CLIENT_PLANNING: '/planning',
-  CLIENT_INTERVENTIONS: '/claims',
+  CLIENT_INTERVENTIONS: '/suivi-taches',
+  CLIENT_TEAMS: '/teams',
 };
 
 interface MenuItem {
@@ -82,23 +85,22 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'DASHBOARD', label: 'Tableau de bord', icon: LayoutDashboard, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'MAP', label: 'Cartographie', icon: MapIcon, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['ADMIN', 'SUPERVISEUR'] },
-    { id: 'SITES', label: 'Gestion des sites', icon: MapPin, roles: ['ADMIN'] },
+    { id: 'SITES', label: 'Gestion des sites', icon: MapPin, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'CLIENTS', label: 'Clients', icon: Users, roles: ['ADMIN'] },
     { id: 'PRODUCTS', label: 'Gestion de produits', icon: Package, roles: ['ADMIN'] },
     { id: 'PLANNING', label: 'Planification', icon: Calendar, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'INTERVENTIONS', label: 'Réclamations', icon: AlertCircle, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'CLAIMS', label: 'Suivi des Tâches', icon: ClipboardList, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'TEAMS', label: 'RH', icon: Users, roles: ['ADMIN', 'SUPERVISEUR'] },
-    { id: 'REPORTING', label: 'Rapports', icon: BarChart3, roles: ['ADMIN'] },
+    { id: 'REPORTING', label: 'Rapports', icon: BarChart3, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'PARAMETRES', label: 'Paramètres', icon: Settings, roles: ['ADMIN'] },
-    // Client specific menu items
+    // Client specific menu items (accès limité - lecture seule via backend filtering)
     { id: 'CLIENT_MAP', label: 'Carte', icon: MapIcon, roles: ['CLIENT'] },
-    { id: 'SITES', label: 'Mes sites', icon: MapPin, roles: ['CLIENT'] },
     { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['CLIENT'] },
     { id: 'CLIENT_CLAIMS', label: 'Réclamations', icon: AlertCircle, roles: ['CLIENT'] },
+    { id: 'CLIENT_INTERVENTIONS', label: 'Suivi des Tâches', icon: ClipboardList, roles: ['CLIENT'] },
     { id: 'CLIENT_PLANNING', label: 'Planning', icon: Calendar, roles: ['CLIENT'] },
-    { id: 'CLIENT_INTERVENTIONS', label: 'Interventions', icon: ClipboardList, roles: ['CLIENT'] },
-    { id: 'TEAMS', label: 'RH', icon: Users, roles: ['CLIENT'] },
+    { id: 'CLIENT_TEAMS', label: 'Équipes', icon: Users, roles: ['CLIENT'] },
   ];
 
   // Filter entries based on role

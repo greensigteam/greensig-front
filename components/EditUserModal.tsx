@@ -90,7 +90,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
   }, []);
 
   const clientData = clients.find(c => c.utilisateur === user.id);
-  const initialOperateur = operateurs.find(o => o.utilisateur === user.id) || null;
+  const initialOperateur = operateurs.find(o => o.id === user.id) || null;
   const [operateurInfo, setOperateurInfo] = useState<OperateurList | null>(initialOperateur);
 
   const [allCompetences, setAllCompetences] = useState<Competence[]>([]);
@@ -105,7 +105,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
         const all = await fetchCompetences();
         setAllCompetences(all);
         if (operateurInfo) {
-          const opComps = await fetchCompetencesOperateur(operateurInfo.utilisateur);
+          const opComps = await fetchCompetencesOperateur(operateurInfo.id);
           setOperateurCompetences(opComps);
         } else {
           setOperateurCompetences([]);
@@ -156,7 +156,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
             numeroImmatriculation: operateurFields.numeroImmatriculation,
             telephone: operateurFields.telephone
           };
-          await updateOperateur(operateurInfo.utilisateur, operateurUpdate);
+          await updateOperateur(operateurInfo.id, operateurUpdate);
         } else {
           // try to create operateur profile
           try {
@@ -362,7 +362,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
                     });
                     setOperateurInfo(created as OperateurList);
                     try {
-                      const refreshed = await fetchCompetencesOperateur((created as OperateurList).utilisateur);
+                      const refreshed = await fetchCompetencesOperateur((created as OperateurList).id);
                       setOperateurCompetences(refreshed);
                     } catch (e) {
                       // ignore
@@ -456,11 +456,11 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
                   onClick={async () => {
                     if (!operateurInfo || !newCompetenceId || !newCompetenceNiveau) return;
                     try {
-                      await affecterCompetence(operateurInfo.utilisateur, {
+                      await affecterCompetence(operateurInfo.id, {
                         competenceId: Number(newCompetenceId),
                         niveau: newCompetenceNiveau as any
                       });
-                      const refreshed = await fetchCompetencesOperateur(operateurInfo.utilisateur);
+                      const refreshed = await fetchCompetencesOperateur(operateurInfo.id);
                       setOperateurCompetences(refreshed);
                       setNewCompetenceId('');
                       setNewCompetenceNiveau('');

@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, X, MapPin, Calendar, FileText, Leaf, Droplet, AlertCircle, ClipboardList, Trash2, Map as MapIcon, Ban, Plus, RefreshCw, Activity, Sprout, Wrench, ChevronDown, Check, Printer, Download } from 'lucide-react';
+import { Filter, X, MapPin, FileText, Leaf, Droplet, AlertCircle, ClipboardList, Map as MapIcon, Ban, Activity, Sprout, Wrench, ChevronDown, Check, Printer, Download } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
 import { MOCK_INVENTORY, InventoryItem } from '../services/mockData';
-import { fetchInventory, ApiError, type InventoryResponse, type InventoryFilters, fetchAllSites, type SiteFrontend, fetchFilterOptions, exportData, exportInventoryExcel, exportInventoryPDF, downloadBlob } from '../services/api';
+import { fetchInventory, ApiError, type InventoryResponse, fetchAllSites, type SiteFrontend, fetchFilterOptions, exportInventoryExcel, exportInventoryPDF, downloadBlob } from '../services/api';
 import { planningService } from '../services/planningService';
 import { fetchEquipes } from '../services/usersApi';
 import TaskFormModal, { InventoryObjectOption } from '../components/planning/TaskFormModal';
@@ -13,6 +13,11 @@ import { EquipeList } from '../types/users';
 import { useToast } from '../contexts/ToastContext';
 import { useSearch } from '../contexts/SearchContext';
 import LoadingScreen from '../components/LoadingScreen';
+import { User } from '../types';
+
+interface InventoryProps {
+  user: User;
+} 
 
 // Types de végétation et hydrologie pour les filtres
 const VEGETATION_TYPES = ['Arbre', 'Palmier', 'Gazon', 'Arbuste', 'Vivace', 'Cactus', 'Graminee'];
@@ -87,19 +92,19 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, options, i
     <div className={`relative ${className}`} ref={containerRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between bg-white border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm hover:border-gray-400 ${isOpen ? 'ring-2 ring-emerald-500/20 border-emerald-500' : ''}`}
+        className={`w-full flex items-center justify-between bg-white border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm hover:border-slate-400 ${isOpen ? 'ring-2 ring-emerald-500/20 border-emerald-500' : ''}`}
       >
         <div className="flex items-center gap-2 truncate">
-          {icon && <span className="text-gray-500 flex-shrink-0">{icon}</span>}
-          <span className={`truncate ${value === 'all' ? 'text-gray-600' : 'text-gray-900 font-medium'}`}>
+          {icon && <span className="text-slate-500 flex-shrink-0">{icon}</span>}
+          <span className={`truncate ${value === 'all' ? 'text-slate-600' : 'text-slate-900 font-medium'}`}>
             {selectedLabel}
           </span>
         </div>
-        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ml-2 ${isOpen ? 'transform rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 flex-shrink-0 ml-2 ${isOpen ? 'transform rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-auto animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-auto animate-in fade-in zoom-in-95 duration-100">
           <div className="py-1">
             {options.map((option) => (
               <button
@@ -108,7 +113,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, options, i
                   onChange(option.value);
                   setIsOpen(false);
                 }}
-                className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between hover:bg-gray-50 transition-colors ${value === option.value ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-gray-700'}`}
+                className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between hover:bg-slate-50 transition-colors ${value === option.value ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-slate-700'}`}
               >
                 <span className="truncate">{option.label}</span>
                 {value === option.value && <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />}
@@ -140,7 +145,7 @@ const ExportDropdown = ({ onExportCSV, onExportExcel, onPrint }: { onExportCSV: 
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
       >
         <Download className="w-4 h-4" />
         <span>Exporter</span>
@@ -148,28 +153,28 @@ const ExportDropdown = ({ onExportCSV, onExportExcel, onPrint }: { onExportCSV: 
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-50 py-1 animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-100 z-50 py-1 animate-in fade-in zoom-in-95 duration-100">
           <button
             onClick={() => { onExportCSV(); setIsOpen(false); }}
-            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
           >
             <FileText className="w-4 h-4 text-emerald-600" />
             CSV
           </button>
           <button
             onClick={() => { onExportExcel(); setIsOpen(false); }}
-            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
           >
             <FileText className="w-4 h-4 text-green-600" />
             Excel (XLSX)
           </button>
-          <div className="border-t border-gray-100 my-1"></div>
+          <div className="border-t border-slate-100 my-1"></div>
           <button
             onClick={() => { onPrint(); setIsOpen(false); }}
-            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
           >
-            <Printer className="w-4 h-4 text-gray-500" />
-            Imprimer
+            <Printer className="w-4 h-4 text-slate-500" />
+            Export en PDF
           </button>
         </div>
       )}
@@ -178,8 +183,9 @@ const ExportDropdown = ({ onExportCSV, onExportExcel, onPrint }: { onExportCSV: 
 };
 
 // Main Inventory Component
-const Inventory: React.FC = () => {
+const Inventory: React.FC<InventoryProps> = ({ user }) => {
   const navigate = useNavigate();
+  const isClient = user.role === 'CLIENT';
   const { showToast } = useToast();
   const { searchQuery, setPlaceholder } = useSearch();
 
@@ -198,14 +204,12 @@ const Inventory: React.FC = () => {
   const [isTaskCompatible, setIsTaskCompatible] = useState(true);
   const [compatibilityLoading, setCompatibilityLoading] = useState(false);
   const [applicableTasksCount, setApplicableTasksCount] = useState<number | null>(null);
-  const [incompatibleTypesMessage, setIncompatibleTypesMessage] = useState<string | null>(null);
 
   // Task modal state
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
   const [modalEquipes, setModalEquipes] = useState<EquipeList[]>([]);
   const [modalTypesTaches, setModalTypesTaches] = useState<TypeTache[]>([]);
-  const [taskSubmitting, setTaskSubmitting] = useState(false);
 
   // ✅ Advanced Filters - Restore from sessionStorage
   const [filters, setFilters] = useState(
@@ -505,7 +509,7 @@ const Inventory: React.FC = () => {
     if (selectedItemsCache.size === 0) {
       setIsTaskCompatible(true);
       setApplicableTasksCount(null);
-      setIncompatibleTypesMessage(null);
+      setApplicableTasksCount(null);
       return;
     }
 
@@ -522,13 +526,12 @@ const Inventory: React.FC = () => {
     if (uniqueTypes.length <= 1) {
       setIsTaskCompatible(true);
       setApplicableTasksCount(null);
-      setIncompatibleTypesMessage(null);
+      setApplicableTasksCount(null);
       return;
     }
 
     // Check compatibility with API
     setCompatibilityLoading(true);
-    setIncompatibleTypesMessage(null);
 
     planningService.getApplicableTypesTaches(uniqueTypes)
       .then(result => {
@@ -536,9 +539,7 @@ const Inventory: React.FC = () => {
         setApplicableTasksCount(result.types_taches.length);
 
         if (result.types_taches.length === 0) {
-          setIncompatibleTypesMessage(
-            `Les types sélectionnés (${uniqueTypes.join(', ')}) n'ont aucune tâche en commun.`
-          );
+          // No common tasks
         }
       })
       .catch(err => {
@@ -554,10 +555,10 @@ const Inventory: React.FC = () => {
       id: parseInt(item.id, 10),
       type: item.type.charAt(0).toUpperCase() + item.type.slice(1),
       nom: item.name,
-      site: item.siteId,
+      site: sites.find(s => s.id === item.siteId)?.name || String(item.siteId),
       soussite: item.zone
     }));
-  }, [selectedItemsCache]);
+  }, [selectedItemsCache, sites]);
 
   // Open task creation modal - fetch required data first
   const handleOpenTaskModal = async () => {
@@ -589,7 +590,6 @@ const Inventory: React.FC = () => {
 
   // Handle task creation from modal
   const handleTaskSubmit = async (data: TacheCreate) => {
-    setTaskSubmitting(true);
     try {
       await planningService.createTache(data);
       showToast('Tâche créée avec succès', 'success');
@@ -605,7 +605,7 @@ const Inventory: React.FC = () => {
       console.error('Erreur création tâche:', error);
       showToast('Erreur lors de la création de la tâche', 'error');
     } finally {
-      setTaskSubmitting(false);
+      // Done processing
     }
   };
 
@@ -879,9 +879,14 @@ const Inventory: React.FC = () => {
       const filename = `inventaire_${new Date().toISOString().split('T')[0]}.xlsx`;
       downloadBlob(blob, filename);
       showToast("Export Excel réussi", "success");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erreur export Excel:", error);
-      showToast("Erreur lors de l'export Excel", "error");
+      // 404 = pas de données à exporter
+      if (error?.status === 404) {
+        showToast("Aucune donnée à exporter", "info");
+      } else {
+        showToast("Erreur lors de l'export Excel", "error");
+      }
     }
   };
 
@@ -924,9 +929,14 @@ const Inventory: React.FC = () => {
       const filename = `inventaire_${new Date().toISOString().split('T')[0]}.pdf`;
       downloadBlob(blob, filename);
       showToast("Export PDF réussi", "success");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erreur export PDF:", error);
-      showToast("Erreur lors de l'export PDF", "error");
+      // 404 = pas de données à exporter
+      if (error?.status === 404) {
+        showToast("Aucune donnée à exporter", "info");
+      } else {
+        showToast("Erreur lors de l'export PDF", "error");
+      }
     }
   };
 
@@ -985,14 +995,14 @@ const Inventory: React.FC = () => {
       `}</style>
 
       {/* Toolbar */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex-shrink-0 no-print">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex-shrink-0 no-print">
         {/* Left: Main Tabs */}
-        <div className="flex items-center bg-gray-100 p-1 rounded-lg">
+        <div className="flex items-center bg-slate-100 p-1 rounded-lg">
           <button
             onClick={() => setMainTab('tous')}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${mainTab === 'tous'
               ? 'bg-white text-emerald-700 shadow-sm'
-              : 'text-gray-500 hover:text-gray-700'
+              : 'text-slate-500 hover:text-slate-700'
               }`}
           >
             <FileText className="w-4 h-4" />
@@ -1002,7 +1012,7 @@ const Inventory: React.FC = () => {
             onClick={() => setMainTab('vegetation')}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${mainTab === 'vegetation'
               ? 'bg-white text-emerald-700 shadow-sm'
-              : 'text-gray-500 hover:text-gray-700'
+              : 'text-slate-500 hover:text-slate-700'
               }`}
           >
             <Leaf className="w-4 h-4" />
@@ -1012,7 +1022,7 @@ const Inventory: React.FC = () => {
             onClick={() => setMainTab('hydraulique')}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${mainTab === 'hydraulique'
               ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-gray-500 hover:text-gray-700'
+              : 'text-slate-500 hover:text-slate-700'
               }`}
           >
             <Droplet className="w-4 h-4" />
@@ -1027,7 +1037,7 @@ const Inventory: React.FC = () => {
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${showFilters || hasActiveFilters
               ? 'bg-emerald-50 border-emerald-600 text-emerald-700'
-              : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+              : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
               }`}
           >
             <Filter className="w-4 h-4" />
@@ -1040,7 +1050,7 @@ const Inventory: React.FC = () => {
           </button>
 
           {/* Export Dropdown */}
-          <ExportDropdown 
+          <ExportDropdown
             onExportCSV={handleExportCSV}
             onExportExcel={handleExportExcel}
             onPrint={handlePrint}
@@ -1050,7 +1060,7 @@ const Inventory: React.FC = () => {
 
       {/* Filters Panel */}
       {showFilters && (
-        <div className="mb-6 pb-4 border-b border-gray-200 bg-gray-50 p-4 rounded-lg flex-shrink-0 no-print">
+        <div className="mb-6 pb-4 border-b border-slate-200 bg-slate-50 p-4 rounded-lg flex-shrink-0 no-print">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Site Filter */}
             <CustomSelect
@@ -1077,16 +1087,18 @@ const Inventory: React.FC = () => {
               icon={<Activity className="w-4 h-4" />}
             />
 
-            {/* Family Filter */}
-            <CustomSelect
-              value={filters.family}
-              onChange={(val) => setFilters({ ...filters, family: val })}
-              options={[
-                { value: 'all', label: 'Famille: Toutes' },
-                ...families.map(f => ({ value: f, label: f }))
-              ]}
-              icon={<Sprout className="w-4 h-4" />}
-            />
+            {/* Family Filter - Only for vegetation */}
+            {mainTab !== 'hydraulique' && (
+              <CustomSelect
+                value={filters.family}
+                onChange={(val) => setFilters({ ...filters, family: val })}
+                options={[
+                  { value: 'all', label: 'Famille: Toutes' },
+                  ...families.map(f => ({ value: f, label: f }))
+                ]}
+                icon={<Sprout className="w-4 h-4" />}
+              />
+            )}
 
             {/* Maintenance Filter */}
             <CustomSelect
@@ -1101,7 +1113,7 @@ const Inventory: React.FC = () => {
               icon={<Wrench className="w-4 h-4" />}
             />
           </div>
-          
+
           {/* Reset Button */}
           {hasActiveFilters && (
             <div className="mt-4 flex justify-end">
@@ -1128,12 +1140,12 @@ const Inventory: React.FC = () => {
       )}
 
       {/* Type Filter Tabs (Secondary) */}
-      <div className="mb-6 flex gap-2 overflow-x-auto pb-2 border-b border-gray-200 flex-shrink-0 no-print">
+      <div className="mb-6 flex gap-2 overflow-x-auto pb-2 border-b border-slate-200 flex-shrink-0 no-print">
         <button
           onClick={() => setFilters({ ...filters, type: 'all' })}
           className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all ${filters.type === 'all'
             ? 'bg-emerald-600 text-white shadow-md'
-            : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+            : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
         >
           Tous
@@ -1144,7 +1156,7 @@ const Inventory: React.FC = () => {
             onClick={() => setFilters({ ...filters, type })}
             className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all ${filters.type === type
               ? 'bg-emerald-600 text-white shadow-md'
-              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
               }`}
           >
             {type}
@@ -1168,7 +1180,7 @@ const Inventory: React.FC = () => {
               <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
               <h3 className="text-lg font-semibold text-red-800 mb-2">Erreur de chargement</h3>
               <p className="text-red-600 mb-4">{apiError}</p>
-              <p className="text-sm text-gray-600">Vérifiez que le serveur Django est démarré.</p>
+              <p className="text-sm text-slate-600">Vérifiez que le serveur Django est démarré.</p>
             </div>
           </div>
         )}
@@ -1197,13 +1209,13 @@ const Inventory: React.FC = () => {
       {/* Floating Action Bar when items are selected */}
       {selectedItemsCache.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-[95vw] no-print">
-          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 px-4 py-3 flex items-center gap-4">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 px-4 py-3 flex items-center gap-4">
             {/* Selection count */}
             <div className="flex items-center gap-2 flex-shrink-0">
               <span className="bg-emerald-100 text-emerald-700 font-bold px-2.5 py-0.5 rounded-full text-sm">
                 {selectedItemsCache.size}
               </span>
-              <span className="text-gray-600 text-sm whitespace-nowrap">
+              <span className="text-slate-600 text-sm whitespace-nowrap">
                 sélectionné{selectedItemsCache.size > 1 ? 's' : ''}
               </span>
               {/* Show selected types - compact */}
@@ -1211,7 +1223,7 @@ const Inventory: React.FC = () => {
                 {[...new Set(Array.from(selectedItemsCache.values()).map(item => item.type))].map(type => (
                   <span
                     key={type}
-                    className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded capitalize"
+                    className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-xs rounded capitalize"
                   >
                     {type}
                   </span>
@@ -1220,18 +1232,18 @@ const Inventory: React.FC = () => {
             </div>
 
             {/* Divider */}
-            <div className="h-6 w-px bg-gray-200 flex-shrink-0"></div>
+            <div className="h-6 w-px bg-slate-200 flex-shrink-0"></div>
 
-            {/* Incompatibility warning - compact */}
-            {!isTaskCompatible && !compatibilityLoading && (
+            {/* Incompatibility warning - compact (hidden for clients) */}
+            {!isClient && !isTaskCompatible && !compatibilityLoading && (
               <div className="flex items-center gap-1.5 px-2 py-1 bg-red-50 border border-red-200 rounded-lg flex-shrink-0">
                 <Ban className="w-3.5 h-3.5 text-red-500" />
                 <span className="text-xs text-red-700 whitespace-nowrap">Types incompatibles</span>
               </div>
             )}
 
-            {/* Compatibility info - compact */}
-            {isTaskCompatible && applicableTasksCount !== null && !compatibilityLoading && (
+            {/* Compatibility info - compact (hidden for clients) */}
+            {!isClient && isTaskCompatible && applicableTasksCount !== null && !compatibilityLoading && (
               <div className="flex items-center gap-1 px-2 py-1 bg-emerald-50 border border-emerald-200 rounded-lg flex-shrink-0">
                 <span className="text-xs text-emerald-700 whitespace-nowrap">
                   ✓ {applicableTasksCount} tâche{applicableTasksCount > 1 ? 's' : ''}
@@ -1247,7 +1259,7 @@ const Inventory: React.FC = () => {
                   setSelectedIds(new Set());
                   setSelectedItemsCache(new Map());
                 }}
-                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
                 title="Effacer la sélection"
               >
                 <X className="w-4 h-4" />
@@ -1282,25 +1294,26 @@ const Inventory: React.FC = () => {
                 Carte
               </button>
 
-              {/* Create task */}
-              <button
-                onClick={handleOpenTaskModal}
-                disabled={!isTaskCompatible || compatibilityLoading || modalLoading}
-                className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 text-sm font-medium shadow-sm whitespace-nowrap ${
-                  !isTaskCompatible || compatibilityLoading || modalLoading
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              {/* Create task - Hidden for clients */}
+              {!isClient && (
+                <button
+                  onClick={handleOpenTaskModal}
+                  disabled={!isTaskCompatible || compatibilityLoading || modalLoading}
+                  className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 text-sm font-medium shadow-sm whitespace-nowrap ${!isTaskCompatible || compatibilityLoading || modalLoading
+                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
                     : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                }`}
-              >
-                {compatibilityLoading || modalLoading ? (
-                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <ClipboardList className="w-4 h-4" />
-                    Tâche
-                  </>
-                )}
-              </button>
+                    }`}
+                >
+                  {compatibilityLoading || modalLoading ? (
+                    <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <ClipboardList className="w-4 h-4" />
+                      Tâche
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1316,6 +1329,7 @@ const Inventory: React.FC = () => {
           onSubmit={handleTaskSubmit}
         />
       )}
+
     </div>
   );
 };

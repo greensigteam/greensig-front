@@ -18,12 +18,14 @@ import {
   FolderInput,
   FileOutput,
   AlertTriangle,
-  MapPin,
   Target,
+  Lock,
 } from 'lucide-react';
 import { Measurement, MeasurementType, DrawingMode } from '../../types';
 import { useDrawing, getObjectTypesByGeometry } from '../../contexts/DrawingContext';
 import ObjectTypeSelector from './ObjectTypeSelector';
+import { fetchCurrentUser } from '../../services/usersApi';
+import { Utilisateur } from '../../types/users';
 
 // Type for reclamation drawing mode (subset of DrawingMode)
 export type ReportDrawingMode = 'none' | 'point' | 'circle' | 'polygon';
@@ -96,6 +98,11 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
   const [showDrawingTools, setShowDrawingTools] = useState(false);
   const [showTypeSelector, setShowTypeSelector] = useState(false);
   const [pendingDrawingMode, setPendingDrawingMode] = useState<DrawingMode | null>(null);
+  const [currentUser, setCurrentUser] = useState<Utilisateur | null>(null);
+
+  React.useEffect(() => {
+    fetchCurrentUser().then(setCurrentUser).catch(console.error);
+  }, []);
 
   // Drawing context
   const {
@@ -233,16 +240,18 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
 
         <div className="h-px bg-slate-100 w-full" />
 
-        {/* Drawing Tools Toggle */}
-        <button
-          onClick={toggleDrawingTools}
-          className={`p-3 transition-colors ${showDrawingTools || isDrawingActive ? 'bg-emerald-600 text-white' : 'hover:bg-slate-50 text-slate-600'}`}
-          title="Outils de dessin"
-        >
-          <Pencil className="w-5 h-5" />
-        </button>
+        {/* Drawing Tools Toggle - Hidden for Clients */}
+        {!currentUser?.roles?.includes('CLIENT') && (
+          <button
+            onClick={toggleDrawingTools}
+            className={`p-3 transition-colors ${showDrawingTools || isDrawingActive ? 'bg-emerald-600 text-white' : 'hover:bg-slate-50 text-slate-600'}`}
+            title="Outils de dessin"
+          >
+            <Pencil className="w-5 h-5" />
+          </button>
+        )}
 
-        <div className="h-px bg-slate-100 w-full" />
+        {(!currentUser?.roles?.includes('CLIENT')) && <div className="h-px bg-slate-100 w-full" />}
 
         {/* Measurement Toggle */}
         <button
@@ -319,11 +328,10 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
           <div className="flex gap-1 bg-slate-50 rounded-lg p-1 mb-3">
             <button
               onClick={() => onStartReportDrawing('point')}
-              className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${
-                reportDrawingMode === 'point'
-                  ? 'bg-orange-500 text-white shadow-md'
-                  : 'hover:bg-white text-slate-600 hover:shadow-sm'
-              }`}
+              className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${reportDrawingMode === 'point'
+                ? 'bg-orange-500 text-white shadow-md'
+                : 'hover:bg-white text-slate-600 hover:shadow-sm'
+                }`}
               title="Pointer un lieu précis"
             >
               <Target className="w-4 h-4" />
@@ -331,11 +339,10 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
             </button>
             <button
               onClick={() => onStartReportDrawing('circle')}
-              className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${
-                reportDrawingMode === 'circle'
-                  ? 'bg-orange-500 text-white shadow-md'
-                  : 'hover:bg-white text-slate-600 hover:shadow-sm'
-              }`}
+              className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${reportDrawingMode === 'circle'
+                ? 'bg-orange-500 text-white shadow-md'
+                : 'hover:bg-white text-slate-600 hover:shadow-sm'
+                }`}
               title="Dessiner un cercle"
             >
               <Circle className="w-4 h-4" />
@@ -343,11 +350,10 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
             </button>
             <button
               onClick={() => onStartReportDrawing('polygon')}
-              className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${
-                reportDrawingMode === 'polygon'
-                  ? 'bg-orange-500 text-white shadow-md'
-                  : 'hover:bg-white text-slate-600 hover:shadow-sm'
-              }`}
+              className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${reportDrawingMode === 'polygon'
+                ? 'bg-orange-500 text-white shadow-md'
+                : 'hover:bg-white text-slate-600 hover:shadow-sm'
+                }`}
               title="Dessiner une zone libre"
             >
               <Pentagon className="w-4 h-4" />
@@ -379,7 +385,7 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
             <ObjectTypeSelector
               geometryType={
                 pendingDrawingMode === 'point' ? 'Point' :
-                pendingDrawingMode === 'line' ? 'LineString' : 'Polygon'
+                  pendingDrawingMode === 'line' ? 'LineString' : 'Polygon'
               }
               onSelect={handleTypeSelect}
               onClose={() => {
@@ -394,11 +400,10 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
             <div className="flex gap-1 bg-slate-50 rounded-lg p-1">
               <button
                 onClick={() => handleDrawingModeClick('point')}
-                className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${
-                  drawingMode === 'point'
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'hover:bg-white text-slate-600 hover:shadow-sm'
-                }`}
+                className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${drawingMode === 'point'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'hover:bg-white text-slate-600 hover:shadow-sm'
+                  }`}
                 title="Dessiner un point"
               >
                 <Circle className="w-4 h-4" />
@@ -406,11 +411,10 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
               </button>
               <button
                 onClick={() => handleDrawingModeClick('line')}
-                className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${
-                  drawingMode === 'line'
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'hover:bg-white text-slate-600 hover:shadow-sm'
-                }`}
+                className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${drawingMode === 'line'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'hover:bg-white text-slate-600 hover:shadow-sm'
+                  }`}
                 title="Dessiner une ligne"
               >
                 <Minus className="w-4 h-4" />
@@ -418,11 +422,10 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
               </button>
               <button
                 onClick={() => handleDrawingModeClick('polygon')}
-                className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${
-                  drawingMode === 'polygon'
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'hover:bg-white text-slate-600 hover:shadow-sm'
-                }`}
+                className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${drawingMode === 'polygon'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'hover:bg-white text-slate-600 hover:shadow-sm'
+                  }`}
                 title="Dessiner un polygone"
               >
                 <Pentagon className="w-4 h-4" />
@@ -432,26 +435,39 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
           </div>
 
           <div className="mb-3">
-            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Données</div>
-            <div className="flex gap-2">
-              <button
-                onClick={onImport}
-                className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 bg-slate-50 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 rounded-lg transition-colors text-xs font-medium border border-transparent hover:border-emerald-200"
-                title="Importer des données"
-              >
-                <FolderInput className="w-3.5 h-3.5" />
-                Importer
-              </button>
-              <button
-                onClick={onExport}
-                className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 bg-slate-50 hover:bg-blue-50 hover:text-blue-700 text-slate-600 rounded-lg transition-colors text-xs font-medium border border-transparent hover:border-blue-200"
-                title="Exporter des données"
-              >
-                <FileOutput className="w-3.5 h-3.5" />
-                Exporter
-              </button>
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Données</div>
+              <div className="flex gap-2">
+                {/* Import button - disabled for CLIENT with tooltip (backend: CanImportData) */}
+                {(() => {
+                  const canImport = !currentUser?.roles?.includes('CLIENT');
+                  return (
+                    <button
+                      onClick={canImport ? onImport : undefined}
+                      className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium border ${
+                        canImport
+                          ? 'bg-slate-50 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 border-transparent hover:border-emerald-200 cursor-pointer'
+                          : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                      }`}
+                      title={canImport ? "Importer des données" : "Import réservé aux administrateurs et superviseurs"}
+                      aria-disabled={!canImport}
+                    >
+                      {!canImport && <Lock className="w-3 h-3" />}
+                      <FolderInput className="w-3.5 h-3.5" />
+                      Importer
+                    </button>
+                  );
+                })()}
+                {/* Export button - visible for all (backend: CanExportData allows all authenticated users) */}
+                <button
+                  onClick={onExport}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 bg-slate-50 hover:bg-blue-50 hover:text-blue-700 text-slate-600 rounded-lg transition-colors text-xs font-medium border border-transparent hover:border-blue-200"
+                  title="Exporter des données"
+                >
+                  <FileOutput className="w-3.5 h-3.5" />
+                  Exporter
+                </button>
+              </div>
             </div>
-          </div>
 
           <div className="mb-3">
             <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Historique</div>
@@ -459,11 +475,10 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
               <button
                 onClick={undo}
                 disabled={!canUndo}
-                className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium ${
-                  canUndo
-                    ? 'bg-slate-50 hover:bg-slate-100 text-slate-600'
-                    : 'bg-slate-50 text-slate-300 cursor-not-allowed'
-                }`}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium ${canUndo
+                  ? 'bg-slate-50 hover:bg-slate-100 text-slate-600'
+                  : 'bg-slate-50 text-slate-300 cursor-not-allowed'
+                  }`}
                 title="Annuler (Ctrl+Z)"
               >
                 <Undo2 className="w-3.5 h-3.5" />
@@ -472,11 +487,10 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
               <button
                 onClick={redo}
                 disabled={!canRedo}
-                className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium ${
-                  canRedo
-                    ? 'bg-slate-50 hover:bg-slate-100 text-slate-600'
-                    : 'bg-slate-50 text-slate-300 cursor-not-allowed'
-                }`}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium ${canRedo
+                  ? 'bg-slate-50 hover:bg-slate-100 text-slate-600'
+                  : 'bg-slate-50 text-slate-300 cursor-not-allowed'
+                  }`}
                 title="Rétablir (Ctrl+Y)"
               >
                 <Redo2 className="w-3.5 h-3.5" />

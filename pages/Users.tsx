@@ -1,10 +1,8 @@
 import {
   Utilisateur,
   Client,
-  OperateurList,
   UtilisateurUpdate,
   ClientUpdate,
-  OperateurUpdate,
   Role,
   NomRole,
   NOM_ROLE_LABELS
@@ -13,31 +11,32 @@ import {
   CreateAdminModal,
   CreateClientModal,
   CreateChefEquipeModal,
-  CreateOperateurModal,
   UserTypeMenu
 } from '../components/users/CreateUserModals';
-import { AdminDetailModal } from '../components/users/UserDetailModals';
+import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
+import { AdminDetailModal, ClientDetailModal, UserDetailModalSelector } from '../components/users/UserDetailModals';
 import React, { useState, useEffect } from 'react';
 import {
   Users as UsersIcon,
-  UserPlus,
   UserCheck,
   Shield,
   Building2,
-  Search,
   X,
   Edit2,
-  Trash2,
+  UserX,
   Mail,
   Award,
   Check,
   AlertCircle,
-  Save
+  Save,
+  MoreVertical,
+  Eye
 } from 'lucide-react';
 import { DataTable } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
 import { useNavigate } from 'react-router-dom';
 import LoadingScreen from '../components/LoadingScreen';
+import { useSearch } from '../contexts/SearchContext';
 
 // ...existing code...
 
@@ -49,11 +48,9 @@ import {
   updateUtilisateur,
   deleteUtilisateur,
   updateClient,
-  fetchOperateurById,
-  updateOperateur,
-  fetchOperateurs,
   attribuerRole,
-  retirerRole
+  retirerRole,
+  fetchClientByUserId
 } from '../services/usersApi';
 
 // ============================================================================
@@ -63,12 +60,11 @@ import {
 interface EditUserModalProps {
   user: Utilisateur;
   clients: Client[];
-  operateurs: OperateurList[];
   onClose: () => void;
   onUpdated: () => void;
 }
 
-const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs, onClose, onUpdated }) => {
+const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, onClose, onUpdated }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [roleLoading, setRoleLoading] = useState<string | null>(null);
@@ -76,6 +72,12 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
   const [userRoles, setUserRoles] = useState<NomRole[]>(user.roles);
   const [allRoles, setAllRoles] = useState<Role[]>([]);
   const [currentUserRoles, setCurrentUserRoles] = useState<NomRole[]>([]);
+  const [loadedClientData, setLoadedClientData] = useState<Client | null>(null);
+  const [clientDataLoading, setClientDataLoading] = useState(false);
+
+  // Trouver les donnees specifiques selon le type
+  const clientDataFromList = clients.find(c => c.utilisateur === user.id);
+  const clientData = loadedClientData || clientDataFromList;
 
   useEffect(() => {
     // Charger tous les rôles disponibles
@@ -88,6 +90,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
       }
     };
     fetchAllRoles();
+
     // Récupérer le profil utilisateur courant pour vérifier les permissions
     const fetchMe = async () => {
       try {
@@ -108,11 +111,33 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
       }
     };
     fetchMe();
-  }, []);
 
-  // Trouver les donnees specifiques selon le type
-  const clientData = clients.find(c => c.utilisateur === user.id);
-  const operateurData = operateurs.find(o => o.utilisateur === user.id);
+    // Si l'utilisateur est un CLIENT et les données ne sont pas dans la liste, les charger depuis l'API
+    if (user.roles.includes('CLIENT') && !clientDataFromList) {
+      const loadClientData = async () => {
+        setClientDataLoading(true);
+        try {
+          const data = await fetchClientByUserId(user.id);
+          if (data) {
+            setLoadedClientData(data);
+            // Mettre à jour les champs client avec les données chargées
+            setClientFields({
+              nomStructure: data.nomStructure || '',
+              adresse: data.adresse || '',
+              telephone: data.telephone || '',
+              contactPrincipal: data.contactPrincipal || '',
+              emailFacturation: data.emailFacturation || ''
+            });
+          }
+        } catch (err) {
+          console.error('Erreur chargement client:', err);
+        } finally {
+          setClientDataLoading(false);
+        }
+      };
+      loadClientData();
+    }
+  }, [user.id, user.roles, clientDataFromList]);
 
   // Champs communs
   const [formData, setFormData] = useState({
@@ -124,17 +149,11 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
 
   // Champs Client
   const [clientFields, setClientFields] = useState({
-    nomStructure: clientData?.nomStructure || '',
-    adresse: clientData?.adresse || '',
-    telephone: clientData?.telephone || '',
-    contactPrincipal: clientData?.contactPrincipal || '',
-    emailFacturation: clientData?.emailFacturation || ''
-  });
-
-  // Champs Operateur
-  const [operateurFields, setOperateurFields] = useState({
-    numeroImmatriculation: operateurData?.numeroImmatriculation || '',
-    telephone: operateurData?.telephone || ''
+    nomStructure: clientDataFromList?.nomStructure || '',
+    adresse: clientDataFromList?.adresse || '',
+    telephone: clientDataFromList?.telephone || '',
+    contactPrincipal: clientDataFromList?.contactPrincipal || '',
+    emailFacturation: clientDataFromList?.emailFacturation || ''
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -162,15 +181,6 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
           emailFacturation: clientFields.emailFacturation
         };
         await updateClient(clientData.utilisateur, clientUpdate);
-      } else if (user.roles && user.roles.includes('SUPERVISEUR') && operateurData) {
-        const operateurUpdate: OperateurUpdate = {
-          nom: formData.nom,
-          prenom: formData.prenom,
-          email: formData.email,
-          numeroImmatriculation: operateurFields.numeroImmatriculation,
-          telephone: operateurFields.telephone
-        };
-        await updateOperateur(operateurData.utilisateur, operateurUpdate);
       }
 
       onUpdated();
@@ -423,37 +433,6 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
               </>
             )}
 
-            {/* Champs specifiques Operateur */}
-            {user.roles.includes('SUPERVISEUR') && (
-              <>
-                <hr className="my-4" />
-                <h3 className="font-medium text-gray-900 flex items-center gap-2">
-                  <UserCheck className="w-4 h-4 text-gray-400" />
-                  Informations operateur
-                </h3>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Matricule</label>
-                    <input
-                      type="text"
-                      value={operateurFields.numeroImmatriculation}
-                      onChange={(e) => setOperateurFields({ ...operateurFields, numeroImmatriculation: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Telephone</label>
-                    <input
-                      type="tel"
-                      value={operateurFields.telephone}
-                      onChange={(e) => setOperateurFields({ ...operateurFields, telephone: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                    />
-                  </div>
-                </div>
-              </>
-            )}
           </div>
 
           <div className="p-6 border-t border-gray-200 flex gap-3">
@@ -497,15 +476,11 @@ interface StatCardProps {
 }
 
 const StatCard: React.FC<StatCardProps> = ({ icon, label, value, color }) => (
-  <div className="bg-white rounded-lg border border-gray-200 p-4">
-    <div className="flex items-center gap-3">
-      <div className={`p-2 rounded-lg ${color}`}>
-        {icon}
-      </div>
-      <div>
-        <p className="text-sm text-gray-500">{label}</p>
-        <p className="text-2xl font-bold text-gray-900">{value}</p>
-      </div>
+  <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+    <div className="text-sm font-medium text-slate-500 mb-1">{label}</div>
+    <div className="text-3xl font-bold text-slate-800">{value}</div>
+    <div className={`absolute top-4 right-4 p-2 rounded-lg ${color}`}>
+      {icon}
     </div>
   </div>
 );
@@ -514,27 +489,26 @@ const StatCard: React.FC<StatCardProps> = ({ icon, label, value, color }) => (
 // COMPOSANT PRINCIPAL - Users
 // ============================================================================
 
-type TabType = 'tous' | 'admins' | 'operateurs' | 'clients' | 'chefs';
+interface UsersProps {
+  triggerCreate?: number;
+}
 
-const Users: React.FC = () => {
+const Users: React.FC<UsersProps> = ({ triggerCreate }) => {
   const navigate = useNavigate();
+  const { searchQuery, setPlaceholder } = useSearch();
 
   // State
-  const [activeTab, setActiveTab] = useState<TabType>('tous');
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
 
   // Data
   const [utilisateurs, setUtilisateurs] = useState<Utilisateur[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
-  const [operateurs, setOperateurs] = useState<OperateurList[]>([]);
   const [stats, setStats] = useState<{
     total: number;
     actifs: number;
     admins: number;
-    operateurs: number;
     clients: number;
-    chefsEquipe: number;
+    superviseurs: number;
   } | null>(null);
 
   // Modals
@@ -542,9 +516,10 @@ const Users: React.FC = () => {
   const [showCreateAdmin, setShowCreateAdmin] = useState(false);
   const [showCreateClient, setShowCreateClient] = useState(false);
   const [showCreateChefEquipe, setShowCreateChefEquipe] = useState(false);
-  const [showCreateOperateur, setShowCreateOperateur] = useState(false);
   const [selectedAdminUser, setSelectedAdminUser] = useState<Utilisateur | null>(null);
   const [editingUser, setEditingUser] = useState<Utilisateur | null>(null);
+  const [deleteUserId, setDeleteUserId] = useState<number | null>(null);
+  const [openActionMenu, setOpenActionMenu] = useState<number | null>(null);
 
   // Handler pour la sélection du type d'utilisateur
   const handleUserTypeSelect = (type: NomRole) => {
@@ -567,20 +542,30 @@ const Users: React.FC = () => {
     loadData();
   }, []);
 
+  // Set search placeholder
+  useEffect(() => {
+    setPlaceholder('Rechercher un utilisateur (nom, prénom, email)...');
+  }, [setPlaceholder]);
+
+  // Handle external trigger to open create modal
+  useEffect(() => {
+    if (triggerCreate && triggerCreate > 0) {
+      setShowUserTypeMenu(true);
+    }
+  }, [triggerCreate]);
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const [utilisateursRes, clientsRes, operateursRes] = await Promise.all([
+      const [utilisateursRes, clientsRes] = await Promise.all([
         fetchUtilisateurs(),
-        fetchClients(),
-        fetchOperateurs()
+        fetchClients()
       ]);
 
       setUtilisateurs(utilisateursRes.results);
       setClients(clientsRes.results);
-      setOperateurs(operateursRes.results);
-      // Calcul local à partir de la liste d'utilisateurs pour s'assurer que
-      // les cartes statistiques reflètent les rôles (un utilisateur peut avoir plusieurs rôles).
+
+      // Calcul local à partir de la liste d'utilisateurs
       const users = utilisateursRes.results || [];
       const total = users.length;
       const actifs = users.filter(u => u.actif).length;
@@ -596,9 +581,8 @@ const Users: React.FC = () => {
         total,
         actifs,
         admins: parRoleCounts['ADMIN'] || 0,
-        operateurs: parRoleCounts['SUPERVISEUR'] || 0,
         clients: parRoleCounts['CLIENT'] || 0,
-        chefsEquipe: parRoleCounts['SUPERVISEUR'] || 0
+        superviseurs: parRoleCounts['SUPERVISEUR'] || 0
       });
     } catch (error) {
       console.error('Erreur chargement donnees:', error);
@@ -623,38 +607,18 @@ const Users: React.FC = () => {
   };
 
   const handleRowClick = (user: Utilisateur) => {
-    // Navigate to appropriate detail page based on role
-    if (user.roles.includes('CLIENT')) {
-      // Find the client record to get the correct ID
-      const clientData = clients.find(c => c.utilisateur === user.id);
-      if (clientData) {
-        navigate(`/clients/${clientData.utilisateur}`);
-      }
-    } else if (user.roles.includes('SUPERVISEUR')) {
-      // SUPERVISEUR users: For now, show modal (could create a SuperviseurDetailPage later)
-      setSelectedAdminUser(user);
-    } else if (user.roles.includes('ADMIN')) {
-      // Show modal for admins
-      setSelectedAdminUser(user);
-    } else {
-      // Fallback: show admin modal
-      setSelectedAdminUser(user);
-    }
+    // Show detail modal for all user types
+    // UserDetailModalSelector will choose the appropriate modal based on role
+    setSelectedAdminUser(user);
   };
 
-  // Filtre par rôle (dropdown)
+  // Filtre par rôle
   const [roleFilter, setRoleFilter] = useState<string | null>(null);
   const filteredUsers = utilisateurs.filter(u => {
-    // Filter by tab
-    if (activeTab === 'admins' && !(u.roles && u.roles.includes('ADMIN'))) return false;
-    if (activeTab === 'operateurs' && !(u.roles && u.roles.includes('SUPERVISEUR'))) return false;
-    if (activeTab === 'clients' && !(u.roles && u.roles.includes('CLIENT'))) return false;
-    if (activeTab === 'chefs' && !(u.roles && u.roles.includes('SUPERVISEUR'))) return false;
-
-    // Filter by role (dropdown)
+    // Filter by role
     if (roleFilter && !(u.roles && u.roles.includes(roleFilter as any))) return false;
 
-    // Filter by search
+    // Filter by search (from header)
     if (searchQuery) {
       const search = searchQuery.toLowerCase();
       return (
@@ -670,29 +634,33 @@ const Users: React.FC = () => {
   // Columns - Mêmes colonnes pour tous les onglets (affichage des infos utilisateur)
   const columns = [
     {
-      key: 'fullName',
-      label: 'Nom',
+      key: 'prenom',
+      label: 'Prénom',
       render: (u: Utilisateur) => (
         <div className="flex items-center gap-3">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${u.roles.includes('ADMIN') ? 'bg-purple-100' :
             u.roles.includes('SUPERVISEUR') ? 'bg-blue-100' :
-              u.roles.includes('SUPERVISEUR') ? 'bg-yellow-100' :
-                u.roles.includes('CLIENT') ? 'bg-green-100' : 'bg-gray-100'
+              u.roles.includes('CLIENT') ? 'bg-green-100' : 'bg-gray-100'
             }`}>
             {u.roles.includes('ADMIN') ? (
               <Shield className="w-4 h-4 text-purple-600" />
             ) : u.roles.includes('SUPERVISEUR') ? (
               <UserCheck className="w-4 h-4 text-blue-600" />
-            ) : u.roles.includes('SUPERVISEUR') ? (
-              <Award className="w-4 h-4 text-yellow-600" />
             ) : (
               <Building2 className="w-4 h-4 text-green-600" />
             )}
           </div>
-          <div>
-            <p className="font-medium text-gray-900">{u.fullName}</p>
-            <p className="text-xs text-gray-500">{u.email}</p>
-          </div>
+          <span className="font-medium text-gray-900">{u.prenom}</span>
+        </div>
+      )
+    },
+    {
+      key: 'nom',
+      label: 'Nom',
+      render: (u: Utilisateur) => (
+        <div>
+          <p className="font-medium text-gray-900">{u.nom}</p>
+          <p className="text-xs text-gray-500">{u.email}</p>
         </div>
       )
     },
@@ -736,24 +704,9 @@ const Users: React.FC = () => {
 
   return (
     <div className="p-4 sm:p-6 h-full flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 flex-shrink-0">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestion des Utilisateurs</h1>
-          <p className="text-gray-500 mt-1">Administrateurs, operateurs et clients</p>
-        </div>
-        <button
-          onClick={() => setShowUserTypeMenu(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
-        >
-          <UserPlus className="w-4 h-4" />
-          Nouvel utilisateur
-        </button>
-      </div>
-
       {/* Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6 flex-shrink-0">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6 flex-shrink-0">
           <StatCard
             icon={<UsersIcon className="w-5 h-5 text-gray-600" />}
             label="Total"
@@ -773,15 +726,9 @@ const Users: React.FC = () => {
             color="bg-purple-100"
           />
           <StatCard
-            icon={<UserCheck className="w-5 h-5 text-blue-600" />}
-            label="Operateurs"
-            value={stats.operateurs}
-            color="bg-blue-100"
-          />
-          <StatCard
             icon={<Award className="w-5 h-5 text-yellow-600" />}
-            label="Chefs d'equipe"
-            value={stats.chefsEquipe}
+            label="Superviseurs"
+            value={stats.superviseurs}
             color="bg-yellow-100"
           />
           <StatCard
@@ -793,91 +740,56 @@ const Users: React.FC = () => {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="mb-4 flex border-b border-gray-200 flex-shrink-0">
-        <button
-          onClick={() => { setActiveTab('tous'); setRoleFilter(null); }}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'tous'
-            ? 'border-emerald-500 text-emerald-600'
-            : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-        >
-          Tous ({utilisateurs.length})
-        </button>
-        <button
-          onClick={() => { setActiveTab('admins'); setRoleFilter(null); }}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'admins'
-            ? 'border-emerald-500 text-emerald-600'
-            : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-        >
-          <span className="flex items-center gap-2">
-            <Shield className="w-4 h-4" />
-            Admins ({utilisateurs.filter(u => u.roles && u.roles.includes('ADMIN')).length})
-          </span>
-        </button>
-        <button
-          onClick={() => { setActiveTab('operateurs'); setRoleFilter(null); }}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'operateurs'
-            ? 'border-emerald-500 text-emerald-600'
-            : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-        >
-          <span className="flex items-center gap-2">
-            <UserCheck className="w-4 h-4" />
-            Operateurs ({utilisateurs.filter(u => u.roles && u.roles.includes('SUPERVISEUR')).length})
-          </span>
-        </button>
-        <button
-          onClick={() => { setActiveTab('chefs'); setRoleFilter(null); }}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'chefs'
-            ? 'border-emerald-500 text-emerald-600'
-            : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-        >
-          <span className="flex items-center gap-2">
-            <Award className="w-4 h-4" />
-            Chefs d'équipe ({utilisateurs.filter(u => u.roles && u.roles.includes('SUPERVISEUR')).length})
-          </span>
-        </button>
-        <button
-          onClick={() => { setActiveTab('clients'); setRoleFilter(null); }}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'clients'
-            ? 'border-emerald-500 text-emerald-600'
-            : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-        >
-          <span className="flex items-center gap-2">
-            <Building2 className="w-4 h-4" />
-            Clients ({utilisateurs.filter(u => u.roles && u.roles.includes('CLIENT')).length})
-          </span>
-        </button>
-      </div>
-
-      {/* Filtres et recherche */}
-      <div className="mb-4 flex gap-4 items-center flex-shrink-0">
-        <div className="relative max-w-md flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher par nom, prenom ou email..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-          />
+      {/* Filtres */}
+      <div className="mb-4 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-slate-500">Filtrer par rôle :</span>
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+            <button
+              onClick={() => setRoleFilter(null)}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${!roleFilter
+                  ? 'bg-white text-slate-800 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-800'
+                }`}
+            >
+              Tous
+            </button>
+            <button
+              onClick={() => setRoleFilter('ADMIN')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${roleFilter === 'ADMIN'
+                  ? 'bg-white text-purple-700 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-800'
+                }`}
+            >
+              <Shield className="w-3.5 h-3.5" />
+              Admin
+            </button>
+            <button
+              onClick={() => setRoleFilter('SUPERVISEUR')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${roleFilter === 'SUPERVISEUR'
+                  ? 'bg-white text-blue-700 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-800'
+                }`}
+            >
+              <Award className="w-3.5 h-3.5" />
+              Superviseur
+            </button>
+            <button
+              onClick={() => setRoleFilter('CLIENT')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${roleFilter === 'CLIENT'
+                  ? 'bg-white text-green-700 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-800'
+                }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              Client
+            </button>
+          </div>
         </div>
-        <div>
-          <select
-            value={roleFilter || ''}
-            onChange={e => setRoleFilter(e.target.value || null)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          >
-            <option value="">Tous les rôles</option>
-            <option value="ADMIN">Admin</option>
-            <option value="SUPERVISEUR">Opérateur</option>
-            <option value="SUPERVISEUR">Chef d'équipe</option>
-            <option value="CLIENT">Client</option>
-          </select>
+
+        <div className="text-sm text-slate-500">
+          <span className="font-semibold text-slate-700">{filteredUsers.length}</span> utilisateur{filteredUsers.length > 1 ? 's' : ''}
+          {(searchQuery || roleFilter) && <span className="text-emerald-600 ml-1">(filtrés)</span>}
         </div>
       </div>
 
@@ -891,30 +803,65 @@ const Users: React.FC = () => {
               key: 'actions',
               label: 'Actions',
               render: (user) => (
-                <div className="flex gap-2">
+                <div className="relative">
                   <button
-                    className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-                    title="Modifier"
-                    onClick={e => {
+                    className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Actions"
+                    onClick={(e) => {
                       e.stopPropagation();
-                      setEditingUser(user);
+                      setOpenActionMenu(openActionMenu === user.id ? null : user.id);
                     }}
                   >
-                    <Edit2 className="w-4 h-4" />
+                    <MoreVertical className="w-4 h-4" />
                   </button>
-                  <button
-                    className="p-1 text-red-600 hover:bg-red-100 rounded"
-                    title="Supprimer"
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      if (window.confirm('Supprimer cet utilisateur ?')) {
-                        await deleteUtilisateur(Number(user.id));
-                        loadData();
-                      }
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+
+                  {openActionMenu === user.id && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenActionMenu(null);
+                        }}
+                      />
+                      <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                        <button
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRowClick(user);
+                            setOpenActionMenu(null);
+                          }}
+                        >
+                          <Eye className="w-4 h-4 text-gray-500" />
+                          Voir les détails
+                        </button>
+                        <button
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingUser(user);
+                            setOpenActionMenu(null);
+                          }}
+                        >
+                          <Edit2 className="w-4 h-4 text-blue-500" />
+                          Modifier
+                        </button>
+                        <hr className="my-1 border-gray-100" />
+                        <button
+                          className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteUserId(Number(user.id));
+                            setOpenActionMenu(null);
+                          }}
+                        >
+                          <UserX className="w-4 h-4" />
+                          Désactiver
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               ),
               sortable: false
@@ -954,16 +901,10 @@ const Users: React.FC = () => {
         />
       )}
 
-      {showCreateOperateur && (
-        <CreateOperateurModal
-          onClose={() => setShowCreateOperateur(false)}
-          onCreated={loadData}
-        />
-      )}
-
       {selectedAdminUser && (
-        <AdminDetailModal
+        <UserDetailModalSelector
           user={selectedAdminUser}
+          clients={clients}
           onClose={() => setSelectedAdminUser(null)}
           onEdit={(user) => {
             setSelectedAdminUser(null);
@@ -977,9 +918,22 @@ const Users: React.FC = () => {
         <EditUserModal
           user={editingUser}
           clients={clients}
-          operateurs={operateurs}
           onClose={() => setEditingUser(null)}
           onUpdated={loadData}
+        />
+      )}
+
+      {deleteUserId && (
+        <ConfirmDeleteModal
+          title="Désactiver l'utilisateur ?"
+          message="Êtes-vous sûr de vouloir désactiver cet utilisateur ? Son compte ne sera plus accessible."
+          onConfirm={async () => {
+            await deleteUtilisateur(deleteUserId);
+            loadData();
+          }}
+          onCancel={() => setDeleteUserId(null)}
+          confirmText="Désactiver"
+          cancelText="Annuler"
         />
       )}
     </div>

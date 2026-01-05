@@ -128,16 +128,79 @@ export interface UtilisateurRole {
 }
 
 // ============================================================================
-// CLIENT
+// STRUCTURE CLIENT (Organisation cliente)
 // ============================================================================
 
+export interface StructureClient {
+  id: number;
+  nom: string;
+  adresse: string;
+  telephone: string;
+  contactPrincipal: string;
+  emailFacturation: string;
+  logo: string | null;        // Fichier uploadé (chemin relatif)
+  logoUrl: string | null;     // URL externe
+  logoDisplay: string | null; // URL finale à afficher (fichier ou URL)
+  actif: boolean;
+  dateCreation: string;
+  utilisateursCount: number;
+  sitesCount: number;
+}
+
+export interface StructureClientDetail extends StructureClient {
+  utilisateurs: ClientUser[];
+}
+
+export interface StructureClientCreate {
+  nom: string;
+  adresse?: string;
+  telephone?: string;
+  contactPrincipal?: string;
+  emailFacturation?: string;
+  logo?: File | null;        // Fichier uploadé
+  logoUrl?: string | null;   // URL externe
+  actif?: boolean;
+}
+
+export interface StructureClientUpdate {
+  nom?: string;
+  adresse?: string;
+  telephone?: string;
+  contactPrincipal?: string;
+  emailFacturation?: string;
+  logo?: File | null;        // Fichier uploadé
+  logoUrl?: string | null;   // URL externe
+  actif?: boolean;
+}
+
+// ============================================================================
+// CLIENT (Utilisateur d'une structure)
+// ============================================================================
+
+// Client léger (utilisateur d'une structure)
+export interface ClientUser {
+  utilisateur: number;
+  email: string;
+  nom: string;
+  prenom: string;
+  fullName: string;
+  actif: boolean;
+  structureId: number | null;
+  structureNom: string | null;
+}
+
+// Client complet avec détails structure
 export interface Client {
   utilisateur: number;
   utilisateurDetail?: Utilisateur;
   email: string;
   nom: string;
   prenom: string;
+  fullName: string;
   actif: boolean;
+  structure: StructureClient | null;
+  structureId: number | null;
+  // Champs legacy (seront supprimés après migration complète)
   nomStructure: string;
   adresse: string;
   telephone: string;
@@ -146,7 +209,17 @@ export interface Client {
   logo: string | null;
 }
 
+// Création d'un client avec structure existante
 export interface ClientCreate {
+  email: string;
+  nom: string;
+  prenom: string;
+  password: string;
+  structureId: number;  // Structure obligatoire
+}
+
+// Création d'un client avec nouvelle structure (backward compatible)
+export interface ClientWithStructureCreate {
   email: string;
   nom: string;
   prenom: string;
@@ -160,6 +233,8 @@ export interface ClientCreate {
 }
 
 export interface ClientUpdate {
+  structureId?: number;
+  // Champs legacy (pour rétro-compatibilité)
   nomStructure?: string;
   adresse?: string;
   telephone?: string;
@@ -192,7 +267,10 @@ export interface SuperviseurCreate {
   nom: string;
   prenom: string;
   password: string;
-  actif?: boolean;
+  matricule: string;
+  telephone?: string;
+  secteur_geographique?: string;
+  date_prise_fonction?: string;
 }
 
 export interface SuperviseurUpdate {
@@ -500,6 +578,8 @@ export interface EquipeFilters {
   search?: string;
   actif?: boolean;
   chefEquipe?: number;
+  site?: number;
+  superviseur?: number;
   statutOperationnel?: StatutEquipe;
   membresMin?: number;
   membresMax?: number;
@@ -526,6 +606,21 @@ export interface CompetenceFilters {
   search?: string;
   categorie?: CategorieCompetence;
   page?: number;
+}
+
+export interface StructureClientFilters {
+  search?: string;
+  actif?: boolean;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface ClientFilters {
+  search?: string;
+  actif?: boolean;
+  structure?: number;
+  page?: number;
+  pageSize?: number;
 }
 
 export interface HistoriqueRHFilters {

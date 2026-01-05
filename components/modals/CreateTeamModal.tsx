@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, AlertCircle, Loader2 } from 'lucide-react';
 import { OperateurList } from '../../types/users';
 import { createEquipe, affecterMembres } from '../../services/usersApi';
-import { fetchSites, SiteFrontend } from '../../services/api';
+import { fetchAllSites, SiteFrontend } from '../../services/api';
 import TransferList from '../TransferList';
 
 interface CreateTeamModalProps {
@@ -33,8 +33,8 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
     const loadSites = async () => {
       setLoadingSites(true);
       try {
-        const sitesData = await fetchSites();
-        setSites(sitesData.filter(s => s.actif));
+        const sitesData = await fetchAllSites();
+        setSites(sitesData.filter(s => s.actif !== false));
       } catch (error) {
         console.error('Erreur chargement sites:', error);
       } finally {
@@ -112,61 +112,61 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto flex flex-col">
-          <div className="p-6 space-y-6 flex-1">
+          <div className="p-4 space-y-4 flex-1">
             {/* Erreur */}
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm whitespace-pre-line">
+              <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm whitespace-pre-line">
                 <div className="flex items-start gap-2">
-                  <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <span>{error}</span>
                 </div>
               </div>
             )}
 
-            {/* Nom de l'équipe */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nom de l'équipe <span className="text-red-500">*</span>
-              </label>
-              <input
-                required
-                type="text"
-                value={formData.nomEquipe}
-                onChange={(e) => setFormData({ ...formData, nomEquipe: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                placeholder="Ex: Équipe C - Irrigation"
-              />
+            {/* Row 1: Nom + Chef d'équipe */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Nom de l'équipe */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nom de l'équipe <span className="text-red-500">*</span>
+                </label>
+                <input
+                  required
+                  type="text"
+                  value={formData.nomEquipe}
+                  onChange={(e) => setFormData({ ...formData, nomEquipe: e.target.value })}
+                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                  placeholder="Ex: Équipe C - Irrigation"
+                />
+              </div>
+
+              {/* Chef d'équipe */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Chef d'équipe (optionnel)
+                </label>
+                <select
+                  value={formData.chefEquipe}
+                  onChange={(e) => setFormData({ ...formData, chefEquipe: Number(e.target.value) })}
+                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                >
+                  <option value={0}>Sélectionner un chef</option>
+                  {chefsPotentiels.map((op) => (
+                    <option key={op.id} value={op.id}>
+                      {op.fullName} ({op.numeroImmatriculation})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            {/* Chef d'équipe */}
+            {/* Row 2: Site d'affectation */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Chef d'équipe (optionnel)
-              </label>
-              <select
-                value={formData.chefEquipe}
-                onChange={(e) => setFormData({ ...formData, chefEquipe: Number(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-              >
-                <option value={0}>Sélectionner un chef</option>
-                {chefsPotentiels.map((op) => (
-                  <option key={op.id} value={op.id}>
-                    {op.fullName} ({op.numeroImmatriculation})
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1 text-xs text-gray-500">
-                Seuls les opérateurs avec la compétence "Gestion d'équipe" sont affichés
-              </p>
-            </div>
-
-            {/* Site d'affectation contractuelle */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Site d'affectation contractuelle (optionnel)
               </label>
               {loadingSites ? (
-                <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
+                <div className="flex items-center gap-2 text-sm text-gray-500 py-1.5">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Chargement des sites...
                 </div>
@@ -174,7 +174,7 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
                 <select
                   value={formData.site}
                   onChange={(e) => setFormData({ ...formData, site: Number(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                 >
                   <option value={0}>Aucun site</option>
                   {sites.map((site) => (
@@ -184,15 +184,12 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
                   ))}
                 </select>
               )}
-              <p className="mt-1 text-xs text-gray-500">
-                Site auquel l'équipe est affectée de manière permanente
-              </p>
             </div>
 
-            {/* Membres à affecter - TransferList */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                Membres à affecter
+            {/* Membres à affecter - TransferList (prend le reste de l'espace) */}
+            <div className="flex-1 flex flex-col min-h-0">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Membres à affecter ({operateursSansEquipe.length} disponibles)
               </label>
               <TransferList
                 available={operateursSansEquipe}
@@ -200,17 +197,14 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
                 onChange={setSelectedMembres}
                 getItemId={(op) => op.id}
                 getItemLabel={(op) => op.fullName || `${op.nom} ${op.prenom}`}
-                getItemSubtitle={(op) => `Mat: ${op.numeroImmatriculation}${op.equipeNom ? ` • ${op.equipeNom}` : ''}`}
+                getItemSubtitle={(op) => `${op.numeroImmatriculation}${op.equipeNom ? ` • ${op.equipeNom}` : ''}`}
                 availableLabel="Opérateurs disponibles"
                 selectedLabel="Membres de l'équipe"
-                searchPlaceholder="Rechercher un opérateur (nom, matricule)..."
+                searchPlaceholder="Rechercher (nom, matricule)..."
                 emptyAvailableMessage="Aucun opérateur disponible"
-                emptySelectedMessage="Sélectionnez des membres pour l'équipe"
-                height="280px"
+                emptySelectedMessage="Aucun membre sélectionné"
+                height="240px"
               />
-              <p className="mt-2 text-xs text-gray-500">
-                💡 Cliquez sur un opérateur pour l'ajouter/retirer, ou utilisez les boutons pour tout ajouter/retirer
-              </p>
             </div>
           </div>
 

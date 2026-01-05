@@ -1,7 +1,6 @@
-import { useState, useEffect, useMemo, useCallback, memo, useRef, type FC, type MouseEvent } from 'react';
+import { useState, useEffect, useMemo, useCallback, memo, useRef, type FC } from 'react';
 import { Calendar as BigCalendar, dateFnsLocalizer } from 'react-big-calendar';
 import withDragAndDrop, { EventInteractionArgs } from 'react-big-calendar/lib/addons/dragAndDrop';
-import { useLocation } from 'react-router-dom';
 import {
     format, parse, startOfWeek, getDay, endOfWeek,
     addMonths, subMonths, addWeeks, subWeeks, addDays, subDays, isToday
@@ -12,7 +11,7 @@ import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 
 import {
     Users, Clock, X, Trash2, Edit, Timer, AlertTriangle, Download, Calendar as CalendarIcon, List,
-    ChevronLeft, ChevronRight, Circle, CheckCircle2, MoreVertical, CornerUpLeft, ChevronDown
+    ChevronLeft, ChevronRight, CheckCircle2, MoreVertical, CornerUpLeft, ChevronDown
 } from 'lucide-react';
 import { planningService } from '../services/planningService';
 import { fetchEquipes, fetchClients } from '../services/usersApi';
@@ -20,29 +19,21 @@ import { fetchCurrentUser } from '../services/api';
 import {
     Tache, TacheCreate, TacheUpdate, TypeTache,
     STATUT_TACHE_LABELS, STATUT_TACHE_COLORS,
-    PRIORITE_LABELS, PRIORITE_COLORS,
-    PlanningFilters, EMPTY_PLANNING_FILTERS, countActivePlanningFilters
+    PRIORITE_LABELS
 } from '../types/planning';
 import { EquipeList, Client } from '../types/users';
 import TaskFormModal, { InventoryObjectOption } from '../components/planning/TaskFormModal';
 import QuickTaskCreator from '../components/planning/QuickTaskCreator';
-import PlanningFiltersComponent from '../components/planning/PlanningFilters';
 import { StatusBadge } from '../components/StatusBadge';
 import LoadingScreen from '../components/LoadingScreen';
 import { fetchSites, fetchInventory } from '../services/api';
+import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import {
-    useFloating,
-    offset,
-    flip,
-    shift,
-    autoUpdate,
     FloatingPortal,
-    useDismiss,
-    useInteractions,
     type ReferenceType,
     type VirtualElement,
-    type Placement
 } from '@floating-ui/react';
+import { localInputToUTC } from '../utils/dateHelpers';
 
 // ============================================================================
 // STYLES CUSTOM (Google Tasks Look & Feel)
@@ -111,24 +102,15 @@ interface CalendarEvent {
 // COMPOSANT TÂCHE (Google Tasks Style)
 // ============================================================================
 
-const TaskEvent = memo(function TaskEvent({ event, title }: { event: CalendarEvent, title: string }) {
+const TaskEvent = memo(function TaskEvent({ event }: { event: CalendarEvent, title?: string }) {
     const tache = event.resource;
     const isCompleted = tache.statut === 'TERMINEE';
     const isUrgent = tache.priorite === 5;
 
-    // Gestion du clic sur la checkbox (stop propagation pour ne pas ouvrir le détail)
-    const handleCheckClick = (e: MouseEvent) => {
-        e.stopPropagation();
-        // L'action sera gérée par le parent via une fonction passée ou un contexte,
-        // mais ici on simule visuellement pour l'instant ou on utilise un bus d'événement
-        // Pour simplifier, on laisse le clic global gérer l'ouverture, et le détail aura la checkbox.
-        // Si on veut le check direct depuis la grille, il faut passer la fonction update.
-    };
-
     return (
         <div
             className={`
-                group flex items-start gap-2 p-1.5 rounded-lg transition-all duration-200
+                task-event-root group flex items-start gap-2 p-1.5 rounded-lg transition-all duration-200
                 ${isCompleted ? 'opacity-60' : 'hover:bg-gray-100'}
                 ${tache.charge_estimee_heures ? 'min-h-[28px]' : ''}
             `}
@@ -148,7 +130,7 @@ const TaskEvent = memo(function TaskEvent({ event, title }: { event: CalendarEve
             </div>
 
             {/* Contenu Texte */}
-            <div className="flex flex-col leading-tight min-w-0">
+            <div className="task-event-content flex flex-col leading-tight min-w-0">
                 <span
                     className={`
                         text-xs font-medium truncate
@@ -167,7 +149,7 @@ const TaskEvent = memo(function TaskEvent({ event, title }: { event: CalendarEve
                         </span>
                         {tache.equipes_detail?.length > 0 && (
                             <span className="text-[9px] px-1 py-0.5 bg-gray-100 rounded text-gray-500 truncate max-w-[80px]">
-                                {tache.equipes_detail.length > 1 ? `${tache.equipes_detail.length} éq.` : tache.equipes_detail[0].nomEquipe}
+                                {tache.equipes_detail.length > 1 ? `${tache.equipes_detail.length} éq.` : tache.equipes_detail[0]?.nomEquipe}
                             </span>
                         )}
                     </div>
@@ -181,196 +163,132 @@ const TaskEvent = memo(function TaskEvent({ event, title }: { event: CalendarEve
 // POPOVER DETAIL (Google Tasks Card)
 // ============================================================================
 
-/**
- * Calculate transform-origin based on Floating UI placement
- * This ensures the "genie lamp" animation originates from the correct direction
- */
-const getTransformOrigin = (placement: Placement): string => {
-    const [side, alignment = 'center'] = placement.split('-') as [string, string?];
-
-    const sideOrigins: Record<string, string> = {
-        top: 'bottom',
-        bottom: 'top',
-        left: 'right',
-        right: 'left',
-    };
-
-    const originSide = sideOrigins[side];
-    const originAlign = alignment || 'center';
-
-    // Horizontal placements (left/right): "right center", "left start", etc.
-    if (side === 'left' || side === 'right') {
-        return `${originSide} ${originAlign}`;
-    }
-
-    // Vertical placements (top/bottom): "center bottom", "start top", etc.
-    return `${originAlign} ${originSide}`;
-};
-
 interface PopoverProps {
     tache: Tache;
-    reference: ReferenceType;
     onClose: () => void;
     onEdit: () => void;
     onDelete: () => void;
     onToggleComplete: () => void;
+    isReadOnly?: boolean;
 }
 
-const TaskDetailPopover: FC<PopoverProps> = ({ tache, reference, onClose, onEdit, onDelete, onToggleComplete }) => {
-    const [isOpen, setIsOpen] = useState(true);
-
-    console.log('🎯 POPOVER RENDER:', {
-        tache: tache.titre,
-        referenceType: reference instanceof Element ? 'DOM Element' : 'VirtualElement',
-        referenceBoundingRect: reference && typeof reference === 'object' && 'getBoundingClientRect' in reference
-            ? reference.getBoundingClientRect()
-            : 'No getBoundingClientRect',
-    });
-
-    // Floating UI handles all positioning automatically
-    const { refs, floatingStyles, placement, context } = useFloating({
-        open: isOpen,
-        onOpenChange: (open) => {
-            setIsOpen(open);
-            if (!open) onClose();
-        },
-        placement: 'right-start', // Preferred placement
-        strategy: 'fixed', // CRITICAL: Use fixed positioning because FloatingPortal renders in body
-        middleware: [
-            offset(10), // 10px gap from reference element
-            flip({
-                // Try these placements in order if primary doesn't fit
-                fallbackPlacements: [
-                    'left-start',
-                    'right-end',
-                    'left-end',
-                    'top-start',
-                    'bottom-start',
-                    'top',
-                    'bottom'
-                ],
-                padding: 20, // Keep 20px from viewport edges
-            }),
-            shift({
-                padding: 10, // Allow shifting to fit in viewport
-            }),
-        ],
-        whileElementsMounted: autoUpdate, // Auto-repositions on scroll/resize
-        elements: {
-            reference: reference as any, // Pass reference directly (supports DOM elements and VirtualElement)
-        },
-    });
-
-    console.log('🎯 FLOATING UI RESULT:', {
-        placement,
-        floatingStyles,
-        transformOrigin: getTransformOrigin(placement),
-    });
-
-    // Built-in dismiss handling (ESC key + outside clicks)
-    const dismiss = useDismiss(context, {
-        outsidePress: true,
-        escapeKey: true,
-    });
-
-    const { getFloatingProps } = useInteractions([dismiss]);
-
+const TaskDetailPopover: FC<PopoverProps> = ({ tache, onClose, onEdit, onDelete, onToggleComplete, isReadOnly }) => {
     const isCompleted = tache.statut === 'TERMINEE';
+
+    // Handle escape key and click outside
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
 
     return (
         <FloatingPortal>
+            {/* Backdrop */}
             <div
-                ref={refs.setFloating}
-                style={{
-                    ...floatingStyles,
-                    transformOrigin: getTransformOrigin(placement),
-                }}
-                {...getFloatingProps()}
-                className="z-[1000] w-[400px] bg-white rounded-xl shadow-2xl border border-gray-100 animate-popover flex flex-col overflow-hidden"
+                className="fixed inset-0 bg-black/30 z-[999] animate-in fade-in duration-200"
+                onClick={onClose}
+            />
+            {/* Centered Modal */}
+            <div
+                className="fixed inset-0 z-[1000] flex items-center justify-center p-4 pointer-events-none"
             >
-                {/* Header Actions */}
-                <div className="flex justify-between items-center px-4 py-2 bg-white border-b border-gray-50">
-                    <button onClick={onClose} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
-                        <X className="w-5 h-5" />
-                    </button>
-                    <div className="flex items-center gap-1">
-                        <button onClick={onEdit} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors" title="Modifier">
-                            <Edit className="w-4 h-4" />
+                <div
+                    className="w-[420px] max-w-full bg-white rounded-xl shadow-2xl border border-gray-100 animate-popover flex flex-col overflow-hidden pointer-events-auto"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {/* Header Actions */}
+                    <div className="flex justify-between items-center px-4 py-2 bg-white border-b border-gray-50">
+                        <button onClick={onClose} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
+                            <X className="w-5 h-5" />
                         </button>
-                        <button onClick={onDelete} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors" title="Supprimer">
-                            <Trash2 className="w-4 h-4" />
-                        </button>
-                        <button className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
-                            <MoreVertical className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                            {!isReadOnly && (
+                                <>
+                                    <button onClick={onEdit} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors" title="Modifier">
+                                        <Edit className="w-4 h-4" />
+                                    </button>
+                                    <button onClick={onDelete} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors" title="Supprimer">
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </>
+                            )}
+                            <button className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
+                                <MoreVertical className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
-                </div>
 
-                {/* Hero Content */}
-                <div className="px-6 py-5">
-                    <div className="flex items-start gap-4">
-                        {/* Big Checkbox */}
-                        <button
-                            onClick={onToggleComplete}
-                            className={`
+                    {/* Hero Content */}
+                    <div className="px-6 py-5">
+                        <div className="flex items-start gap-4">
+                            {/* Big Checkbox - disabled for CLIENT (readOnly) */}
+                            <button
+                                onClick={isReadOnly ? undefined : onToggleComplete}
+                                disabled={isReadOnly}
+                                className={`
                             mt-1 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300
                             ${isCompleted
-                                    ? 'bg-emerald-600 border-emerald-600 text-white animate-check'
-                                    : 'bg-white border-gray-400 hover:border-emerald-500 hover:bg-emerald-50'
-                                }
+                                        ? 'bg-emerald-600 border-emerald-600 text-white animate-check'
+                                        : 'bg-white border-gray-400 hover:border-emerald-500 hover:bg-emerald-50'
+                                    }
+                            ${isReadOnly ? 'cursor-not-allowed opacity-60' : ''}
                         `}
-                        >
-                            {isCompleted && <CheckCircle2 className="w-4 h-4" />}
-                        </button>
+                            >
+                                {isCompleted && <CheckCircle2 className="w-4 h-4" />}
+                            </button>
 
-                        <div className="flex-1">
-                            <h3 className={`text-lg font-medium leading-snug ${isCompleted ? 'line-through text-gray-500' : 'text-gray-900'}`}>
-                                {tache.type_tache_detail.nom_tache}
-                            </h3>
-                            <div className="mt-2 flex flex-col gap-1 text-sm text-gray-600">
-                                <div className="flex items-center gap-2">
-                                    <Clock className="w-4 h-4 text-gray-400" />
-                                    <span>
-                                        {format(new Date(tache.date_debut_planifiee), 'EEEE d MMMM', { locale: fr })}
-                                        <span className="mx-1">•</span>
-                                        {format(new Date(tache.date_debut_planifiee), 'HH:mm')} - {format(new Date(tache.date_fin_planifiee), 'HH:mm')}
-                                    </span>
-                                </div>
-                                {(tache.equipes_detail?.length > 0 || tache.equipe_detail) && (
+                            <div className="flex-1">
+                                <h3 className={`text-lg font-medium leading-snug ${isCompleted ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+                                    {tache.type_tache_detail.nom_tache}
+                                </h3>
+                                <div className="mt-2 flex flex-col gap-1 text-sm text-gray-600">
                                     <div className="flex items-center gap-2">
-                                        <Users className="w-4 h-4 text-gray-400" />
+                                        <Clock className="w-4 h-4 text-gray-400" />
                                         <span>
-                                            {tache.equipes_detail?.length > 0
-                                                ? tache.equipes_detail.map(e => (e as any).nom_equipe || e.nomEquipe).join(', ')
-                                                : (tache.equipe_detail as any)?.nom_equipe || tache.equipe_detail?.nomEquipe}
+                                            {format(new Date(tache.date_debut_planifiee), 'EEEE d MMMM', { locale: fr })}
+                                            <span className="mx-1">•</span>
+                                            {format(new Date(tache.date_debut_planifiee), 'HH:mm')} - {format(new Date(tache.date_fin_planifiee), 'HH:mm')}
                                         </span>
                                     </div>
+                                    {(tache.equipes_detail?.length > 0 || tache.equipe_detail) && (
+                                        <div className="flex items-center gap-2">
+                                            <Users className="w-4 h-4 text-gray-400" />
+                                            <span>
+                                                {tache.equipes_detail?.length > 0
+                                                    ? tache.equipes_detail.map(e => (e as any).nom_equipe || e.nomEquipe).join(', ')
+                                                    : (tache.equipe_detail as any)?.nom_equipe || tache.equipe_detail?.nomEquipe}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Body / Context */}
+                    {(tache.commentaires || tache.priorite) && (
+                        <div className="px-6 pb-6 pt-0 space-y-4">
+                            {tache.commentaires && (
+                                <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg leading-relaxed">
+                                    {tache.commentaires}
+                                </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                                <StatusBadge status={tache.statut}>
+                                    {STATUT_TACHE_LABELS[tache.statut]}
+                                </StatusBadge>
+                                {tache.priorite > 1 && (
+                                    <span className={`text-xs px-2 py-1 rounded-full border ${tache.priorite >= 4 ? 'bg-red-50 border-red-200 text-red-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+                                        {PRIORITE_LABELS[tache.priorite]}
+                                    </span>
                                 )}
                             </div>
                         </div>
-                    </div>
+                    )}
                 </div>
-
-                {/* Body / Context */}
-                {(tache.commentaires || tache.priorite) && (
-                    <div className="px-6 pb-6 pt-0 space-y-4">
-                        {tache.commentaires && (
-                            <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg leading-relaxed">
-                                {tache.commentaires}
-                            </div>
-                        )}
-                        <div className="flex items-center gap-2">
-                            <StatusBadge variant="default" status={tache.statut}>
-                                {STATUT_TACHE_LABELS[tache.statut]}
-                            </StatusBadge>
-                            {tache.priorite > 1 && (
-                                <span className={`text-xs px-2 py-1 rounded-full border ${tache.priorite >= 4 ? 'bg-red-50 border-red-200 text-red-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
-                                    {PRIORITE_LABELS[tache.priorite]}
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                )}
             </div>
         </FloatingPortal>
     );
@@ -386,27 +304,12 @@ const Planning: FC = () => {
     const [typesTaches, setTypesTaches] = useState<TypeTache[]>([]);
     const [sites, setSites] = useState<Array<{ id: number; name: string }>>([]);
 
-    // === FILTRES STATE ===
-    const [clients, setClients] = useState<Client[]>([]);
-    const [filters, setFilters] = useState<PlanningFilters>(() => {
-        // Restaurer depuis localStorage au mount
-        const saved = localStorage.getItem('planningFilters');
-        if (saved) {
-            try {
-                return JSON.parse(saved);
-            } catch (e) {
-                console.error('Failed to parse saved filters:', e);
-                return EMPTY_PLANNING_FILTERS;
-            }
-        }
-        return EMPTY_PLANNING_FILTERS;
-    });
-
+    const [_clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const [isReadOnly, setIsReadOnly] = useState(false);
-    const [isClientView, setIsClientView] = useState(false);
+    const [_isClientView, setIsClientView] = useState(false);
     const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
 
     // Popover State
@@ -433,139 +336,11 @@ const Planning: FC = () => {
 
     const [isExporting, setIsExporting] = useState(false);
     const calendarRef = useRef<HTMLDivElement>(null);
-    const location = useLocation();
     const [initialTaskValues, setInitialTaskValues] = useState<Partial<TacheCreate> | undefined>(undefined);
     const [preSelectedObjects, setPreSelectedObjects] = useState<InventoryObjectOption[] | undefined>(undefined);
 
-    // === LOGIQUE DE FILTRAGE (Performance optimisée) ===
-    const filteredTaches = useMemo(() => {
-        let result = taches;
-
-        // Filtre Client
-        if (filters.clientId !== null) {
-            result = result.filter(t => t.client_detail?.utilisateur === filters.clientId);
-        }
-
-        // Filtre Site
-        if (filters.siteId !== null) {
-            result = result.filter(t =>
-                t.objets_detail?.some(obj => obj.site === filters.siteId!.toString())
-            );
-        }
-
-        // Filtre Équipe (support multi-teams US-PLAN-013)
-        if (filters.equipeId !== null) {
-            result = result.filter(t => {
-                if (t.equipes_detail?.length > 0) {
-                    return t.equipes_detail.some(eq => eq.id === filters.equipeId);
-                }
-                return t.equipe_detail?.id === filters.equipeId;
-            });
-        }
-
-        // Filtre Statuts (multi-select)
-        if (filters.statuts.length > 0) {
-            result = result.filter(t => filters.statuts.includes(t.statut));
-        }
-
-        return result;
-    }, [taches, filters]);
-
-    // Sites filtrés selon client sélectionné
-    const availableSites = useMemo(() => {
-        console.log('🔍 [FILTRAGE SITES] Début du calcul');
-        console.log('  → Client sélectionné:', filters.clientId);
-        console.log('  → Nombre total de sites:', sites.length);
-        console.log('  → Nombre total de tâches:', taches.length);
-
-        if (filters.clientId === null) {
-            console.log('  ✅ Aucun client sélectionné, retour de tous les sites');
-            return sites;
-        }
-
-        // Filtrer sites via les tâches du client
-        const clientTaches = taches.filter(t => t.client_detail?.utilisateur === filters.clientId);
-        console.log('  → Tâches du client:', clientTaches.length);
-
-        // Debug: Afficher quelques tâches
-        if (clientTaches.length === 0) {
-            console.warn('  ⚠️ Aucune tâche trouvée pour ce client !');
-            console.log('  → Toutes les tâches:', taches.map(t => ({
-                id: t.id,
-                client_id: t.client_detail?.utilisateur,
-                client_nom: t.client_detail?.nom_structure
-            })));
-        } else {
-            console.log('  → Exemples de tâches client:', clientTaches.slice(0, 3).map(t => ({
-                id: t.id,
-                type: t.type_tache_detail.nom_tache,
-                objets_count: t.objets_detail?.length || 0
-            })));
-        }
-
-        const siteIds = new Set<number>();
-
-        clientTaches.forEach(t => {
-            if (!t.objets_detail || t.objets_detail.length === 0) {
-                console.log(`  ⚠️ Tâche ${t.id} n'a pas d'objets liés`);
-                return;
-            }
-
-            t.objets_detail?.forEach(obj => {
-                const siteId = parseInt(obj.site);
-                if (!isNaN(siteId)) {
-                    siteIds.add(siteId);
-                    console.log(`  ✓ Site ${siteId} trouvé via objet ${obj.id}`);
-                }
-            });
-        });
-
-        console.log('  → Sites IDs extraits:', Array.from(siteIds));
-        const filteredSites = sites.filter(s => siteIds.has(s.id));
-        console.log('  → Sites filtrés:', filteredSites.map(s => ({ id: s.id, name: s.name })));
-
-        return filteredSites;
-    }, [filters.clientId, sites, taches]);
-
-    // Handler filtres avec persistence
-    const handleFiltersChange = useCallback((newFilters: PlanningFilters) => {
-        setFilters(newFilters);
-        localStorage.setItem('planningFilters', JSON.stringify(newFilters));
-    }, []);
-
-    // Validate saved filters against loaded data (handle deleted IDs)
-    useEffect(() => {
-        if (loading) return;
-
-        let needsUpdate = false;
-        const validated = { ...filters };
-
-        // Validate clientId
-        if (filters.clientId !== null && !clients.find(c => c.utilisateur === filters.clientId)) {
-            console.warn(`Saved clientId ${filters.clientId} not found in loaded data, resetting`);
-            validated.clientId = null;
-            validated.siteId = null; // Reset dependent filter
-            needsUpdate = true;
-        }
-
-        // Validate siteId
-        if (filters.siteId !== null && !availableSites.find(s => s.id === filters.siteId)) {
-            console.warn(`Saved siteId ${filters.siteId} not found in loaded data, resetting`);
-            validated.siteId = null;
-            needsUpdate = true;
-        }
-
-        // Validate equipeId
-        if (filters.equipeId !== null && !equipes.find(e => e.id === filters.equipeId)) {
-            console.warn(`Saved equipeId ${filters.equipeId} not found in loaded data, resetting`);
-            validated.equipeId = null;
-            needsUpdate = true;
-        }
-
-        if (needsUpdate) {
-            handleFiltersChange(validated);
-        }
-    }, [loading, clients, equipes, availableSites, filters, handleFiltersChange]);
+    // Toutes les tâches (pas de filtrage dans Planning, les filtres sont dans SuiviTaches)
+    const filteredTaches = taches;
 
     // ... (Data Loading & Navigation Effects - unchanged)
     useEffect(() => { loadStableData(); loadTaches(); }, []);
@@ -613,8 +388,11 @@ const Planning: FC = () => {
                     } else if (sitesData.results) {
                         console.log('sitesData.results exists');
 
-                        // Check if results.features exists (GeoJSON FeatureCollection inside results)
-                        if (sitesData.results.features && Array.isArray(sitesData.results.features)) {
+                        // Check if results is a FeatureCollection (has type and features properties)
+                        if (typeof sitesData.results === 'object' &&
+                            !Array.isArray(sitesData.results) &&
+                            'features' in sitesData.results &&
+                            Array.isArray(sitesData.results.features)) {
                             console.log('✓ sitesData.results.features is array (GeoJSON), length:', sitesData.results.features.length);
                             results = sitesData.results.features;
                         }
@@ -623,13 +401,13 @@ const Planning: FC = () => {
                             console.log('✓ sitesData.results is array, length:', sitesData.results.length);
                             results = sitesData.results;
                         }
-                        // Check if results is an object (convert to array) - LAST RESORT
-                        else if (typeof sitesData.results === 'object' && sitesData.results !== null) {
+                        // Unexpected format
+                        else {
                             console.log('⚠️ sitesData.results is object, keys:', Object.keys(sitesData.results));
                             console.log('This should not happen - unexpected format');
                             results = [];
                         }
-                    } else if (sitesData.features && Array.isArray(sitesData.features)) {
+                    } else if ('features' in sitesData && Array.isArray(sitesData.features)) {
                         console.log('✓ sitesData.features is array (GeoJSON at root), length:', sitesData.features.length);
                         results = sitesData.features;
                     }
@@ -680,7 +458,7 @@ const Planning: FC = () => {
                 tachesAvecClient.slice(0, 3).map(t => ({
                     tache_id: t.id,
                     client_id: t.client_detail?.utilisateur,
-                    client_nom: t.client_detail?.nom_structure
+                    client_nom: t.client_detail?.nomStructure
                 }))
             );
 
@@ -690,23 +468,74 @@ const Planning: FC = () => {
         }
     };
 
-    // ... (Keep handleExportPDF)
+    // PDF Export with programmatic rendering (Google Calendar style)
     const handleExportPDF = async () => {
         if (!calendarRef.current) return;
         setIsExporting(true);
+
         try {
-            const [html2canvasModule, jsPDFModule] = await Promise.all([import('html2canvas'), import('jspdf')]);
-            const html2canvas = html2canvasModule.default;
+            const jsPDFModule = await import('jspdf');
             const { jsPDF } = jsPDFModule;
-            const canvas = await html2canvas(calendarRef.current, { scale: 2, useCORS: true, logging: false, windowWidth: calendarRef.current.scrollWidth, windowHeight: calendarRef.current.scrollHeight });
-            const imgData = canvas.toDataURL('image/png');
+
             const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
             const pageWidth = pdf.internal.pageSize.getWidth();
             const pageHeight = pdf.internal.pageSize.getHeight();
-            pdf.setFillColor(245, 247, 250);
+
+            // Couleurs selon les statuts du backend (types/planning.ts)
+            const colors = {
+                // Statuts de tâches
+                blue: { r: 59, g: 130, b: 246 },           // #3b82f6 - PLANIFIEE
+                blueLight: { r: 219, g: 234, b: 254 },     // #dbeafe
+                blueDark: { r: 30, g: 64, b: 175 },        // #1e40af
+                gray: { r: 107, g: 114, b: 128 },          // #6b7280 - NON_DEBUTEE
+                grayLight: { r: 243, g: 244, b: 246 },     // #f3f4f6
+                grayDark: { r: 55, g: 65, b: 81 },         // #374151
+                orange: { r: 249, g: 115, b: 22 },         // #f97316 - EN_COURS
+                orangeLight: { r: 255, g: 237, b: 213 },   // #ffedd5
+                orangeDark: { r: 154, g: 52, b: 18 },      // #9a3412
+                green: { r: 34, g: 197, b: 94 },           // #22c55e - TERMINEE
+                greenLight: { r: 220, g: 252, b: 231 },    // #dcfce7
+                greenDark: { r: 22, g: 101, b: 52 },       // #166534
+                red: { r: 239, g: 68, b: 68 },             // #ef4444 - ANNULEE / Urgent
+                redLight: { r: 254, g: 226, b: 226 },      // #fee2e2
+                redDark: { r: 153, g: 27, b: 27 },         // #991b1b
+                // UI
+                emerald: { r: 16, g: 185, b: 129 },        // #10b981 - Accent GreenSIG
+                emeraldLight: { r: 209, g: 250, b: 229 },  // #d1fae5
+            };
+
+            // Helper pour obtenir la couleur selon le statut (conforme au backend)
+            const getTaskColor = (task: Tache) => {
+                // Priorité urgente (4-5) override le statut visuellement
+                if (task.priorite >= 4 && task.statut !== 'TERMINEE' && task.statut !== 'ANNULEE') {
+                    return { bg: colors.redLight, text: colors.redDark, border: colors.red };
+                }
+
+                switch (task.statut) {
+                    case 'PLANIFIEE':
+                        return { bg: colors.blueLight, text: colors.blueDark, border: colors.blue };
+                    case 'NON_DEBUTEE':
+                        return { bg: colors.grayLight, text: colors.grayDark, border: colors.gray };
+                    case 'EN_COURS':
+                        return { bg: colors.orangeLight, text: colors.orangeDark, border: colors.orange };
+                    case 'TERMINEE':
+                        return { bg: colors.greenLight, text: colors.greenDark, border: colors.green };
+                    case 'ANNULEE':
+                        return { bg: colors.redLight, text: colors.redDark, border: colors.red };
+                    default:
+                        return { bg: colors.grayLight, text: colors.grayDark, border: colors.gray };
+                }
+            };
+
+            // En-tête avec fond dégradé simulé
+            pdf.setFillColor(colors.grayLight.r, colors.grayLight.g, colors.grayLight.b);
             pdf.rect(0, 0, pageWidth, 25, 'F');
 
-            // Ajouter le logo GreenSIG en haut à gauche
+            // Ligne verte décorative en haut
+            pdf.setFillColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
+            pdf.rect(0, 0, pageWidth, 1, 'F');
+
+            // Logo
             try {
                 const logoResponse = await fetch('/logofinal.png');
                 if (logoResponse.ok) {
@@ -716,38 +545,507 @@ const Planning: FC = () => {
                         reader.onloadend = () => resolve(reader.result as string);
                         reader.readAsDataURL(logoBlob);
                     });
-                    // Ajouter le logo (30mm largeur x 15mm hauteur)
                     pdf.addImage(logoBase64, 'PNG', 14, 5, 30, 15);
                 }
             } catch (logoError) {
                 console.error('Erreur chargement logo:', logoError);
             }
 
-            pdf.setFontSize(22);
-            pdf.setTextColor(16, 185, 129);
-            pdf.text('GreenSIG', 50, 16);
-            pdf.setFontSize(14);
-            pdf.setTextColor(55, 65, 81);
+            pdf.setFontSize(16);
+            pdf.setTextColor(colors.grayDark.r, colors.grayDark.g, colors.grayDark.b);
             pdf.text('Planning des interventions', pageWidth - 14, 16, { align: 'right' });
-            const dateStr = new Date().toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
             pdf.setFontSize(10);
-            pdf.setTextColor(107, 114, 128);
+            pdf.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
+            pdf.text(`Période: ${dateLabel}`, pageWidth / 2, 16, { align: 'center' });
+
+            const dateStr = new Date().toLocaleDateString('fr-FR', {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            });
             pdf.text(`Exporté le ${dateStr}`, pageWidth - 14, 22, { align: 'right' });
-            const imgWidth = pageWidth - 20;
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            const maxHeight = pageHeight - 35;
-            let finalHeight = imgHeight;
-            let finalWidth = imgWidth;
-            if (imgHeight > maxHeight) {
-                const ratio = maxHeight / imgHeight;
-                finalHeight = maxHeight;
-                finalWidth = imgWidth * ratio;
+
+            // Filter tasks to the visible date range to avoid empty PDFs
+            let tasksToRender = filteredTaches;
+            if (currentView === 'month') {
+                // For month view, include tasks from the entire displayed calendar (including overflow days)
+                const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+                const startDate = new Date(firstDay);
+                startDate.setDate(startDate.getDate() - (startDate.getDay() === 0 ? 6 : startDate.getDay() - 1));
+
+                const endDate = new Date(startDate);
+                endDate.setDate(endDate.getDate() + 42); // 6 weeks
+
+                tasksToRender = filteredTaches.filter(t => {
+                    const taskDate = new Date(t.date_debut_planifiee);
+                    return taskDate >= startDate && taskDate < endDate;
+                });
+            } else if (currentView === 'week') {
+                // For week view, include tasks from the displayed week
+                const weekStart = new Date(currentDate);
+                weekStart.setDate(weekStart.getDate() - (weekStart.getDay() === 0 ? 6 : weekStart.getDay() - 1));
+
+                const weekEnd = new Date(weekStart);
+                weekEnd.setDate(weekEnd.getDate() + 7);
+
+                tasksToRender = filteredTaches.filter(t => {
+                    const taskDate = new Date(t.date_debut_planifiee);
+                    return taskDate >= weekStart && taskDate < weekEnd;
+                });
+            } else if (currentView === 'day') {
+                // For day view, include tasks from the current day
+                const dayStart = new Date(currentDate);
+                dayStart.setHours(0, 0, 0, 0);
+
+                const dayEnd = new Date(currentDate);
+                dayEnd.setHours(23, 59, 59, 999);
+
+                tasksToRender = filteredTaches.filter(t => {
+                    const taskDate = new Date(t.date_debut_planifiee);
+                    return taskDate >= dayStart && taskDate <= dayEnd;
+                });
+            } else if (currentView === 'agenda') {
+                // For agenda/list view, include tasks from the current month
+                const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+                monthStart.setHours(0, 0, 0, 0);
+
+                const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+                monthEnd.setHours(23, 59, 59, 999);
+
+                tasksToRender = filteredTaches.filter(t => {
+                    const taskDate = new Date(t.date_debut_planifiee);
+                    return taskDate >= monthStart && taskDate <= monthEnd;
+                });
             }
-            const xPos = (pageWidth - finalWidth) / 2;
-            pdf.addImage(imgData, 'PNG', xPos, 30, finalWidth, finalHeight);
-            pdf.setFontSize(8);
-            pdf.setTextColor(156, 163, 175);
-            pdf.text('Document généré automatiquement par GreenSIG', pageWidth / 2, pageHeight - 5, { align: 'center' });
+
+            // Debug logging
+            console.log('[PDF Export] Current view:', currentView);
+            console.log('[PDF Export] Current date:', currentDate);
+            console.log('[PDF Export] Total tasks in system:', filteredTaches.length);
+            console.log('[PDF Export] Tasks after filtering:', tasksToRender.length);
+            if (tasksToRender.length > 0) {
+                console.log('[PDF Export] Sample task dates:', tasksToRender.slice(0, 3).map(t => ({
+                    nom: t.type_tache_detail.nom_tache,
+                    date: new Date(t.date_debut_planifiee).toISOString()
+                })));
+            } else {
+                console.warn('[PDF Export] No tasks found for current view and date range!');
+                if (filteredTaches.length > 0) {
+                    console.log('[PDF Export] Sample of all task dates:', filteredTaches.slice(0, 5).map(t => ({
+                        nom: t.type_tache_detail.nom_tache,
+                        date: new Date(t.date_debut_planifiee).toISOString()
+                    })));
+                }
+            }
+
+            // Date d'aujourd'hui pour mise en surbrillance
+            const today = new Date();
+
+            // Dessiner le calendrier selon la vue
+            if (currentView === 'month') {
+                const startY = 32;
+                const cellWidth = (pageWidth - 20) / 7;
+                const cellHeight = 26;
+                const headerHeight = 8;
+
+                // En-têtes des jours avec style amélioré
+                const dayNames = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'];
+                pdf.setFillColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
+                pdf.rect(10, startY, pageWidth - 20, headerHeight, 'F');
+
+                pdf.setFontSize(9);
+                pdf.setTextColor(255, 255, 255);
+                pdf.setFont('helvetica', 'bold');
+                dayNames.forEach((day, i) => {
+                    const x = 10 + (i * cellWidth) + (cellWidth / 2);
+                    pdf.text(day, x, startY + 5.5, { align: 'center' });
+                });
+
+                // Calculer les jours du mois
+                const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+                const startDate = new Date(firstDay);
+                startDate.setDate(startDate.getDate() - (startDate.getDay() === 0 ? 6 : startDate.getDay() - 1));
+
+                // Dessiner la grille et les tâches
+                for (let i = 0; i < 42; i++) {
+                    const date = new Date(startDate);
+                    date.setDate(date.getDate() + i);
+
+                    const currentRow = Math.floor(i / 7);
+                    const currentCol = i % 7;
+
+                    const x = 10 + (currentCol * cellWidth);
+                    const y = startY + headerHeight + (currentRow * cellHeight);
+
+                    const isCurrentMonth = date.getMonth() === currentDate.getMonth();
+                    const isToday = date.toDateString() === today.toDateString();
+
+                    // Fond de la cellule
+                    if (isToday) {
+                        pdf.setFillColor(colors.emeraldLight.r, colors.emeraldLight.g, colors.emeraldLight.b);
+                        pdf.rect(x, y, cellWidth, cellHeight, 'F');
+                    } else if (!isCurrentMonth) {
+                        pdf.setFillColor(250, 250, 252);
+                        pdf.rect(x, y, cellWidth, cellHeight, 'F');
+                    } else {
+                        pdf.setFillColor(255, 255, 255);
+                        pdf.rect(x, y, cellWidth, cellHeight, 'F');
+                    }
+
+                    // Bordure
+                    pdf.setDrawColor(220, 220, 220);
+                    pdf.setLineWidth(0.2);
+                    pdf.rect(x, y, cellWidth, cellHeight);
+
+                    // Numéro du jour
+                    if (isToday) {
+                        // Cercle vert pour aujourd'hui
+                        pdf.setFillColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
+                        pdf.circle(x + 5, y + 4, 3, 'F');
+                        pdf.setFontSize(8);
+                        pdf.setFont('helvetica', 'bold');
+                        pdf.setTextColor(255, 255, 255);
+                        pdf.text(date.getDate().toString(), x + 5, y + 5, { align: 'center' });
+                    } else {
+                        pdf.setFontSize(10);
+                        pdf.setFont('helvetica', 'bold');
+                        pdf.setTextColor(isCurrentMonth ? 50 : 180);
+                        pdf.text(date.getDate().toString(), x + 2.5, y + 5);
+                    }
+
+                    // Tâches du jour
+                    const dayTasks = tasksToRender.filter(t => {
+                        const taskDate = new Date(t.date_debut_planifiee);
+                        return taskDate.getDate() === date.getDate() &&
+                            taskDate.getMonth() === date.getMonth() &&
+                            taskDate.getFullYear() === date.getFullYear();
+                    }).sort((a, b) => new Date(a.date_debut_planifiee).getTime() - new Date(b.date_debut_planifiee).getTime());
+
+                    let taskY = y + 8;
+                    const maxTasksPerCell = 3;
+                    const taskHeight = 4.2;
+
+                    dayTasks.slice(0, maxTasksPerCell).forEach((task) => {
+                        const taskX = x + 0.8;
+                        const taskWidth = cellWidth - 1.6;
+                        const taskColor = getTaskColor(task);
+
+                        // Fond de la tâche avec couleur selon statut
+                        pdf.setFillColor(taskColor.bg.r, taskColor.bg.g, taskColor.bg.b);
+                        pdf.roundedRect(taskX, taskY, taskWidth, taskHeight, 0.8, 0.8, 'F');
+
+                        // Bordure gauche colorée (indicateur de statut)
+                        pdf.setFillColor(taskColor.border.r, taskColor.border.g, taskColor.border.b);
+                        pdf.rect(taskX, taskY + 0.3, 0.6, taskHeight - 0.6, 'F');
+
+                        // Texte de la tâche
+                        pdf.setFontSize(6.5);
+                        pdf.setFont('helvetica', task.statut === 'TERMINEE' ? 'normal' : 'bold');
+                        pdf.setTextColor(taskColor.text.r, taskColor.text.g, taskColor.text.b);
+
+                        const taskTime = format(new Date(task.date_debut_planifiee), 'HH:mm');
+                        const taskText = `${taskTime} ${task.type_tache_detail.nom_tache}`;
+
+                        // Tronquer si nécessaire
+                        const maxTextWidth = taskWidth - 2;
+                        let displayText = taskText;
+                        if (pdf.getTextWidth(taskText) > maxTextWidth) {
+                            let truncated = taskText;
+                            while (pdf.getTextWidth(truncated + '…') > maxTextWidth && truncated.length > 0) {
+                                truncated = truncated.slice(0, -1);
+                            }
+                            displayText = truncated + '…';
+                        }
+
+                        pdf.text(displayText, taskX + 1.2, taskY + 2.9);
+                        taskY += taskHeight + 0.6;
+                    });
+
+                    // Indicateur "+X autres"
+                    if (dayTasks.length > maxTasksPerCell) {
+                        pdf.setFontSize(6);
+                        pdf.setFont('helvetica', 'bold');
+                        pdf.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
+                        pdf.text(`+${dayTasks.length - maxTasksPerCell} autre${dayTasks.length - maxTasksPerCell > 1 ? 's' : ''}`, x + 2, taskY + 2);
+                    }
+                }
+            } else if (currentView === 'week') {
+                // Vue semaine
+                const startY = 32;
+                const timeColWidth = 15;
+                const cellWidth = (pageWidth - 20 - timeColWidth) / 7;
+                const headerHeight = 10;
+                const hourHeight = 12;
+                const startHour = 7;
+                const endHour = 19;
+
+                // En-têtes des jours avec dates
+                const weekStart = startOfWeek(currentDate, { locale: fr, weekStartsOn: 1 });
+                const dayNames = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'];
+
+                pdf.setFillColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
+                pdf.rect(10 + timeColWidth, startY, pageWidth - 20 - timeColWidth, headerHeight, 'F');
+
+                pdf.setFontSize(8);
+                pdf.setTextColor(255, 255, 255);
+                pdf.setFont('helvetica', 'bold');
+
+                for (let i = 0; i < 7; i++) {
+                    const dayDate = new Date(weekStart);
+                    dayDate.setDate(dayDate.getDate() + i);
+                    const x = 10 + timeColWidth + (i * cellWidth) + (cellWidth / 2);
+                    const isToday = dayDate.toDateString() === today.toDateString();
+
+                    if (isToday) {
+                        pdf.setFillColor(255, 255, 255);
+                        pdf.circle(x, startY + 5, 4, 'F');
+                        pdf.setTextColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
+                    } else {
+                        pdf.setTextColor(255, 255, 255);
+                    }
+                    pdf.text(`${dayNames[i]} ${dayDate.getDate()}`, x, startY + 6, { align: 'center' });
+                }
+
+                // Grille horaire
+                const gridStartY = startY + headerHeight;
+                for (let hour = startHour; hour <= endHour; hour++) {
+                    const y = gridStartY + (hour - startHour) * hourHeight;
+
+                    // Ligne de l'heure
+                    pdf.setDrawColor(230, 230, 230);
+                    pdf.setLineWidth(0.1);
+                    pdf.line(10, y, pageWidth - 10, y);
+
+                    // Label de l'heure
+                    pdf.setFontSize(7);
+                    pdf.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
+                    pdf.setFont('helvetica', 'normal');
+                    pdf.text(`${hour.toString().padStart(2, '0')}:00`, 12, y + 3);
+                }
+
+                // Bordures des colonnes
+                for (let i = 0; i <= 7; i++) {
+                    const x = 10 + timeColWidth + (i * cellWidth);
+                    pdf.setDrawColor(220, 220, 220);
+                    pdf.line(x, gridStartY, x, gridStartY + (endHour - startHour) * hourHeight);
+                }
+
+                // Dessiner les tâches de la semaine
+                for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+                    const dayDate = new Date(weekStart);
+                    dayDate.setDate(dayDate.getDate() + dayIndex);
+
+                    const dayTasks = tasksToRender.filter(t => {
+                        const taskDate = new Date(t.date_debut_planifiee);
+                        return taskDate.toDateString() === dayDate.toDateString();
+                    });
+
+                    dayTasks.forEach((task) => {
+                        const taskStart = new Date(task.date_debut_planifiee);
+                        const taskEnd = new Date(task.date_fin_planifiee);
+                        const startHourTask = taskStart.getHours() + taskStart.getMinutes() / 60;
+                        const endHourTask = taskEnd.getHours() + taskEnd.getMinutes() / 60;
+
+                        if (startHourTask >= startHour && startHourTask < endHour) {
+                            const x = 10 + timeColWidth + (dayIndex * cellWidth) + 1;
+                            const y = gridStartY + (startHourTask - startHour) * hourHeight;
+                            const height = Math.min((endHourTask - startHourTask) * hourHeight, (endHour - startHourTask) * hourHeight);
+                            const width = cellWidth - 2;
+
+                            const taskColor = getTaskColor(task);
+
+                            pdf.setFillColor(taskColor.bg.r, taskColor.bg.g, taskColor.bg.b);
+                            pdf.roundedRect(x, y, width, Math.max(height, 6), 1, 1, 'F');
+
+                            pdf.setFillColor(taskColor.border.r, taskColor.border.g, taskColor.border.b);
+                            pdf.rect(x, y + 0.5, 1, Math.max(height, 6) - 1, 'F');
+
+                            pdf.setFontSize(6);
+                            pdf.setFont('helvetica', 'bold');
+                            pdf.setTextColor(taskColor.text.r, taskColor.text.g, taskColor.text.b);
+
+                            const taskText = task.type_tache_detail.nom_tache;
+                            const maxTextWidth = width - 3;
+                            let displayText = taskText;
+                            if (pdf.getTextWidth(taskText) > maxTextWidth) {
+                                let truncated = taskText;
+                                while (pdf.getTextWidth(truncated + '…') > maxTextWidth && truncated.length > 0) {
+                                    truncated = truncated.slice(0, -1);
+                                }
+                                displayText = truncated + '…';
+                            }
+                            pdf.text(displayText, x + 2, y + 4);
+                        }
+                    });
+                }
+            } else {
+                // Vue liste (agenda/day) - Affichage en tableau
+                const startY = 35;
+                const rowHeight = 8;
+                const colWidths = {
+                    date: 35,
+                    time: 20,
+                    task: 90,
+                    client: 50,
+                    status: 30
+                };
+
+                // En-tête du tableau
+                pdf.setFillColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
+                pdf.rect(10, startY, pageWidth - 20, rowHeight, 'F');
+
+                pdf.setFontSize(8);
+                pdf.setTextColor(255, 255, 255);
+                pdf.setFont('helvetica', 'bold');
+
+                let xPos = 12;
+                pdf.text('Date', xPos, startY + 5.5);
+                xPos += colWidths.date;
+                pdf.text('Heure', xPos, startY + 5.5);
+                xPos += colWidths.time;
+                pdf.text('Tâche', xPos, startY + 5.5);
+                xPos += colWidths.task;
+                pdf.text('Client', xPos, startY + 5.5);
+                xPos += colWidths.client;
+                pdf.text('Statut', xPos, startY + 5.5);
+
+                // Trier les tâches par date
+                const sortedTasks = [...tasksToRender].sort((a, b) =>
+                    new Date(a.date_debut_planifiee).getTime() - new Date(b.date_debut_planifiee).getTime()
+                );
+
+                let currentY = startY + rowHeight;
+                const maxY = pageHeight - 20; // Laisser de l'espace pour la légende
+
+                sortedTasks.forEach((task, index) => {
+                    // Vérifier si on a besoin d'une nouvelle page
+                    if (currentY + rowHeight > maxY) {
+                        pdf.addPage();
+                        currentY = 20;
+                    }
+
+                    const taskColor = getTaskColor(task);
+                    const taskDate = new Date(task.date_debut_planifiee);
+
+                    // Fond alterné pour lisibilité
+                    if (index % 2 === 0) {
+                        pdf.setFillColor(250, 250, 252);
+                        pdf.rect(10, currentY, pageWidth - 20, rowHeight, 'F');
+                    }
+
+                    // Bordure gauche colorée selon le statut
+                    pdf.setFillColor(taskColor.border.r, taskColor.border.g, taskColor.border.b);
+                    pdf.rect(10, currentY, 2, rowHeight, 'F');
+
+                    pdf.setFontSize(7);
+                    pdf.setFont('helvetica', 'normal');
+                    pdf.setTextColor(colors.grayDark.r, colors.grayDark.g, colors.grayDark.b);
+
+                    xPos = 14;
+                    // Date
+                    pdf.text(format(taskDate, 'dd/MM/yyyy', { locale: fr }), xPos, currentY + 5.5);
+                    xPos += colWidths.date;
+
+                    // Heure
+                    pdf.text(format(taskDate, 'HH:mm'), xPos, currentY + 5.5);
+                    xPos += colWidths.time;
+
+                    // Nom de la tâche (tronquer si nécessaire)
+                    pdf.setFont('helvetica', 'bold');
+                    let taskName = task.type_tache_detail.nom_tache;
+                    const maxTaskWidth = colWidths.task - 4;
+                    if (pdf.getTextWidth(taskName) > maxTaskWidth) {
+                        while (pdf.getTextWidth(taskName + '…') > maxTaskWidth && taskName.length > 0) {
+                            taskName = taskName.slice(0, -1);
+                        }
+                        taskName += '…';
+                    }
+                    pdf.text(taskName, xPos, currentY + 5.5);
+                    xPos += colWidths.task;
+
+                    // Client (tronquer si nécessaire)
+                    pdf.setFont('helvetica', 'normal');
+                    let clientName = task.client_detail?.nomStructure || 'N/A';
+                    const maxClientWidth = colWidths.client - 4;
+                    if (pdf.getTextWidth(clientName) > maxClientWidth) {
+                        while (pdf.getTextWidth(clientName + '…') > maxClientWidth && clientName.length > 0) {
+                            clientName = clientName.slice(0, -1);
+                        }
+                        clientName += '…';
+                    }
+                    pdf.text(clientName, xPos, currentY + 5.5);
+                    xPos += colWidths.client;
+
+                    // Statut (badge coloré)
+                    const statusLabels: Record<string, string> = {
+                        'PLANIFIEE': 'Planifiée',
+                        'NON_DEBUTEE': 'Non débutée',
+                        'EN_COURS': 'En cours',
+                        'TERMINEE': 'Terminée',
+                        'ANNULEE': 'Annulée'
+                    };
+                    const statusText = statusLabels[task.statut] || task.statut;
+
+                    pdf.setFillColor(taskColor.bg.r, taskColor.bg.g, taskColor.bg.b);
+                    pdf.roundedRect(xPos, currentY + 1.5, colWidths.status - 2, 5, 1, 1, 'F');
+
+                    pdf.setFontSize(6);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.setTextColor(taskColor.text.r, taskColor.text.g, taskColor.text.b);
+                    pdf.text(statusText, xPos + (colWidths.status - 2) / 2, currentY + 5, { align: 'center' });
+
+                    currentY += rowHeight;
+                });
+
+                // Message si aucune tâche
+                if (sortedTasks.length === 0) {
+                    pdf.setFontSize(10);
+                    pdf.setFont('helvetica', 'italic');
+                    pdf.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
+                    pdf.text('Aucune tâche pour cette période', pageWidth / 2, startY + 40, { align: 'center' });
+                }
+            }
+
+
+            // Légende en bas (conforme aux statuts du backend)
+            const legendY = pageHeight - 8;
+            pdf.setFontSize(7);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(colors.grayDark.r, colors.grayDark.g, colors.grayDark.b);
+            pdf.text('Statuts:', 10, legendY);
+
+            const legendItems = [
+                { label: 'Planifiée', color: colors.blue },
+                { label: 'Non débutée', color: colors.gray },
+                { label: 'En cours', color: colors.orange },
+                { label: 'Terminée', color: colors.green },
+                { label: 'Annulée', color: colors.red },
+            ];
+
+            let legendX = 26;
+            legendItems.forEach(item => {
+                pdf.setFillColor(item.color.r, item.color.g, item.color.b);
+                pdf.roundedRect(legendX, legendY - 2.5, 3, 3, 0.5, 0.5, 'F');
+                pdf.setFont('helvetica', 'normal');
+                pdf.setTextColor(colors.grayDark.r, colors.grayDark.g, colors.grayDark.b);
+                pdf.text(item.label, legendX + 4.5, legendY);
+                legendX += pdf.getTextWidth(item.label) + 10;
+            });
+
+            // Légende priorité urgente
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('|  Priorité:', legendX + 2, legendY);
+            legendX += pdf.getTextWidth('|  Priorité:') + 4;
+            pdf.setFillColor(colors.red.r, colors.red.g, colors.red.b);
+            pdf.roundedRect(legendX, legendY - 2.5, 3, 3, 0.5, 0.5, 'F');
+            pdf.setFont('helvetica', 'normal');
+            pdf.text('Haute/Urgent', legendX + 4.5, legendY);
+
+            // Pied de page (sur la même ligne que la légende, à droite)
+            pdf.setFontSize(6);
+            pdf.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
+            pdf.text('Document généré automatiquement par GreenSIG', pageWidth - 10, legendY, { align: 'right' });
+
             pdf.save(`planning_greensig_${new Date().toISOString().split('T')[0]}.pdf`);
         } catch (error) {
             console.error('Erreur export PDF:', error);
@@ -762,7 +1060,11 @@ const Planning: FC = () => {
         const target = tacheToEdit || popoverInfo?.tache;
         if (!target) return;
         try {
-            const updateData: TacheUpdate = { ...data, date_debut_planifiee: new Date(data.date_debut_planifiee).toISOString(), date_fin_planifiee: new Date(data.date_fin_planifiee).toISOString() };
+            const updateData: TacheUpdate = {
+                ...data,
+                date_debut_planifiee: localInputToUTC(data.date_debut_planifiee) || data.date_debut_planifiee,
+                date_fin_planifiee: localInputToUTC(data.date_fin_planifiee) || data.date_fin_planifiee
+            };
             await planningService.updateTache(target.id, updateData);
             await loadTaches();
             setShowCreateForm(false);
@@ -773,7 +1075,11 @@ const Planning: FC = () => {
 
     const handleCreateTache = async (data: TacheCreate) => {
         try {
-            const createData = { ...data, date_debut_planifiee: new Date(data.date_debut_planifiee).toISOString(), date_fin_planifiee: new Date(data.date_fin_planifiee).toISOString() };
+            const createData = {
+                ...data,
+                date_debut_planifiee: localInputToUTC(data.date_debut_planifiee) || data.date_debut_planifiee,
+                date_fin_planifiee: localInputToUTC(data.date_fin_planifiee) || data.date_fin_planifiee
+            };
             await planningService.createTache(createData);
             await loadTaches();
             setShowCreateForm(false);
@@ -790,19 +1096,14 @@ const Planning: FC = () => {
         const deletedId = tacheToDelete;
 
         try {
-            // Mise à jour optimiste : retirer la tâche de la liste AVANT l'appel API
-            setTaches(prev => prev.filter(t => t.id !== deletedId));
-            setTacheToDelete(null); // Fermer le modal immédiatement
-
-            // Appel API en arrière-plan
             await planningService.deleteTache(deletedId);
-
-            // Pas besoin de loadTaches() car on a déjà mis à jour l'état optimistiquement
+            setTaches(prev => prev.filter(t => t.id !== deletedId));
+            setTacheToDelete(null);
         } catch (err) {
             // En cas d'erreur, recharger pour restaurer l'état correct
             console.error('Erreur suppression tâche:', err);
             await loadTaches();
-            alert('Erreur lors de la suppression');
+            throw err; // Re-throw pour que le modal affiche l'erreur
         }
     };
     const handleResetCharge = async (tacheId: number) => { try { await planningService.resetCharge(tacheId); await loadTaches(); } catch (err) { alert('Erreur charge'); } };
@@ -877,7 +1178,7 @@ const Planning: FC = () => {
         const rect = target.getBoundingClientRect();
 
         console.log('📅 CALENDAR CLICK:', {
-            tache: event.resource.titre,
+            tache: event.resource.type_tache_detail?.nom_tache,
             clickPosition: {
                 mouseEvent: e.nativeEvent instanceof MouseEvent ? {
                     clientX: (e.nativeEvent as MouseEvent).clientX,
@@ -1028,17 +1329,8 @@ const Planning: FC = () => {
                     {viewMode === 'list' && <h2 className="text-xl font-normal text-gray-800">Agenda des tâches</h2>}
                 </div>
 
-                {/* CENTER: FILTRES */}
-                <div className="flex items-center justify-center flex-1">
-                    <PlanningFiltersComponent
-                        filters={filters}
-                        onFiltersChange={handleFiltersChange}
-                        clients={clients}
-                        sites={availableSites}
-                        equipes={equipes}
-                        disabled={loading}
-                    />
-                </div>
+                {/* CENTER: Spacer */}
+                <div className="flex-1" />
 
                 {/* RIGHT: View controls */}
                 <div className="flex items-center gap-3 w-full md:w-auto justify-end">
@@ -1146,7 +1438,7 @@ const Planning: FC = () => {
                                                         key={tache.id}
                                                         onClick={(e) => {
                                                             console.log('📋 AGENDA CLICK:', {
-                                                                tache: tache.titre,
+                                                                tache: tache.type_tache_detail?.nom_tache,
                                                                 clickPosition: {
                                                                     clientX: e.clientX,
                                                                     clientY: e.clientY,
@@ -1223,7 +1515,7 @@ const Planning: FC = () => {
 
                                                         {/* Status Badge */}
                                                         <div className="flex-shrink-0">
-                                                            <StatusBadge variant="default" status={tache.statut}>
+                                                            <StatusBadge status={tache.statut}>
                                                                 {STATUT_TACHE_LABELS[tache.statut]}
                                                             </StatusBadge>
                                                         </div>
@@ -1243,11 +1535,11 @@ const Planning: FC = () => {
             {popoverInfo && (
                 <TaskDetailPopover
                     tache={popoverInfo.tache}
-                    reference={popoverInfo.reference}
                     onClose={() => setPopoverInfo(null)}
                     onEdit={() => { setTacheToEdit(popoverInfo.tache); setShowCreateForm(true); }}
                     onDelete={() => handleDeleteTache(popoverInfo.tache.id)}
                     onToggleComplete={() => handleToggleComplete(popoverInfo.tache)}
+                    isReadOnly={isReadOnly}
                 />
             )}
 
@@ -1285,21 +1577,16 @@ const Planning: FC = () => {
 
             {/* Delete Confirmation Modal */}
             {tacheToDelete && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
-                        <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500"><Trash2 className="w-7 h-7" /></div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">Supprimer la tâche ?</h3>
-                        <p className="text-sm text-gray-500 mb-8">Cette action est irréversible.</p>
-                        <div className="flex gap-3">
-                            <button onClick={() => setTacheToDelete(null)} className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium">Annuler</button>
-                            <button onClick={confirmDelete} className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 font-medium">Supprimer</button>
-                        </div>
-                    </div>
-                </div>
+                <ConfirmDeleteModal
+                    title="Supprimer la tâche ?"
+                    message="Cette action est irréversible."
+                    onConfirm={confirmDelete}
+                    onCancel={() => setTacheToDelete(null)}
+                />
             )}
 
             {/* Quick Task Creator */}
-            {showQuickCreator && (
+            {showQuickCreator && !isReadOnly && (
                 <QuickTaskCreator
                     isOpen={showQuickCreator}
                     onClose={() => setShowQuickCreator(false)}
