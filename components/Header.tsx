@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { User, ViewState, MapSearchResult, SearchSuggestion, TargetLocation } from '../types';
-import { Bell, X, Search, Loader2, MapPin, ChevronRight, Command, Clock } from 'lucide-react';
+import { X, Search, Loader2, MapPin, ChevronRight, Command, Clock } from 'lucide-react';
 import { useSearch } from '../contexts/SearchContext';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import NotificationBell from './NotificationBell';
 
 interface HeaderProps {
   user: User;
@@ -25,7 +26,8 @@ const VIEW_TITLES: Record<ViewState, string> = {
   'CLIENT_PORTAL': 'Espace Client',
   'PRODUCTS': 'Gestion des Produits',
   'SITES': 'Gestion des Sites',
-  'CLIENTS': 'Clients'
+  'CLIENTS': 'Clients',
+  'SUIVI_TACHES': 'Suivi des Tâches'
 };
 
 const PATH_TO_VIEW: Record<string, ViewState> = {
@@ -35,6 +37,7 @@ const PATH_TO_VIEW: Record<string, ViewState> = {
   '/planning': 'PLANNING',
   '/interventions': 'INTERVENTIONS',
   '/claims': 'CLAIMS',
+  '/reclamations': 'CLAIMS',
   '/teams': 'TEAMS',
   '/reporting': 'REPORTING',
   '/client': 'CLIENT_PORTAL',
@@ -42,7 +45,8 @@ const PATH_TO_VIEW: Record<string, ViewState> = {
   '/products': 'PRODUCTS',
   '/users': 'USERS',
   '/clients': 'CLIENTS',
-  '/structures': 'CLIENTS'
+  '/structures': 'CLIENTS',
+  '/suivi-taches': 'SUIVI_TACHES'
 };
 
 const Header: React.FC<HeaderProps> = ({ user }) => {
@@ -200,10 +204,7 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
           </div>
         </div>
 
-        <button className="relative p-2 md:p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-all duration-200 group">
-          <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
-          <span className="absolute top-2 right-2 md:top-2.5 md:right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white shadow-sm"></span>
-        </button>
+        <NotificationBell />
 
         <div className="flex items-center gap-2 md:gap-3 pl-2 md:pl-4 border-l border-slate-200/60 h-10">
           <div className="hidden md:flex flex-col items-end">

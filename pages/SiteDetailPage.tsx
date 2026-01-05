@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getSiteById, fetchAllSites, SiteFrontend, deleteSite, updateSite, apiFetch, fetchCurrentUser } from '../services/api';
-import { fetchClients, fetchEquipes, fetchSuperviseurs, updateEquipe } from '../services/usersApi';
-import type { Client, EquipeList, SuperviseurList } from '../types/users';
+import { fetchStructures, fetchEquipes, fetchSuperviseurs, updateEquipe } from '../services/usersApi';
+import type { StructureClient, EquipeList, SuperviseurList } from '../types/users';
 import { OLMap } from '../components/OLMap';
 import { MAP_LAYERS } from '../constants';
 import { useToast } from '../contexts/ToastContext';
@@ -87,19 +87,7 @@ const ErrorDisplay: React.FC<{ message: string }> = ({ message }) => (
     </div>
 );
 
-const StatCard: React.FC<{ title: string; value: string | number; icon: React.ReactNode; color: string }> = ({ title, value, icon, color }) => (
-    <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-        <div className="flex items-center justify-between">
-            <div>
-                <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
-                <p className="text-3xl font-bold text-slate-800">{value}</p>
-            </div>
-            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${color}`}>
-                {icon}
-            </div>
-        </div>
-    </div>
-);
+
 
 const TabButton: React.FC<{
     active: boolean;
@@ -110,11 +98,10 @@ const TabButton: React.FC<{
 }> = ({ active, onClick, icon, label, badge }) => (
     <button
         onClick={onClick}
-        className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
-            active
-                ? 'border-emerald-600 text-emerald-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-        }`}
+        className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${active
+            ? 'border-emerald-600 text-emerald-600'
+            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+            }`}
     >
         {icon}
         <span className="font-medium text-sm">{label}</span>
@@ -141,7 +128,7 @@ const SiteDetailPage: React.FC = () => {
 
     // Client assignment modal
     const [showAssignClientModal, setShowAssignClientModal] = useState(false);
-    const [clients, setClients] = useState<Client[]>([]);
+    const [clients, setClients] = useState<StructureClient[]>([]);
     const [isLoadingClients, setIsLoadingClients] = useState(false);
     const [clientSearchQuery, setClientSearchQuery] = useState('');
 
@@ -197,7 +184,7 @@ const SiteDetailPage: React.FC = () => {
 
                 // If not found, force refresh cache and try again
                 if (!foundSite) {
-                    const allSites = await fetchAllSites(true);
+                    const allSites = await fetchAllSites();
                     // Flexible comparison (string/number)
                     foundSite = allSites.find(s => String(s.id) === String(id));
                 } else {
@@ -237,7 +224,7 @@ const SiteDetailPage: React.FC = () => {
             setIsLoadingEquipes(true);
             try {
                 // Force refresh to bypass cache when filtering by site
-                const response = await fetchEquipes({ site: siteId }, true);
+                const response = await fetchEquipes({ site: siteId });
                 console.log('[SiteDetailPage] Équipes received:', response.results.length, 'teams');
                 console.log('[SiteDetailPage] First team (if any):', response.results[0]);
                 setEquipes(response.results);
@@ -301,7 +288,7 @@ const SiteDetailPage: React.FC = () => {
     const loadClients = async () => {
         setIsLoadingClients(true);
         try {
-            const data = await fetchClients();
+            const data = await fetchStructures();
             setClients(data.results || []);
         } catch (error: any) {
             showToast('Erreur lors du chargement des clients', 'error');
@@ -310,10 +297,10 @@ const SiteDetailPage: React.FC = () => {
         }
     };
 
-    const handleAssignClient = async (clientId: number) => {
+    const handleAssignClient = async (structureId: number) => {
         if (!site) return;
         try {
-            await updateSite(Number(site.id), { client: clientId });
+            await updateSite(Number(site.id), { structure_client: structureId });
             showToast('Client assigné avec succès', 'success');
             setRefreshKey(prev => prev + 1); // Trigger reload
             setShowAssignClientModal(false);
@@ -324,9 +311,9 @@ const SiteDetailPage: React.FC = () => {
     };
 
     const filteredClients = clients.filter(c =>
-        c.nomStructure?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
         c.nom?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
-        c.email?.toLowerCase().includes(clientSearchQuery.toLowerCase())
+        c.contactPrincipal?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+        c.emailFacturation?.toLowerCase().includes(clientSearchQuery.toLowerCase())
     );
 
     // Load superviseurs when modal opens
@@ -437,29 +424,33 @@ const SiteDetailPage: React.FC = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => setIsEditModalOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors"
-                    >
-                        <Edit className="w-4 h-4" />
-                        Modifier
-                    </button>
-                    <button
-                        onClick={() => setShowDeleteModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                        Supprimer
-                    </button>
-                    {showDeleteModal && (
-                        <ConfirmDeleteModal
-                            title="Supprimer le site"
-                            message="Êtes-vous sûr de vouloir supprimer ce site ? Cette action est irréversible."
-                            onConfirm={handleDelete}
-                            onCancel={() => setShowDeleteModal(false)}
-                            confirmText="Supprimer"
-                            cancelText="Annuler"
-                        />
+                    {!currentUser?.roles?.includes('CLIENT') && (
+                        <>
+                            <button
+                                onClick={() => setIsEditModalOpen(true)}
+                                className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors"
+                            >
+                                <Edit className="w-4 h-4" />
+                                Modifier
+                            </button>
+                            <button
+                                onClick={() => setShowDeleteModal(true)}
+                                className="flex items-center gap-2 px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                Supprimer
+                            </button>
+                            {showDeleteModal && (
+                                <ConfirmDeleteModal
+                                    title="Supprimer le site"
+                                    message="Êtes-vous sûr de vouloir supprimer ce site ? Cette action est irréversible."
+                                    onConfirm={handleDelete}
+                                    onCancel={() => setShowDeleteModal(false)}
+                                    confirmText="Supprimer"
+                                    cancelText="Annuler"
+                                />
+                            )}
+                        </>
                     )}
                 </div>
             </header>
@@ -523,11 +514,11 @@ const SiteDetailPage: React.FC = () => {
                                                     // If current user is the owner client, display "Vous-même"
                                                     if (currentUser &&
                                                         currentUser.roles?.includes('CLIENT') &&
-                                                        currentUser.client_id &&
-                                                        currentUser.client_id === site.client) {
+                                                        currentUser.structure_client_id &&
+                                                        currentUser.structure_client_id === site.structure_client) {
                                                         return 'Vous-même';
                                                     }
-                                                    return site.client_nom || 'Non assigné';
+                                                    return site.structure_client_nom || 'Non assigné';
                                                 })()}
                                             </div>
                                             {currentUser?.roles?.includes('ADMIN') && (
@@ -1147,20 +1138,22 @@ const SiteDetailPage: React.FC = () => {
                                 </div>
                             ) : (
                                 <div className="space-y-2">
-                                    {filteredClients.map((client) => (
+                                    {filteredClients.map((structure) => (
                                         <button
-                                            key={client.utilisateur}
-                                            onClick={() => handleAssignClient(client.utilisateur)}
+                                            key={structure.id}
+                                            onClick={() => handleAssignClient(structure.id)}
                                             className="w-full p-4 border rounded-lg hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left group"
                                         >
                                             <div className="flex items-center justify-between">
                                                 <div className="flex-1">
                                                     <div className="font-medium text-gray-900 group-hover:text-emerald-700">
-                                                        {client.nomStructure}
+                                                        {structure.nom}
                                                     </div>
-                                                    <div className="text-sm text-gray-500 mt-1">
-                                                        {client.nom} {client.prenom} • {client.email}
-                                                    </div>
+                                                    {(structure.contactPrincipal || structure.emailFacturation) && (
+                                                        <div className="text-sm text-gray-500 mt-1">
+                                                            {structure.contactPrincipal}{structure.contactPrincipal && structure.emailFacturation ? ' • ' : ''}{structure.emailFacturation}
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 <Plus className="w-5 h-5 text-gray-400 group-hover:text-emerald-600" />
                                             </div>

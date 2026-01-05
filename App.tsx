@@ -29,6 +29,7 @@ const Clients = lazy(() => import('./pages/Clients'));
 const StructureDetailPage = lazy(() => import('./pages/StructureDetailPage'));
 const ClientUserDetailPage = lazy(() => import('./pages/ClientUserDetailPage'));
 const OperateurDetailPage = lazy(() => import('./pages/OperateurDetailPage'));
+const Notifications = lazy(() => import('./pages/Notifications'));
 import { User, MapLayerType, Coordinates, OverlayState, MapObjectDetail, UserLocation, Measurement, MeasurementType } from './types';
 import { MAP_LAYERS } from './constants';
 import { hasExistingToken, fetchCurrentUser, updateInventoryItem, deleteInventoryItem } from './services/api';
@@ -40,6 +41,7 @@ import { ToastProvider } from './contexts/ToastContext';
 import { SelectionProvider } from './contexts/SelectionContext';
 import { DrawingProvider } from './contexts/DrawingContext';
 import { SearchProvider } from './contexts/SearchContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import logger from './services/logger';
 import ConfirmDeleteModal from './components/modals/ConfirmDeleteModal';
@@ -253,8 +255,9 @@ function App() {
           <SelectionProvider maxSelections={100}>
             <DrawingProvider>
               <SearchProvider>
-                <MapProvider>
-                  <Routes>
+                <NotificationProvider user={user}>
+                  <MapProvider>
+                    <Routes>
                     <Route
                       path="/"
                       element={
@@ -327,7 +330,7 @@ function App() {
                     >
                       <Route index element={<Navigate to={user.role === 'CLIENT' ? '/client/map' : '/dashboard'} replace />} />
                       <Route path="dashboard" element={<Dashboard />} />
-                      <Route path="inventory" element={<Suspense fallback={<PageLoadingFallback />}><Inventory /></Suspense>} />
+                      <Route path="inventory" element={<Suspense fallback={<PageLoadingFallback />}><Inventory user={user} /></Suspense>} />
                       <Route path="inventory/:objectType/:objectId" element={<Suspense fallback={<PageLoadingFallback />}><InventoryDetailPage /></Suspense>} />
                       <Route path="sites" element={<Suspense fallback={<PageLoadingFallback />}><Sites /></Suspense>} />
                       <Route path="sites/:id" element={<Suspense fallback={<PageLoadingFallback />}><SiteDetailPage /></Suspense>} />
@@ -364,7 +367,7 @@ function App() {
 
                       <Route path="planning" element={<Suspense fallback={<PageLoadingFallback />}><Planning /></Suspense>} />
                       <Route path="ratios" element={<Suspense fallback={<PageLoadingFallback />}><RatiosProductivite /></Suspense>} />
-                      <Route path="claims" element={<Suspense fallback={<PageLoadingFallback />}><SuiviTaches /></Suspense>} />
+                      <Route path="suivi-taches" element={<Suspense fallback={<PageLoadingFallback />}><SuiviTaches /></Suspense>} />
                       <Route path="products" element={<Suspense fallback={<PageLoadingFallback />}><Produits /></Suspense>} />
                       <Route path="reporting" element={<Suspense fallback={<PageLoadingFallback />}><Reporting /></Suspense>} />
                       <Route path="monthly-report" element={
@@ -382,13 +385,15 @@ function App() {
                           <Suspense fallback={<PageLoadingFallback />}><Parametres /></Suspense>
                         </RequireRole>
                       } />
+                      <Route path="notifications" element={<Suspense fallback={<PageLoadingFallback />}><Notifications user={user} /></Suspense>} />
                       <Route path="client" element={<Navigate to="/client/map" replace />} />
                       <Route path="client/map" element={null} />
                       {/* Add a /map route if you want a dedicated map view without the panel */}
                       <Route path="map" element={null} />
                     </Route>
-                  </Routes>
-                </MapProvider>
+                    </Routes>
+                  </MapProvider>
+                </NotificationProvider>
               </SearchProvider>
             </DrawingProvider>
           </SelectionProvider>

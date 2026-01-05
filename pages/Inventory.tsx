@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, X, MapPin, Calendar, FileText, Leaf, Droplet, AlertCircle, ClipboardList, Trash2, Map as MapIcon, Ban, Plus, RefreshCw, Activity, Sprout, Wrench, ChevronDown, Check, Printer, Download } from 'lucide-react';
+import { Filter, X, MapPin, FileText, Leaf, Droplet, AlertCircle, ClipboardList, Map as MapIcon, Ban, Activity, Sprout, Wrench, ChevronDown, Check, Printer, Download } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
 import { MOCK_INVENTORY, InventoryItem } from '../services/mockData';
-import { fetchInventory, ApiError, type InventoryResponse, type InventoryFilters, fetchAllSites, type SiteFrontend, fetchFilterOptions, exportData, exportInventoryExcel, exportInventoryPDF, downloadBlob } from '../services/api';
+import { fetchInventory, ApiError, type InventoryResponse, fetchAllSites, type SiteFrontend, fetchFilterOptions, exportInventoryExcel, exportInventoryPDF, downloadBlob } from '../services/api';
 import { planningService } from '../services/planningService';
 import { fetchEquipes } from '../services/usersApi';
 import TaskFormModal, { InventoryObjectOption } from '../components/planning/TaskFormModal';
@@ -13,6 +13,11 @@ import { EquipeList } from '../types/users';
 import { useToast } from '../contexts/ToastContext';
 import { useSearch } from '../contexts/SearchContext';
 import LoadingScreen from '../components/LoadingScreen';
+import { User } from '../types';
+
+interface InventoryProps {
+  user: User;
+} 
 
 // Types de végétation et hydrologie pour les filtres
 const VEGETATION_TYPES = ['Arbre', 'Palmier', 'Gazon', 'Arbuste', 'Vivace', 'Cactus', 'Graminee'];
@@ -169,7 +174,7 @@ const ExportDropdown = ({ onExportCSV, onExportExcel, onPrint }: { onExportCSV: 
             className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
           >
             <Printer className="w-4 h-4 text-slate-500" />
-            Imprimer
+            Export en PDF
           </button>
         </div>
       )}
@@ -178,8 +183,9 @@ const ExportDropdown = ({ onExportCSV, onExportExcel, onPrint }: { onExportCSV: 
 };
 
 // Main Inventory Component
-const Inventory: React.FC = () => {
+const Inventory: React.FC<InventoryProps> = ({ user }) => {
   const navigate = useNavigate();
+  const isClient = user.role === 'CLIENT';
   const { showToast } = useToast();
   const { searchQuery, setPlaceholder } = useSearch();
 
@@ -198,14 +204,12 @@ const Inventory: React.FC = () => {
   const [isTaskCompatible, setIsTaskCompatible] = useState(true);
   const [compatibilityLoading, setCompatibilityLoading] = useState(false);
   const [applicableTasksCount, setApplicableTasksCount] = useState<number | null>(null);
-  const [incompatibleTypesMessage, setIncompatibleTypesMessage] = useState<string | null>(null);
 
   // Task modal state
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
   const [modalEquipes, setModalEquipes] = useState<EquipeList[]>([]);
   const [modalTypesTaches, setModalTypesTaches] = useState<TypeTache[]>([]);
-  const [taskSubmitting, setTaskSubmitting] = useState(false);
 
   // ✅ Advanced Filters - Restore from sessionStorage
   const [filters, setFilters] = useState(
@@ -505,7 +509,7 @@ const Inventory: React.FC = () => {
     if (selectedItemsCache.size === 0) {
       setIsTaskCompatible(true);
       setApplicableTasksCount(null);
-      setIncompatibleTypesMessage(null);
+      setApplicableTasksCount(null);
       return;
     }
 
@@ -522,13 +526,12 @@ const Inventory: React.FC = () => {
     if (uniqueTypes.length <= 1) {
       setIsTaskCompatible(true);
       setApplicableTasksCount(null);
-      setIncompatibleTypesMessage(null);
+      setApplicableTasksCount(null);
       return;
     }
 
     // Check compatibility with API
     setCompatibilityLoading(true);
-    setIncompatibleTypesMessage(null);
 
     planningService.getApplicableTypesTaches(uniqueTypes)
       .then(result => {
@@ -536,9 +539,7 @@ const Inventory: React.FC = () => {
         setApplicableTasksCount(result.types_taches.length);
 
         if (result.types_taches.length === 0) {
-          setIncompatibleTypesMessage(
-            `Les types sélectionnés (${uniqueTypes.join(', ')}) n'ont aucune tâche en commun.`
-          );
+          // No common tasks
         }
       })
       .catch(err => {
@@ -554,10 +555,10 @@ const Inventory: React.FC = () => {
       id: parseInt(item.id, 10),
       type: item.type.charAt(0).toUpperCase() + item.type.slice(1),
       nom: item.name,
-      site: item.siteId,
+      site: sites.find(s => s.id === item.siteId)?.name || String(item.siteId),
       soussite: item.zone
     }));
-  }, [selectedItemsCache]);
+  }, [selectedItemsCache, sites]);
 
   // Open task creation modal - fetch required data first
   const handleOpenTaskModal = async () => {
@@ -589,7 +590,6 @@ const Inventory: React.FC = () => {
 
   // Handle task creation from modal
   const handleTaskSubmit = async (data: TacheCreate) => {
-    setTaskSubmitting(true);
     try {
       await planningService.createTache(data);
       showToast('Tâche créée avec succès', 'success');
@@ -605,7 +605,7 @@ const Inventory: React.FC = () => {
       console.error('Erreur création tâche:', error);
       showToast('Erreur lors de la création de la tâche', 'error');
     } finally {
-      setTaskSubmitting(false);
+      // Done processing
     }
   };
 
@@ -1113,7 +1113,7 @@ const Inventory: React.FC = () => {
               icon={<Wrench className="w-4 h-4" />}
             />
           </div>
-          
+
           {/* Reset Button */}
           {hasActiveFilters && (
             <div className="mt-4 flex justify-end">
@@ -1234,16 +1234,16 @@ const Inventory: React.FC = () => {
             {/* Divider */}
             <div className="h-6 w-px bg-slate-200 flex-shrink-0"></div>
 
-            {/* Incompatibility warning - compact */}
-            {!isTaskCompatible && !compatibilityLoading && (
+            {/* Incompatibility warning - compact (hidden for clients) */}
+            {!isClient && !isTaskCompatible && !compatibilityLoading && (
               <div className="flex items-center gap-1.5 px-2 py-1 bg-red-50 border border-red-200 rounded-lg flex-shrink-0">
                 <Ban className="w-3.5 h-3.5 text-red-500" />
                 <span className="text-xs text-red-700 whitespace-nowrap">Types incompatibles</span>
               </div>
             )}
 
-            {/* Compatibility info - compact */}
-            {isTaskCompatible && applicableTasksCount !== null && !compatibilityLoading && (
+            {/* Compatibility info - compact (hidden for clients) */}
+            {!isClient && isTaskCompatible && applicableTasksCount !== null && !compatibilityLoading && (
               <div className="flex items-center gap-1 px-2 py-1 bg-emerald-50 border border-emerald-200 rounded-lg flex-shrink-0">
                 <span className="text-xs text-emerald-700 whitespace-nowrap">
                   ✓ {applicableTasksCount} tâche{applicableTasksCount > 1 ? 's' : ''}
@@ -1294,25 +1294,26 @@ const Inventory: React.FC = () => {
                 Carte
               </button>
 
-              {/* Create task */}
-              <button
-                onClick={handleOpenTaskModal}
-                disabled={!isTaskCompatible || compatibilityLoading || modalLoading}
-                className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 text-sm font-medium shadow-sm whitespace-nowrap ${
-                  !isTaskCompatible || compatibilityLoading || modalLoading
+              {/* Create task - Hidden for clients */}
+              {!isClient && (
+                <button
+                  onClick={handleOpenTaskModal}
+                  disabled={!isTaskCompatible || compatibilityLoading || modalLoading}
+                  className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 text-sm font-medium shadow-sm whitespace-nowrap ${!isTaskCompatible || compatibilityLoading || modalLoading
                     ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
                     : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                }`}
-              >
-                {compatibilityLoading || modalLoading ? (
-                  <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <ClipboardList className="w-4 h-4" />
-                    Tâche
-                  </>
-                )}
-              </button>
+                    }`}
+                >
+                  {compatibilityLoading || modalLoading ? (
+                    <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <ClipboardList className="w-4 h-4" />
+                      Tâche
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>

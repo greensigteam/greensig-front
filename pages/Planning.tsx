@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, memo, useRef, type FC } from 'react';
 import { Calendar as BigCalendar, dateFnsLocalizer } from 'react-big-calendar';
 import withDragAndDrop, { EventInteractionArgs } from 'react-big-calendar/lib/addons/dragAndDrop';
-import { useLocation } from 'react-router-dom';
 import {
     format, parse, startOfWeek, getDay, endOfWeek,
     addMonths, subMonths, addWeeks, subWeeks, addDays, subDays, isToday
@@ -12,7 +11,7 @@ import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 
 import {
     Users, Clock, X, Trash2, Edit, Timer, AlertTriangle, Download, Calendar as CalendarIcon, List,
-    ChevronLeft, ChevronRight, Circle, CheckCircle2, MoreVertical, CornerUpLeft, ChevronDown
+    ChevronLeft, ChevronRight, CheckCircle2, MoreVertical, CornerUpLeft, ChevronDown
 } from 'lucide-react';
 import { planningService } from '../services/planningService';
 import { fetchEquipes, fetchClients } from '../services/usersApi';
@@ -20,7 +19,7 @@ import { fetchCurrentUser } from '../services/api';
 import {
     Tache, TacheCreate, TacheUpdate, TypeTache,
     STATUT_TACHE_LABELS, STATUT_TACHE_COLORS,
-    PRIORITE_LABELS, PRIORITE_COLORS
+    PRIORITE_LABELS
 } from '../types/planning';
 import { EquipeList, Client } from '../types/users';
 import TaskFormModal, { InventoryObjectOption } from '../components/planning/TaskFormModal';
@@ -30,18 +29,11 @@ import LoadingScreen from '../components/LoadingScreen';
 import { fetchSites, fetchInventory } from '../services/api';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import {
-    useFloating,
-    offset,
-    flip,
-    shift,
-    autoUpdate,
     FloatingPortal,
-    useDismiss,
-    useInteractions,
     type ReferenceType,
     type VirtualElement,
-    type Placement
 } from '@floating-ui/react';
+import { localInputToUTC } from '../utils/dateHelpers';
 
 // ============================================================================
 // STYLES CUSTOM (Google Tasks Look & Feel)
@@ -157,7 +149,7 @@ const TaskEvent = memo(function TaskEvent({ event }: { event: CalendarEvent, tit
                         </span>
                         {tache.equipes_detail?.length > 0 && (
                             <span className="text-[9px] px-1 py-0.5 bg-gray-100 rounded text-gray-500 truncate max-w-[80px]">
-                                {tache.equipes_detail.length > 1 ? `${tache.equipes_detail.length} éq.` : tache.equipes_detail[0].nomEquipe}
+                                {tache.equipes_detail.length > 1 ? `${tache.equipes_detail.length} éq.` : tache.equipes_detail[0]?.nomEquipe}
                             </span>
                         )}
                     </div>
@@ -171,196 +163,132 @@ const TaskEvent = memo(function TaskEvent({ event }: { event: CalendarEvent, tit
 // POPOVER DETAIL (Google Tasks Card)
 // ============================================================================
 
-/**
- * Calculate transform-origin based on Floating UI placement
- * This ensures the "genie lamp" animation originates from the correct direction
- */
-const getTransformOrigin = (placement: Placement): string => {
-    const [side, alignment = 'center'] = placement.split('-') as [string, string?];
-
-    const sideOrigins: Record<string, string> = {
-        top: 'bottom',
-        bottom: 'top',
-        left: 'right',
-        right: 'left',
-    };
-
-    const originSide = sideOrigins[side];
-    const originAlign = alignment || 'center';
-
-    // Horizontal placements (left/right): "right center", "left start", etc.
-    if (side === 'left' || side === 'right') {
-        return `${originSide} ${originAlign}`;
-    }
-
-    // Vertical placements (top/bottom): "center bottom", "start top", etc.
-    return `${originAlign} ${originSide}`;
-};
-
 interface PopoverProps {
     tache: Tache;
-    reference: ReferenceType;
     onClose: () => void;
     onEdit: () => void;
     onDelete: () => void;
     onToggleComplete: () => void;
+    isReadOnly?: boolean;
 }
 
-const TaskDetailPopover: FC<PopoverProps> = ({ tache, reference, onClose, onEdit, onDelete, onToggleComplete }) => {
-    const [isOpen, setIsOpen] = useState(true);
-
-    console.log('🎯 POPOVER RENDER:', {
-        tache: tache.type_tache_detail?.nom_tache,
-        referenceType: reference instanceof Element ? 'DOM Element' : 'VirtualElement',
-        referenceBoundingRect: reference && typeof reference === 'object' && 'getBoundingClientRect' in reference
-            ? reference.getBoundingClientRect()
-            : 'No getBoundingClientRect',
-    });
-
-    // Floating UI handles all positioning automatically
-    const { refs, floatingStyles, placement, context } = useFloating({
-        open: isOpen,
-        onOpenChange: (open) => {
-            setIsOpen(open);
-            if (!open) onClose();
-        },
-        placement: 'right-start', // Preferred placement
-        strategy: 'fixed', // CRITICAL: Use fixed positioning because FloatingPortal renders in body
-        middleware: [
-            offset(10), // 10px gap from reference element
-            flip({
-                // Try these placements in order if primary doesn't fit
-                fallbackPlacements: [
-                    'left-start',
-                    'right-end',
-                    'left-end',
-                    'top-start',
-                    'bottom-start',
-                    'top',
-                    'bottom'
-                ],
-                padding: 20, // Keep 20px from viewport edges
-            }),
-            shift({
-                padding: 10, // Allow shifting to fit in viewport
-            }),
-        ],
-        whileElementsMounted: autoUpdate, // Auto-repositions on scroll/resize
-        elements: {
-            reference: reference as any, // Pass reference directly (supports DOM elements and VirtualElement)
-        },
-    });
-
-    console.log('🎯 FLOATING UI RESULT:', {
-        placement,
-        floatingStyles,
-        transformOrigin: getTransformOrigin(placement),
-    });
-
-    // Built-in dismiss handling (ESC key + outside clicks)
-    const dismiss = useDismiss(context, {
-        outsidePress: true,
-        escapeKey: true,
-    });
-
-    const { getFloatingProps } = useInteractions([dismiss]);
-
+const TaskDetailPopover: FC<PopoverProps> = ({ tache, onClose, onEdit, onDelete, onToggleComplete, isReadOnly }) => {
     const isCompleted = tache.statut === 'TERMINEE';
+
+    // Handle escape key and click outside
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
 
     return (
         <FloatingPortal>
+            {/* Backdrop */}
             <div
-                ref={refs.setFloating}
-                style={{
-                    ...floatingStyles,
-                    transformOrigin: getTransformOrigin(placement),
-                }}
-                {...getFloatingProps()}
-                className="z-[1000] w-[400px] bg-white rounded-xl shadow-2xl border border-gray-100 animate-popover flex flex-col overflow-hidden"
+                className="fixed inset-0 bg-black/30 z-[999] animate-in fade-in duration-200"
+                onClick={onClose}
+            />
+            {/* Centered Modal */}
+            <div
+                className="fixed inset-0 z-[1000] flex items-center justify-center p-4 pointer-events-none"
             >
-                {/* Header Actions */}
-                <div className="flex justify-between items-center px-4 py-2 bg-white border-b border-gray-50">
-                    <button onClick={onClose} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
-                        <X className="w-5 h-5" />
-                    </button>
-                    <div className="flex items-center gap-1">
-                        <button onClick={onEdit} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors" title="Modifier">
-                            <Edit className="w-4 h-4" />
+                <div
+                    className="w-[420px] max-w-full bg-white rounded-xl shadow-2xl border border-gray-100 animate-popover flex flex-col overflow-hidden pointer-events-auto"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {/* Header Actions */}
+                    <div className="flex justify-between items-center px-4 py-2 bg-white border-b border-gray-50">
+                        <button onClick={onClose} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
+                            <X className="w-5 h-5" />
                         </button>
-                        <button onClick={onDelete} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors" title="Supprimer">
-                            <Trash2 className="w-4 h-4" />
-                        </button>
-                        <button className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
-                            <MoreVertical className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                            {!isReadOnly && (
+                                <>
+                                    <button onClick={onEdit} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors" title="Modifier">
+                                        <Edit className="w-4 h-4" />
+                                    </button>
+                                    <button onClick={onDelete} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors" title="Supprimer">
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </>
+                            )}
+                            <button className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
+                                <MoreVertical className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
-                </div>
 
-                {/* Hero Content */}
-                <div className="px-6 py-5">
-                    <div className="flex items-start gap-4">
-                        {/* Big Checkbox */}
-                        <button
-                            onClick={onToggleComplete}
-                            className={`
+                    {/* Hero Content */}
+                    <div className="px-6 py-5">
+                        <div className="flex items-start gap-4">
+                            {/* Big Checkbox - disabled for CLIENT (readOnly) */}
+                            <button
+                                onClick={isReadOnly ? undefined : onToggleComplete}
+                                disabled={isReadOnly}
+                                className={`
                             mt-1 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300
                             ${isCompleted
-                                    ? 'bg-emerald-600 border-emerald-600 text-white animate-check'
-                                    : 'bg-white border-gray-400 hover:border-emerald-500 hover:bg-emerald-50'
-                                }
+                                        ? 'bg-emerald-600 border-emerald-600 text-white animate-check'
+                                        : 'bg-white border-gray-400 hover:border-emerald-500 hover:bg-emerald-50'
+                                    }
+                            ${isReadOnly ? 'cursor-not-allowed opacity-60' : ''}
                         `}
-                        >
-                            {isCompleted && <CheckCircle2 className="w-4 h-4" />}
-                        </button>
+                            >
+                                {isCompleted && <CheckCircle2 className="w-4 h-4" />}
+                            </button>
 
-                        <div className="flex-1">
-                            <h3 className={`text-lg font-medium leading-snug ${isCompleted ? 'line-through text-gray-500' : 'text-gray-900'}`}>
-                                {tache.type_tache_detail.nom_tache}
-                            </h3>
-                            <div className="mt-2 flex flex-col gap-1 text-sm text-gray-600">
-                                <div className="flex items-center gap-2">
-                                    <Clock className="w-4 h-4 text-gray-400" />
-                                    <span>
-                                        {format(new Date(tache.date_debut_planifiee), 'EEEE d MMMM', { locale: fr })}
-                                        <span className="mx-1">•</span>
-                                        {format(new Date(tache.date_debut_planifiee), 'HH:mm')} - {format(new Date(tache.date_fin_planifiee), 'HH:mm')}
-                                    </span>
-                                </div>
-                                {(tache.equipes_detail?.length > 0 || tache.equipe_detail) && (
+                            <div className="flex-1">
+                                <h3 className={`text-lg font-medium leading-snug ${isCompleted ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+                                    {tache.type_tache_detail.nom_tache}
+                                </h3>
+                                <div className="mt-2 flex flex-col gap-1 text-sm text-gray-600">
                                     <div className="flex items-center gap-2">
-                                        <Users className="w-4 h-4 text-gray-400" />
+                                        <Clock className="w-4 h-4 text-gray-400" />
                                         <span>
-                                            {tache.equipes_detail?.length > 0
-                                                ? tache.equipes_detail.map(e => (e as any).nom_equipe || e.nomEquipe).join(', ')
-                                                : (tache.equipe_detail as any)?.nom_equipe || tache.equipe_detail?.nomEquipe}
+                                            {format(new Date(tache.date_debut_planifiee), 'EEEE d MMMM', { locale: fr })}
+                                            <span className="mx-1">•</span>
+                                            {format(new Date(tache.date_debut_planifiee), 'HH:mm')} - {format(new Date(tache.date_fin_planifiee), 'HH:mm')}
                                         </span>
                                     </div>
+                                    {(tache.equipes_detail?.length > 0 || tache.equipe_detail) && (
+                                        <div className="flex items-center gap-2">
+                                            <Users className="w-4 h-4 text-gray-400" />
+                                            <span>
+                                                {tache.equipes_detail?.length > 0
+                                                    ? tache.equipes_detail.map(e => (e as any).nom_equipe || e.nomEquipe).join(', ')
+                                                    : (tache.equipe_detail as any)?.nom_equipe || tache.equipe_detail?.nomEquipe}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Body / Context */}
+                    {(tache.commentaires || tache.priorite) && (
+                        <div className="px-6 pb-6 pt-0 space-y-4">
+                            {tache.commentaires && (
+                                <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg leading-relaxed">
+                                    {tache.commentaires}
+                                </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                                <StatusBadge status={tache.statut}>
+                                    {STATUT_TACHE_LABELS[tache.statut]}
+                                </StatusBadge>
+                                {tache.priorite > 1 && (
+                                    <span className={`text-xs px-2 py-1 rounded-full border ${tache.priorite >= 4 ? 'bg-red-50 border-red-200 text-red-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+                                        {PRIORITE_LABELS[tache.priorite]}
+                                    </span>
                                 )}
                             </div>
                         </div>
-                    </div>
+                    )}
                 </div>
-
-                {/* Body / Context */}
-                {(tache.commentaires || tache.priorite) && (
-                    <div className="px-6 pb-6 pt-0 space-y-4">
-                        {tache.commentaires && (
-                            <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg leading-relaxed">
-                                {tache.commentaires}
-                            </div>
-                        )}
-                        <div className="flex items-center gap-2">
-                            <StatusBadge status={tache.statut}>
-                                {STATUT_TACHE_LABELS[tache.statut]}
-                            </StatusBadge>
-                            {tache.priorite > 1 && (
-                                <span className={`text-xs px-2 py-1 rounded-full border ${tache.priorite >= 4 ? 'bg-red-50 border-red-200 text-red-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
-                                    {PRIORITE_LABELS[tache.priorite]}
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                )}
             </div>
         </FloatingPortal>
     );
@@ -408,7 +336,6 @@ const Planning: FC = () => {
 
     const [isExporting, setIsExporting] = useState(false);
     const calendarRef = useRef<HTMLDivElement>(null);
-    const location = useLocation();
     const [initialTaskValues, setInitialTaskValues] = useState<Partial<TacheCreate> | undefined>(undefined);
     const [preSelectedObjects, setPreSelectedObjects] = useState<InventoryObjectOption[] | undefined>(undefined);
 
@@ -638,6 +565,79 @@ const Planning: FC = () => {
             });
             pdf.text(`Exporté le ${dateStr}`, pageWidth - 14, 22, { align: 'right' });
 
+            // Filter tasks to the visible date range to avoid empty PDFs
+            let tasksToRender = filteredTaches;
+            if (currentView === 'month') {
+                // For month view, include tasks from the entire displayed calendar (including overflow days)
+                const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+                const startDate = new Date(firstDay);
+                startDate.setDate(startDate.getDate() - (startDate.getDay() === 0 ? 6 : startDate.getDay() - 1));
+
+                const endDate = new Date(startDate);
+                endDate.setDate(endDate.getDate() + 42); // 6 weeks
+
+                tasksToRender = filteredTaches.filter(t => {
+                    const taskDate = new Date(t.date_debut_planifiee);
+                    return taskDate >= startDate && taskDate < endDate;
+                });
+            } else if (currentView === 'week') {
+                // For week view, include tasks from the displayed week
+                const weekStart = new Date(currentDate);
+                weekStart.setDate(weekStart.getDate() - (weekStart.getDay() === 0 ? 6 : weekStart.getDay() - 1));
+
+                const weekEnd = new Date(weekStart);
+                weekEnd.setDate(weekEnd.getDate() + 7);
+
+                tasksToRender = filteredTaches.filter(t => {
+                    const taskDate = new Date(t.date_debut_planifiee);
+                    return taskDate >= weekStart && taskDate < weekEnd;
+                });
+            } else if (currentView === 'day') {
+                // For day view, include tasks from the current day
+                const dayStart = new Date(currentDate);
+                dayStart.setHours(0, 0, 0, 0);
+
+                const dayEnd = new Date(currentDate);
+                dayEnd.setHours(23, 59, 59, 999);
+
+                tasksToRender = filteredTaches.filter(t => {
+                    const taskDate = new Date(t.date_debut_planifiee);
+                    return taskDate >= dayStart && taskDate <= dayEnd;
+                });
+            } else if (currentView === 'agenda') {
+                // For agenda/list view, include tasks from the current month
+                const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+                monthStart.setHours(0, 0, 0, 0);
+
+                const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+                monthEnd.setHours(23, 59, 59, 999);
+
+                tasksToRender = filteredTaches.filter(t => {
+                    const taskDate = new Date(t.date_debut_planifiee);
+                    return taskDate >= monthStart && taskDate <= monthEnd;
+                });
+            }
+
+            // Debug logging
+            console.log('[PDF Export] Current view:', currentView);
+            console.log('[PDF Export] Current date:', currentDate);
+            console.log('[PDF Export] Total tasks in system:', filteredTaches.length);
+            console.log('[PDF Export] Tasks after filtering:', tasksToRender.length);
+            if (tasksToRender.length > 0) {
+                console.log('[PDF Export] Sample task dates:', tasksToRender.slice(0, 3).map(t => ({
+                    nom: t.type_tache_detail.nom_tache,
+                    date: new Date(t.date_debut_planifiee).toISOString()
+                })));
+            } else {
+                console.warn('[PDF Export] No tasks found for current view and date range!');
+                if (filteredTaches.length > 0) {
+                    console.log('[PDF Export] Sample of all task dates:', filteredTaches.slice(0, 5).map(t => ({
+                        nom: t.type_tache_detail.nom_tache,
+                        date: new Date(t.date_debut_planifiee).toISOString()
+                    })));
+                }
+            }
+
             // Date d'aujourd'hui pour mise en surbrillance
             const today = new Date();
 
@@ -714,7 +714,7 @@ const Planning: FC = () => {
                     }
 
                     // Tâches du jour
-                    const dayTasks = filteredTaches.filter(t => {
+                    const dayTasks = tasksToRender.filter(t => {
                         const taskDate = new Date(t.date_debut_planifiee);
                         return taskDate.getDate() === date.getDate() &&
                             taskDate.getMonth() === date.getMonth() &&
@@ -835,7 +835,7 @@ const Planning: FC = () => {
                     const dayDate = new Date(weekStart);
                     dayDate.setDate(dayDate.getDate() + dayIndex);
 
-                    const dayTasks = filteredTaches.filter(t => {
+                    const dayTasks = tasksToRender.filter(t => {
                         const taskDate = new Date(t.date_debut_planifiee);
                         return taskDate.toDateString() === dayDate.toDateString();
                     });
@@ -878,7 +878,134 @@ const Planning: FC = () => {
                         }
                     });
                 }
+            } else {
+                // Vue liste (agenda/day) - Affichage en tableau
+                const startY = 35;
+                const rowHeight = 8;
+                const colWidths = {
+                    date: 35,
+                    time: 20,
+                    task: 90,
+                    client: 50,
+                    status: 30
+                };
+
+                // En-tête du tableau
+                pdf.setFillColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
+                pdf.rect(10, startY, pageWidth - 20, rowHeight, 'F');
+
+                pdf.setFontSize(8);
+                pdf.setTextColor(255, 255, 255);
+                pdf.setFont('helvetica', 'bold');
+
+                let xPos = 12;
+                pdf.text('Date', xPos, startY + 5.5);
+                xPos += colWidths.date;
+                pdf.text('Heure', xPos, startY + 5.5);
+                xPos += colWidths.time;
+                pdf.text('Tâche', xPos, startY + 5.5);
+                xPos += colWidths.task;
+                pdf.text('Client', xPos, startY + 5.5);
+                xPos += colWidths.client;
+                pdf.text('Statut', xPos, startY + 5.5);
+
+                // Trier les tâches par date
+                const sortedTasks = [...tasksToRender].sort((a, b) =>
+                    new Date(a.date_debut_planifiee).getTime() - new Date(b.date_debut_planifiee).getTime()
+                );
+
+                let currentY = startY + rowHeight;
+                const maxY = pageHeight - 20; // Laisser de l'espace pour la légende
+
+                sortedTasks.forEach((task, index) => {
+                    // Vérifier si on a besoin d'une nouvelle page
+                    if (currentY + rowHeight > maxY) {
+                        pdf.addPage();
+                        currentY = 20;
+                    }
+
+                    const taskColor = getTaskColor(task);
+                    const taskDate = new Date(task.date_debut_planifiee);
+
+                    // Fond alterné pour lisibilité
+                    if (index % 2 === 0) {
+                        pdf.setFillColor(250, 250, 252);
+                        pdf.rect(10, currentY, pageWidth - 20, rowHeight, 'F');
+                    }
+
+                    // Bordure gauche colorée selon le statut
+                    pdf.setFillColor(taskColor.border.r, taskColor.border.g, taskColor.border.b);
+                    pdf.rect(10, currentY, 2, rowHeight, 'F');
+
+                    pdf.setFontSize(7);
+                    pdf.setFont('helvetica', 'normal');
+                    pdf.setTextColor(colors.grayDark.r, colors.grayDark.g, colors.grayDark.b);
+
+                    xPos = 14;
+                    // Date
+                    pdf.text(format(taskDate, 'dd/MM/yyyy', { locale: fr }), xPos, currentY + 5.5);
+                    xPos += colWidths.date;
+
+                    // Heure
+                    pdf.text(format(taskDate, 'HH:mm'), xPos, currentY + 5.5);
+                    xPos += colWidths.time;
+
+                    // Nom de la tâche (tronquer si nécessaire)
+                    pdf.setFont('helvetica', 'bold');
+                    let taskName = task.type_tache_detail.nom_tache;
+                    const maxTaskWidth = colWidths.task - 4;
+                    if (pdf.getTextWidth(taskName) > maxTaskWidth) {
+                        while (pdf.getTextWidth(taskName + '…') > maxTaskWidth && taskName.length > 0) {
+                            taskName = taskName.slice(0, -1);
+                        }
+                        taskName += '…';
+                    }
+                    pdf.text(taskName, xPos, currentY + 5.5);
+                    xPos += colWidths.task;
+
+                    // Client (tronquer si nécessaire)
+                    pdf.setFont('helvetica', 'normal');
+                    let clientName = task.client_detail?.nomStructure || 'N/A';
+                    const maxClientWidth = colWidths.client - 4;
+                    if (pdf.getTextWidth(clientName) > maxClientWidth) {
+                        while (pdf.getTextWidth(clientName + '…') > maxClientWidth && clientName.length > 0) {
+                            clientName = clientName.slice(0, -1);
+                        }
+                        clientName += '…';
+                    }
+                    pdf.text(clientName, xPos, currentY + 5.5);
+                    xPos += colWidths.client;
+
+                    // Statut (badge coloré)
+                    const statusLabels: Record<string, string> = {
+                        'PLANIFIEE': 'Planifiée',
+                        'NON_DEBUTEE': 'Non débutée',
+                        'EN_COURS': 'En cours',
+                        'TERMINEE': 'Terminée',
+                        'ANNULEE': 'Annulée'
+                    };
+                    const statusText = statusLabels[task.statut] || task.statut;
+
+                    pdf.setFillColor(taskColor.bg.r, taskColor.bg.g, taskColor.bg.b);
+                    pdf.roundedRect(xPos, currentY + 1.5, colWidths.status - 2, 5, 1, 1, 'F');
+
+                    pdf.setFontSize(6);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.setTextColor(taskColor.text.r, taskColor.text.g, taskColor.text.b);
+                    pdf.text(statusText, xPos + (colWidths.status - 2) / 2, currentY + 5, { align: 'center' });
+
+                    currentY += rowHeight;
+                });
+
+                // Message si aucune tâche
+                if (sortedTasks.length === 0) {
+                    pdf.setFontSize(10);
+                    pdf.setFont('helvetica', 'italic');
+                    pdf.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
+                    pdf.text('Aucune tâche pour cette période', pageWidth / 2, startY + 40, { align: 'center' });
+                }
             }
+
 
             // Légende en bas (conforme aux statuts du backend)
             const legendY = pageHeight - 8;
@@ -933,7 +1060,11 @@ const Planning: FC = () => {
         const target = tacheToEdit || popoverInfo?.tache;
         if (!target) return;
         try {
-            const updateData: TacheUpdate = { ...data, date_debut_planifiee: new Date(data.date_debut_planifiee).toISOString(), date_fin_planifiee: new Date(data.date_fin_planifiee).toISOString() };
+            const updateData: TacheUpdate = {
+                ...data,
+                date_debut_planifiee: localInputToUTC(data.date_debut_planifiee) || data.date_debut_planifiee,
+                date_fin_planifiee: localInputToUTC(data.date_fin_planifiee) || data.date_fin_planifiee
+            };
             await planningService.updateTache(target.id, updateData);
             await loadTaches();
             setShowCreateForm(false);
@@ -944,7 +1075,11 @@ const Planning: FC = () => {
 
     const handleCreateTache = async (data: TacheCreate) => {
         try {
-            const createData = { ...data, date_debut_planifiee: new Date(data.date_debut_planifiee).toISOString(), date_fin_planifiee: new Date(data.date_fin_planifiee).toISOString() };
+            const createData = {
+                ...data,
+                date_debut_planifiee: localInputToUTC(data.date_debut_planifiee) || data.date_debut_planifiee,
+                date_fin_planifiee: localInputToUTC(data.date_fin_planifiee) || data.date_fin_planifiee
+            };
             await planningService.createTache(createData);
             await loadTaches();
             setShowCreateForm(false);
@@ -1400,11 +1535,11 @@ const Planning: FC = () => {
             {popoverInfo && (
                 <TaskDetailPopover
                     tache={popoverInfo.tache}
-                    reference={popoverInfo.reference}
                     onClose={() => setPopoverInfo(null)}
                     onEdit={() => { setTacheToEdit(popoverInfo.tache); setShowCreateForm(true); }}
                     onDelete={() => handleDeleteTache(popoverInfo.tache.id)}
                     onToggleComplete={() => handleToggleComplete(popoverInfo.tache)}
+                    isReadOnly={isReadOnly}
                 />
             )}
 
@@ -1451,7 +1586,7 @@ const Planning: FC = () => {
             )}
 
             {/* Quick Task Creator */}
-            {showQuickCreator && (
+            {showQuickCreator && !isReadOnly && (
                 <QuickTaskCreator
                     isOpen={showQuickCreator}
                     onClose={() => setShowQuickCreator(false)}

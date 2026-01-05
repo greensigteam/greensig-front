@@ -6,9 +6,9 @@ import {
   fetchEquipeMembres,
   fetchOperateurs,
   affecterMembres,
-  retirerMembre,
-  invalidateCache
+  retirerMembre
 } from '../services/usersApi';
+import { invalidateCacheByPrefix } from '../hooks/useDataCache';
 import DetailModal from '../components/DetailModal';
 
 interface EditEquipeModalProps {
@@ -49,7 +49,7 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
     setLoadingMembres(true);
     try {
       // Invalider le cache des opérateurs pour forcer un appel API frais
-      await invalidateCache('operateurs');
+      invalidateCacheByPrefix('operateurs');
 
       const [membresRes, operateursRes] = await Promise.all([
         fetchEquipeMembres(equipe.id),

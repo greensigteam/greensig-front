@@ -17,8 +17,6 @@ import {
     PhotoList,
     PhotoCreate
 } from '../types/suiviTaches';
-import { db, cacheKeys, cacheTTL } from './db';
-
 const API_BASE_URL = '/api/suivi-taches';
 
 // ============================================================================
@@ -80,9 +78,6 @@ export const createProduit = async (data: ProduitCreate): Promise<ProduitDetail>
         body: JSON.stringify(data)
     });
     const result = await handleResponse<ProduitDetail>(response);
-
-    // Invalider le cache du suivi des tâches
-    await db.remove(cacheKeys.suiviTaches());
     return result;
 };
 
@@ -93,9 +88,6 @@ export const updateProduit = async (id: number, data: Partial<ProduitCreate>): P
         body: JSON.stringify(data)
     });
     const result = await handleResponse<ProduitDetail>(response);
-
-    // Invalider le cache du suivi des tâches
-    await db.remove(cacheKeys.suiviTaches());
     return result;
 };
 
@@ -107,9 +99,6 @@ export const deleteProduit = async (id: number): Promise<void> => {
     if (!response.ok) {
         throw new Error('Erreur lors de la suppression');
     }
-
-    // Invalider le cache du suivi des tâches
-    await db.remove(cacheKeys.suiviTaches());
 };
 
 export const fetchProduitsActifs = async (): Promise<ProduitList[]> => {
@@ -134,9 +123,6 @@ export const softDeleteProduit = async (id: number): Promise<{ message: string; 
         headers: getAuthHeaders()
     });
     const result = await handleResponse<{ message: string; produit: ProduitDetail }>(response);
-
-    // Invalider le cache du suivi des tâches
-    await db.remove(cacheKeys.suiviTaches());
     return result;
 };
 
@@ -146,9 +132,6 @@ export const reactivateProduit = async (id: number): Promise<{ message: string; 
         headers: getAuthHeaders()
     });
     const result = await handleResponse<{ message: string; produit: ProduitDetail }>(response);
-
-    // Invalider le cache du suivi des tâches
-    await db.remove(cacheKeys.suiviTaches());
     return result;
 };
 
@@ -171,9 +154,6 @@ export const createMatiereActive = async (data: ProduitMatiereActiveCreate): Pro
         body: JSON.stringify(data)
     });
     const result = await handleResponse<ProduitMatiereActive>(response);
-
-    // Invalider le cache du suivi des tâches
-    await db.remove(cacheKeys.suiviTaches());
     return result;
 };
 
@@ -187,9 +167,6 @@ export const updateMatiereActive = async (
         body: JSON.stringify(data)
     });
     const result = await handleResponse<ProduitMatiereActive>(response);
-
-    // Invalider le cache du suivi des tâches
-    await db.remove(cacheKeys.suiviTaches());
     return result;
 };
 
@@ -201,9 +178,6 @@ export const deleteMatiereActive = async (id: number): Promise<void> => {
     if (!response.ok) {
         throw new Error('Erreur lors de la suppression');
     }
-
-    // Invalider le cache du suivi des tâches
-    await db.remove(cacheKeys.suiviTaches());
 };
 
 // ============================================================================
@@ -224,11 +198,7 @@ export const createDose = async (data: DoseProduitCreate): Promise<DoseProduit> 
         headers: getAuthHeaders(),
         body: JSON.stringify(data)
     });
-    const result = await handleResponse<DoseProduit>(response);
-
-    // Invalider le cache du suivi des tâches
-    await db.remove(cacheKeys.suiviTaches());
-    return result;
+    return handleResponse<DoseProduit>(response);
 };
 
 export const updateDose = async (id: number, data: Partial<DoseProduitCreate>): Promise<DoseProduit> => {
@@ -237,11 +207,7 @@ export const updateDose = async (id: number, data: Partial<DoseProduitCreate>): 
         headers: getAuthHeaders(),
         body: JSON.stringify(data)
     });
-    const result = await handleResponse<DoseProduit>(response);
-
-    // Invalider le cache du suivi des tâches
-    await db.remove(cacheKeys.suiviTaches());
-    return result;
+    return handleResponse<DoseProduit>(response);
 };
 
 export const deleteDose = async (id: number): Promise<void> => {
@@ -252,9 +218,6 @@ export const deleteDose = async (id: number): Promise<void> => {
     if (!response.ok) {
         throw new Error('Erreur lors de la suppression');
     }
-
-    // Invalider le cache du suivi des tâches
-    await db.remove(cacheKeys.suiviTaches());
 };
 
 // ============================================================================
@@ -289,8 +252,6 @@ export const createConsommation = async (data: ConsommationProduitCreate): Promi
     });
     const result = await handleResponse<ConsommationProduit>(response);
 
-    // Invalider le cache du suivi des tâches
-    await db.remove(cacheKeys.suiviTaches());
     return result;
 };
 
@@ -305,8 +266,6 @@ export const updateConsommation = async (
     });
     const result = await handleResponse<ConsommationProduit>(response);
 
-    // Invalider le cache du suivi des tâches
-    await db.remove(cacheKeys.suiviTaches());
     return result;
 };
 
@@ -318,9 +277,6 @@ export const deleteConsommation = async (id: number): Promise<void> => {
     if (!response.ok) {
         throw new Error('Erreur lors de la suppression');
     }
-
-    // Invalider le cache du suivi des tâches
-    await db.remove(cacheKeys.suiviTaches());
 };
 
 // ============================================================================
@@ -384,8 +340,6 @@ export const createPhoto = async (data: PhotoCreate): Promise<Photo> => {
     });
     const result = await handleResponse<Photo>(response);
 
-    // Invalider le cache du suivi des tâches
-    await db.remove(cacheKeys.suiviTaches());
     return result;
 };
 
@@ -397,8 +351,6 @@ export const updatePhoto = async (id: number, data: Partial<PhotoCreate>): Promi
     });
     const result = await handleResponse<Photo>(response);
 
-    // Invalider le cache du suivi des tâches
-    await db.remove(cacheKeys.suiviTaches());
     return result;
 };
 
@@ -410,7 +362,4 @@ export const deletePhoto = async (id: number): Promise<void> => {
     if (!response.ok) {
         throw new Error('Erreur lors de la suppression');
     }
-
-    // Invalider le cache du suivi des tâches
-    await db.remove(cacheKeys.suiviTaches());
 };

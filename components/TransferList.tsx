@@ -129,7 +129,7 @@ export function TransferList<T>({
               {searchQuery ? 'Aucun résultat' : emptyAvailableMessage}
             </div>
           ) : (
-            <div className="p-1">
+            <div className="p-0.5">
               {filteredAvailable.map(item => {
                 const id = getItemId(item);
                 const isHovered = hoveredAvailable === id;
@@ -140,25 +140,25 @@ export function TransferList<T>({
                     onClick={() => addItem(item)}
                     onMouseEnter={() => setHoveredAvailable(id)}
                     onMouseLeave={() => setHoveredAvailable(null)}
-                    className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
+                    className={`w-full text-left px-2 py-1 rounded transition-colors ${
                       isHovered
                         ? 'bg-emerald-50 border border-emerald-200'
                         : 'hover:bg-gray-50 border border-transparent'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-1">
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium text-gray-900 truncate">
+                        <div className="text-xs font-medium text-gray-900 truncate">
                           {getItemLabel(item)}
                         </div>
                         {getItemSubtitle && (
-                          <div className="text-xs text-gray-500 truncate">
+                          <div className="text-[10px] text-gray-500 truncate leading-tight">
                             {getItemSubtitle(item)}
                           </div>
                         )}
                       </div>
                       {isHovered && (
-                        <ChevronRight className="w-4 h-4 text-emerald-600 flex-shrink-0 ml-2" />
+                        <ChevronRight className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
                       )}
                     </div>
                   </button>
@@ -210,7 +210,7 @@ export function TransferList<T>({
               {emptySelectedMessage}
             </div>
           ) : (
-            <div className="p-1">
+            <div className="p-0.5">
               {selected.map(item => {
                 const id = getItemId(item);
                 const isHovered = hoveredSelected === id;
@@ -221,22 +221,22 @@ export function TransferList<T>({
                     onClick={() => removeItem(item)}
                     onMouseEnter={() => setHoveredSelected(id)}
                     onMouseLeave={() => setHoveredSelected(null)}
-                    className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
+                    className={`w-full text-left px-2 py-1 rounded transition-colors ${
                       isHovered
                         ? 'bg-red-50 border border-red-200'
                         : 'hover:bg-emerald-50 border border-transparent'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-1">
                       {isHovered && (
-                        <ChevronLeft className="w-4 h-4 text-red-600 flex-shrink-0 mr-2" />
+                        <ChevronLeft className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
                       )}
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium text-gray-900 truncate">
+                        <div className="text-xs font-medium text-gray-900 truncate">
                           {getItemLabel(item)}
                         </div>
                         {getItemSubtitle && (
-                          <div className="text-xs text-gray-500 truncate">
+                          <div className="text-[10px] text-gray-500 truncate leading-tight">
                             {getItemSubtitle(item)}
                           </div>
                         )}

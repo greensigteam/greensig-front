@@ -30,24 +30,56 @@ export function utcToLocalInput(utcDate: string | Date | null | undefined): stri
 
 /**
  * Convertit une date locale (depuis un input datetime-local) vers UTC
- * pour l'envoyer au backend
+ * pour l'envoyer au backend.
+ * Utilise l'analyse manuelle pour garantir que la chaîne est traitée comme locale
+ * quel que soit le navigateur.
  *
- * @param localDateString - Date locale au format 'YYYY-MM-DDTHH:mm'
+ * @param localDateString - Date locale au format 'YYYY-MM-DDTHH:mm' ou 'YYYY-MM-DD'
  * @returns String ISO UTC (avec 'Z')
- *
- * @example
- * // L'utilisateur sélectionne "2025-12-27T16:00" (heure locale Maroc UTC+1)
- * // Le backend doit recevoir "2025-12-27T15:00:00Z" (UTC)
- * localInputToUTC("2025-12-27T16:00") // "2025-12-27T15:00:00.000Z"
  */
 export function localInputToUTC(localDateString: string | null | undefined): string | null {
   if (!localDateString) return null;
 
-  // Créer un objet Date en interprétant la string comme heure locale
-  const localDate = new Date(localDateString);
+  try {
+    // Si la chaîne contient déjà un indicateur de fuseau horaire, ne pas la toucher
+    if (localDateString.includes('Z') || localDateString.includes('+')) {
+      return new Date(localDateString).toISOString();
+    }
 
-  // Convertir en ISO UTC (avec 'Z')
-  return localDate.toISOString();
+    // Analyse manuelle du format 'YYYY-MM-DDTHH:mm' ou 'YYYY-MM-DD'
+    const parts = localDateString.split('T');
+    const datePartStr = parts[0];
+    if (!datePartStr) return null;
+
+    const dateParts = datePartStr.split('-').map(Number);
+    const timeParts = (parts[1] || '00:00').split(':').map(Number);
+
+    if (dateParts.length >= 3) {
+      const year = dateParts[0] ?? 0;
+      const month = dateParts[1] ?? 1;
+      const day = dateParts[2] ?? 1;
+      const hour = timeParts[0] ?? 0;
+      const minute = timeParts[1] ?? 0;
+
+      // Les mois en JS sont 0-11
+      const localDate = new Date(
+        year,
+        month - 1,
+        day,
+        hour,
+        minute
+      );
+
+      return localDate.toISOString();
+    }
+
+    // Fallback safe
+    const date = new Date(localDateString);
+    return isNaN(date.getTime()) ? null : date.toISOString();
+  } catch (e) {
+    console.error("Erreur conversion date locale vers UTC:", e);
+    return null;
+  }
 }
 
 /**
