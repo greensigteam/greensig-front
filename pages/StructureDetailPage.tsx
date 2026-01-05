@@ -37,7 +37,7 @@ interface InventoryStats {
         byType: Record<string, number>;
     };
     bySite?: Array<{
-        siteId: number;
+        siteId: number | string;
         siteName: string;
         total: number;
         vegetation: number;
@@ -140,7 +140,7 @@ const ActionMenu: React.FC<{
 
 const LoadingScreen: React.FC = () => (
     <div className="fixed inset-0 z-50">
-        <LoadingWrapper isLoading={true} />
+        <LoadingWrapper isLoading={true}><div /></LoadingWrapper>
     </div>
 );
 
@@ -153,11 +153,10 @@ const TabButton: React.FC<{
 }> = ({ active, onClick, icon, label, badge }) => (
     <button
         onClick={onClick}
-        className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
-            active
-                ? 'border-emerald-600 text-emerald-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-        }`}
+        className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${active
+            ? 'border-emerald-600 text-emerald-600'
+            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+            }`}
     >
         {icon}
         <span className="font-medium text-sm">{label}</span>
@@ -254,11 +253,10 @@ const OngletGeneral: React.FC<{ structure: StructureClientDetail }> = ({ structu
                     <div className="space-y-4">
                         <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
                             <span className="text-sm text-slate-500">Structure</span>
-                            <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                                structure.actif
-                                    ? 'bg-emerald-100 text-emerald-700'
-                                    : 'bg-red-100 text-red-700'
-                            }`}>
+                            <span className={`text-xs font-bold px-2 py-1 rounded-full ${structure.actif
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-red-100 text-red-700'
+                                }`}>
                                 {structure.actif ? 'Active' : 'Inactive'}
                             </span>
                         </div>
@@ -432,11 +430,10 @@ const OngletUtilisateurs: React.FC<{
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                                        user.actif
-                                            ? 'bg-emerald-100 text-emerald-700'
-                                            : 'bg-red-100 text-red-700'
-                                    }`}>
+                                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${user.actif
+                                        ? 'bg-emerald-100 text-emerald-700'
+                                        : 'bg-red-100 text-red-700'
+                                        }`}>
                                         {user.actif ? 'Actif' : 'Inactif'}
                                     </span>
                                     <ActionMenu
@@ -729,7 +726,7 @@ const OngletSites: React.FC<{
 
     const handleUnassignSite = async (siteId: string) => {
         try {
-            await updateSite(Number(siteId), { structure_client: undefined });
+            await updateSite(Number(siteId), { structure_client: null });
             showToast('Site desassigne avec succes', 'success');
             onRefresh();
         } catch (error: any) {
@@ -773,31 +770,28 @@ const OngletSites: React.FC<{
                         <div className="flex items-center bg-slate-100 p-1 rounded-lg">
                             <button
                                 onClick={() => setStatusFilter('all')}
-                                className={`px-4 py-2 text-sm rounded-md transition-colors ${
-                                    statusFilter === 'all'
-                                        ? 'bg-white shadow-sm text-slate-800 font-medium'
-                                        : 'text-slate-600 hover:text-slate-800'
-                                }`}
+                                className={`px-4 py-2 text-sm rounded-md transition-colors ${statusFilter === 'all'
+                                    ? 'bg-white shadow-sm text-slate-800 font-medium'
+                                    : 'text-slate-600 hover:text-slate-800'
+                                    }`}
                             >
                                 Tous ({sites.length})
                             </button>
                             <button
                                 onClick={() => setStatusFilter('active')}
-                                className={`px-4 py-2 text-sm rounded-md transition-colors ${
-                                    statusFilter === 'active'
-                                        ? 'bg-white shadow-sm text-slate-800 font-medium'
-                                        : 'text-slate-600 hover:text-slate-800'
-                                }`}
+                                className={`px-4 py-2 text-sm rounded-md transition-colors ${statusFilter === 'active'
+                                    ? 'bg-white shadow-sm text-slate-800 font-medium'
+                                    : 'text-slate-600 hover:text-slate-800'
+                                    }`}
                             >
                                 Actifs ({sites.filter(s => s.actif !== false).length})
                             </button>
                             <button
                                 onClick={() => setStatusFilter('inactive')}
-                                className={`px-4 py-2 text-sm rounded-md transition-colors ${
-                                    statusFilter === 'inactive'
-                                        ? 'bg-white shadow-sm text-slate-800 font-medium'
-                                        : 'text-slate-600 hover:text-slate-800'
-                                }`}
+                                className={`px-4 py-2 text-sm rounded-md transition-colors ${statusFilter === 'inactive'
+                                    ? 'bg-white shadow-sm text-slate-800 font-medium'
+                                    : 'text-slate-600 hover:text-slate-800'
+                                    }`}
                             >
                                 Inactifs ({sites.filter(s => s.actif === false).length})
                             </button>
@@ -824,11 +818,10 @@ const OngletSites: React.FC<{
                                                 Code: {site.code_site || 'N/A'}
                                             </p>
                                         </div>
-                                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                                            site.actif !== false
-                                                ? 'bg-emerald-100 text-emerald-700'
-                                                : 'bg-red-100 text-red-700'
-                                        }`}>
+                                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${site.actif !== false
+                                            ? 'bg-emerald-100 text-emerald-700'
+                                            : 'bg-red-100 text-red-700'
+                                            }`}>
                                             {site.actif !== false ? 'Actif' : 'Inactif'}
                                         </span>
                                     </div>
@@ -1132,7 +1125,7 @@ const OngletInterventions: React.FC<{
                     <tbody className="divide-y divide-slate-100">
                         {currentTaches.map((tache) => {
                             const firstSite = tache.objets_detail && tache.objets_detail.length > 0
-                                ? tache.objets_detail[0].site_nom
+                                ? tache.objets_detail[0]?.site_nom
                                 : null;
 
                             return (
@@ -1833,11 +1826,10 @@ const EditStructureModal: React.FC<{
                             <button
                                 type="button"
                                 onClick={() => setLogoMode('upload')}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                                    logoMode === 'upload'
-                                        ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
-                                        : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
-                                }`}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${logoMode === 'upload'
+                                    ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
+                                    : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
+                                    }`}
                             >
                                 <Upload className="w-4 h-4" />
                                 Upload
@@ -1845,11 +1837,10 @@ const EditStructureModal: React.FC<{
                             <button
                                 type="button"
                                 onClick={() => setLogoMode('url')}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                                    logoMode === 'url'
-                                        ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
-                                        : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
-                                }`}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${logoMode === 'url'
+                                    ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
+                                    : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
+                                    }`}
                             >
                                 <LinkIcon className="w-4 h-4" />
                                 URL

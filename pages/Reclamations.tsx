@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { AlertCircle, Eye, Edit2, Trash2, X, MapPin, ClipboardList, Calendar, TrendingUp, RefreshCw, Loader2, Plus, Settings, MoreVertical, Clock, Star, BarChart3 } from 'lucide-react';
+import { AlertCircle, Edit2, Trash2, X, MapPin, ClipboardList, Calendar, TrendingUp, RefreshCw, Loader2, Settings, MoreVertical, Clock, Star, BarChart3, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useSearch } from '../contexts/SearchContext';
 import { Reclamation, TypeReclamation, Urgence, ReclamationCreate, ReclamationStats } from '../types/reclamations';
@@ -91,6 +91,14 @@ const Reclamations: React.FC = () => {
     // Delete confirmation state
     const [deletingReclamationId, setDeletingReclamationId] = useState<number | null>(null);
 
+    // Pagination Reclamations
+    const [currentPageRec, setCurrentPageRec] = useState(1);
+    const [itemsPerPageRec, setItemsPerPageRec] = useState(10);
+
+    // Pagination Taches
+    const [currentPageTache, setCurrentPageTache] = useState(1);
+    const [itemsPerPageTache, setItemsPerPageTache] = useState(10);
+
     // Set search placeholder
     useEffect(() => {
         setPlaceholder('Rechercher une réclamation par numéro, description...');
@@ -145,6 +153,12 @@ const Reclamations: React.FC = () => {
             setStatsLoading(false);
         }
     };
+
+    // Reset pages on search or filter change
+    useEffect(() => {
+        setCurrentPageRec(1);
+        setCurrentPageTache(1);
+    }, [searchQuery, activeTab]);
 
     // Handle navigation from MapPage with site pre-selected
     useEffect(() => {
@@ -358,8 +372,8 @@ const Reclamations: React.FC = () => {
                 ...data,
                 reclamation: reclamationTargetForTask?.id,
                 // Conversion Dates ISO
-                date_debut_planifiee: new Date(data.date_debut_planifiee).toISOString(),
-                date_fin_planifiee: new Date(data.date_fin_planifiee).toISOString(),
+                date_debut_planifiee: localInputToUTC(data.date_debut_planifiee) || data.date_debut_planifiee,
+                date_fin_planifiee: localInputToUTC(data.date_fin_planifiee) || data.date_fin_planifiee,
             };
 
             await planningService.createTache(payload);
@@ -415,6 +429,15 @@ const Reclamations: React.FC = () => {
         );
     }, [tachesLiees, searchQuery]);
 
+    // Pagination calculations
+    const totalPagesRec = Math.ceil(filteredReclamations.length / itemsPerPageRec);
+    const startIndexRec = (currentPageRec - 1) * itemsPerPageRec;
+    const paginatedReclamations = filteredReclamations.slice(startIndexRec, startIndexRec + itemsPerPageRec);
+
+    const totalPagesTache = Math.ceil(filteredTaches.length / itemsPerPageTache);
+    const startIndexTache = (currentPageTache - 1) * itemsPerPageTache;
+    const paginatedTaches = filteredTaches.slice(startIndexTache, startIndexTache + itemsPerPageTache);
+
     return (
         <div className="p-6 space-y-6">
             {/* Toolbar */}
@@ -426,7 +449,7 @@ const Reclamations: React.FC = () => {
                         className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === 'reclamations'
                             ? 'bg-white text-emerald-700 shadow-sm'
                             : 'text-slate-500 hover:text-slate-700'
-                        }`}
+                            }`}
                     >
                         Réclamations ({filteredReclamations.length})
                     </button>
@@ -436,7 +459,7 @@ const Reclamations: React.FC = () => {
                             className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === 'taches'
                                 ? 'bg-white text-purple-700 shadow-sm'
                                 : 'text-slate-500 hover:text-slate-700'
-                            }`}
+                                }`}
                         >
                             Tâches liées ({filteredTaches.length})
                         </button>
@@ -447,7 +470,7 @@ const Reclamations: React.FC = () => {
                             className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === 'stats'
                                 ? 'bg-white text-blue-700 shadow-sm'
                                 : 'text-slate-500 hover:text-slate-700'
-                            }`}
+                                }`}
                         >
                             <span className="flex items-center gap-1.5">
                                 <BarChart3 className="w-4 h-4" />
@@ -468,15 +491,7 @@ const Reclamations: React.FC = () => {
                         </span>
                     )}
 
-                    {!isClient && activeTab !== 'stats' && (
-                        <button
-                            onClick={() => setIsCreateModalOpen(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
-                        >
-                            <Plus className="w-4 h-4" />
-                            <span className="hidden sm:inline">Nouvelle</span>
-                        </button>
-                    )}
+
 
                     {/* Actions Dropdown */}
                     <div className="relative" ref={actionsMenuRef}>
@@ -527,140 +542,181 @@ const Reclamations: React.FC = () => {
                             </p>
                         </div>
                     ) : (
-                        <table className="w-full">
-                            <thead className="bg-slate-50 border-b border-slate-100 rounded-t-xl">
-                                <tr>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider first:rounded-tl-xl">Numéro</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Urgence</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Site / Zone</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Créé par</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Statut</th>
-                                    <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider rounded-tr-xl">
-                                        <Settings className="w-4 h-4 ml-auto text-slate-400" />
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {filteredReclamations.map(rec => (
-                                    <tr
-                                        key={rec.id}
-                                        onClick={() => handleDetails(rec.id)}
-                                        className="hover:bg-slate-50 transition-colors group cursor-pointer"
-                                    >
-                                        <td className="px-6 py-4">
-                                            <span className="text-sm font-medium text-slate-800">{rec.numero_reclamation}</span>
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-slate-600">{rec.type_reclamation_nom}</td>
-                                        <td className="px-6 py-4">
-                                            <span
-                                                className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
-                                                style={{
-                                                    backgroundColor: (rec.urgence_couleur || '#ccc') + '20',
-                                                    color: rec.urgence_couleur || '#666'
-                                                }}
-                                            >
-                                                {rec.urgence_niveau}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-medium text-slate-800">{rec.site_nom}</span>
-                                                {rec.zone_nom && <span className="text-xs text-slate-400">{rec.zone_nom}</span>}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-slate-600">
-                                            {rec.createur_nom || <span className="text-slate-400 italic">Anonyme</span>}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-slate-600">
-                                            {new Date(rec.date_creation).toLocaleDateString('fr-FR')}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`
-                                                inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium
-                                                ${rec.statut === 'NOUVELLE' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
-                                                    rec.statut === 'RESOLUE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                                                    rec.statut === 'EN_COURS' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                                                    rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'bg-orange-50 text-orange-700 border border-orange-100' :
-                                                    rec.statut === 'CLOTUREE' ? 'bg-slate-100 text-slate-600 border border-slate-200' :
-                                                    'bg-slate-100 text-slate-600 border border-slate-200'}
-                                            `}>
-                                                <div className={`w-1.5 h-1.5 rounded-full ${
-                                                    rec.statut === 'NOUVELLE' ? 'bg-blue-500' :
-                                                    rec.statut === 'RESOLUE' ? 'bg-emerald-500' :
-                                                    rec.statut === 'EN_COURS' ? 'bg-amber-500' :
-                                                    rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'bg-orange-500' :
-                                                    'bg-slate-400'
-                                                }`} />
-                                                {rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'Validation' : rec.statut.toLowerCase().replace('_', ' ')}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex justify-end" data-row-menu>
-                                                <div className="relative">
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setRowMenuOpen(rowMenuOpen === rec.id ? null : rec.id);
-                                                        }}
-                                                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                                                    >
-                                                        <MoreVertical className="w-4 h-4" />
-                                                    </button>
+                        <>
+                            <table className="w-full">
+                                <thead className="bg-slate-50 border-b border-slate-100 rounded-t-xl">
+                                    <tr>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider first:rounded-tl-xl">Numéro</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Urgence</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Site / Zone</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Créé par</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Statut</th>
+                                        <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider rounded-tr-xl">
+                                            <Settings className="w-4 h-4 ml-auto text-slate-400" />
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {paginatedReclamations.map(rec => (
+                                        <tr
+                                            key={rec.id}
+                                            onClick={() => handleDetails(rec.id)}
+                                            className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                                        >
+                                            <td className="px-6 py-4">
+                                                <span className="text-sm font-medium text-slate-800">{rec.numero_reclamation}</span>
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-slate-600">{rec.type_reclamation_nom}</td>
+                                            <td className="px-6 py-4">
+                                                <span
+                                                    className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
+                                                    style={{
+                                                        backgroundColor: (rec.urgence_couleur || '#ccc') + '20',
+                                                        color: rec.urgence_couleur || '#666'
+                                                    }}
+                                                >
+                                                    {rec.urgence_niveau}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-medium text-slate-800">{rec.site_nom}</span>
+                                                    {rec.zone_nom && <span className="text-xs text-slate-400">{rec.zone_nom}</span>}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-slate-600">
+                                                {rec.createur_nom || <span className="text-slate-400 italic">Anonyme</span>}
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-slate-600">
+                                                {new Date(rec.date_creation).toLocaleDateString('fr-FR')}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={`
+                                                    inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium
+                                                    ${rec.statut === 'NOUVELLE' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
+                                                        rec.statut === 'RESOLUE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                                                            rec.statut === 'EN_COURS' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                                                                rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'bg-orange-50 text-orange-700 border border-orange-100' :
+                                                                    rec.statut === 'CLOTUREE' ? 'bg-slate-100 text-slate-600 border border-slate-200' :
+                                                                        'bg-slate-100 text-slate-600 border border-slate-200'}
+                                                `}>
+                                                    <div className={`w-1.5 h-1.5 rounded-full ${rec.statut === 'NOUVELLE' ? 'bg-blue-500' :
+                                                        rec.statut === 'RESOLUE' ? 'bg-emerald-500' :
+                                                            rec.statut === 'EN_COURS' ? 'bg-amber-500' :
+                                                                rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'bg-orange-500' :
+                                                                    'bg-slate-400'
+                                                        }`} />
+                                                    {rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'Validation' : rec.statut.toLowerCase().replace('_', ' ')}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex justify-end" data-row-menu>
+                                                    <div className="relative">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setRowMenuOpen(rowMenuOpen === rec.id ? null : rec.id);
+                                                            }}
+                                                            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                                        >
+                                                            <MoreVertical className="w-4 h-4" />
+                                                        </button>
 
-                                                    {rowMenuOpen === rec.id && (
-                                                        <div className="absolute right-0 mt-1 w-44 bg-white rounded-xl shadow-lg border border-slate-200 py-1 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                                                            {!isClient && !isChefEquipe && rec.statut !== 'CLOTUREE' && (
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        handleOpenTaskModal(rec);
-                                                                        setRowMenuOpen(null);
-                                                                    }}
-                                                                    className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                                                                >
-                                                                    <ClipboardList className="w-4 h-4 text-purple-500" />
-                                                                    Créer une tâche
-                                                                </button>
-                                                            )}
-
-                                                            {!isClient && (isAdmin || (rec.createur === currentUser?.id)) && (
-                                                                <>
-                                                                    <div className="my-1 border-t border-slate-100" />
+                                                        {rowMenuOpen === rec.id && (
+                                                            <div className="absolute right-0 mt-1 w-44 bg-white rounded-xl shadow-lg border border-slate-200 py-1 z-[60] animate-in fade-in slide-in-from-top-2 duration-150">
+                                                                {!isClient && !isChefEquipe && rec.statut !== 'CLOTUREE' && (
                                                                     <button
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
-                                                                            handleEdit(rec.id);
+                                                                            handleOpenTaskModal(rec);
                                                                             setRowMenuOpen(null);
                                                                         }}
                                                                         className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                                                                     >
-                                                                        <Edit2 className="w-4 h-4 text-emerald-500" />
-                                                                        Modifier
+                                                                        <ClipboardList className="w-4 h-4 text-purple-500" />
+                                                                        Créer une tâche
                                                                     </button>
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleDelete(rec.id);
-                                                                            setRowMenuOpen(null);
-                                                                        }}
-                                                                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                                                                    >
-                                                                        <Trash2 className="w-4 h-4" />
-                                                                        Supprimer
-                                                                    </button>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    )}
+                                                                )}
+
+                                                                {!isClient && (isAdmin || (rec.createur === currentUser?.id)) && (
+                                                                    <>
+                                                                        <div className="my-1 border-t border-slate-100" />
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleEdit(rec.id);
+                                                                                setRowMenuOpen(null);
+                                                                            }}
+                                                                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                                                                        >
+                                                                            <Edit2 className="w-4 h-4 text-emerald-500" />
+                                                                            Modifier
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleDelete(rec.id);
+                                                                                setRowMenuOpen(null);
+                                                                            }}
+                                                                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                                                        >
+                                                                            <Trash2 className="w-4 h-4" />
+                                                                            Supprimer
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </td>
+                                            </td>
                                         </tr>
                                     ))}
-                            </tbody>
-                        </table>
+                                </tbody>
+                            </table>
+
+                            {/* Pagination Reclamations */}
+                            <div className="sticky bottom-0 bg-white border-t border-slate-200 px-6 py-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="text-sm text-slate-600">
+                                        Affichage {startIndexRec + 1} à {Math.min(startIndexRec + itemsPerPageRec, filteredReclamations.length)} sur {filteredReclamations.length}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => setCurrentPageRec(1)}
+                                            disabled={currentPageRec === 1}
+                                            className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <ChevronsLeft className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentPageRec(p => Math.max(1, p - 1))}
+                                            disabled={currentPageRec === 1}
+                                            className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <ChevronLeft className="w-4 h-4" />
+                                        </button>
+                                        <span className="px-3 py-1 text-sm text-slate-600">Page {currentPageRec} sur {totalPagesRec > 0 ? totalPagesRec : 1}</span>
+                                        <button
+                                            onClick={() => setCurrentPageRec(p => Math.min(totalPagesRec, p + 1))}
+                                            disabled={currentPageRec === totalPagesRec || totalPagesRec === 0}
+                                            className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <ChevronRight className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentPageRec(totalPagesRec)}
+                                            disabled={currentPageRec === totalPagesRec || totalPagesRec === 0}
+                                            className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <ChevronsRight className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
                     )}
                 </div>
             )}
@@ -681,88 +737,128 @@ const Reclamations: React.FC = () => {
                             </p>
                         </div>
                     ) : (
-                        <table className="w-full">
-                            <thead className="bg-slate-50 border-b border-slate-100">
-                                <tr>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Type Tâche</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Réclamation</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Equipe</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Dates</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Priorité</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Statut</th>
-                                    <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                                        <Settings className="w-4 h-4 ml-auto text-slate-400" />
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {filteredTaches.map(t => {
-                                    const statutColors = STATUT_TACHE_COLORS[t.statut] || { bg: 'bg-slate-100', text: 'text-slate-800' };
-                                    return (
-                                        <tr key={t.id} className="hover:bg-slate-50 transition-colors group">
-                                            <td className="px-6 py-4">
-                                                <span className="text-sm font-medium text-slate-800">{t.type_tache_detail.nom_tache}</span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                {t.reclamation_numero ? (
-                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-100">
-                                                        <AlertCircle className="w-3 h-3" />
-                                                        {t.reclamation_numero}
+                        <>
+                            <table className="w-full">
+                                <thead className="bg-slate-50 border-b border-slate-100">
+                                    <tr>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Type Tâche</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Réclamation</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Equipe</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Dates</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Priorité</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Statut</th>
+                                        <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                            <Settings className="w-4 h-4 ml-auto text-slate-400" />
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {paginatedTaches.map(t => {
+                                        const statutColors = STATUT_TACHE_COLORS[t.statut] || { bg: 'bg-slate-100', text: 'text-slate-800' };
+                                        return (
+                                            <tr key={t.id} className="hover:bg-slate-50 transition-colors group">
+                                                <td className="px-6 py-4">
+                                                    <span className="text-sm font-medium text-slate-800">{t.type_tache_detail.nom_tache}</span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {t.reclamation_numero ? (
+                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-100">
+                                                            <AlertCircle className="w-3 h-3" />
+                                                            {t.reclamation_numero}
+                                                        </span>
+                                                    ) : <span className="text-slate-400">-</span>}
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-slate-600">
+                                                    {t.equipes_detail && t.equipes_detail.length > 0
+                                                        ? t.equipes_detail.map(eq => eq.nomEquipe).join(', ')
+                                                        : (t.equipe_detail as any)?.nomEquipe || (t.equipe_detail as any)?.nom_equipe || '-'}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-sm text-slate-600">
+                                                            {new Date(t.date_debut_planifiee).toLocaleDateString('fr-FR')}
+                                                        </span>
+                                                        <span className="text-xs text-slate-400">
+                                                            → {new Date(t.date_fin_planifiee).toLocaleDateString('fr-FR')}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${t.priorite >= 4 ? 'bg-red-50 text-red-700 border border-red-100' :
+                                                        t.priorite === 3 ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                                                            'bg-slate-100 text-slate-600 border border-slate-200'
+                                                        }`}>
+                                                        {PRIORITE_LABELS[t.priorite]}
                                                     </span>
-                                                ) : <span className="text-slate-400">-</span>}
-                                            </td>
-                                            <td className="px-6 py-4 text-sm text-slate-600">
-                                                {t.equipes_detail && t.equipes_detail.length > 0
-                                                    ? t.equipes_detail.map(eq => eq.nomEquipe).join(', ')
-                                                    : (t.equipe_detail as any)?.nomEquipe || (t.equipe_detail as any)?.nom_equipe || '-'}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm text-slate-600">
-                                                        {new Date(t.date_debut_planifiee).toLocaleDateString('fr-FR')}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statutColors.bg} ${statutColors.text}`}>
+                                                        <div className={`w-1.5 h-1.5 rounded-full ${t.statut === 'PLANIFIEE' ? 'bg-blue-500' :
+                                                            t.statut === 'EN_COURS' ? 'bg-amber-500' :
+                                                                t.statut === 'TERMINEE' ? 'bg-emerald-500' :
+                                                                    t.statut === 'ANNULEE' ? 'bg-red-500' :
+                                                                        'bg-slate-400'
+                                                            }`} />
+                                                        {t.statut.toLowerCase().replace('_', ' ')}
                                                     </span>
-                                                    <span className="text-xs text-slate-400">
-                                                        → {new Date(t.date_fin_planifiee).toLocaleDateString('fr-FR')}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                                                    t.priorite >= 4 ? 'bg-red-50 text-red-700 border border-red-100' :
-                                                    t.priorite === 3 ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                                                    'bg-slate-100 text-slate-600 border border-slate-200'
-                                                }`}>
-                                                    {PRIORITE_LABELS[t.priorite]}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statutColors.bg} ${statutColors.text}`}>
-                                                    <div className={`w-1.5 h-1.5 rounded-full ${
-                                                        t.statut === 'PLANIFIEE' ? 'bg-blue-500' :
-                                                        t.statut === 'EN_COURS' ? 'bg-amber-500' :
-                                                        t.statut === 'TERMINEE' ? 'bg-emerald-500' :
-                                                        t.statut === 'ANNULEE' ? 'bg-red-500' :
-                                                        'bg-slate-400'
-                                                    }`} />
-                                                    {t.statut.toLowerCase().replace('_', ' ')}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex justify-end">
-                                                    <button
-                                                        onClick={() => navigate(`/planning?date=${t.date_debut_planifiee?.split('T')[0] || ''}`)}
-                                                        className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                                                        title="Voir dans l'agenda"
-                                                    >
-                                                        <Calendar className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )
-                                })}
-                            </tbody>
-                        </table>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex justify-end">
+                                                        <button
+                                                            onClick={() => navigate(`/planning?date=${t.date_debut_planifiee?.split('T')[0] || ''}`)}
+                                                            className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                                                            title="Voir dans l'agenda"
+                                                        >
+                                                            <Calendar className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
+
+                            {/* Pagination Taches */}
+                            <div className="sticky bottom-0 bg-white border-t border-slate-200 px-6 py-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="text-sm text-slate-600">
+                                        Affichage {startIndexTache + 1} à {Math.min(startIndexTache + itemsPerPageTache, filteredTaches.length)} sur {filteredTaches.length}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => setCurrentPageTache(1)}
+                                            disabled={currentPageTache === 1}
+                                            className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <ChevronsLeft className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentPageTache(p => Math.max(1, p - 1))}
+                                            disabled={currentPageTache === 1}
+                                            className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <ChevronLeft className="w-4 h-4" />
+                                        </button>
+                                        <span className="px-3 py-1 text-sm text-slate-600">Page {currentPageTache} sur {totalPagesTache > 0 ? totalPagesTache : 1}</span>
+                                        <button
+                                            onClick={() => setCurrentPageTache(p => Math.min(totalPagesTache, p + 1))}
+                                            disabled={currentPageTache === totalPagesTache || totalPagesTache === 0}
+                                            className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <ChevronRight className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentPageTache(totalPagesTache)}
+                                            disabled={currentPageTache === totalPagesTache || totalPagesTache === 0}
+                                            className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <ChevronsRight className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
                     )}
                 </div>
             )}
@@ -849,30 +945,30 @@ const Reclamations: React.FC = () => {
                                         <h3 className="font-bold text-lg text-slate-800">Répartition par Statut</h3>
                                     </div>
                                     <div className="p-6">
-                                    <ResponsiveContainer width="100%" height={280}>
-                                        <PieChart>
-                                            <Pie
-                                                data={Object.entries(stats.par_statut).map(([statut, count]) => ({
-                                                    name: statut === 'PRISE_EN_COMPTE' ? 'Prise en compte' :
-                                                          statut === 'EN_COURS' ? 'En cours' :
-                                                          statut.charAt(0) + statut.slice(1).toLowerCase(),
-                                                    value: count
-                                                }))}
-                                                cx="50%"
-                                                cy="50%"
-                                                labelLine={false}
-                                                label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                                                outerRadius={80}
-                                                fill="#8884d8"
-                                                dataKey="value"
-                                            >
-                                                {Object.keys(stats.par_statut).map((_entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'][index % 6]} />
-                                                ))}
-                                            </Pie>
-                                            <Tooltip />
-                                        </PieChart>
-                                    </ResponsiveContainer>
+                                        <ResponsiveContainer width="100%" height={280}>
+                                            <PieChart>
+                                                <Pie
+                                                    data={Object.entries(stats.par_statut).map(([statut, count]) => ({
+                                                        name: statut === 'PRISE_EN_COMPTE' ? 'Prise en compte' :
+                                                            statut === 'EN_COURS' ? 'En cours' :
+                                                                statut.charAt(0) + statut.slice(1).toLowerCase(),
+                                                        value: count
+                                                    }))}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    labelLine={false}
+                                                    label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                                    outerRadius={80}
+                                                    fill="#8884d8"
+                                                    dataKey="value"
+                                                >
+                                                    {Object.keys(stats.par_statut).map((_entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'][index % 6]} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip />
+                                            </PieChart>
+                                        </ResponsiveContainer>
                                     </div>
                                 </div>
 
@@ -882,18 +978,18 @@ const Reclamations: React.FC = () => {
                                         <h3 className="font-bold text-lg text-slate-800">Répartition par Type</h3>
                                     </div>
                                     <div className="p-6">
-                                    <ResponsiveContainer width="100%" height={280}>
-                                        <BarChart data={stats.par_type.map((item) => ({
-                                            name: item.type_reclamation__nom_reclamation,
-                                            count: item.count
-                                        }))}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                                            <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} tick={{ fontSize: 12 }} />
-                                            <YAxis tick={{ fontSize: 12 }} />
-                                            <Tooltip />
-                                            <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
+                                        <ResponsiveContainer width="100%" height={280}>
+                                            <BarChart data={stats.par_type.map((item) => ({
+                                                name: item.type_reclamation__nom_reclamation,
+                                                count: item.count
+                                            }))}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                                                <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} tick={{ fontSize: 12 }} />
+                                                <YAxis tick={{ fontSize: 12 }} />
+                                                <Tooltip />
+                                                <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
                                     </div>
                                 </div>
 
@@ -903,18 +999,18 @@ const Reclamations: React.FC = () => {
                                         <h3 className="font-bold text-lg text-slate-800">Répartition par Urgence</h3>
                                     </div>
                                     <div className="p-6">
-                                    <ResponsiveContainer width="100%" height={280}>
-                                        <BarChart data={stats.par_urgence.map((item) => ({
-                                            name: item.urgence__niveau_urgence,
-                                            count: item.count
-                                        }))} layout="vertical">
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                                            <XAxis type="number" tick={{ fontSize: 12 }} />
-                                            <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
-                                            <Tooltip />
-                                            <Bar dataKey="count" fill="#f59e0b" radius={[0, 4, 4, 0]} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
+                                        <ResponsiveContainer width="100%" height={280}>
+                                            <BarChart data={stats.par_urgence.map((item) => ({
+                                                name: item.urgence__niveau_urgence,
+                                                count: item.count
+                                            }))} layout="vertical">
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                                                <XAxis type="number" tick={{ fontSize: 12 }} />
+                                                <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
+                                                <Tooltip />
+                                                <Bar dataKey="count" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
                                     </div>
                                 </div>
 
@@ -925,15 +1021,15 @@ const Reclamations: React.FC = () => {
                                             <h3 className="font-bold text-lg text-slate-800">Répartition par Zone</h3>
                                         </div>
                                         <div className="p-6">
-                                        <ResponsiveContainer width="100%" height={280}>
-                                            <BarChart data={stats.par_zone}>
-                                                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                                                <XAxis dataKey="zone__nom" angle={-45} textAnchor="end" height={100} tick={{ fontSize: 12 }} />
-                                                <YAxis tick={{ fontSize: 12 }} />
-                                                <Tooltip />
-                                                <Bar dataKey="count" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                                            </BarChart>
-                                        </ResponsiveContainer>
+                                            <ResponsiveContainer width="100%" height={280}>
+                                                <BarChart data={stats.par_zone}>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                                                    <XAxis dataKey="zone__nom" angle={-45} textAnchor="end" height={100} tick={{ fontSize: 12 }} />
+                                                    <YAxis tick={{ fontSize: 12 }} />
+                                                    <Tooltip />
+                                                    <Bar dataKey="count" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
                                         </div>
                                     </div>
                                 )}

@@ -98,8 +98,8 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'SITES', label: 'Mes sites', icon: MapPin, roles: ['CLIENT'] },
     { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['CLIENT'] },
     { id: 'CLIENT_CLAIMS', label: 'Réclamations', icon: AlertCircle, roles: ['CLIENT'] },
+    { id: 'CLIENT_INTERVENTIONS', label: 'Suivi des Tâches', icon: ClipboardList, roles: ['CLIENT'] },
     { id: 'CLIENT_PLANNING', label: 'Planning', icon: Calendar, roles: ['CLIENT'] },
-    { id: 'CLIENT_INTERVENTIONS', label: 'Interventions', icon: ClipboardList, roles: ['CLIENT'] },
     { id: 'TEAMS', label: 'RH', icon: Users, roles: ['CLIENT'] },
   ];
 

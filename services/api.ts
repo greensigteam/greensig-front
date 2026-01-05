@@ -466,7 +466,7 @@ export interface UpdateSiteData {
   nom_site?: string
   code_site?: string
   client?: number
-  structure_client?: number
+  structure_client?: number | null
   superviseur?: number | null
   adresse?: string
   superficie_totale?: number | null
@@ -777,6 +777,7 @@ export interface ExportPDFRequest {
   visibleLayers: Record<string, boolean>
   center: [number, number]  // [lng, lat]
   zoom: number
+  siteNames?: string[]  // Optional: Names of visible sites
 }
 
 export async function exportPDF(data: ExportPDFRequest): Promise<Blob> {

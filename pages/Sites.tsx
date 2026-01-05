@@ -11,6 +11,8 @@ import { useToast } from '../contexts/ToastContext';
 import { useSearch } from '../contexts/SearchContext';
 import SiteEditModal from '../components/sites/SiteEditModal';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
+import { fetchCurrentUser } from '../services/usersApi';
+import type { Utilisateur } from '../types/users';
 
 // Composant Dropdown pour les actions
 const ActionDropdown = ({
@@ -104,7 +106,15 @@ export default function Sites() {
     const [editingSite, setEditingSite] = useState<SiteFrontend | null>(null);
 
     // Delete confirmation
+    // Delete confirmation
     const [deletingSite, setDeletingSite] = useState<SiteFrontend | null>(null);
+
+    // Current user
+    const [currentUser, setCurrentUser] = useState<Utilisateur | null>(null);
+
+    useEffect(() => {
+        fetchCurrentUser().then(setCurrentUser).catch(console.error);
+    }, []);
 
     // Set search placeholder
     useEffect(() => {
@@ -115,7 +125,7 @@ export default function Sites() {
     const loadSites = useCallback(async () => {
         setIsLoading(true);
         try {
-            const data = await fetchAllSites(true); // Force refresh
+            const data = await fetchAllSites(); // Force refresh
             setSites(data);
         } catch (error: any) {
             showToast(error.message || 'Erreur lors du chargement des sites', 'error');
@@ -246,7 +256,7 @@ export default function Sites() {
             </div>
 
             {/* Sites Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-100">
                 {isLoading ? (
                     <div className="flex items-center justify-center py-12">
                         <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
@@ -330,12 +340,14 @@ export default function Sites() {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <ActionDropdown
-                                                onEdit={() => setEditingSite(site)}
-                                                onDelete={() => setDeletingSite(site)}
-                                                onToggleActive={() => handleToggleActive(site)}
-                                                isActive={site.actif !== false}
-                                            />
+                                            {(!currentUser?.roles?.includes('CLIENT')) && (
+                                                <ActionDropdown
+                                                    onEdit={() => setEditingSite(site)}
+                                                    onDelete={() => setDeletingSite(site)}
+                                                    onToggleActive={() => handleToggleActive(site)}
+                                                    isActive={site.actif !== false}
+                                                />
+                                            )}
                                         </td>
                                     </tr>
                                 ))}

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom';
 import {
     Users, RefreshCw, Edit2, Trash2, MoreVertical, Plus, Building2,
-    Mail, Phone, MapPin, ChevronLeft, ChevronRight,
+    Mail, Phone, MapPin, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
     AlertCircle, CheckCircle, Loader2, Upload, Link as LinkIcon
 } from 'lucide-react';
 import { fetchStructures, updateStructure, deleteStructure, createStructure } from '../services/usersApi';
@@ -29,7 +29,18 @@ const ActionDropdown = ({
     isActive: boolean
 }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [openUpwards, setOpenUpwards] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (isOpen && dropdownRef.current) {
+            const rect = dropdownRef.current.getBoundingClientRect();
+            const windowHeight = window.innerHeight;
+            const spaceBelow = windowHeight - rect.bottom;
+            // Si moins de 200px en dessous, on ouvre vers le haut
+            setOpenUpwards(spaceBelow < 200);
+        }
+    }, [isOpen]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -51,7 +62,7 @@ const ActionDropdown = ({
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 z-50 py-1 animate-in fade-in zoom-in-95 duration-100">
+                <div className={`absolute right-0 ${openUpwards ? 'bottom-full mb-2' : 'top-full mt-2'} w-48 bg-white rounded-lg shadow-lg border border-gray-100 z-50 py-1 animate-in ${openUpwards ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2'} fade-in zoom-in-95 duration-100`}>
                     <button
                         onClick={(e) => { e.stopPropagation(); onEdit(); setIsOpen(false); }}
                         className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
@@ -280,11 +291,10 @@ const StructureModal: React.FC<StructureModalProps> = ({ isOpen, onClose, onSave
                             <button
                                 type="button"
                                 onClick={() => setLogoMode('upload')}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                                    logoMode === 'upload'
-                                        ? 'bg-emerald-100 text-emerald-700 font-medium'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${logoMode === 'upload'
+                                    ? 'bg-emerald-100 text-emerald-700 font-medium'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
                             >
                                 <Upload className="w-4 h-4" />
                                 Uploader
@@ -292,11 +302,10 @@ const StructureModal: React.FC<StructureModalProps> = ({ isOpen, onClose, onSave
                             <button
                                 type="button"
                                 onClick={() => setLogoMode('url')}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                                    logoMode === 'url'
-                                        ? 'bg-emerald-100 text-emerald-700 font-medium'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${logoMode === 'url'
+                                    ? 'bg-emerald-100 text-emerald-700 font-medium'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
                             >
                                 <LinkIcon className="w-4 h-4" />
                                 URL externe
@@ -401,7 +410,7 @@ export default function Clients() {
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [itemsPerPage] = useState(10);
 
     // Modals
     const [editingStructure, setEditingStructure] = useState<StructureClient | null>(null);
@@ -417,7 +426,7 @@ export default function Clients() {
     const loadStructures = useCallback(async () => {
         setIsLoading(true);
         try {
-            const data = await fetchStructures({}, true);
+            const data = await fetchStructures({});
             setStructures(data.results || []);
         } catch (error: any) {
             showToast(error.message || 'Erreur lors du chargement des structures', 'error');
@@ -499,31 +508,28 @@ export default function Clients() {
                     <div className="flex items-center bg-gray-100 p-1 rounded-lg">
                         <button
                             onClick={() => setStatusFilter('all')}
-                            className={`px-4 py-2 text-sm rounded-md transition-colors ${
-                                statusFilter === 'all'
-                                    ? 'bg-white shadow-sm text-gray-900 font-medium'
-                                    : 'text-gray-600 hover:text-gray-900'
-                            }`}
+                            className={`px-4 py-2 text-sm rounded-md transition-colors ${statusFilter === 'all'
+                                ? 'bg-white shadow-sm text-gray-900 font-medium'
+                                : 'text-gray-600 hover:text-gray-900'
+                                }`}
                         >
                             Toutes ({structures.length})
                         </button>
                         <button
                             onClick={() => setStatusFilter('active')}
-                            className={`px-4 py-2 text-sm rounded-md transition-colors ${
-                                statusFilter === 'active'
-                                    ? 'bg-white shadow-sm text-gray-900 font-medium'
-                                    : 'text-gray-600 hover:text-gray-900'
-                            }`}
+                            className={`px-4 py-2 text-sm rounded-md transition-colors ${statusFilter === 'active'
+                                ? 'bg-white shadow-sm text-gray-900 font-medium'
+                                : 'text-gray-600 hover:text-gray-900'
+                                }`}
                         >
                             Actives ({structures.filter(s => s.actif).length})
                         </button>
                         <button
                             onClick={() => setStatusFilter('inactive')}
-                            className={`px-4 py-2 text-sm rounded-md transition-colors ${
-                                statusFilter === 'inactive'
-                                    ? 'bg-white shadow-sm text-gray-900 font-medium'
-                                    : 'text-gray-600 hover:text-gray-900'
-                            }`}
+                            className={`px-4 py-2 text-sm rounded-md transition-colors ${statusFilter === 'inactive'
+                                ? 'bg-white shadow-sm text-gray-900 font-medium'
+                                : 'text-gray-600 hover:text-gray-900'
+                                }`}
                         >
                             Inactives ({structures.filter(s => !s.actif).length})
                         </button>
@@ -554,7 +560,7 @@ export default function Clients() {
             </div>
 
             {/* Table */}
-            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div className="bg-white rounded-xl shadow-sm border">
                 {isLoading ? (
                     <div className="fixed inset-0 z-50">
                         <LoadingScreen isLoading={true} loop={true} minDuration={0} />
@@ -570,159 +576,159 @@ export default function Clients() {
                         )}
                     </div>
                 ) : (
-                    <>
-                        <table className="w-full">
-                            <thead className="bg-gray-50 border-b">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                        Logo
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                        Structure
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                        Contact
-                                    </th>
-                                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                        Utilisateurs
-                                    </th>
-                                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                        Sites
-                                    </th>
-                                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                        Statut
-                                    </th>
-                                    <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {paginatedStructures.map(structure => (
-                                    <tr
-                                        key={structure.id}
-                                        className="hover:bg-gray-50 transition-colors group"
-                                    >
-                                        <td className="px-6 py-4">
-                                            {structure.logoDisplay ? (
-                                                <img
-                                                    src={structure.logoDisplay}
-                                                    className="w-10 h-10 rounded-full object-cover ring-2 ring-gray-100"
-                                                    alt={structure.nom}
-                                                />
-                                            ) : (
-                                                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                                                    <Building2 className="w-5 h-5 text-emerald-600" />
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <Link
-                                                to={`/structures/${structure.id}`}
-                                                className="block group-hover:text-emerald-600 transition-colors"
-                                            >
-                                                <div className="font-medium text-gray-900 group-hover:text-emerald-600">
-                                                    {structure.nom}
-                                                </div>
-                                                {structure.adresse && (
-                                                    <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5 truncate max-w-xs">
-                                                        <MapPin className="w-3 h-3 flex-shrink-0" />
-                                                        {structure.adresse}
+                    <div className="flex flex-col">
+                        <div className="overflow-x-auto overflow-y-visible">
+                            <table className="w-full min-w-[1000px]">
+                                <thead className="bg-gray-50 border-b">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                            Logo
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                            Structure
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                            Contact
+                                        </th>
+                                        <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                            Utilisateurs
+                                        </th>
+                                        <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                            Sites
+                                        </th>
+                                        <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                            Statut
+                                        </th>
+                                        <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                            Actions
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {paginatedStructures.map(structure => (
+                                        <tr
+                                            key={structure.id}
+                                            className="hover:bg-gray-50 transition-colors group"
+                                        >
+                                            <td className="px-6 py-4">
+                                                {structure.logoDisplay ? (
+                                                    <img
+                                                        src={structure.logoDisplay}
+                                                        className="w-10 h-10 rounded-full object-cover ring-2 ring-gray-100"
+                                                        alt={structure.nom}
+                                                    />
+                                                ) : (
+                                                    <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                                                        <Building2 className="w-5 h-5 text-emerald-600" />
                                                     </div>
                                                 )}
-                                            </Link>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-sm text-gray-900">
-                                                {structure.contactPrincipal || '-'}
-                                            </div>
-                                            {structure.telephone && (
-                                                <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                                                    <Phone className="w-3 h-3" />
-                                                    {structure.telephone}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <Link
+                                                    to={`/structures/${structure.id}`}
+                                                    className="block group-hover:text-emerald-600 transition-colors"
+                                                >
+                                                    <div className="font-medium text-gray-900 group-hover:text-emerald-600">
+                                                        {structure.nom}
+                                                    </div>
+                                                    {structure.adresse && (
+                                                        <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5 truncate max-w-xs">
+                                                            <MapPin className="w-3 h-3 flex-shrink-0" />
+                                                            {structure.adresse}
+                                                        </div>
+                                                    )}
+                                                </Link>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="text-sm text-gray-900">
+                                                    {structure.contactPrincipal || '-'}
                                                 </div>
-                                            )}
-                                            {structure.emailFacturation && (
-                                                <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                                                    <Mail className="w-3 h-3" />
-                                                    {structure.emailFacturation}
+                                                {structure.telephone && (
+                                                    <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                                                        <Phone className="w-3 h-3" />
+                                                        {structure.telephone}
+                                                    </div>
+                                                )}
+                                                {structure.emailFacturation && (
+                                                    <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                                                        <Mail className="w-3 h-3" />
+                                                        {structure.emailFacturation}
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <div className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-sm font-medium">
+                                                    <Users className="w-4 h-4" />
+                                                    {structure.utilisateursCount}
                                                 </div>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <div className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-sm font-medium">
-                                                <Users className="w-4 h-4" />
-                                                {structure.utilisateursCount}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <div className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-full text-sm font-medium">
-                                                <MapPin className="w-4 h-4" />
-                                                {structure.sitesCount}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <StatusBadge
-                                                variant="boolean"
-                                                value={structure.actif}
-                                                labels={{ true: 'Active', false: 'Inactive' }}
-                                            />
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <ActionDropdown
-                                                onEdit={() => setEditingStructure(structure)}
-                                                onDelete={() => setDeletingStructure(structure)}
-                                                onToggleActive={() => handleToggleActive(structure)}
-                                                isActive={structure.actif}
-                                            />
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <div className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-full text-sm font-medium">
+                                                    <MapPin className="w-4 h-4" />
+                                                    {structure.sitesCount}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <StatusBadge
+                                                    variant="boolean"
+                                                    value={structure.actif}
+                                                    labels={{ true: 'Active', false: 'Inactive' }}
+                                                />
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <ActionDropdown
+                                                    onEdit={() => setEditingStructure(structure)}
+                                                    onDelete={() => setDeletingStructure(structure)}
+                                                    onToggleActive={() => handleToggleActive(structure)}
+                                                    isActive={structure.actif}
+                                                />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
 
                         {/* Pagination */}
-                        <div className="flex items-center justify-between px-6 py-4 border-t bg-gray-50">
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm text-gray-600">Afficher</span>
-                                <select
-                                    value={itemsPerPage}
-                                    onChange={(e) => {
-                                        setItemsPerPage(Number(e.target.value));
-                                        setCurrentPage(1);
-                                    }}
-                                    className="border border-gray-300 rounded-md text-sm py-1 px-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-                                >
-                                    <option value={10}>10</option>
-                                    <option value={20}>20</option>
-                                    <option value={50}>50</option>
-                                </select>
-                                <span className="text-sm text-gray-600">par page</span>
-                            </div>
-
-                            <div className="flex items-center gap-4">
-                                <span className="text-sm text-gray-600">
-                                    {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredStructures.length)} sur {filteredStructures.length}
-                                </span>
-                                <div className="flex items-center gap-1">
+                        <div className="sticky bottom-0 bg-white border-t border-slate-200 px-6 py-3">
+                            <div className="flex items-center justify-between">
+                                <div className="text-sm text-slate-600">
+                                    Affichage {startIndex + 1} à {Math.min(startIndex + itemsPerPage, filteredStructures.length)} sur {filteredStructures.length}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setCurrentPage(1)}
+                                        disabled={currentPage === 1}
+                                        className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <ChevronsLeft className="w-4 h-4" />
+                                    </button>
                                     <button
                                         onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                         disabled={currentPage === 1}
-                                        className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                        className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        <ChevronLeft className="w-5 h-5" />
+                                        <ChevronLeft className="w-4 h-4" />
                                     </button>
+                                    <span className="px-3 py-1 text-sm text-slate-600">Page {currentPage} sur {totalPages > 0 ? totalPages : 1}</span>
                                     <button
                                         onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                                         disabled={currentPage === totalPages || totalPages === 0}
-                                        className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                        className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        <ChevronRight className="w-5 h-5" />
+                                        <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentPage(totalPages)}
+                                        disabled={currentPage === totalPages || totalPages === 0}
+                                        className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <ChevronsRight className="w-4 h-4" />
                                     </button>
                                 </div>
                             </div>
                         </div>
-                    </>
+                    </div>
                 )}
             </div>
 

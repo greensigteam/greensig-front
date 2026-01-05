@@ -5,6 +5,7 @@ import {
     TypeTache, ParticipationCreate, ParticipationTache,
     RatioProductivite, RatioProductiviteCreate
 } from '../types/planning';
+import { localInputToUTC } from '../utils/dateHelpers';
 
 const BASE_URL = '/api/planification';
 
@@ -52,10 +53,18 @@ export const planningService = {
 
     async createTache(data: TacheCreate): Promise<Tache> {
         console.log('Creating task with data:', JSON.stringify(data, null, 2));
+
+        // Ensure dates are converted to UTC if they are local strings
+        const payload = {
+            ...data,
+            date_debut_planifiee: localInputToUTC(data.date_debut_planifiee) || data.date_debut_planifiee,
+            date_fin_planifiee: localInputToUTC(data.date_fin_planifiee) || data.date_fin_planifiee
+        };
+
         const response = await apiFetch(`${BASE_URL}/taches/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+            body: JSON.stringify(payload)
         });
         if (!response.ok) {
             const error = await response.json();
@@ -66,10 +75,17 @@ export const planningService = {
     },
 
     async updateTache(id: number, data: TacheUpdate): Promise<Tache> {
+        // Ensure dates are converted to UTC if they are local strings
+        const payload = { ...data };
+        if (data.date_debut_planifiee) payload.date_debut_planifiee = localInputToUTC(data.date_debut_planifiee) || data.date_debut_planifiee;
+        if (data.date_fin_planifiee) payload.date_fin_planifiee = localInputToUTC(data.date_fin_planifiee) || data.date_fin_planifiee;
+        if (data.date_debut_reelle) payload.date_debut_reelle = localInputToUTC(data.date_debut_reelle) || data.date_debut_reelle;
+        if (data.date_fin_reelle) payload.date_fin_reelle = localInputToUTC(data.date_fin_reelle) || data.date_fin_reelle;
+
         const response = await apiFetch(`${BASE_URL}/taches/${id}/`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+            body: JSON.stringify(payload)
         });
         if (!response.ok) throw new Error('Erreur modification tâche');
         return response.json();
@@ -119,7 +135,18 @@ export const planningService = {
         const response = await apiFetch(`${BASE_URL}/types-taches/applicables/?types_objets=${encodeURIComponent(typesParam)}`);
 
         if (!response.ok) throw new Error('Erreur chargement types tâches applicables');
-        return response.json();
+        const data = await response.json();
+
+        // Normalisation : si c'est un tableau, on l'encapsule dans le format attendu
+        if (Array.isArray(data)) {
+            return {
+                types_objets_demandes: typesObjets,
+                nombre_types_taches: data.length,
+                types_taches: data
+            };
+        }
+
+        return data;
     },
 
     /**

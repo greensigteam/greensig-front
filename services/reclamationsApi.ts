@@ -7,6 +7,7 @@ import {
     SatisfactionCreate,
     ReclamationStats
 } from '../types/reclamations';
+import { localInputToUTC } from '../utils/dateHelpers';
 const API_BASE_URL = '/api/reclamations';
 
 // ============================================================================
@@ -99,10 +100,14 @@ export const fetchReclamationById = async (id: number): Promise<Reclamation> => 
 };
 
 export const createReclamation = async (data: ReclamationCreate): Promise<Reclamation> => {
+    const payload = {
+        ...data,
+        date_constatation: localInputToUTC(data.date_constatation) || data.date_constatation
+    };
     const response = await fetch(`${API_BASE_URL}/reclamations/`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify(data)
+        body: JSON.stringify(payload)
     });
     const result = await handleResponse<Reclamation>(response);
     return result;
@@ -116,10 +121,14 @@ export const fetchReclamationSuivi = async (id: number): Promise<Reclamation> =>
 };
 
 export const updateReclamation = async (id: number, data: Partial<ReclamationCreate>): Promise<Reclamation> => {
+    const payload = {
+        ...data,
+        date_constatation: data.date_constatation ? (localInputToUTC(data.date_constatation) || data.date_constatation) : undefined
+    };
     const response = await fetch(`${API_BASE_URL}/reclamations/${id}/`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
-        body: JSON.stringify(data)
+        body: JSON.stringify(payload)
     });
     const result = await handleResponse<Reclamation>(response);
     return result;

@@ -48,6 +48,7 @@ import CompetenceMatrix, { ViewMode } from '../components/CompetenceMatrix';
 // Modales extraites
 import CreateTeamModal from '../components/modals/CreateTeamModal';
 import CreateOperateurModal from '../components/modals/CreateOperateurModal';
+import EditOperateurModal from '../components/modals/EditOperateurModal';
 import EquipeDetailModal from '../components/modals/EquipeDetailModal';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import { OperateurDetailModal } from './OperateurDetailPage';
@@ -93,7 +94,8 @@ import {
   fetchClients,
   deleteOperateur,
   deleteEquipe,
-  fetchCurrentUser
+  fetchCurrentUser,
+  fetchUtilisateurById
 } from '../services/usersApi';
 
 // ============================================================================
@@ -138,7 +140,7 @@ const Teams: React.FC = () => {
   // Data
   const [equipes, setEquipes] = useState<EquipeList[]>([]);
   const [operateurs, setOperateurs] = useState<OperateurList[]>([]);
-  const [utilisateurs, setUtilisateurs] = useState<Utilisateur[]>([]);
+  // const [utilisateurs, setUtilisateurs] = useState<Utilisateur[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [absences, setAbsences] = useState<Absence[]>([]);
   const [absencesAValider, setAbsencesAValider] = useState<Absence[]>([]);
@@ -311,7 +313,7 @@ const Teams: React.FC = () => {
     console.log('[Teams] 🔄 Loading équipes data, page:', page, 'forceRefresh:', forceRefresh);
     try {
       const [equipesRes, chefsPotentielsRes] = await Promise.all([
-        fetchEquipes({ page, pageSize: 50 }, forceRefresh),
+        fetchEquipes({ page, pageSize: 50 }),
         chefsPotentiels.length === 0 ? fetchChefsPotentiels() : Promise.resolve(chefsPotentiels)
       ]);
       console.log('[Teams] ✅ Équipes loaded:', equipesRes.results.length, 'équipes');
@@ -446,6 +448,36 @@ const Teams: React.FC = () => {
     }
   };
 
+  const handleOpenCreateAbsence = async () => {
+    // Ensure operators are loaded before opening the modal
+    if (operateurs.length === 0) {
+      try {
+        const operateursRes = await fetchOperateurs({ page: 1, pageSize: 200 });
+        setOperateurs(operateursRes.results);
+      } catch (error) {
+        console.error('Erreur chargement opérateurs:', error);
+        showToast('Erreur lors du chargement des opérateurs', 'error');
+        return;
+      }
+    }
+    setShowCreateAbsence(true);
+  };
+
+  const handleOpenCreateTeam = async () => {
+    // Ensure operators are loaded before opening the modal
+    if (operateurs.length === 0) {
+      try {
+        const operateursRes = await fetchOperateurs({ page: 1, pageSize: 200 });
+        setOperateurs(operateursRes.results);
+      } catch (error) {
+        console.error('Erreur chargement opérateurs:', error);
+        showToast('Erreur lors du chargement des opérateurs', 'error');
+        return;
+      }
+    }
+    setShowCreateTeam(true);
+  };
+
   // Filter data (using debounced search for performance)
   const filteredEquipes = useMemo(() => equipes
     .filter(e => e.actif)
@@ -490,7 +522,12 @@ const Teams: React.FC = () => {
     return true;
   }), [absences, debouncedSearchQuery, absenceFilters]);
 
-  const operateursSansEquipe = operateurs.filter(o => o.equipe === null && o.actif);
+  // Filter active operators available for team assignment
+  // Show ALL active operators (not just those without a team) to allow reassignment
+  const operateursSansEquipe = operateurs.filter(o => {
+    const estActif = o.actif === true || (o.actif === undefined && o.statut === 'ACTIF');
+    return estActif;
+  });
 
   // Get unique categories from competences
   const competenceCategories = useMemo(() => {
@@ -507,6 +544,8 @@ const Teams: React.FC = () => {
   const [editEquipe, setEditEquipe] = useState<EquipeList | null>(null);
   const [deleteEquipeId, setDeleteEquipeId] = useState<number | null>(null);
   const [deleteOperateurId, setDeleteOperateurId] = useState<number | null>(null);
+
+  const [editingOperateur, setEditingOperateur] = useState<OperateurList | null>(null);
 
   const equipesColumns: Column<EquipeList>[] = [
     { key: 'nomEquipe', label: 'Nom' },
@@ -594,7 +633,7 @@ const Teams: React.FC = () => {
               <button
                 className="p-1 text-blue-600 hover:bg-blue-100 rounded"
                 title="Modifier"
-                onClick={(ev) => { ev.stopPropagation(); const u = utilisateurs.find(us => us.id === o.id); if (u) setEditingUser(u); }}
+                onClick={(ev) => { ev.stopPropagation(); setEditingOperateur(o); }}
               >
                 <Edit2 className="w-4 h-4" />
               </button>
@@ -873,265 +912,55 @@ const Teams: React.FC = () => {
 
         {/* Right: Action Buttons */}
         <div className="flex items-center gap-2.5">
-          {/* Competences Tab Controls */}
+          {/* Competences Tab Controls - Simplified */}
           {activeTab === 'competences' && (
             <>
-              {/* Edit Mode Toggle - Icon only */}
+              {/* Edit Mode Toggle */}
               <button
                 onClick={() => setMatrixEditMode(!matrixEditMode)}
-                className={`p-2.5 rounded-lg transition-all duration-200 ${
-                  matrixEditMode
-                    ? 'bg-orange-500 text-white shadow-md hover:bg-orange-600'
-                    : 'bg-blue-500 text-white shadow-md hover:bg-blue-600'
-                }`}
-                title={matrixEditMode ? 'Mode consultation' : 'Mode édition'}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${matrixEditMode
+                  ? 'bg-orange-500 text-white shadow-md hover:bg-orange-600'
+                  : 'bg-emerald-600 text-white shadow-md hover:bg-emerald-700'
+                  }`}
               >
                 {matrixEditMode ? (
-                  <Eye className="w-4 h-4" />
+                  <>
+                    <Eye className="w-4 h-4" />
+                    <span className="hidden sm:inline">Consultation</span>
+                  </>
                 ) : (
-                  <Edit3 className="w-4 h-4" />
+                  <>
+                    <Edit3 className="w-4 h-4" />
+                    <span className="hidden sm:inline">Édition</span>
+                  </>
                 )}
               </button>
 
-              {/* Separator */}
-              <div className="h-8 w-px bg-gray-300"></div>
-
-              {/* View Mode Toggle - Icons only */}
+              {/* View Mode Toggle */}
               <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
                 <button
                   onClick={() => setMatrixViewMode('cards')}
-                  className={`p-2 rounded-md transition-all duration-200 ${
-                    matrixViewMode === 'cards'
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'text-gray-600 hover:bg-white hover:text-gray-900'
-                  }`}
+                  className={`p-2 rounded-md transition-all duration-200 ${matrixViewMode === 'cards'
+                    ? 'bg-white text-emerald-700 shadow-sm'
+                    : 'text-gray-600 hover:bg-white/50 hover:text-gray-900'
+                    }`}
                   title="Vue cartes"
                 >
                   <LayoutGrid className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setMatrixViewMode('table')}
-                  className={`p-2 rounded-md transition-all duration-200 ${
-                    matrixViewMode === 'table'
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'text-gray-600 hover:bg-white hover:text-gray-900'
-                  }`}
+                  className={`p-2 rounded-md transition-all duration-200 ${matrixViewMode === 'table'
+                    ? 'bg-white text-emerald-700 shadow-sm'
+                    : 'text-gray-600 hover:bg-white/50 hover:text-gray-900'
+                    }`}
                   title="Vue tableau"
                 >
                   <Table className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Separator */}
-              <div className="h-8 w-px bg-gray-300"></div>
-
-              {/* Filters Toggle - Icon only */}
-              <button
-                onClick={() => setMatrixShowFilters(!matrixShowFilters)}
-                className={`relative p-2.5 rounded-lg transition-all duration-200 ${
-                  matrixShowFilters || matrixNiveauFilter || matrixCategorieFilter
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 shadow-sm'
-                }`}
-                title="Filtres"
-              >
-                <Filter className="w-4 h-4" />
-                {(matrixNiveauFilter || matrixCategorieFilter) && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold shadow">
-                    {(matrixNiveauFilter ? 1 : 0) + (matrixCategorieFilter ? 1 : 0)}
-                  </span>
-                )}
-              </button>
-
-              {/* Inline Filters - Custom selects with icons */}
-              {matrixShowFilters && (
-                <>
-                  {/* Niveau Filter */}
-                  <Listbox value={matrixNiveauFilter} onChange={setMatrixNiveauFilter}>
-                    <div className="relative">
-                      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]">
-                        <BarChart3 className="w-4 h-4 text-gray-500" />
-                        <span className="flex-1 text-left">
-                          {matrixNiveauFilter === '' && 'Niveau'}
-                          {matrixNiveauFilter === 'NON' && 'Aucune'}
-                          {matrixNiveauFilter === 'DEBUTANT' && 'Débutant'}
-                          {matrixNiveauFilter === 'INTERMEDIAIRE' && 'Intermédiaire'}
-                          {matrixNiveauFilter === 'EXPERT' && 'Expert'}
-                        </span>
-                        <ChevronDown className="w-4 h-4 text-gray-400" />
-                      </Listbox.Button>
-                      <Transition
-                        as={React.Fragment}
-                        leave="transition ease-in duration-100"
-                        leaveFrom="opacity-100"
-                        leaveTo="opacity-0"
-                      >
-                        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                          <Listbox.Option
-                            value=""
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${
-                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <BarChart3 className="w-4 h-4 text-gray-500" />
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>
-                                  Niveau
-                                </span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                          <Listbox.Option
-                            value="NON"
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${
-                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <Ban className="w-4 h-4 text-red-500" />
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>
-                                  Aucune
-                                </span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                          <Listbox.Option
-                            value="DEBUTANT"
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${
-                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <Star className="w-4 h-4 text-orange-500" />
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>
-                                  Débutant
-                                </span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                          <Listbox.Option
-                            value="INTERMEDIAIRE"
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${
-                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <TrendingUp className="w-4 h-4 text-blue-500" />
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>
-                                  Intermédiaire
-                                </span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                          <Listbox.Option
-                            value="EXPERT"
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${
-                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <CheckCircle className="w-4 h-4 text-green-500" />
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>
-                                  Expert
-                                </span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                        </Listbox.Options>
-                      </Transition>
-                    </div>
-                  </Listbox>
-
-                  {/* Categorie Filter */}
-                  <Listbox value={matrixCategorieFilter} onChange={setMatrixCategorieFilter}>
-                    <div className="relative">
-                      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]">
-                        <FolderOpen className="w-4 h-4 text-gray-500" />
-                        <span className="flex-1 text-left truncate">
-                          {matrixCategorieFilter || 'Catégorie'}
-                        </span>
-                        <ChevronDown className="w-4 h-4 text-gray-400" />
-                      </Listbox.Button>
-                      <Transition
-                        as={React.Fragment}
-                        leave="transition ease-in duration-100"
-                        leaveFrom="opacity-100"
-                        leaveTo="opacity-0"
-                      >
-                        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                          <Listbox.Option
-                            value=""
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${
-                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <FolderOpen className="w-4 h-4 text-gray-500" />
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>
-                                  Catégorie
-                                </span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                          {competenceCategories.map(cat => (
-                            <Listbox.Option
-                              key={cat}
-                              value={cat}
-                              className={({ active }) =>
-                                `relative cursor-pointer select-none py-2 px-3 ${
-                                  active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
-                                }`
-                              }
-                            >
-                              {({ selected }) => (
-                                <span className={`block truncate ${selected ? 'font-semibold' : 'font-normal'}`}>
-                                  {cat}
-                                </span>
-                              )}
-                            </Listbox.Option>
-                          ))}
-                        </Listbox.Options>
-                      </Transition>
-                    </div>
-                  </Listbox>
-
-                  {(matrixNiveauFilter || matrixCategorieFilter) && (
-                    <button
-                      onClick={() => {
-                        setMatrixNiveauFilter('');
-                        setMatrixCategorieFilter('');
-                      }}
-                      className="p-2.5 rounded-lg text-red-600 hover:bg-red-50 transition-all duration-200 border border-red-200 hover:border-red-300 shadow-sm"
-                      title="Réinitialiser les filtres"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </>
-              )}
-
-              {/* Separator */}
-              <div className="h-8 w-px bg-gray-300"></div>
-
-              {/* Refresh Button - Icon only */}
+              {/* Refresh Button */}
               <button
                 onClick={loadData}
                 className="p-2.5 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 shadow-sm"
@@ -1148,11 +977,10 @@ const Teams: React.FC = () => {
               {/* Filters Toggle - Icon only */}
               <button
                 onClick={() => setShowAbsenceFilters(!showAbsenceFilters)}
-                className={`relative p-2.5 rounded-lg transition-all duration-200 ${
-                  showAbsenceFilters || absenceFilters.statut || absenceFilters.typeAbsence || absenceFilters.dateDebut || absenceFilters.dateFin
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 shadow-sm'
-                }`}
+                className={`relative p-2.5 rounded-lg transition-all duration-200 ${showAbsenceFilters || absenceFilters.statut || absenceFilters.typeAbsence || absenceFilters.dateDebut || absenceFilters.dateFin
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 shadow-sm'
+                  }`}
                 title="Filtres"
               >
                 <Filter className="w-4 h-4" />
@@ -1190,8 +1018,7 @@ const Teams: React.FC = () => {
                           <Listbox.Option
                             value=""
                             className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${
-                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
                               }`
                             }
                           >
@@ -1207,8 +1034,7 @@ const Teams: React.FC = () => {
                           <Listbox.Option
                             value="DEMANDEE"
                             className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${
-                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
                               }`
                             }
                           >
@@ -1224,8 +1050,7 @@ const Teams: React.FC = () => {
                           <Listbox.Option
                             value="VALIDEE"
                             className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${
-                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
                               }`
                             }
                           >
@@ -1241,8 +1066,7 @@ const Teams: React.FC = () => {
                           <Listbox.Option
                             value="REFUSEE"
                             className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${
-                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
                               }`
                             }
                           >
@@ -1258,8 +1082,7 @@ const Teams: React.FC = () => {
                           <Listbox.Option
                             value="ANNULEE"
                             className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${
-                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
                               }`
                             }
                           >
@@ -1301,8 +1124,7 @@ const Teams: React.FC = () => {
                           <Listbox.Option
                             value=""
                             className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${
-                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
                               }`
                             }
                           >
@@ -1318,8 +1140,7 @@ const Teams: React.FC = () => {
                           <Listbox.Option
                             value="CONGE"
                             className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${
-                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
                               }`
                             }
                           >
@@ -1335,8 +1156,7 @@ const Teams: React.FC = () => {
                           <Listbox.Option
                             value="MALADIE"
                             className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${
-                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
                               }`
                             }
                           >
@@ -1352,8 +1172,7 @@ const Teams: React.FC = () => {
                           <Listbox.Option
                             value="FORMATION"
                             className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${
-                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
                               }`
                             }
                           >
@@ -1369,8 +1188,7 @@ const Teams: React.FC = () => {
                           <Listbox.Option
                             value="AUTRE"
                             className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${
-                                active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                              `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
                               }`
                             }
                           >
@@ -1435,7 +1253,7 @@ const Teams: React.FC = () => {
               {/* Create Button */}
               {!isReadOnly && (
                 <button
-                  onClick={() => setShowCreateAbsence(true)}
+                  onClick={handleOpenCreateAbsence}
                   className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm"
                 >
                   <Plus className="w-4 h-4" />
@@ -1461,7 +1279,7 @@ const Teams: React.FC = () => {
               {/* Create Button */}
               {!isReadOnly && (
                 <button
-                  onClick={() => setShowCreateTeam(true)}
+                  onClick={handleOpenCreateTeam}
                   className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm"
                 >
                   <Plus className="w-4 h-4" />
@@ -1477,11 +1295,10 @@ const Teams: React.FC = () => {
               {/* Filters Toggle */}
               <button
                 onClick={() => setShowOperateurFilters(!showOperateurFilters)}
-                className={`relative p-2.5 rounded-lg transition-all duration-200 ${
-                  showOperateurFilters || operateurFilters.statut || operateurFilters.equipe || operateurFilters.estChef || operateurFilters.disponible
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 shadow-sm'
-                }`}
+                className={`relative p-2.5 rounded-lg transition-all duration-200 ${showOperateurFilters || operateurFilters.statut || operateurFilters.equipe || operateurFilters.estChef || operateurFilters.disponible
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 shadow-sm'
+                  }`}
                 title="Filtres"
               >
                 <Filter className="w-4 h-4" />
@@ -1738,6 +1555,158 @@ const Teams: React.FC = () => {
       </div>
 
 
+      {/* Competences Filter Bar - Dedicated section */}
+      {activeTab === 'competences' && (
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex-shrink-0">
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Label */}
+            <div className="flex items-center gap-2 text-sm font-medium text-gray-600">
+              <Filter className="w-4 h-4" />
+              <span>Filtrer par :</span>
+            </div>
+
+            {/* Niveau Filter - Chip style buttons */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">Niveau</span>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  onClick={() => setMatrixNiveauFilter('')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${matrixNiveauFilter === ''
+                    ? 'bg-gray-800 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                >
+                  Tous
+                </button>
+                <button
+                  onClick={() => setMatrixNiveauFilter('NON')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all ${matrixNiveauFilter === 'NON'
+                    ? 'bg-red-500 text-white shadow-sm'
+                    : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
+                    }`}
+                >
+                  <Ban className="w-3 h-3" />
+                  Aucune
+                </button>
+                <button
+                  onClick={() => setMatrixNiveauFilter('DEBUTANT')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all ${matrixNiveauFilter === 'DEBUTANT'
+                    ? 'bg-orange-500 text-white shadow-sm'
+                    : 'bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200'
+                    }`}
+                >
+                  <Star className="w-3 h-3" />
+                  Débutant
+                </button>
+                <button
+                  onClick={() => setMatrixNiveauFilter('INTERMEDIAIRE')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all ${matrixNiveauFilter === 'INTERMEDIAIRE'
+                    ? 'bg-blue-500 text-white shadow-sm'
+                    : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
+                    }`}
+                >
+                  <TrendingUp className="w-3 h-3" />
+                  Intermédiaire
+                </button>
+                <button
+                  onClick={() => setMatrixNiveauFilter('EXPERT')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all ${matrixNiveauFilter === 'EXPERT'
+                    ? 'bg-green-500 text-white shadow-sm'
+                    : 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
+                    }`}
+                >
+                  <CheckCircle className="w-3 h-3" />
+                  Expert
+                </button>
+              </div>
+            </div>
+
+            {/* Separator */}
+            <div className="h-8 w-px bg-gray-200 hidden md:block"></div>
+
+            {/* Catégorie Filter */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">Catégorie</span>
+              <Listbox value={matrixCategorieFilter} onChange={setMatrixCategorieFilter}>
+                <div className="relative">
+                  <Listbox.Button className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-full text-xs font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all cursor-pointer min-w-[140px]">
+                    <FolderOpen className="w-3.5 h-3.5 text-gray-500" />
+                    <span className="flex-1 text-left truncate">
+                      {matrixCategorieFilter || 'Toutes'}
+                    </span>
+                    <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                  </Listbox.Button>
+                  <Transition
+                    as={React.Fragment}
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-48 overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                      <Listbox.Option
+                        value=""
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                          }`
+                        }
+                      >
+                        {({ selected }) => (
+                          <div className="flex items-center gap-2">
+                            <FolderOpen className="w-4 h-4 text-gray-500" />
+                            <span className={selected ? 'font-semibold' : 'font-normal'}>
+                              Toutes les catégories
+                            </span>
+                          </div>
+                        )}
+                      </Listbox.Option>
+                      {competenceCategories.map(cat => (
+                        <Listbox.Option
+                          key={cat}
+                          value={cat}
+                          className={({ active }) =>
+                            `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
+                            }`
+                          }
+                        >
+                          {({ selected }) => (
+                            <span className={`block truncate ${selected ? 'font-semibold' : 'font-normal'}`}>
+                              {cat}
+                            </span>
+                          )}
+                        </Listbox.Option>
+                      ))}
+                    </Listbox.Options>
+                  </Transition>
+                </div>
+              </Listbox>
+            </div>
+
+            {/* Reset button */}
+            {(matrixNiveauFilter || matrixCategorieFilter) && (
+              <button
+                onClick={() => {
+                  setMatrixNiveauFilter('');
+                  setMatrixCategorieFilter('');
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-full transition-all border border-red-200"
+              >
+                <X className="w-3 h-3" />
+                Réinitialiser
+              </button>
+            )}
+
+            {/* Active filters count */}
+            {(matrixNiveauFilter || matrixCategorieFilter) && (
+              <div className="ml-auto flex items-center gap-2">
+                <span className="text-xs text-gray-500">
+                  {(matrixNiveauFilter ? 1 : 0) + (matrixCategorieFilter ? 1 : 0)} filtre{((matrixNiveauFilter ? 1 : 0) + (matrixCategorieFilter ? 1 : 0)) > 1 ? 's' : ''} actif{((matrixNiveauFilter ? 1 : 0) + (matrixCategorieFilter ? 1 : 0)) > 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Content */}
       <div className="flex-1 overflow-auto min-h-0">
         {activeTab === 'equipes' && (
@@ -1834,6 +1803,14 @@ const Teams: React.FC = () => {
           clients={clients}
           operateurs={operateurs}
           onClose={() => setEditingUser(null)}
+          onUpdated={loadData}
+        />
+      )}
+
+      {editingOperateur && (
+        <EditOperateurModal
+          operateur={editingOperateur}
+          onClose={() => setEditingOperateur(null)}
           onUpdated={loadData}
         />
       )}

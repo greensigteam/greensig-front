@@ -197,7 +197,7 @@ export const FormModal: React.FC<FormModalProps> = ({
         {steps && steps.length > 0 && (
           <StepIndicator
             steps={steps}
-            currentStep={currentStep || steps[0].id}
+            currentStep={currentStep || steps[0]?.id || ''}
             completedSteps={completedSteps}
           />
         )}
@@ -402,8 +402,8 @@ export const FormInput: React.FC<{
   placeholder?: string;
   disabled?: boolean;
   required?: boolean;
-  min?: number;
-  max?: number;
+  min?: number | string;
+  max?: number | string;
   step?: number;
   className?: string;
 }> = ({

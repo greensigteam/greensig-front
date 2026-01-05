@@ -5,7 +5,6 @@ import {
     Loader2, FileImage, Play, CheckCircle, XCircle, ThumbsUp, ThumbsDown, ShieldCheck,
     RefreshCw, Eye, Filter, X, Clock, Pencil
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { planningService } from '../services/planningService';
 import { fetchCurrentUser, fetchAllSites, SiteFrontend } from '../services/api';
 import { fetchEquipes, fetchStructures } from '../services/usersApi';
@@ -32,7 +31,6 @@ const getFullImageUrl = (url: string | null): string => {
 };
 
 const SuiviTaches: React.FC = () => {
-    const navigate = useNavigate();
     const { searchQuery, setPlaceholder } = useSearch();
 
     // State UI
@@ -177,7 +175,7 @@ const SuiviTaches: React.FC = () => {
         setLoadingTypesTaches(true);
         try {
             const response = await planningService.getTypesTaches();
-            setTypesTaches(response.results || response);
+            setTypesTaches((response as any).results || response);
         } catch (error) {
             console.error("Erreur chargement types de tâches", error);
         } finally {
@@ -445,11 +443,10 @@ const SuiviTaches: React.FC = () => {
                 {/* Filter Toggle Button */}
                 <button
                     onClick={() => setShowFilters(!showFilters)}
-                    className={`relative p-2.5 rounded-lg transition-all duration-200 shrink-0 ${
-                        showFilters || activeFiltersCount > 0
-                            ? 'bg-emerald-600 text-white shadow-md'
-                            : 'bg-white text-slate-700 border border-slate-300 hover:border-slate-400 shadow-sm'
-                    }`}
+                    className={`relative p-2.5 rounded-lg transition-all duration-200 shrink-0 ${showFilters || activeFiltersCount > 0
+                        ? 'bg-emerald-600 text-white shadow-md'
+                        : 'bg-white text-slate-700 border border-slate-300 hover:border-slate-400 shadow-sm'
+                        }`}
                     title="Filtres"
                 >
                     <Filter className="w-4 h-4" />
@@ -570,56 +567,56 @@ const SuiviTaches: React.FC = () => {
                 {/* Left Panel: Task List */}
                 <div className={`${selectedTache ? 'hidden lg:flex' : 'flex'} flex-1 flex-col`}>
                     <div className="flex-1 overflow-y-auto p-4">
-                            {loadingTasks ? (
-                                <div className="flex justify-center p-12">
-                                    <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
-                                </div>
-                            ) : filteredTaches.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-12 text-slate-500">
-                                    <Calendar className="w-12 h-12 mb-4 text-slate-300" />
-                                    <p className="text-lg font-medium">Aucune tâche trouvée</p>
-                                </div>
-                            ) : (
-                                <div className="grid gap-3">
-                                    {filteredTaches.map(tache => (
-                                        <div
-                                            key={tache.id}
-                                            onClick={() => setSelectedTache(tache)}
-                                            className={`bg-white rounded-xl border p-4 cursor-pointer transition-all hover:shadow-md ${selectedTache?.id === tache.id
-                                                ? 'border-emerald-500 ring-2 ring-emerald-500/20'
-                                                : 'border-slate-200 hover:border-slate-300'
-                                                }`}
-                                        >
-                                            <div className="flex justify-between items-start mb-2">
-                                                <h3 className="font-semibold text-slate-800">
-                                                    {tache.type_tache_detail?.nom_tache || 'Tâche sans nom'}
-                                                </h3>
-                                                <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUT_TACHE_COLORS[tache.statut]?.bg} ${STATUT_TACHE_COLORS[tache.statut]?.text}`}>
-                                                    {tache.statut.replace('_', ' ')}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-4 text-sm text-slate-500">
-                                                <span className="flex items-center gap-1">
-                                                    <Calendar className="w-3.5 h-3.5" />
-                                                    {new Date(tache.date_debut_planifiee).toLocaleDateString()}
-                                                </span>
-                                                <span className="flex items-center gap-1 truncate max-w-[200px]" title={
-                                                    tache.objets_detail?.length
-                                                        ? tache.objets_detail.map(o => o.site_nom || 'Site inconnu').join(', ')
-                                                        : 'Aucune localisation'
-                                                }>
-                                                    <MapPin className="w-3.5 h-3.5 shrink-0" />
-                                                    {tache.objets_detail?.length
-                                                        ? (tache.objets_detail[0]?.site_nom || 'Site') + (tache.objets_detail.length > 1 ? ` (+${tache.objets_detail.length - 1})` : '')
-                                                        : 'Non localisé'
-                                                    }
-                                                </span>
-                                            </div>
+                        {loadingTasks ? (
+                            <div className="flex justify-center p-12">
+                                <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+                            </div>
+                        ) : filteredTaches.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                                <Calendar className="w-12 h-12 mb-4 text-slate-300" />
+                                <p className="text-lg font-medium">Aucune tâche trouvée</p>
+                            </div>
+                        ) : (
+                            <div className="grid gap-3">
+                                {filteredTaches.map(tache => (
+                                    <div
+                                        key={tache.id}
+                                        onClick={() => setSelectedTache(tache)}
+                                        className={`bg-white rounded-xl border p-4 cursor-pointer transition-all hover:shadow-md ${selectedTache?.id === tache.id
+                                            ? 'border-emerald-500 ring-2 ring-emerald-500/20'
+                                            : 'border-slate-200 hover:border-slate-300'
+                                            }`}
+                                    >
+                                        <div className="flex justify-between items-start mb-2">
+                                            <h3 className="font-semibold text-slate-800">
+                                                {tache.type_tache_detail?.nom_tache || 'Tâche sans nom'}
+                                            </h3>
+                                            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUT_TACHE_COLORS[tache.statut]?.bg} ${STATUT_TACHE_COLORS[tache.statut]?.text}`}>
+                                                {tache.statut.replace('_', ' ')}
+                                            </span>
                                         </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                                        <div className="flex items-center gap-4 text-sm text-slate-500">
+                                            <span className="flex items-center gap-1">
+                                                <Calendar className="w-3.5 h-3.5" />
+                                                {new Date(tache.date_debut_planifiee).toLocaleDateString()}
+                                            </span>
+                                            <span className="flex items-center gap-1 truncate max-w-[200px]" title={
+                                                tache.objets_detail?.length
+                                                    ? tache.objets_detail.map(o => o.site_nom || 'Site inconnu').join(', ')
+                                                    : 'Aucune localisation'
+                                            }>
+                                                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                                                {tache.objets_detail?.length
+                                                    ? (tache.objets_detail[0]?.site_nom || 'Site') + (tache.objets_detail.length > 1 ? ` (+${tache.objets_detail.length - 1})` : '')
+                                                    : 'Non localisé'
+                                                }
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Right Panel: Task Detail */}
@@ -1203,15 +1200,13 @@ const SuiviTaches: React.FC = () => {
                 </div>
             )}
 
-            {/* Edit Task Modal */}
             {showEditModal && selectedTache && (
                 <TaskFormModal
-                    isOpen={showEditModal}
                     onClose={() => setShowEditModal(false)}
                     onSubmit={handleTaskUpdate}
                     typesTaches={typesTaches}
                     equipes={equipes}
-                    editingTask={selectedTache}
+                    tache={selectedTache}
                 />
             )}
         </div>

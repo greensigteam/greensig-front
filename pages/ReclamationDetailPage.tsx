@@ -26,7 +26,7 @@ import { TypeTache, TacheCreate } from '../types/planning';
 import { EquipeList, Utilisateur } from '../types/users';
 import { SatisfactionForm } from '../components/SatisfactionForm';
 import TaskFormModal from '../components/planning/TaskFormModal';
-import { formatLocalDate } from '../utils/dateHelpers';
+import { formatLocalDate, localInputToUTC } from '../utils/dateHelpers';
 import { format } from 'date-fns';
 import LoadingScreen from '../components/LoadingScreen';
 import ConfirmModal from '../components/ConfirmModal';
@@ -247,8 +247,8 @@ const ReclamationDetailPage: React.FC = () => {
             const payload: TacheCreate = {
                 ...data,
                 reclamation: reclamation.id,
-                date_debut_planifiee: new Date(data.date_debut_planifiee).toISOString(),
-                date_fin_planifiee: new Date(data.date_fin_planifiee).toISOString(),
+                date_debut_planifiee: localInputToUTC(data.date_debut_planifiee) || data.date_debut_planifiee,
+                date_fin_planifiee: localInputToUTC(data.date_fin_planifiee) || data.date_fin_planifiee,
             };
 
             await planningService.createTache(payload);
@@ -421,7 +421,7 @@ const ReclamationDetailPage: React.FC = () => {
                                     {reclamation.numero_reclamation}
                                 </h1>
                                 <p className="text-sm text-slate-500">
-                                    Créée le {new Date(reclamation.date_creation).toLocaleDateString('fr-FR')}
+                                    Créée le {formatLocalDate(reclamation.date_creation, { day: 'numeric', month: 'long', year: 'numeric' })}
                                 </p>
                             </div>
                         </div>
@@ -575,33 +575,25 @@ const ReclamationDetailPage: React.FC = () => {
                                     <div className="flex justify-between items-center py-2 border-b border-slate-100">
                                         <span className="text-sm text-slate-500">Prise en compte</span>
                                         <span className="text-sm font-medium text-slate-800">
-                                            {reclamation.date_prise_en_compte
-                                                ? new Date(reclamation.date_prise_en_compte).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-                                                : '-'}
+                                            {formatLocalDate(reclamation.date_prise_en_compte, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                     </div>
                                     <div className="flex justify-between items-center py-2 border-b border-slate-100">
                                         <span className="text-sm text-slate-500">Début traitement</span>
                                         <span className="text-sm font-medium text-slate-800">
-                                            {reclamation.date_debut_traitement
-                                                ? new Date(reclamation.date_debut_traitement).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-                                                : '-'}
+                                            {formatLocalDate(reclamation.date_debut_traitement, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                     </div>
                                     <div className="flex justify-between items-center py-2 border-b border-slate-100">
                                         <span className="text-sm text-slate-500">Résolution</span>
                                         <span className="text-sm font-medium text-emerald-600">
-                                            {reclamation.date_resolution
-                                                ? new Date(reclamation.date_resolution).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-                                                : '-'}
+                                            {formatLocalDate(reclamation.date_resolution, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                     </div>
                                     <div className="flex justify-between items-center py-2">
                                         <span className="text-sm text-slate-500">Clôture réelle</span>
                                         <span className="text-sm font-medium text-slate-800">
-                                            {reclamation.date_cloture_reelle
-                                                ? new Date(reclamation.date_cloture_reelle).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-                                                : '-'}
+                                            {formatLocalDate(reclamation.date_cloture_reelle, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                     </div>
                                 </div>

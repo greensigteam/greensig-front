@@ -20,11 +20,11 @@ import { fetchInventory, type InventoryResponse } from '../../services/api';
 import {
     Tache, TacheCreate, TypeTache,
     PRIORITE_LABELS,
-    PrioriteTache, FrequenceRecurrence,
+    PrioriteTache,
     RatioProductivite
 } from '../../types/planning';
 import { EquipeList } from '../../types/users';
-import FormModal, { FormField, FormInput, FormTextarea, FormSelect } from '../FormModal';
+import FormModal from '../FormModal';
 import { RecurrenceSelector, type RecurrenceParams } from './RecurrenceSelector';
 
 
@@ -281,7 +281,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
     };
 
     const [formData, setFormData] = useState<TacheCreate>({
-        id_client: tache?.client_detail?.id || initialValues?.id_client || null,
+        id_client: tache?.client_detail?.utilisateur || initialValues?.id_client || null,
         id_type_tache: tache?.type_tache_detail?.id || initialValues?.id_type_tache || 0,
         equipes_ids: initialEquipesIds(),
         date_debut_planifiee: tache?.date_debut_planifiee ? formatDateTimeLocal(new Date(tache.date_debut_planifiee)) : (initialValues?.date_debut_planifiee || getDefaultStartDate()),
@@ -304,7 +304,13 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
     // State for object selector
     const [selectedObjects, setSelectedObjects] = useState<InventoryObjectOption[]>(
         preSelectedObjects ||
-        tache?.objets_detail?.map(o => ({ id: o.id, type: o.nom_type, nom: o.display, site: o.site, soussite: o.sous_site })) ||
+        tache?.objets_detail?.map(o => ({
+            id: o.id,
+            type: o.nom_type || '',
+            nom: o.display || `Objet #${o.id}`,
+            site: o.site_nom || '',
+            soussite: o.sous_site_nom
+        })) ||
         []
     );
     const [showObjectSelector, setShowObjectSelector] = useState(false);
@@ -329,8 +335,8 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         }
         if (selectedObjects.length > 0) {
             // Find site ID from available objects
-            const firstObj = availableObjects.find(o => o.site === selectedObjects[0].site);
-            return { id: (firstObj as any)?.siteId || null, name: selectedObjects[0].site };
+            const firstObj = availableObjects.find(o => o.site === selectedObjects[0]?.site);
+            return { id: (firstObj as any)?.siteId || null, name: selectedObjects[0]?.site };
         }
         return null;
     }, [selectedObjects, siteFilter, availableObjects]);
@@ -341,7 +347,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
             return equipes;
         }
         // Filter by site name (siteNom) since we have the site name from objects
-        const filtered = equipes.filter(e => e.siteNom === lockedSite.name);
+        const filtered = equipes.filter(e => e.siteNom === lockedSite?.name);
         return filtered;
     }, [equipes, lockedSite]);
 
@@ -393,17 +399,18 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         }
 
         // Get unique object types from selected objects
-        const uniqueTypes = [...new Set(selectedObjects.map(obj => obj.type))];
+        const uniqueTypes = [...new Set(selectedObjects.map(obj => obj.type).filter(Boolean))];
 
         setLoadingFilteredTypes(true);
         setIncompatibleObjectsError(null);
 
         planningService.getApplicableTypesTaches(uniqueTypes)
             .then(result => {
-                setFilteredTypesTaches(result.types_taches);
+                const types = result?.types_taches || [];
+                setFilteredTypesTaches(types);
 
                 // If no applicable task types, show error
-                if (result.types_taches.length === 0) {
+                if (types.length === 0) {
                     const typesList = uniqueTypes.join(', ');
                     setIncompatibleObjectsError(
                         `Aucun type de tâche n'est applicable aux types d'objets sélectionnés (${typesList}). ` +
@@ -649,7 +656,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
     // Synchroniser le formulaire quand la tâche change (édition)
     useEffect(() => {
         if (tache) {
-            // Initialize equipes from M2M or legacy single equipe
+            // Initialize teams
             const equipesIds = (): number[] => {
                 if (tache.equipes_detail && tache.equipes_detail.length > 0) {
                     return tache.equipes_detail.map(e => e.id);
@@ -660,16 +667,33 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                 return [];
             };
 
+            // Initialize selected objects
+            // FIX: Map correctly using updated serializer fields
+            const newSelectedObjects = tache.objets_detail?.map(o => ({
+                id: o.id,
+                type: o.nom_type || '', // Now available from backend
+                nom: o.display || `Objet #${o.id}`, // Now available from backend
+                site: o.site_nom || '',
+                soussite: o.sous_site_nom
+            })) || [];
+
+            setSelectedObjects(newSelectedObjects);
+
             setFormData({
-                id_client: tache.client_detail ? ((tache.client_detail as any).utilisateur || tache.client_detail.utilisateur) : null,
+                id_client: tache.client_detail ? tache.client_detail.utilisateur : null,
                 id_type_tache: tache.type_tache_detail ? tache.type_tache_detail.id : 0,
                 equipes_ids: equipesIds(),
                 date_debut_planifiee: formatDateTimeLocal(new Date(tache.date_debut_planifiee)),
                 date_fin_planifiee: formatDateTimeLocal(new Date(tache.date_fin_planifiee)),
                 priorite: tache.priorite,
                 commentaires: tache.commentaires || '',
-                parametres_recurrence: tache.parametres_recurrence || null
+                parametres_recurrence: tache.parametres_recurrence || null,
+                charge_estimee_heures: tache.charge_estimee_heures,
+                reclamation: tache.reclamation || null,
+                objets: newSelectedObjects.map(o => o.id) // Ensure sync immediately
             });
+
+            setChargeManuelle(tache.charge_manuelle);
         }
     }, [tache]);
 
@@ -700,511 +724,511 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
             submitDisabled={!!incompatibleObjectsError || filteredTypesTaches.length === 0}
         >
             <div className="space-y-4">
-                        {/* Validation Warnings */}
-                        {validationWarnings.length > 0 && (
-                            <div className="bg-orange-50 border-l-4 border-orange-500 p-4 mb-4">
-                                <div className="flex items-start">
-                                    <div className="flex-shrink-0">
-                                        <AlertTriangle className="h-5 w-5 text-orange-500" />
-                                    </div>
-                                    <div className="ml-3">
-                                        <h3 className="text-sm font-medium text-orange-800">
-                                            Attention
-                                        </h3>
-                                        <div className="mt-1 text-sm text-orange-700">
-                                            <ul className="list-disc list-inside space-y-1">
-                                                {validationWarnings.map((warning, index) => (
-                                                    <li key={index}>{warning}</li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    </div>
+                {/* Validation Warnings */}
+                {validationWarnings.length > 0 && (
+                    <div className="bg-orange-50 border-l-4 border-orange-500 p-4 mb-4">
+                        <div className="flex items-start">
+                            <div className="flex-shrink-0">
+                                <AlertTriangle className="h-5 w-5 text-orange-500" />
+                            </div>
+                            <div className="ml-3">
+                                <h3 className="text-sm font-medium text-orange-800">
+                                    Attention
+                                </h3>
+                                <div className="mt-1 text-sm text-orange-700">
+                                    <ul className="list-disc list-inside space-y-1">
+                                        {validationWarnings.map((warning, index) => (
+                                            <li key={index}>{warning}</li>
+                                        ))}
+                                    </ul>
                                 </div>
                             </div>
-                        )}
+                        </div>
+                    </div>
+                )}
 
-                        {/* Erreur d'incompatibilité des objets */}
-                        {incompatibleObjectsError && (
-                            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
-                                <div className="flex items-start">
-                                    <div className="flex-shrink-0">
-                                        <Ban className="h-5 w-5 text-red-500" />
-                                    </div>
-                                    <div className="ml-3">
-                                        <h3 className="text-sm font-medium text-red-800">
-                                            Objets incompatibles
-                                        </h3>
-                                        <div className="mt-1 text-sm text-red-700">
-                                            {incompatibleObjectsError}
-                                        </div>
-                                        <div className="mt-2">
-                                            <Link
-                                                to="/ratios"
-                                                target="_blank"
-                                                className="text-sm text-red-600 hover:text-red-800 underline flex items-center gap-1"
-                                            >
-                                                <Gauge className="w-3 h-3" />
-                                                Configurer les ratios de productivité
-                                                <ExternalLink className="w-3 h-3" />
-                                            </Link>
-                                        </div>
-                                    </div>
-                                </div>
+                {/* Erreur d'incompatibilité des objets */}
+                {incompatibleObjectsError && (
+                    <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+                        <div className="flex items-start">
+                            <div className="flex-shrink-0">
+                                <Ban className="h-5 w-5 text-red-500" />
                             </div>
-                        )}
-
-                        {/* Type de tâche avec création dynamique */}
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                Type de tâche <span className="text-red-500">*</span>
-                                {selectedObjects.length > 0 && filteredTypesTaches.length < typesTaches.length && !loadingFilteredTypes && (
-                                    <span className="ml-2 text-xs text-amber-600 font-normal">
-                                        ({filteredTypesTaches.length} types applicables sur {typesTaches.length})
-                                    </span>
-                                )}
-                                {loadingFilteredTypes && (
-                                    <span className="ml-2 text-xs text-slate-400 font-normal">
-                                        Chargement...
-                                    </span>
-                                )}
-                            </label>
-                            <TypeTacheSelector
-                                value={formData.id_type_tache || null}
-                                typesTaches={filteredTypesTaches}
-                                onChange={(id) => setFormData({ ...formData, id_type_tache: id })}
-                            />
-                            {selectedObjects.length > 0 && filteredTypesTaches.length > 0 && filteredTypesTaches.length < typesTaches.length && (
-                                <p className="text-xs text-slate-500 mt-1">
-                                    Seuls les types de tâches applicables aux objets sélectionnés sont affichés.
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Équipes avec sélection multiple (US-PLAN-013) */}
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                Équipes
-                                {lockedSite && filteredEquipes.length < equipes.length && (
-                                    <span className="ml-2 text-xs text-blue-600 font-normal">
-                                        ({filteredEquipes.length} équipe{filteredEquipes.length > 1 ? 's' : ''} sur ce site)
-                                    </span>
-                                )}
-                            </label>
-                            <MultiEquipeSelector
-                                values={formData.equipes_ids || []}
-                                equipes={filteredEquipes}
-                                onChange={(ids) => setFormData({ ...formData, equipes_ids: ids })}
-                            />
-                            {lockedSite && filteredEquipes.length === 0 && (
-                                <p className="text-xs text-amber-600 mt-1">
-                                    Aucune équipe n'est affectée au site "{lockedSite.name}".
-                                    Vous pouvez créer la tâche sans équipe ou affecter une équipe à ce site depuis la page Équipes.
-                                </p>
-                            )}
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
-                                    Date début <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    ref={startDateRef}
-                                    required
-                                    type="datetime-local"
-                                    value={formData.date_debut_planifiee}
-                                    onChange={(e) => {
-                                        setFormData({ ...formData, date_debut_planifiee: e.target.value });
-                                        // Auto-fermeture du picker après sélection
-                                        setTimeout(() => {
-                                            startDateRef.current?.blur();
-                                        }, 100);
-                                    }}
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
-                                    Date fin <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    ref={endDateRef}
-                                    required
-                                    type="datetime-local"
-                                    value={formData.date_fin_planifiee}
-                                    onChange={(e) => {
-                                        setFormData({ ...formData, date_fin_planifiee: e.target.value });
-                                        // Auto-fermeture du picker après sélection
-                                        setTimeout(() => {
-                                            endDateRef.current?.blur();
-                                        }, 100);
-                                    }}
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                Priorité
-                            </label>
-                            <select
-                                value={formData.priorite}
-                                onChange={(e) => setFormData({ ...formData, priorite: Number(e.target.value) as PrioriteTache })}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                            >
-                                {Object.entries(PRIORITE_LABELS).map(([value, label]) => (
-                                    <option key={value} value={value}>
-                                        {label}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                Commentaires
-                            </label>
-                            <textarea
-                                value={formData.commentaires}
-                                onChange={(e) => setFormData({ ...formData, commentaires: e.target.value })}
-                                rows={3}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                placeholder="Détails de la tâche..."
-                            />
-                        </div>
-
-                        {/* Charge estimée (uniquement en mode édition) */}
-                        {tache && (
-                            <div className="border-t pt-4">
-                                <div className="flex items-center justify-between mb-3">
-                                    <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                                        <Timer className="w-4 h-4" />
-                                        Charge estimée
-                                        {chargeManuelle && (
-                                            <span className="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full">
-                                                Manuelle
-                                            </span>
-                                        )}
-                                    </label>
-                                    {chargeManuelle && onResetCharge && (
-                                        <button
-                                            type="button"
-                                            onClick={async () => {
-                                                setIsResettingCharge(true);
-                                                try {
-                                                    await onResetCharge(tache.id);
-                                                    setChargeManuelle(false);
-                                                } finally {
-                                                    setIsResettingCharge(false);
-                                                }
-                                            }}
-                                            disabled={isResettingCharge}
-                                            className="text-sm text-emerald-600 hover:text-emerald-700 flex items-center gap-1 disabled:opacity-50"
-                                        >
-                                            <RefreshCw className={`w-3 h-3 ${isResettingCharge ? 'animate-spin' : ''}`} />
-                                            Recalculer auto
-                                        </button>
-                                    )}
+                            <div className="ml-3">
+                                <h3 className="text-sm font-medium text-red-800">
+                                    Objets incompatibles
+                                </h3>
+                                <div className="mt-1 text-sm text-red-700">
+                                    {incompatibleObjectsError}
                                 </div>
-                                <div className="flex items-center gap-3">
-                                    <div className="relative flex-1">
-                                        <input
-                                            type="number"
-                                            step="0.5"
-                                            min="0"
-                                            value={formData.charge_estimee_heures ?? ''}
-                                            onChange={(e) => {
-                                                const val = e.target.value ? parseFloat(e.target.value) : null;
-                                                setFormData({ ...formData, charge_estimee_heures: val });
-                                                if (val !== null) setChargeManuelle(true);
-                                            }}
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none pr-16"
-                                            placeholder="Auto"
-                                        />
-                                        <span className="absolute right-3 top-2.5 text-sm text-slate-400">heures</span>
-                                    </div>
-                                    {!chargeManuelle && tache.charge_estimee_heures !== null && (
-                                        <span className="text-sm text-slate-500 whitespace-nowrap">
-                                            Calculé: {tache.charge_estimee_heures}h
-                                        </span>
-                                    )}
-                                </div>
-                                <p className="text-xs text-slate-400 mt-1">
-                                    {chargeManuelle
-                                        ? 'Valeur saisie manuellement. Cliquez sur "Recalculer auto" pour revenir au calcul automatique.'
-                                        : (
-                                            <>
-                                                Calculée automatiquement selon les objets liés et les{' '}
-                                                <Link to="/ratios" target="_blank" className="text-emerald-600 hover:underline">
-                                                    ratios de productivité
-                                                </Link>.
-                                            </>
-                                        )}
-                                </p>
-                            </div>
-                        )}
-
-                        {/* Sélecteur d'objets de l'inventaire */}
-                        <div className="border-t pt-4">
-                            <div className="flex items-center justify-between mb-3">
-                                <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                                    <TreePine className="w-4 h-4" />
-                                    Objets concernés
-                                    {selectedObjects.length > 0 && (
-                                        <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full">
-                                            {selectedObjects.length}
-                                        </span>
-                                    )}
-                                </label>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowObjectSelector(!showObjectSelector)}
-                                    className="text-sm text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
-                                >
-                                    {showObjectSelector ? 'Masquer' : 'Sélectionner'}
-                                    <ChevronDown className={`w-4 h-4 transition-transform ${showObjectSelector ? 'rotate-180' : ''}`} />
-                                </button>
-                            </div>
-
-                            {/* Site lock indicator */}
-                            {lockedSite && (
-                                <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-3">
-                                    <div className="flex items-center gap-2 text-sm text-blue-700">
-                                        <MapPin className="w-4 h-4" />
-                                        <span>Site : <strong>{lockedSite.name}</strong></span>
-                                        <span className="text-blue-500 text-xs">(seuls les objets et équipes de ce site sont affichés)</span>
-                                    </div>
-                                    {/* Ne pas afficher le bouton "Changer de site" si le site est verrouillé par siteFilter */}
-                                    {!siteFilter && selectedObjects.length > 0 && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setSelectedObjects([])}
-                                            className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                                        >
-                                            <X className="w-3 h-3" />
-                                            Changer de site
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Selected objects chips */}
-                            {selectedObjects.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mb-3">
-                                    {selectedObjects.map((obj) => (
-                                        <span
-                                            key={obj.id}
-                                            className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-xs px-2 py-1 rounded-full border border-emerald-200"
-                                        >
-                                            <span className="font-medium">{obj.nom}</span>
-                                            <span className="text-emerald-500">#{obj.id}</span>
-                                            <button
-                                                type="button"
-                                                onClick={() => removeObject(obj.id)}
-                                                className="ml-1 hover:text-red-500"
-                                            >
-                                                <X className="w-3 h-3" />
-                                            </button>
-                                        </span>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Object selector dropdown */}
-                            {showObjectSelector && (
-                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-3">
-                                    <div className="relative">
-                                        <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                                        <input
-                                            type="text"
-                                            value={objectSearchQuery}
-                                            onChange={(e) => setObjectSearchQuery(e.target.value)}
-                                            placeholder="Rechercher par nom, type ou site..."
-                                            className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                        />
-                                    </div>
-
-                                    <div className="max-h-48 overflow-y-auto space-y-1">
-                                        {loadingObjects ? (
-                                            <div className="text-center py-4 text-slate-500 text-sm">Chargement...</div>
-                                        ) : filteredObjects.length === 0 ? (
-                                            <div className="text-center py-4 text-slate-500 text-sm">
-                                                {objectSearchQuery
-                                                    ? 'Aucun résultat pour cette recherche'
-                                                    : lockedSite
-                                                        ? `Aucun autre objet disponible sur le site "${lockedSite.name}"`
-                                                        : 'Aucun objet disponible'}
-                                            </div>
-                                        ) : (
-                                            filteredObjects.slice(0, 50).map((obj) => {
-                                                const isSelected = selectedObjects.some(o => o.id === obj.id);
-                                                return (
-                                                    <button
-                                                        key={obj.id}
-                                                        type="button"
-                                                        onClick={() => toggleObjectSelection(obj)}
-                                                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-sm transition-colors ${isSelected
-                                                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                                            : 'bg-white hover:bg-slate-100 border border-slate-200'
-                                                            }`}
-                                                    >
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="font-medium truncate">{obj.nom}</span>
-                                                                <span className="text-xs bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">
-                                                                    {obj.type}
-                                                                </span>
-                                                            </div>
-                                                            <div className="text-xs text-slate-500 truncate">
-                                                                {obj.site}{obj.soussite && ` → ${obj.soussite}`}
-                                                            </div>
-                                                        </div>
-                                                        {isSelected && (
-                                                            <span className="ml-2 text-emerald-600">✓</span>
-                                                        )}
-                                                    </button>
-                                                );
-                                            })
-                                        )}
-                                        {filteredObjects.length > 50 && (
-                                            <div className="text-center py-2 text-xs text-slate-400">
-                                                +{filteredObjects.length - 50} autres résultats...
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Aperçu de la charge estimée */}
-                        {!tache && selectedObjects.length > 0 && formData.id_type_tache > 0 && (
-                            <div className="border-t pt-4">
-                                <div className="flex items-center justify-between mb-3">
-                                    <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                                        <Calculator className="w-4 h-4" />
-                                        Aperçu de la charge estimée
-                                    </label>
+                                <div className="mt-2">
                                     <Link
                                         to="/ratios"
                                         target="_blank"
-                                        className="text-sm text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                                        className="text-sm text-red-600 hover:text-red-800 underline flex items-center gap-1"
                                     >
                                         <Gauge className="w-3 h-3" />
-                                        Configurer les ratios
+                                        Configurer les ratios de productivité
                                         <ExternalLink className="w-3 h-3" />
                                     </Link>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
-                                {loadingRatios ? (
-                                    <div className="bg-slate-50 p-3 rounded-lg text-center text-slate-500 text-sm">
-                                        Chargement des ratios...
-                                    </div>
-                                ) : chargePreview ? (
-                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
-                                        {/* Total */}
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm font-medium text-blue-800">
-                                                Charge estimée totale
-                                            </span>
-                                            <span className="text-lg font-bold text-blue-700">
-                                                {chargePreview.totalHeures > 0 ? `${chargePreview.totalHeures}h` : '—'}
-                                            </span>
-                                        </div>
+                {/* Type de tâche avec création dynamique */}
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Type de tâche <span className="text-red-500">*</span>
+                        {selectedObjects.length > 0 && filteredTypesTaches.length < typesTaches.length && !loadingFilteredTypes && (
+                            <span className="ml-2 text-xs text-amber-600 font-normal">
+                                ({filteredTypesTaches.length} types applicables sur {typesTaches.length})
+                            </span>
+                        )}
+                        {loadingFilteredTypes && (
+                            <span className="ml-2 text-xs text-slate-400 font-normal">
+                                Chargement...
+                            </span>
+                        )}
+                    </label>
+                    <TypeTacheSelector
+                        value={formData.id_type_tache || null}
+                        typesTaches={filteredTypesTaches}
+                        onChange={(id) => setFormData({ ...formData, id_type_tache: id })}
+                    />
+                    {selectedObjects.length > 0 && filteredTypesTaches.length > 0 && filteredTypesTaches.length < typesTaches.length && (
+                        <p className="text-xs text-slate-500 mt-1">
+                            Seuls les types de tâches applicables aux objets sélectionnés sont affichés.
+                        </p>
+                    )}
+                </div>
 
-                                        {/* Details by type */}
-                                        {chargePreview.details.length > 0 && (
-                                            <div className="border-t border-blue-200 pt-2 space-y-1">
-                                                {chargePreview.details.map((detail, idx) => (
-                                                    <div key={idx} className="flex items-center justify-between text-xs">
-                                                        <span className="text-blue-700">
-                                                            {detail.count}x {detail.type}
-                                                        </span>
-                                                        {detail.ratio ? (
-                                                            <span className="text-blue-600">
-                                                                {detail.ratio.ratio} {detail.ratio.unite_mesure === 'm2' ? 'm²' : detail.ratio.unite_mesure === 'ml' ? 'ml' : 'unités'}/h
-                                                                → <strong>{Math.round(detail.heures * 100) / 100}h</strong>
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-amber-600 italic">
-                                                                Ratio non configuré
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
+                {/* Équipes avec sélection multiple (US-PLAN-013) */}
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Équipes
+                        {lockedSite && filteredEquipes.length < equipes.length && (
+                            <span className="ml-2 text-xs text-blue-600 font-normal">
+                                ({filteredEquipes.length} équipe{filteredEquipes.length > 1 ? 's' : ''} sur ce site)
+                            </span>
+                        )}
+                    </label>
+                    <MultiEquipeSelector
+                        values={formData.equipes_ids || []}
+                        equipes={filteredEquipes}
+                        onChange={(ids) => setFormData({ ...formData, equipes_ids: ids })}
+                    />
+                    {lockedSite && filteredEquipes.length === 0 && (
+                        <p className="text-xs text-amber-600 mt-1">
+                            Aucune équipe n'est affectée au site "{lockedSite.name}".
+                            Vous pouvez créer la tâche sans équipe ou affecter une équipe à ce site depuis la page Équipes.
+                        </p>
+                    )}
+                </div>
 
-                                        {/* Warning for unconfigured types */}
-                                        {chargePreview.hasUnconfiguredTypes && (
-                                            <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded mt-2">
-                                                Certains types d'objets n'ont pas de ratio configuré pour ce type de tâche.
-                                                <Link to="/ratios" target="_blank" className="underline ml-1">
-                                                    Configurer les ratios
-                                                </Link>
-                                            </p>
-                                        )}
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                            Date début <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            ref={startDateRef}
+                            required
+                            type="datetime-local"
+                            value={formData.date_debut_planifiee}
+                            onChange={(e) => {
+                                setFormData({ ...formData, date_debut_planifiee: e.target.value });
+                                // Auto-fermeture du picker après sélection
+                                setTimeout(() => {
+                                    startDateRef.current?.blur();
+                                }, 100);
+                            }}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                            Date fin <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            ref={endDateRef}
+                            required
+                            type="datetime-local"
+                            value={formData.date_fin_planifiee}
+                            onChange={(e) => {
+                                setFormData({ ...formData, date_fin_planifiee: e.target.value });
+                                // Auto-fermeture du picker après sélection
+                                setTimeout(() => {
+                                    endDateRef.current?.blur();
+                                }, 100);
+                            }}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                        />
+                    </div>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Priorité
+                    </label>
+                    <select
+                        value={formData.priorite}
+                        onChange={(e) => setFormData({ ...formData, priorite: Number(e.target.value) as PrioriteTache })}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                    >
+                        {Object.entries(PRIORITE_LABELS).map(([value, label]) => (
+                            <option key={value} value={value}>
+                                {label}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Commentaires
+                    </label>
+                    <textarea
+                        value={formData.commentaires}
+                        onChange={(e) => setFormData({ ...formData, commentaires: e.target.value })}
+                        rows={3}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                        placeholder="Détails de la tâche..."
+                    />
+                </div>
+
+                {/* Charge estimée (uniquement en mode édition) */}
+                {tache && (
+                    <div className="border-t pt-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                <Timer className="w-4 h-4" />
+                                Charge estimée
+                                {chargeManuelle && (
+                                    <span className="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full">
+                                        Manuelle
+                                    </span>
+                                )}
+                            </label>
+                            {chargeManuelle && onResetCharge && (
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        setIsResettingCharge(true);
+                                        try {
+                                            await onResetCharge(tache.id);
+                                            setChargeManuelle(false);
+                                        } finally {
+                                            setIsResettingCharge(false);
+                                        }
+                                    }}
+                                    disabled={isResettingCharge}
+                                    className="text-sm text-emerald-600 hover:text-emerald-700 flex items-center gap-1 disabled:opacity-50"
+                                >
+                                    <RefreshCw className={`w-3 h-3 ${isResettingCharge ? 'animate-spin' : ''}`} />
+                                    Recalculer auto
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className="relative flex-1">
+                                <input
+                                    type="number"
+                                    step="0.5"
+                                    min="0"
+                                    value={formData.charge_estimee_heures ?? ''}
+                                    onChange={(e) => {
+                                        const val = e.target.value ? parseFloat(e.target.value) : null;
+                                        setFormData({ ...formData, charge_estimee_heures: val });
+                                        if (val !== null) setChargeManuelle(true);
+                                    }}
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none pr-16"
+                                    placeholder="Auto"
+                                />
+                                <span className="absolute right-3 top-2.5 text-sm text-slate-400">heures</span>
+                            </div>
+                            {!chargeManuelle && tache.charge_estimee_heures !== null && (
+                                <span className="text-sm text-slate-500 whitespace-nowrap">
+                                    Calculé: {tache.charge_estimee_heures}h
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1">
+                            {chargeManuelle
+                                ? 'Valeur saisie manuellement. Cliquez sur "Recalculer auto" pour revenir au calcul automatique.'
+                                : (
+                                    <>
+                                        Calculée automatiquement selon les objets liés et les{' '}
+                                        <Link to="/ratios" target="_blank" className="text-emerald-600 hover:underline">
+                                            ratios de productivité
+                                        </Link>.
+                                    </>
+                                )}
+                        </p>
+                    </div>
+                )}
+
+                {/* Sélecteur d'objets de l'inventaire */}
+                <div className="border-t pt-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                            <TreePine className="w-4 h-4" />
+                            Objets concernés
+                            {selectedObjects.length > 0 && (
+                                <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full">
+                                    {selectedObjects.length}
+                                </span>
+                            )}
+                        </label>
+                        <button
+                            type="button"
+                            onClick={() => setShowObjectSelector(!showObjectSelector)}
+                            className="text-sm text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                        >
+                            {showObjectSelector ? 'Masquer' : 'Sélectionner'}
+                            <ChevronDown className={`w-4 h-4 transition-transform ${showObjectSelector ? 'rotate-180' : ''}`} />
+                        </button>
+                    </div>
+
+                    {/* Site lock indicator */}
+                    {lockedSite && (
+                        <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-3">
+                            <div className="flex items-center gap-2 text-sm text-blue-700">
+                                <MapPin className="w-4 h-4" />
+                                <span>Site : <strong>{lockedSite.name}</strong></span>
+                                <span className="text-blue-500 text-xs">(seuls les objets et équipes de ce site sont affichés)</span>
+                            </div>
+                            {/* Ne pas afficher le bouton "Changer de site" si le site est verrouillé par siteFilter */}
+                            {!siteFilter && selectedObjects.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedObjects([])}
+                                    className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                >
+                                    <X className="w-3 h-3" />
+                                    Changer de site
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Selected objects chips */}
+                    {selectedObjects.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-3">
+                            {selectedObjects.map((obj) => (
+                                <span
+                                    key={obj.id}
+                                    className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-xs px-2 py-1 rounded-full border border-emerald-200"
+                                >
+                                    <span className="font-medium">{obj.nom}</span>
+                                    <span className="text-emerald-500">#{obj.id}</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => removeObject(obj.id)}
+                                        className="ml-1 hover:text-red-500"
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                </span>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Object selector dropdown */}
+                    {showObjectSelector && (
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-3">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                                <input
+                                    type="text"
+                                    value={objectSearchQuery}
+                                    onChange={(e) => setObjectSearchQuery(e.target.value)}
+                                    placeholder="Rechercher par nom, type ou site..."
+                                    className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                                />
+                            </div>
+
+                            <div className="max-h-48 overflow-y-auto space-y-1">
+                                {loadingObjects ? (
+                                    <div className="text-center py-4 text-slate-500 text-sm">Chargement...</div>
+                                ) : filteredObjects.length === 0 ? (
+                                    <div className="text-center py-4 text-slate-500 text-sm">
+                                        {objectSearchQuery
+                                            ? 'Aucun résultat pour cette recherche'
+                                            : lockedSite
+                                                ? `Aucun autre objet disponible sur le site "${lockedSite.name}"`
+                                                : 'Aucun objet disponible'}
                                     </div>
                                 ) : (
-                                    <div className="bg-slate-50 p-3 rounded-lg text-center text-slate-500 text-sm">
-                                        {ratios.length === 0 ? (
-                                            <span>
-                                                Aucun ratio configuré.{' '}
-                                                <Link to="/ratios" target="_blank" className="text-emerald-600 underline">
-                                                    Configurer les ratios
-                                                </Link>
-                                            </span>
-                                        ) : (
-                                            'Sélectionnez un type de tâche et des objets pour voir l\'aperçu'
-                                        )}
+                                    filteredObjects.slice(0, 50).map((obj) => {
+                                        const isSelected = selectedObjects.some(o => o.id === obj.id);
+                                        return (
+                                            <button
+                                                key={obj.id}
+                                                type="button"
+                                                onClick={() => toggleObjectSelection(obj)}
+                                                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-sm transition-colors ${isSelected
+                                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                                    : 'bg-white hover:bg-slate-100 border border-slate-200'
+                                                    }`}
+                                            >
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-medium truncate">{obj.nom}</span>
+                                                        <span className="text-xs bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">
+                                                            {obj.type}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-xs text-slate-500 truncate">
+                                                        {obj.site}{obj.soussite && ` → ${obj.soussite}`}
+                                                    </div>
+                                                </div>
+                                                {isSelected && (
+                                                    <span className="ml-2 text-emerald-600">✓</span>
+                                                )}
+                                            </button>
+                                        );
+                                    })
+                                )}
+                                {filteredObjects.length > 50 && (
+                                    <div className="text-center py-2 text-xs text-slate-400">
+                                        +{filteredObjects.length - 50} autres résultats...
                                     </div>
                                 )}
                             </div>
-                        )}
+                        </div>
+                    )}
+                </div>
 
-                        {/* Smart Alert: Suggest recurrence for large workloads */}
-                        {chargePreview && chargePreview.totalHeures > 10 && !formData.parametres_recurrence && (
-                            <div className="border-t pt-4">
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-                                    <RefreshCw className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                                    <div className="flex-1">
-                                        <h4 className="text-sm font-semibold text-blue-900">
-                                            Charge importante détectée ({chargePreview.totalHeures.toFixed(1)}h)
-                                        </h4>
-                                        <p className="text-sm text-blue-700 mt-1">
-                                            Cette tâche dépasse une journée de travail (10h max selon la loi marocaine). Pour respecter la règle d'or (1 tâche = 1 jour),
-                                            activez la récurrence quotidienne ci-dessous.
-                                        </p>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const days = Math.ceil(chargePreview.totalHeures / 10);
-                                                setFormData({
-                                                    ...formData,
-                                                    parametres_recurrence: {
-                                                        frequence: 'daily',
-                                                        interval: 1,
-                                                        nombre_occurrences: days,
-                                                    }
-                                                });
-                                            }}
-                                            className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                                        >
-                                            Activer récurrence ({Math.ceil(chargePreview.totalHeures / 10)} jours)
-                                        </button>
-                                    </div>
+                {/* Aperçu de la charge estimée */}
+                {!tache && selectedObjects.length > 0 && formData.id_type_tache > 0 && (
+                    <div className="border-t pt-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                <Calculator className="w-4 h-4" />
+                                Aperçu de la charge estimée
+                            </label>
+                            <Link
+                                to="/ratios"
+                                target="_blank"
+                                className="text-sm text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                            >
+                                <Gauge className="w-3 h-3" />
+                                Configurer les ratios
+                                <ExternalLink className="w-3 h-3" />
+                            </Link>
+                        </div>
+
+                        {loadingRatios ? (
+                            <div className="bg-slate-50 p-3 rounded-lg text-center text-slate-500 text-sm">
+                                Chargement des ratios...
+                            </div>
+                        ) : chargePreview ? (
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+                                {/* Total */}
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm font-medium text-blue-800">
+                                        Charge estimée totale
+                                    </span>
+                                    <span className="text-lg font-bold text-blue-700">
+                                        {chargePreview.totalHeures > 0 ? `${chargePreview.totalHeures}h` : '—'}
+                                    </span>
                                 </div>
+
+                                {/* Details by type */}
+                                {chargePreview.details.length > 0 && (
+                                    <div className="border-t border-blue-200 pt-2 space-y-1">
+                                        {chargePreview.details.map((detail, idx) => (
+                                            <div key={idx} className="flex items-center justify-between text-xs">
+                                                <span className="text-blue-700">
+                                                    {detail.count}x {detail.type}
+                                                </span>
+                                                {detail.ratio ? (
+                                                    <span className="text-blue-600">
+                                                        {detail.ratio.ratio} {detail.ratio.unite_mesure === 'm2' ? 'm²' : detail.ratio.unite_mesure === 'ml' ? 'ml' : 'unités'}/h
+                                                        → <strong>{Math.round(detail.heures * 100) / 100}h</strong>
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-amber-600 italic">
+                                                        Ratio non configuré
+                                                    </span>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Warning for unconfigured types */}
+                                {chargePreview.hasUnconfiguredTypes && (
+                                    <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded mt-2">
+                                        Certains types d'objets n'ont pas de ratio configuré pour ce type de tâche.
+                                        <Link to="/ratios" target="_blank" className="underline ml-1">
+                                            Configurer les ratios
+                                        </Link>
+                                    </p>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="bg-slate-50 p-3 rounded-lg text-center text-slate-500 text-sm">
+                                {ratios.length === 0 ? (
+                                    <span>
+                                        Aucun ratio configuré.{' '}
+                                        <Link to="/ratios" target="_blank" className="text-emerald-600 underline">
+                                            Configurer les ratios
+                                        </Link>
+                                    </span>
+                                ) : (
+                                    'Sélectionnez un type de tâche et des objets pour voir l\'aperçu'
+                                )}
                             </div>
                         )}
+                    </div>
+                )}
 
-                        {/* Récurrence (Google Calendar style) */}
-                        <div className="border-t pt-4">
-                            <RecurrenceSelector
-                                value={formData.parametres_recurrence as RecurrenceParams | null}
-                                onChange={(params) => setFormData({ ...formData, parametres_recurrence: params })}
-                                startDate={formData.date_debut_planifiee || new Date().toISOString()}
-                            />
+                {/* Smart Alert: Suggest recurrence for large workloads */}
+                {chargePreview && chargePreview.totalHeures > 10 && !formData.parametres_recurrence && (
+                    <div className="border-t pt-4">
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+                            <RefreshCw className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                                <h4 className="text-sm font-semibold text-blue-900">
+                                    Charge importante détectée ({chargePreview.totalHeures.toFixed(1)}h)
+                                </h4>
+                                <p className="text-sm text-blue-700 mt-1">
+                                    Cette tâche dépasse une journée de travail (10h max selon la loi marocaine). Pour respecter la règle d'or (1 tâche = 1 jour),
+                                    activez la récurrence quotidienne ci-dessous.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const days = Math.ceil(chargePreview.totalHeures / 10);
+                                        setFormData({
+                                            ...formData,
+                                            parametres_recurrence: {
+                                                frequence: 'daily',
+                                                interval: 1,
+                                                nombre_occurrences: days,
+                                            }
+                                        });
+                                    }}
+                                    className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                    Activer récurrence ({Math.ceil(chargePreview.totalHeures / 10)} jours)
+                                </button>
+                            </div>
                         </div>
+                    </div>
+                )}
+
+                {/* Récurrence (Google Calendar style) */}
+                <div className="border-t pt-4">
+                    <RecurrenceSelector
+                        value={formData.parametres_recurrence as RecurrenceParams | null}
+                        onChange={(params) => setFormData({ ...formData, parametres_recurrence: params })}
+                        startDate={formData.date_debut_planifiee || new Date().toISOString()}
+                    />
+                </div>
             </div>
         </FormModal>
     );

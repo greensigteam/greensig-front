@@ -747,43 +747,39 @@ const Users: React.FC<UsersProps> = ({ triggerCreate }) => {
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
             <button
               onClick={() => setRoleFilter(null)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                !roleFilter
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${!roleFilter
                   ? 'bg-white text-slate-800 shadow-sm'
                   : 'text-slate-600 hover:text-slate-800'
-              }`}
+                }`}
             >
               Tous
             </button>
             <button
               onClick={() => setRoleFilter('ADMIN')}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${
-                roleFilter === 'ADMIN'
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${roleFilter === 'ADMIN'
                   ? 'bg-white text-purple-700 shadow-sm'
                   : 'text-slate-600 hover:text-slate-800'
-              }`}
+                }`}
             >
               <Shield className="w-3.5 h-3.5" />
               Admin
             </button>
             <button
               onClick={() => setRoleFilter('SUPERVISEUR')}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${
-                roleFilter === 'SUPERVISEUR'
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${roleFilter === 'SUPERVISEUR'
                   ? 'bg-white text-blue-700 shadow-sm'
                   : 'text-slate-600 hover:text-slate-800'
-              }`}
+                }`}
             >
               <Award className="w-3.5 h-3.5" />
               Superviseur
             </button>
             <button
               onClick={() => setRoleFilter('CLIENT')}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${
-                roleFilter === 'CLIENT'
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${roleFilter === 'CLIENT'
                   ? 'bg-white text-green-700 shadow-sm'
                   : 'text-slate-600 hover:text-slate-800'
-              }`}
+                }`}
             >
               <Building2 className="w-3.5 h-3.5" />
               Client

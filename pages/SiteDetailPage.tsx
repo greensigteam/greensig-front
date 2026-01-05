@@ -87,19 +87,7 @@ const ErrorDisplay: React.FC<{ message: string }> = ({ message }) => (
     </div>
 );
 
-const StatCard: React.FC<{ title: string; value: string | number; icon: React.ReactNode; color: string }> = ({ title, value, icon, color }) => (
-    <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-        <div className="flex items-center justify-between">
-            <div>
-                <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
-                <p className="text-3xl font-bold text-slate-800">{value}</p>
-            </div>
-            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${color}`}>
-                {icon}
-            </div>
-        </div>
-    </div>
-);
+
 
 const TabButton: React.FC<{
     active: boolean;
@@ -110,11 +98,10 @@ const TabButton: React.FC<{
 }> = ({ active, onClick, icon, label, badge }) => (
     <button
         onClick={onClick}
-        className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
-            active
-                ? 'border-emerald-600 text-emerald-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-        }`}
+        className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${active
+            ? 'border-emerald-600 text-emerald-600'
+            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+            }`}
     >
         {icon}
         <span className="font-medium text-sm">{label}</span>
@@ -197,7 +184,7 @@ const SiteDetailPage: React.FC = () => {
 
                 // If not found, force refresh cache and try again
                 if (!foundSite) {
-                    const allSites = await fetchAllSites(true);
+                    const allSites = await fetchAllSites();
                     // Flexible comparison (string/number)
                     foundSite = allSites.find(s => String(s.id) === String(id));
                 } else {
@@ -237,7 +224,7 @@ const SiteDetailPage: React.FC = () => {
             setIsLoadingEquipes(true);
             try {
                 // Force refresh to bypass cache when filtering by site
-                const response = await fetchEquipes({ site: siteId }, true);
+                const response = await fetchEquipes({ site: siteId });
                 console.log('[SiteDetailPage] Équipes received:', response.results.length, 'teams');
                 console.log('[SiteDetailPage] First team (if any):', response.results[0]);
                 setEquipes(response.results);
@@ -437,29 +424,33 @@ const SiteDetailPage: React.FC = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => setIsEditModalOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors"
-                    >
-                        <Edit className="w-4 h-4" />
-                        Modifier
-                    </button>
-                    <button
-                        onClick={() => setShowDeleteModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                        Supprimer
-                    </button>
-                    {showDeleteModal && (
-                        <ConfirmDeleteModal
-                            title="Supprimer le site"
-                            message="Êtes-vous sûr de vouloir supprimer ce site ? Cette action est irréversible."
-                            onConfirm={handleDelete}
-                            onCancel={() => setShowDeleteModal(false)}
-                            confirmText="Supprimer"
-                            cancelText="Annuler"
-                        />
+                    {!currentUser?.roles?.includes('CLIENT') && (
+                        <>
+                            <button
+                                onClick={() => setIsEditModalOpen(true)}
+                                className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors"
+                            >
+                                <Edit className="w-4 h-4" />
+                                Modifier
+                            </button>
+                            <button
+                                onClick={() => setShowDeleteModal(true)}
+                                className="flex items-center gap-2 px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                Supprimer
+                            </button>
+                            {showDeleteModal && (
+                                <ConfirmDeleteModal
+                                    title="Supprimer le site"
+                                    message="Êtes-vous sûr de vouloir supprimer ce site ? Cette action est irréversible."
+                                    onConfirm={handleDelete}
+                                    onCancel={() => setShowDeleteModal(false)}
+                                    confirmText="Supprimer"
+                                    cancelText="Annuler"
+                                />
+                            )}
+                        </>
                     )}
                 </div>
             </header>
