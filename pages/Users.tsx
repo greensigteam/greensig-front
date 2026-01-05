@@ -559,9 +559,6 @@ const Users: React.FC = () => {
       case 'SUPERVISEUR':
         setShowCreateChefEquipe(true);
         break;
-      case 'SUPERVISEUR':
-        setShowCreateOperateur(true);
-        break;
     }
   };
 
