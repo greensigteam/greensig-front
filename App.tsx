@@ -43,6 +43,7 @@ import { DrawingProvider } from './contexts/DrawingContext';
 import { SearchProvider } from './contexts/SearchContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import ErrorBoundary from './components/ErrorBoundary';
+import { ApiErrorListener } from './components/ApiErrorListener';
 import logger from './services/logger';
 import ConfirmDeleteModal from './components/modals/ConfirmDeleteModal';
 
@@ -252,6 +253,7 @@ function App() {
     <BrowserRouter>
       <ErrorBoundary>
         <ToastProvider>
+          <ApiErrorListener />
           <SelectionProvider maxSelections={100}>
             <DrawingProvider>
               <SearchProvider>
@@ -332,8 +334,16 @@ function App() {
                       <Route path="dashboard" element={<Dashboard />} />
                       <Route path="inventory" element={<Suspense fallback={<PageLoadingFallback />}><Inventory user={user} /></Suspense>} />
                       <Route path="inventory/:objectType/:objectId" element={<Suspense fallback={<PageLoadingFallback />}><InventoryDetailPage /></Suspense>} />
-                      <Route path="sites" element={<Suspense fallback={<PageLoadingFallback />}><Sites /></Suspense>} />
-                      <Route path="sites/:id" element={<Suspense fallback={<PageLoadingFallback />}><SiteDetailPage /></Suspense>} />
+                      <Route path="sites" element={
+                        <RequireRole user={user} roles={['ADMIN', 'SUPERVISEUR']}>
+                          <Suspense fallback={<PageLoadingFallback />}><Sites /></Suspense>
+                        </RequireRole>
+                      } />
+                      <Route path="sites/:id" element={
+                        <RequireRole user={user} roles={['ADMIN', 'SUPERVISEUR', 'CLIENT']}>
+                          <Suspense fallback={<PageLoadingFallback />}><SiteDetailPage /></Suspense>
+                        </RequireRole>
+                      } />
                       <Route path="clients" element={
                         <RequireRole user={user} roles={['ADMIN']}>
                           <Suspense fallback={<PageLoadingFallback />}><Clients /></Suspense>
@@ -353,7 +363,11 @@ function App() {
                       <Route path="reclamations" element={<Suspense fallback={<PageLoadingFallback />}><Reclamations /></Suspense>} />
                       <Route path="reclamations/:id" element={<Suspense fallback={<PageLoadingFallback />}><ReclamationDetailPage /></Suspense>} />
                       <Route path="reclamations/stats" element={<Suspense fallback={<PageLoadingFallback />}><ReclamationsDashboard /></Suspense>} />
-                      <Route path="teams" element={<Suspense fallback={<PageLoadingFallback />}><Teams /></Suspense>} />
+                      <Route path="teams" element={
+                        <RequireRole user={user} roles={['ADMIN', 'SUPERVISEUR', 'CLIENT']}>
+                          <Suspense fallback={<PageLoadingFallback />}><Teams /></Suspense>
+                        </RequireRole>
+                      } />
                       <Route path="users" element={
                         <RequireRole user={user} roles={['ADMIN']}>
                           <Suspense fallback={<PageLoadingFallback />}><Users /></Suspense>
@@ -369,7 +383,11 @@ function App() {
                       <Route path="ratios" element={<Suspense fallback={<PageLoadingFallback />}><RatiosProductivite /></Suspense>} />
                       <Route path="suivi-taches" element={<Suspense fallback={<PageLoadingFallback />}><SuiviTaches /></Suspense>} />
                       <Route path="products" element={<Suspense fallback={<PageLoadingFallback />}><Produits /></Suspense>} />
-                      <Route path="reporting" element={<Suspense fallback={<PageLoadingFallback />}><Reporting /></Suspense>} />
+                      <Route path="reporting" element={
+                        <RequireRole user={user} roles={['ADMIN', 'SUPERVISEUR']}>
+                          <Suspense fallback={<PageLoadingFallback />}><Reporting /></Suspense>
+                        </RequireRole>
+                      } />
                       <Route path="monthly-report" element={
                         <RequireRole user={user} roles={['ADMIN']}>
                           <Suspense fallback={<PageLoadingFallback />}><MonthlyReport /></Suspense>

@@ -12,6 +12,29 @@ import logger from './logger';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
+// ==============================================================================
+// GESTION DES ERREURS D'AUTORISATION (403)
+// ==============================================================================
+
+// Événement personnalisé pour les erreurs 403 (accès refusé)
+export const API_FORBIDDEN_EVENT = 'api:forbidden';
+
+export interface ApiForbiddenEventDetail {
+  url: string;
+  message: string;
+}
+
+/**
+ * Émet un événement 403 que les composants React peuvent écouter
+ * pour afficher un toast d'erreur
+ */
+function emitForbiddenError(url: string, message: string) {
+  const event = new CustomEvent<ApiForbiddenEventDetail>(API_FORBIDDEN_EVENT, {
+    detail: { url, message }
+  });
+  window.dispatchEvent(event);
+}
+
 // Wrapper fetch pour ajouter automatiquement le token
 export async function apiFetch(url: string, options: RequestInit = {}) {
   const token = localStorage.getItem('token');
@@ -34,6 +57,19 @@ export async function apiFetch(url: string, options: RequestInit = {}) {
     console.warn('Token invalide ou expiré, redirection login...');
     localStorage.removeItem('token');
     window.location.href = '/';
+  }
+
+  if (response.status === 403) {
+    // Accès refusé - permissions insuffisantes
+    console.warn('Accès refusé (403):', url);
+    let errorMessage = 'Accès refusé - Vous n\'avez pas les permissions nécessaires';
+    try {
+      const errorData = await response.clone().json();
+      errorMessage = errorData.detail || errorData.message || errorMessage;
+    } catch {
+      // Ignore JSON parse errors
+    }
+    emitForbiddenError(url, errorMessage);
   }
 
   return response;

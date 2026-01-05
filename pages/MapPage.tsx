@@ -1053,8 +1053,9 @@ export const MapPage: React.FC<MapPageProps> = ({
         onSiteHover={handleSiteHover}
         onSiteSelect={handleSiteSelect}
         onViewSite={handleViewSite}
-        onCreateSite={handleCreateSite}
-        onEditSite={setEditingSite}
+        // Only ADMIN and SUPERVISEUR can create/edit sites
+        onCreateSite={userRole !== 'CLIENT' ? handleCreateSite : undefined}
+        onEditSite={userRole !== 'CLIENT' ? setEditingSite : undefined}
         onToggle={setIsCarouselOpen}
       />
 

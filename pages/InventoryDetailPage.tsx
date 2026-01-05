@@ -8,9 +8,9 @@ import { EditObjectModal } from '../components/EditObjectModal';
 import { MAP_LAYERS } from '../constants';
 import LoadingScreen from '../components/LoadingScreen';
 import { planningService } from '../services/planningService';
-import { fetchEquipes } from '../services/usersApi';
+import { fetchEquipes, fetchCurrentUser } from '../services/usersApi';
 import { Tache, TacheCreate, TypeTache, STATUT_TACHE_LABELS, STATUT_TACHE_COLORS } from '../types/planning';
-import { EquipeList } from '../types/users';
+import { EquipeList, Utilisateur } from '../types/users';
 import TaskFormModal, { InventoryObjectOption } from '../components/planning/TaskFormModal';
 import { useToast } from '../contexts/ToastContext';
 import {
@@ -59,6 +59,16 @@ const InventoryDetailPage: React.FC = () => {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [modalEquipes, setModalEquipes] = useState<EquipeList[]>([]);
   const [modalTypesTaches, setModalTypesTaches] = useState<TypeTache[]>([]);
+
+  // Current user for permission checks
+  const [currentUser, setCurrentUser] = useState<Utilisateur | null>(null);
+  const isClient = currentUser?.roles?.includes('CLIENT') ?? false;
+  const canEdit = !isClient; // ADMIN and SUPERVISEUR can edit
+
+  // Fetch current user on mount
+  useEffect(() => {
+    fetchCurrentUser().then(setCurrentUser).catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (!objectType || !objectId) {
@@ -216,22 +226,25 @@ const InventoryDetailPage: React.FC = () => {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleOpenTaskModal}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
-          >
-            <Plus className="w-4 h-4" />
-            Créer une tâche
-          </button>
-          <button
-            onClick={() => setIsEditModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors font-medium"
-          >
-            <Edit className="w-4 h-4" />
-            Modifier
-          </button>
-        </div>
+        {/* Action buttons - hidden for CLIENT (read-only access) */}
+        {canEdit && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleOpenTaskModal}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              Créer une tâche
+            </button>
+            <button
+              onClick={() => setIsEditModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors font-medium"
+            >
+              <Edit className="w-4 h-4" />
+              Modifier
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Main Content */}
@@ -270,12 +283,14 @@ const InventoryDetailPage: React.FC = () => {
             <div className="text-center py-8 text-slate-500 bg-slate-50 rounded-lg border border-slate-100">
               <Wrench className="w-8 h-8 mx-auto mb-2 text-slate-300" />
               <p>Aucune tâche associée à cet objet.</p>
-              <button
-                onClick={handleOpenTaskModal}
-                className="mt-3 text-sm text-emerald-600 hover:text-emerald-700 font-medium"
-              >
-                + Créer une première tâche
-              </button>
+              {canEdit && (
+                <button
+                  onClick={handleOpenTaskModal}
+                  className="mt-3 text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+                >
+                  + Créer une première tâche
+                </button>
+              )}
             </div>
           ) : (
             <div className="space-y-3">

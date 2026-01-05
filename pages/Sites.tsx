@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
     MapPin, RefreshCw, Edit2, Trash2,
     ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
     AlertCircle, CheckCircle, Loader2,
-    Settings, MoreVertical, Users, Filter
+    Settings, MoreVertical, Users, Filter, Lock
 } from 'lucide-react';
 import { fetchAllSites, updateSite, deleteSite, SiteFrontend } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
@@ -13,6 +13,8 @@ import SiteEditModal from '../components/sites/SiteEditModal';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import { fetchCurrentUser } from '../services/usersApi';
 import type { Utilisateur } from '../types/users';
+import { usePermissions } from '../hooks/usePermissions';
+import type { User, Role } from '../types';
 
 // Composant Dropdown pour les actions
 const ActionDropdown = ({
@@ -22,7 +24,7 @@ const ActionDropdown = ({
     isActive
 }: {
     onEdit: () => void,
-    onDelete: () => void,
+    onDelete?: () => void,  // Optional - only ADMIN can delete
     onToggleActive: () => void,
     isActive: boolean
 }) => {
@@ -73,14 +75,18 @@ const ActionDropdown = ({
                             </>
                         )}
                     </button>
-                    <div className="border-t border-slate-100 my-1"></div>
-                    <button
-                        onClick={(e) => { e.stopPropagation(); onDelete(); setIsOpen(false); }}
-                        className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                        Supprimer
-                    </button>
+                    {onDelete && (
+                        <>
+                            <div className="border-t border-slate-100 my-1"></div>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onDelete(); setIsOpen(false); }}
+                                className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                Supprimer
+                            </button>
+                        </>
+                    )}
                 </div>
             )}
         </div>
@@ -115,6 +121,46 @@ export default function Sites() {
     useEffect(() => {
         fetchCurrentUser().then(setCurrentUser).catch(console.error);
     }, []);
+
+    // Convert Utilisateur to User format for usePermissions
+    const userForPermissions = useMemo((): User | null => {
+        if (!currentUser) return null;
+        // Determine primary role with priority: ADMIN > SUPERVISEUR > CLIENT
+        let role: Role = 'CLIENT';
+        if (currentUser.roles?.includes('ADMIN')) role = 'ADMIN';
+        else if (currentUser.roles?.includes('SUPERVISEUR')) role = 'SUPERVISEUR';
+        else if (currentUser.roles?.includes('CLIENT')) role = 'CLIENT';
+
+        return {
+            id: currentUser.id.toString(),
+            name: currentUser.fullName || `${currentUser.prenom} ${currentUser.nom}`,
+            email: currentUser.email,
+            role,
+        };
+    }, [currentUser]);
+
+    // Get permissions with extended info for superviseur_id
+    const permissions = usePermissions(userForPermissions, {
+        superviseur_id: (currentUser as any)?.superviseur_id,
+        client_structure_id: (currentUser as any)?.client_structure_id,
+    });
+
+    // Helper to check if current user can edit a specific site
+    const canEditSite = useCallback((site: SiteFrontend): boolean => {
+        if (permissions.isAdmin) return true;
+        if (permissions.isSuperviseur) {
+            // SUPERVISEUR can only edit sites they supervise
+            const superviseurId = (currentUser as any)?.superviseur_id;
+            return superviseurId ? site.superviseur === superviseurId : false;
+        }
+        return false;
+    }, [permissions, currentUser]);
+
+    // Helper to check if current user can delete a specific site
+    const canDeleteSite = useCallback((site: SiteFrontend): boolean => {
+        // Only ADMIN can delete sites
+        return permissions.isAdmin;
+    }, [permissions]);
 
     // Set search placeholder
     useEffect(() => {
@@ -340,13 +386,17 @@ export default function Sites() {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            {(!currentUser?.roles?.includes('CLIENT')) && (
+                                            {canEditSite(site) ? (
                                                 <ActionDropdown
                                                     onEdit={() => setEditingSite(site)}
-                                                    onDelete={() => setDeletingSite(site)}
+                                                    onDelete={canDeleteSite(site) ? () => setDeletingSite(site) : undefined}
                                                     onToggleActive={() => handleToggleActive(site)}
                                                     isActive={site.actif !== false}
                                                 />
+                                            ) : (
+                                                <div className="flex items-center justify-end text-slate-400" title="Vous n'avez pas les permissions pour modifier ce site">
+                                                    <Lock className="w-4 h-4" />
+                                                </div>
                                             )}
                                         </td>
                                     </tr>
