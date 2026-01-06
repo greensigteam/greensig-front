@@ -158,7 +158,7 @@ export default function SiteEditModal({ site, isOpen, onClose, onSaved }: SiteEd
     // Préparer les options pour les selects
     const clientOptions = clients.map(client => ({
         value: client.utilisateur.toString(),
-        label: `${client.nomStructure} (${client.nom} ${client.prenom})`
+        label: `${client.structure?.nom || client.nomStructure} (${client.nom} ${client.prenom})`
     }));
 
     const superviseurOptions = superviseurs.map(sup => ({

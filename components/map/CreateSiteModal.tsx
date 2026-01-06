@@ -191,7 +191,7 @@ export const CreateSiteModal: React.FC<CreateSiteModalProps> = ({
               <option value="">-- Sélectionner un client --</option>
               {clients.map((client) => (
                 <option key={client.utilisateur} value={client.utilisateur}>
-                  {client.nomStructure} ({client.nom} {client.prenom})
+                  {client.structure?.nom || client.nomStructure} ({client.nom} {client.prenom})
                 </option>
               ))}
             </select>

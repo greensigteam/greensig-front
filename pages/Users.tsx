@@ -5,7 +5,8 @@ import {
   ClientUpdate,
   Role,
   NomRole,
-  NOM_ROLE_LABELS
+  NOM_ROLE_LABELS,
+  AdminResetPassword
 } from '../types/users';
 import {
   CreateAdminModal,
@@ -30,7 +31,9 @@ import {
   AlertCircle,
   Save,
   MoreVertical,
-  Eye
+  Eye,
+  EyeOff,
+  Key
 } from 'lucide-react';
 import { DataTable } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
@@ -50,7 +53,8 @@ import {
   updateClient,
   attribuerRole,
   retirerRole,
-  fetchClientByUserId
+  fetchClientByUserId,
+  adminResetPassword
 } from '../services/usersApi';
 
 // ============================================================================
@@ -74,6 +78,16 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, onClose, o
   const [currentUserRoles, setCurrentUserRoles] = useState<NomRole[]>([]);
   const [loadedClientData, setLoadedClientData] = useState<Client | null>(null);
   const [clientDataLoading, setClientDataLoading] = useState(false);
+
+  // Password reset state
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [passwordData, setPasswordData] = useState<AdminResetPassword>({
+    newPassword: '',
+    newPasswordConfirm: ''
+  });
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
   // Trouver les donnees specifiques selon le type
   const clientDataFromList = clients.find(c => c.utilisateur === user.id);
@@ -120,14 +134,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, onClose, o
           const data = await fetchClientByUserId(user.id);
           if (data) {
             setLoadedClientData(data);
-            // Mettre à jour les champs client avec les données chargées
-            setClientFields({
-              nomStructure: data.nomStructure || '',
-              adresse: data.adresse || '',
-              telephone: data.telephone || '',
-              contactPrincipal: data.contactPrincipal || '',
-              emailFacturation: data.emailFacturation || ''
-            });
+            // Les champs seront mis à jour automatiquement par le useEffect qui surveille clientData
           }
         } catch (err) {
           console.error('Erreur chargement client:', err);
@@ -156,12 +163,79 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, onClose, o
     emailFacturation: clientDataFromList?.emailFacturation || ''
   });
 
+  // Mettre à jour les champs client quand clientData change
+  useEffect(() => {
+    if (clientData) {
+      // Debug: voir ce que l'API renvoie
+      console.log('🔍 DEBUG clientData:', clientData);
+      console.log('🔍 DEBUG structure:', clientData.structure);
+      console.log('🔍 DEBUG legacy fields:', {
+        nomStructure: clientData.nomStructure,
+        adresse: clientData.adresse,
+        telephone: clientData.telephone
+      });
+
+      setClientFields({
+        // Priorité au nouveau système (structure), sinon legacy
+        nomStructure: clientData.structure?.nom || clientData.nomStructure || '',
+        adresse: clientData.structure?.adresse || clientData.adresse || '',
+        telephone: clientData.structure?.telephone || clientData.telephone || '',
+        contactPrincipal: clientData.structure?.contactPrincipal || clientData.contactPrincipal || '',
+        emailFacturation: clientData.structure?.emailFacturation || clientData.emailFacturation || ''
+      });
+    }
+  }, [clientData]);
+
+  // Password strength calculator
+  const getPasswordStrength = (password: string): { strength: number; label: string; color: string } => {
+    if (!password) return { strength: 0, label: '', color: '' };
+
+    let strength = 0;
+
+    // Length
+    if (password.length >= 8) strength += 1;
+    if (password.length >= 12) strength += 1;
+
+    // Contains lowercase
+    if (/[a-z]/.test(password)) strength += 1;
+
+    // Contains uppercase
+    if (/[A-Z]/.test(password)) strength += 1;
+
+    // Contains numbers
+    if (/\d/.test(password)) strength += 1;
+
+    // Contains special chars
+    if (/[^a-zA-Z\d]/.test(password)) strength += 1;
+
+    if (strength <= 2) return { strength, label: 'Faible', color: 'bg-red-500' };
+    if (strength <= 4) return { strength, label: 'Moyen', color: 'bg-yellow-500' };
+    return { strength, label: 'Fort', color: 'bg-green-500' };
+  };
+
+  const passwordStrength = getPasswordStrength(passwordData.newPassword);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setPasswordError(null);
     setLoading(true);
 
     try {
+      // Validation du mot de passe si la section est affichée
+      if (showPasswordReset && passwordData.newPassword) {
+        if (passwordData.newPassword !== passwordData.newPasswordConfirm) {
+          setPasswordError('Les mots de passe ne correspondent pas');
+          setLoading(false);
+          return;
+        }
+        if (passwordData.newPassword.length < 8) {
+          setPasswordError('Le mot de passe doit contenir au moins 8 caractères');
+          setLoading(false);
+          return;
+        }
+      }
+
       // Mise a jour de l'utilisateur de base
       const updateData: UtilisateurUpdate = {
         nom: formData.nom,
@@ -181,6 +255,11 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, onClose, o
           emailFacturation: clientFields.emailFacturation
         };
         await updateClient(clientData.utilisateur, clientUpdate);
+      }
+
+      // Réinitialisation du mot de passe si demandé
+      if (showPasswordReset && passwordData.newPassword) {
+        await adminResetPassword(Number(user.id), passwordData);
       }
 
       onUpdated();
@@ -232,7 +311,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, onClose, o
                 <div className="mb-4">
                   <p className="text-xs text-gray-500 mb-2">Rôles attribués automatiquement :</p>
                   <div className="flex flex-wrap gap-2">
-                    {['CLIENT', 'SUPERVISEUR', 'SUPERVISEUR'].map((roleName) => {
+                    {['CLIENT', 'SUPERVISEUR'].map((roleName) => {
                       const hasRole = userRoles.includes(roleName as NomRole);
                       if (!hasRole) return null;
                       return (
@@ -244,7 +323,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, onClose, o
                         </div>
                       );
                     })}
-                    {!userRoles.some(r => ['CLIENT', 'SUPERVISEUR', 'SUPERVISEUR'].includes(r)) && (
+                    {!userRoles.some(r => ['CLIENT', 'SUPERVISEUR'].includes(r)) && (
                       <span className="text-xs text-gray-500 italic">Aucun rôle automatique</span>
                     )}
                   </div>
@@ -370,6 +449,129 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, onClose, o
                 {formData.actif ? 'Actif' : 'Inactif'}
               </span>
             </div>
+
+            {/* Section Réinitialisation du mot de passe (ADMIN uniquement) */}
+            {currentUserRoles.includes('ADMIN') && (
+              <>
+                <hr className="my-4" />
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPasswordReset(!showPasswordReset);
+                      if (showPasswordReset) {
+                        // Reset password fields when closing
+                        setPasswordData({ newPassword: '', newPasswordConfirm: '' });
+                        setPasswordError(null);
+                      }
+                    }}
+                    className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-amber-600 transition-colors"
+                  >
+                    <Key className="w-4 h-4" />
+                    {showPasswordReset ? 'Annuler la réinitialisation' : 'Réinitialiser le mot de passe'}
+                  </button>
+
+                  {showPasswordReset && (
+                    <div className="space-y-3 pl-6 border-l-2 border-amber-200">
+                      {passwordError && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                          {passwordError}
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Nouveau mot de passe
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showPassword ? "text" : "password"}
+                            value={passwordData.newPassword}
+                            onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                            className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none"
+                            placeholder="Minimum 8 caractères"
+                            minLength={8}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700 transition-colors"
+                            title={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                          >
+                            {showPassword ? (
+                              <EyeOff className="w-4 h-4" />
+                            ) : (
+                              <Eye className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Password strength indicator */}
+                        {passwordData.newPassword && (
+                          <div className="mt-2 space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-gray-600">Force du mot de passe :</span>
+                              <span className={`font-medium ${passwordStrength.label === 'Fort' ? 'text-green-600' :
+                                  passwordStrength.label === 'Moyen' ? 'text-yellow-600' : 'text-red-600'
+                                }`}>
+                                {passwordStrength.label}
+                              </span>
+                            </div>
+                            <div className="flex gap-1">
+                              {[...Array(6)].map((_, i) => (
+                                <div
+                                  key={i}
+                                  className={`h-1.5 flex-1 rounded-full transition-colors ${i < passwordStrength.strength ? passwordStrength.color : 'bg-gray-200'
+                                    }`}
+                                />
+                              ))}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Utilisez majuscules, minuscules, chiffres et caractères spéciaux pour un mot de passe fort
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Confirmer le mot de passe
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showPasswordConfirm ? "text" : "password"}
+                            value={passwordData.newPasswordConfirm}
+                            onChange={(e) => setPasswordData({ ...passwordData, newPasswordConfirm: e.target.value })}
+                            className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none"
+                            placeholder="Confirmer le mot de passe"
+                            minLength={8}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700 transition-colors"
+                            title={showPasswordConfirm ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                          >
+                            {showPasswordConfirm ? (
+                              <EyeOff className="w-4 h-4" />
+                            ) : (
+                              <Eye className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
+                        {passwordData.newPasswordConfirm && passwordData.newPassword !== passwordData.newPasswordConfirm && (
+                          <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" />
+                            Les mots de passe ne correspondent pas
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* Champs specifiques Client */}
             {user.roles.includes('CLIENT') && (

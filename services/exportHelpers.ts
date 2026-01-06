@@ -25,14 +25,14 @@ export function exportClientsToCSV(clients: Client[]): void {
 
     const rows = clients.map(client => [
         client.utilisateur.toString(),
-        client.nomStructure,
+        client.structure?.nom || client.nomStructure,
         client.nom,
         client.prenom,
         client.email,
-        client.telephone || '',
-        client.adresse || '',
-        client.contactPrincipal || '',
-        client.emailFacturation || '',
+        client.structure?.telephone || client.telephone || '',
+        client.structure?.adresse || client.adresse || '',
+        client.structure?.contactPrincipal || client.contactPrincipal || '',
+        client.structure?.emailFacturation || client.emailFacturation || '',
         client.actif ? 'Actif' : 'Inactif',
         client.utilisateurDetail?.derniereConnexion
             ? new Date(client.utilisateurDetail.derniereConnexion).toLocaleDateString('fr-FR')
@@ -60,14 +60,14 @@ export async function exportClientsToExcel(clients: Client[]): Promise<void> {
     const tableRows = clients.map(client => `
         <tr>
             <td>${client.utilisateur}</td>
-            <td>${escapeHtml(client.nomStructure)}</td>
+            <td>${escapeHtml(client.structure?.nom || client.nomStructure)}</td>
             <td>${escapeHtml(client.nom)}</td>
             <td>${escapeHtml(client.prenom)}</td>
             <td>${escapeHtml(client.email)}</td>
-            <td>${escapeHtml(client.telephone || '')}</td>
-            <td>${escapeHtml(client.adresse || '')}</td>
-            <td>${escapeHtml(client.contactPrincipal || '')}</td>
-            <td>${escapeHtml(client.emailFacturation || '')}</td>
+            <td>${escapeHtml(client.structure?.telephone || client.telephone || '')}</td>
+            <td>${escapeHtml(client.structure?.adresse || client.adresse || '')}</td>
+            <td>${escapeHtml(client.structure?.contactPrincipal || client.contactPrincipal || '')}</td>
+            <td>${escapeHtml(client.structure?.emailFacturation || client.emailFacturation || '')}</td>
             <td>${client.actif ? 'Actif' : 'Inactif'}</td>
             <td>${
                 client.utilisateurDetail?.derniereConnexion

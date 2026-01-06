@@ -8,6 +8,7 @@ import {
   UtilisateurCreate,
   UtilisateurUpdate,
   ChangePassword,
+  AdminResetPassword,
   Role,
   StructureClient,
   StructureClientDetail,
@@ -201,6 +202,19 @@ export async function changePassword(
 ): Promise<{ message: string }> {
   return fetchApi<{ message: string }>(
     `${USERS_API_URL}/utilisateurs/${id}/change_password/`,
+    {
+      method: 'POST',
+      body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
+    }
+  );
+}
+
+export async function adminResetPassword(
+  id: number,
+  data: AdminResetPassword
+): Promise<{ message: string }> {
+  return fetchApi<{ message: string }>(
+    `${USERS_API_URL}/utilisateurs/${id}/admin_reset_password/`,
     {
       method: 'POST',
       body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))

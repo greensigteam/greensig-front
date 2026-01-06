@@ -108,6 +108,11 @@ export interface ChangePassword {
   newPasswordConfirm: string;
 }
 
+export interface AdminResetPassword {
+  newPassword: string;
+  newPasswordConfirm: string;
+}
+
 // ============================================================================
 // ROLE
 // ============================================================================

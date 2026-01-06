@@ -99,7 +99,7 @@ const PlanningFiltersComponent: FC<PlanningFiltersProps> = ({
                 <option value="">Tous les clients</option>
                 {clients.map(c => (
                     <option key={c.utilisateur} value={c.utilisateur}>
-                        {c.nomStructure}
+                        {c.structure?.nom || c.nomStructure}
                     </option>
                 ))}
             </select>

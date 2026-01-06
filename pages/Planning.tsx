@@ -370,7 +370,7 @@ const Planning: FC = () => {
             console.log('  → Nombre de clients:', clientsArray.length);
             console.log('  → Premiers clients:', clientsArray.slice(0, 3).map(c => ({
                 utilisateur: c.utilisateur,
-                nom: c.nomStructure
+                nom: c.structure?.nom || c.nomStructure
             })));
             setClients(clientsArray);
 
@@ -474,7 +474,7 @@ const Planning: FC = () => {
                 tachesAvecClient.slice(0, 3).map(t => ({
                     tache_id: t.id,
                     client_id: t.client_detail?.utilisateur,
-                    client_nom: t.client_detail?.nomStructure
+                    client_nom: t.client_detail?.structure?.nom || t.client_detail?.nomStructure
                 }))
             );
 
@@ -981,7 +981,7 @@ const Planning: FC = () => {
 
                     // Client (tronquer si nécessaire)
                     pdf.setFont('helvetica', 'normal');
-                    let clientName = task.client_detail?.nomStructure || 'N/A';
+                    let clientName = task.client_detail?.structure?.nom || task.client_detail?.nomStructure || 'N/A';
                     const maxClientWidth = colWidths.client - 4;
                     if (pdf.getTextWidth(clientName) > maxClientWidth) {
                         while (pdf.getTextWidth(clientName + '…') > maxClientWidth && clientName.length > 0) {

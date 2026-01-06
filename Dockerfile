@@ -35,18 +35,9 @@ FROM nginx:alpine AS production
 # Copier les fichiers buildes depuis le stage precedent
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copier une configuration nginx par defaut (sera ecrasee par docker-compose)
+# Copier la configuration nginx personnalisee (avec support WebSocket)
 RUN rm /etc/nginx/conf.d/default.conf
-
-# Creer une config minimale pour le container standalone
-RUN echo 'server { \
-    listen 80; \
-    location / { \
-        root /usr/share/nginx/html; \
-        index index.html; \
-        try_files $uri $uri/ /index.html; \
-    } \
-}' > /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Exposer le port
 EXPOSE 80
