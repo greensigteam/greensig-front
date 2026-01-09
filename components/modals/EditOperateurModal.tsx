@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, AlertCircle, Loader2, User, Phone, Mail, Hash, Users, Edit2 } from 'lucide-react';
 import { OperateurList, OperateurUpdate, EquipeList } from '../../types/users';
 import { updateOperateur, fetchEquipes } from '../../services/usersApi';
+import { PremiumInput, PremiumSelect } from '../modals/PremiumFormComponents';
 
 interface EditOperateurModalProps {
     operateur: OperateurList;
@@ -132,133 +133,101 @@ const EditOperateurModal: React.FC<EditOperateurModalProps> = ({
 
                         {/* Nom et Prenom */}
                         <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    Nom <span className="text-red-500">*</span>
-                                </label>
-                                <div className="relative">
-                                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                    <input
-                                        required
-                                        type="text"
-                                        name="nom"
-                                        value={formData.nom}
-                                        onChange={handleChange}
-                                        className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    Prenom <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    required
-                                    type="text"
-                                    name="prenom"
-                                    value={formData.prenom}
-                                    onChange={handleChange}
-                                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                                />
-                            </div>
+                            <PremiumInput
+                                type="text"
+                                value={formData.nom}
+                                onChange={(value) => setFormData(prev => ({ ...prev, nom: value }))}
+                                label="Nom"
+                                icon={<User className="w-4 h-4" />}
+                                required
+                                variant="outlined"
+                                size="md"
+                            />
+                            <PremiumInput
+                                type="text"
+                                value={formData.prenom}
+                                onChange={(value) => setFormData(prev => ({ ...prev, prenom: value }))}
+                                label="Prénom"
+                                icon={<User className="w-4 h-4" />}
+                                required
+                                variant="outlined"
+                                size="md"
+                            />
                         </div>
 
                         {/* Matricule */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                Matricule <span className="text-red-500">*</span>
-                            </label>
-                            <div className="relative">
-                                <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                <input
-                                    required
-                                    type="text"
-                                    name="numeroImmatriculation"
-                                    value={formData.numeroImmatriculation}
-                                    onChange={handleChange}
-                                    className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                                />
-                            </div>
-                        </div>
+                        <PremiumInput
+                            type="text"
+                            value={formData.numeroImmatriculation}
+                            onChange={(value) => setFormData(prev => ({ ...prev, numeroImmatriculation: value }))}
+                            label="Matricule"
+                            icon={<Hash className="w-4 h-4" />}
+                            required
+                            variant="outlined"
+                            size="md"
+                        />
 
                         {/* Email et Telephone */}
                         <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    Email
-                                </label>
-                                <div className="relative">
-                                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                    <input
-                                        type="email"
-                                        name="email"
-                                        value={formData.email || ''}
-                                        onChange={handleChange}
-                                        className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    Telephone
-                                </label>
-                                <div className="relative">
-                                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                    <input
-                                        type="tel"
-                                        name="telephone"
-                                        value={formData.telephone || ''}
-                                        onChange={handleChange}
-                                        className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                                    />
-                                </div>
-                            </div>
+                            <PremiumInput
+                                type="email"
+                                value={formData.email || ''}
+                                onChange={(value) => setFormData(prev => ({ ...prev, email: value }))}
+                                label="Email"
+                                icon={<Mail className="w-4 h-4" />}
+                                variant="outlined"
+                                size="md"
+                            />
+                            <PremiumInput
+                                type="tel"
+                                value={formData.telephone || ''}
+                                onChange={(value) => setFormData(prev => ({ ...prev, telephone: value }))}
+                                label="Téléphone"
+                                icon={<Phone className="w-4 h-4" />}
+                                variant="outlined"
+                                size="md"
+                            />
                         </div>
 
                         {/* Statut */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                Statut
-                            </label>
-                            <select
-                                name="statut"
-                                value={formData.statut}
-                                onChange={handleChange}
-                                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                            >
-                                <option value="ACTIF">Actif</option>
-                                <option value="INACTIF">Inactif</option>
-                                <option value="EN_CONGE">En congé</option>
-                            </select>
-                        </div>
+                        <PremiumSelect
+                            value={formData.statut}
+                            onChange={(value) => setFormData(prev => ({ ...prev, statut: value as 'ACTIF' | 'INACTIF' | 'EN_CONGE' }))}
+                            options={[
+                                { value: 'ACTIF', label: 'Actif' },
+                                { value: 'INACTIF', label: 'Inactif' },
+                                { value: 'EN_CONGE', label: 'En congé' }
+                            ]}
+                            label="Statut"
+                            placeholder="Sélectionner un statut"
+                            variant="outlined"
+                            size="md"
+                        />
 
                         {/* Equipe */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                Equipe
-                            </label>
                             {loadingEquipes ? (
-                                <div className="flex items-center gap-2 text-sm text-gray-500 py-2.5">
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    Chargement des equipes...
+                                <div className="flex items-center gap-2 text-sm text-slate-500 py-3 px-3 bg-slate-50 rounded-lg border border-slate-200">
+                                    <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                                    Chargement des équipes...
                                 </div>
                             ) : (
-                                <div className="relative">
-                                    <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                    <select
-                                        name="equipe"
-                                        value={formData.equipe ?? ''}
-                                        onChange={handleChange}
-                                        className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none appearance-none"
-                                    >
-                                        <option value="">Aucune equipe</option>
-                                        {equipes.map((eq) => (
-                                            <option key={eq.id} value={eq.id}>
-                                                {eq.nomEquipe}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
+                                <PremiumSelect
+                                    value={formData.equipe?.toString() ?? ''}
+                                    onChange={(value) => setFormData(prev => ({ ...prev, equipe: value === '' ? null : Number(value) }))}
+                                    options={[
+                                        { value: '', label: 'Aucune équipe' },
+                                        ...equipes.map((eq) => ({
+                                            value: eq.id.toString(),
+                                            label: eq.nomEquipe
+                                        }))
+                                    ]}
+                                    label="Équipe"
+                                    placeholder="Sélectionner une équipe"
+                                    icon={<Users className="w-4 h-4" />}
+                                    variant="outlined"
+                                    size="md"
+                                />
                             )}
                         </div>
                     </div>

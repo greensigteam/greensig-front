@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, type FC, type FormEvent } from 'r
 import { Link } from 'react-router-dom';
 import { addDays, addWeeks, addMonths, format } from 'date-fns';
 import {
-    Clock, X, Search, ChevronDown, Timer, RefreshCw, Gauge, ExternalLink, Calculator, TreePine, AlertTriangle, MapPin, Ban
+    Clock, X, Search, ChevronDown, Timer, RefreshCw, Gauge, ExternalLink, Calculator, TreePine, AlertTriangle, MapPin, Ban, MessageSquare, ClipboardList, Users
 } from 'lucide-react';
 
 // ============================================================================
@@ -26,197 +26,8 @@ import {
 import { EquipeList } from '../../types/users';
 import FormModal from '../FormModal';
 import { RecurrenceSelector, type RecurrenceParams } from './RecurrenceSelector';
+import { PremiumInput, PremiumSelect, PremiumTextarea, PremiumSearchableSelect, PremiumMultiSelect } from '../modals/PremiumFormComponents';
 
-
-// ============================================================================
-// TYPE TACHE SELECTOR (avec création dynamique)
-// ============================================================================
-
-interface TypeTacheSelectorProps {
-    value: number | null;
-    typesTaches: TypeTache[];
-    onChange: (id: number) => void;
-}
-
-const TypeTacheSelector: FC<TypeTacheSelectorProps> = ({ value, typesTaches, onChange }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-
-    const selectedType = typesTaches.find(t => t.id === value);
-
-    const filteredTypes = useMemo(() => {
-        if (!searchQuery.trim()) return typesTaches;
-        const q = searchQuery.toLowerCase();
-        return typesTaches.filter(t => t.nom_tache.toLowerCase().includes(q));
-    }, [typesTaches, searchQuery]);
-
-    return (
-        <div className="relative">
-            <button
-                type="button"
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-left flex items-center justify-between hover:border-emerald-500 focus:ring-2 focus:ring-emerald-500 outline-none"
-            >
-                <span className={selectedType ? 'text-slate-900' : 'text-slate-400'}>
-                    {selectedType?.nom_tache || 'Sélectionner un type'}
-                </span>
-                <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {isOpen && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-64 overflow-hidden flex flex-col">
-                    <div className="p-2 border-b">
-                        <div className="relative">
-                            <Search className="absolute left-2 top-2.5 w-4 h-4 text-slate-400" />
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Rechercher..."
-                                className="w-full pl-8 pr-3 py-2 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-emerald-500 outline-none"
-                                autoFocus
-                            />
-                        </div>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto">
-                        {filteredTypes.map((type) => (
-                            <button
-                                key={type.id}
-                                type="button"
-                                onClick={() => {
-                                    onChange(type.id);
-                                    setIsOpen(false);
-                                    setSearchQuery('');
-                                }}
-                                className="w-full px-3 py-2 text-left hover:bg-emerald-50 text-sm"
-                            >
-                                {type.nom_tache}
-                            </button>
-                        ))}
-                        {filteredTypes.length === 0 && (
-                            <div className="px-3 py-2 text-sm text-slate-500 text-center">
-                                Aucun résultat
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
-
-// ============================================================================
-// MULTI EQUIPE SELECTOR (US-PLAN-013 - Multi-teams)
-// ============================================================================
-
-interface MultiEquipeSelectorProps {
-    values: number[];
-    equipes: EquipeList[];
-    onChange: (ids: number[]) => void;
-}
-
-const MultiEquipeSelector: FC<MultiEquipeSelectorProps> = ({ values, equipes, onChange }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-
-    const selectedEquipes = equipes.filter(e => values.includes(e.id));
-
-    const filteredEquipes = useMemo(() => {
-        if (!searchQuery.trim()) return equipes;
-        const q = searchQuery.toLowerCase();
-        return equipes.filter(e => e.nomEquipe.toLowerCase().includes(q));
-    }, [equipes, searchQuery]);
-
-    const toggleEquipe = (equipeId: number) => {
-        if (values.includes(equipeId)) {
-            onChange(values.filter(id => id !== equipeId));
-        } else {
-            onChange([...values, equipeId]);
-        }
-    };
-
-    return (
-        <div className="relative">
-            <button
-                type="button"
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-left flex items-center justify-between hover:border-emerald-500 focus:ring-2 focus:ring-emerald-500 outline-none min-h-[42px]"
-            >
-                <div className="flex-1 flex flex-wrap gap-1">
-                    {selectedEquipes.length > 0 ? (
-                        selectedEquipes.map(e => (
-                            <span key={e.id} className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full">
-                                {e.nomEquipe}
-                                <span
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={(ev) => {
-                                        ev.stopPropagation();
-                                        toggleEquipe(e.id);
-                                    }}
-                                    onKeyDown={(ev) => {
-                                        if (ev.key === 'Enter' || ev.key === ' ') {
-                                            ev.stopPropagation();
-                                            toggleEquipe(e.id);
-                                        }
-                                    }}
-                                    className="hover:text-red-500 cursor-pointer"
-                                >
-                                    <X className="w-3 h-3" />
-                                </span>
-                            </span>
-                        ))
-                    ) : (
-                        <span className="text-slate-400">Sélectionner des équipes</span>
-                    )}
-                </div>
-                <ChevronDown className={`w-4 h-4 ml-2 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {isOpen && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-64 overflow-hidden flex flex-col">
-                    <div className="p-2 border-b">
-                        <div className="relative">
-                            <Search className="absolute left-2 top-2.5 w-4 h-4 text-slate-400" />
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Rechercher..."
-                                className="w-full pl-8 pr-3 py-2 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-emerald-500 outline-none"
-                                autoFocus
-                            />
-                        </div>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto">
-                        {filteredEquipes.map((equipe) => {
-                            const isSelected = values.includes(equipe.id);
-                            return (
-                                <button
-                                    key={equipe.id}
-                                    type="button"
-                                    onClick={() => toggleEquipe(equipe.id)}
-                                    className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between ${isSelected ? 'bg-emerald-50' : 'hover:bg-slate-50'
-                                        }`}
-                                >
-                                    <span>{equipe.nomEquipe}</span>
-                                    {isSelected && <span className="text-emerald-600">✓</span>}
-                                </button>
-                            );
-                        })}
-                        {filteredEquipes.length === 0 && (
-                            <div className="px-3 py-2 text-sm text-slate-500 text-center">
-                                Aucun résultat
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
 
 // ============================================================================
 // CREATE/EDIT TASK MODAL
@@ -240,12 +51,14 @@ interface TaskFormModalProps {
     preSelectedObjects?: InventoryObjectOption[];
     /** Filtre par site - ne charge que les objets de ce site */
     siteFilter?: { id: number; name: string };
+    /** État de chargement pendant la soumission */
+    isSubmitting?: boolean;
     onClose: () => void;
     onSubmit: (data: TacheCreate) => void;
     onResetCharge?: (tacheId: number) => Promise<void>;
 }
 
-const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, typesTaches, preSelectedObjects, siteFilter, onClose, onSubmit, onResetCharge }) => {
+const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, typesTaches, preSelectedObjects, siteFilter, isSubmitting = false, onClose, onSubmit, onResetCharge }) => {
     // Initialize equipes from M2M or legacy single equipe
     const initialEquipesIds = (): number[] => {
         if (tache?.equipes_detail && tache.equipes_detail.length > 0) {
@@ -296,6 +109,11 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
 
     const [chargeManuelle, setChargeManuelle] = useState(tache?.charge_manuelle || false);
     const [isResettingCharge, setIsResettingCharge] = useState(false);
+    const [autoRecurrenceActivated, setAutoRecurrenceActivated] = useState(false); // Track if recurrence was auto-activated
+
+    // ✅ PHASE 1: Flags pour calcul auto et répartition multi-jours
+    const [calculerChargeAuto, setCalculerChargeAuto] = useState(true); // Default: ON
+    const [repartirMultiJours, setRepartirMultiJours] = useState(true); // Default: ON
 
     // State for ratios and charge preview
     const [ratios, setRatios] = useState<RatioProductivite[]>([]);
@@ -342,12 +160,24 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
     }, [selectedObjects, siteFilter, availableObjects]);
 
     // Filter equipes by site when a site is locked
+    // ✅ NOUVEAU : Prend en compte le système multi-sites (principal + secondaires + legacy)
     const filteredEquipes = useMemo(() => {
         if (!lockedSite) {
             return equipes;
         }
-        // Filter by site name (siteNom) since we have the site name from objects
-        const filtered = equipes.filter(e => e.siteNom === lockedSite?.name);
+        // Filter by site name - check site principal, sites secondaires, OR legacy site
+        const filtered = equipes.filter(e => {
+            // Check site principal
+            if (e.sitePrincipalNom === lockedSite.name) return true;
+
+            // Check sites secondaires
+            if (e.sitesSecondairesNoms && e.sitesSecondairesNoms.includes(lockedSite.name)) return true;
+
+            // Legacy fallback
+            if (e.siteNom === lockedSite.name) return true;
+
+            return false;
+        });
         return filtered;
     }, [equipes, lockedSite]);
 
@@ -379,6 +209,184 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
 
         setValidationWarnings(warnings);
     }, [formData.date_debut_planifiee, formData.date_fin_planifiee]);
+
+    // Auto-activate recurrence when task spans multiple days
+    useEffect(() => {
+        // Only for new tasks (not editing) or when manually changing dates
+        if (!formData.date_debut_planifiee || !formData.date_fin_planifiee) return;
+
+        const start = new Date(formData.date_debut_planifiee);
+        const end = new Date(formData.date_fin_planifiee);
+
+        // Check if dates are on different calendar days
+        const startDay = format(start, 'yyyy-MM-dd');
+        const endDay = format(end, 'yyyy-MM-dd');
+
+        if (startDay !== endDay && !formData.parametres_recurrence) {
+            // Calculate number of days
+            const diffTime = end.getTime() - start.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end days
+
+            console.log(`🔄 Auto-activating recurrence: ${diffDays} days (${startDay} to ${endDay})`);
+
+            // Auto-activate DAILY recurrence
+            setFormData(prev => ({
+                ...prev,
+                parametres_recurrence: {
+                    frequence: 'daily',
+                    interval: 1,
+                    nombre_occurrences: diffDays,
+                    date_fin: endDay
+                },
+                // Adjust end date to same day to avoid backend validation error
+                date_fin_planifiee: formatDateTimeLocal(new Date(start.getFullYear(), start.getMonth(), start.getDate(), 17, 0, 0))
+            }));
+
+            // ✅ Mark that recurrence was auto-activated
+            setAutoRecurrenceActivated(true);
+        }
+    }, [formData.date_debut_planifiee, formData.date_fin_planifiee]); // ⚠️ Removed parametres_recurrence to avoid loop
+
+    // Calculate estimated charge preview based on selected objects and ratios
+    // ⚠️ MUST be declared BEFORE the useEffect that uses it (to avoid "Cannot access before initialization")
+    const chargePreview = useMemo(() => {
+        if (!formData.id_type_tache || selectedObjects.length === 0 || ratios.length === 0) {
+            return null;
+        }
+
+        // Group objects by type and calculate total superficie if surfacic
+        const objectsByType = selectedObjects.reduce((acc, obj) => {
+            if (!acc[obj.type]) {
+                acc[obj.type] = { count: 0, superficie: 0, objects: [] };
+            }
+            acc[obj.type].count += 1;
+            acc[obj.type].superficie += obj.superficie || 0; // Accumulate superficie
+            acc[obj.type].objects.push(obj);
+            return acc;
+        }, {} as Record<string, { count: number; superficie: number; objects: InventoryObjectOption[] }>);
+
+        let totalHeures = 0;
+        const details: { type: string; count: number; superficie?: number; ratio: RatioProductivite | null; heures: number }[] = [];
+
+        for (const [type, data] of Object.entries(objectsByType)) {
+            // Find matching ratio for this task type and object type
+            const ratio = ratios.find(r =>
+                r.id_type_tache === formData.id_type_tache &&
+                r.type_objet.toLowerCase() === type.toLowerCase()
+            );
+
+            if (ratio) {
+                let heures = 0;
+
+                // ✅ Calculate based on unite_mesure
+                if (ratio.unite_mesure === 'm2' && data.superficie > 0) {
+                    // Surfacic objects: hours = superficie / ratio
+                    heures = data.superficie / ratio.ratio;
+                } else if (ratio.unite_mesure === 'ml') {
+                    // Linear objects: would need longueur (not implemented yet)
+                    // For now, fallback to count
+                    heures = data.count / ratio.ratio;
+                } else {
+                    // 'unite' measure: hours = count / ratio
+                    heures = data.count / ratio.ratio;
+                }
+
+                totalHeures += heures;
+                details.push({
+                    type,
+                    count: data.count,
+                    superficie: data.superficie > 0 ? data.superficie : undefined,
+                    ratio,
+                    heures
+                });
+            } else {
+                details.push({ type, count: data.count, ratio: null, heures: 0 });
+            }
+        }
+
+        return {
+            totalHeures: Math.round(totalHeures * 100) / 100,
+            details,
+            hasUnconfiguredTypes: details.some(d => d.ratio === null)
+        };
+    }, [formData.id_type_tache, selectedObjects, ratios]);
+
+    // ✅ PHASE 2.2: Auto-activate recurrence when charge > 10h (with intelligent calculation based on team work hours)
+    useEffect(() => {
+        // Skip if recurrence already active, or no charge preview
+        if (formData.parametres_recurrence || !chargePreview?.totalHeures) return;
+
+        // ✅ PHASE 1: Skip if user disabled auto-calculation or multi-day splitting
+        if (!calculerChargeAuto || !repartirMultiJours) return;
+
+        // Skip if charge is reasonable for one day (≤ 10h)
+        if (chargePreview.totalHeures <= 10) return;
+
+        // Skip if no team selected (need team to calculate work hours)
+        const equipeId = formData.id_equipe || (formData.equipes_ids && formData.equipes_ids.length > 0 ? formData.equipes_ids[0] : null);
+        if (!equipeId) {
+            console.log('⚠️ No team selected, skipping intelligent recurrence calculation');
+            return;
+        }
+
+        // ✅ PHASE 2.2: Call API to calculate recommended occurrences based on real work hours
+        const startDate = formData.date_debut_planifiee ? new Date(formData.date_debut_planifiee) : new Date();
+        const dateDebut = format(startDate, 'yyyy-MM-dd');
+
+        console.log(`🔄 Calculating intelligent recurrence: ${chargePreview.totalHeures}h for team ${equipeId}`);
+
+        planningService.calculateRecurrenceRecommendee({
+            equipe_id: equipeId,
+            charge_totale_heures: chargePreview.totalHeures,
+            date_debut: dateDebut,
+            frequence: 'daily'
+        })
+            .then(response => {
+                const days = response.nombre_occurrences;
+                const endDate = new Date(startDate);
+                endDate.setDate(endDate.getDate() + (days - 1));
+
+                console.log(`✅ Intelligent recurrence calculated: ${days} days (avg ${response.heures_par_jour_moyen}h/day)`);
+
+                // Auto-activate DAILY recurrence
+                setFormData(prev => ({
+                    ...prev,
+                    parametres_recurrence: {
+                        frequence: 'daily',
+                        interval: 1,
+                        nombre_occurrences: days,
+                        date_fin: format(endDate, 'yyyy-MM-dd')
+                    },
+                    // Keep end date within same day to avoid backend validation error
+                    date_fin_planifiee: formatDateTimeLocal(new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 17, 0, 0))
+                }));
+
+                // ✅ Mark that recurrence was auto-activated
+                setAutoRecurrenceActivated(true);
+            })
+            .catch(err => {
+                console.error('❌ Error calculating intelligent recurrence, falling back to 10h/day:', err);
+
+                // Fallback to hardcoded 10h/day if API fails
+                const days = Math.ceil(chargePreview.totalHeures / 10);
+                const endDate = new Date(startDate);
+                endDate.setDate(endDate.getDate() + (days - 1));
+
+                setFormData(prev => ({
+                    ...prev,
+                    parametres_recurrence: {
+                        frequence: 'daily',
+                        interval: 1,
+                        nombre_occurrences: days,
+                        date_fin: format(endDate, 'yyyy-MM-dd')
+                    },
+                    date_fin_planifiee: formatDateTimeLocal(new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 17, 0, 0))
+                }));
+
+                setAutoRecurrenceActivated(true);
+            });
+
+    }, [chargePreview?.totalHeures, formData.parametres_recurrence, formData.date_debut_planifiee, formData.id_equipe, formData.equipes_ids, calculerChargeAuto, repartirMultiJours]);
 
     // Fetch ratios on mount for charge preview
     useEffect(() => {
@@ -431,49 +439,10 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
             .finally(() => setLoadingFilteredTypes(false));
     }, [selectedObjects, typesTaches]);
 
-    // Calculate estimated charge preview based on selected objects and ratios
-    const chargePreview = useMemo(() => {
-        if (!formData.id_type_tache || selectedObjects.length === 0 || ratios.length === 0) {
-            return null;
-        }
-
-        // Group objects by type
-        const objectsByType = selectedObjects.reduce((acc, obj) => {
-            acc[obj.type] = (acc[obj.type] || 0) + 1;
-            return acc;
-        }, {} as Record<string, number>);
-
-        let totalHeures = 0;
-        const details: { type: string; count: number; ratio: RatioProductivite | null; heures: number }[] = [];
-
-        for (const [type, count] of Object.entries(objectsByType)) {
-            // Find matching ratio for this task type and object type
-            const ratio = ratios.find(r =>
-                r.id_type_tache === formData.id_type_tache &&
-                r.type_objet.toLowerCase() === type.toLowerCase()
-            );
-
-            if (ratio) {
-                // For 'unite' measure, ratio is units per hour
-                // So hours = count / ratio
-                const heures = count / ratio.ratio;
-                totalHeures += heures;
-                details.push({ type, count, ratio, heures });
-            } else {
-                details.push({ type, count, ratio: null, heures: 0 });
-            }
-        }
-
-        return {
-            totalHeures: Math.round(totalHeures * 100) / 100,
-            details,
-            hasUnconfiguredTypes: details.some(d => d.ratio === null)
-        };
-    }, [formData.id_type_tache, selectedObjects, ratios]);
-
     // Fetch inventory objects when siteFilter is set (on mount) - for reclamation context
     useEffect(() => {
-        if (siteFilter && availableObjects.length === 0) {
+        if (siteFilter) {
+            // ✅ Toujours recharger les objets quand siteFilter change, même si availableObjects n'est pas vide
             setLoadingObjects(true);
             fetchInventory({ page_size: 200, site: siteFilter.id })
                 .then((response: InventoryResponse) => {
@@ -484,7 +453,8 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                             type: item.properties.object_type,
                             nom: item.properties.nom || item.properties.famille || `${item.properties.object_type} #${objectId}`,
                             site: item.properties.site_nom,
-                            soussite: item.properties.sous_site_nom
+                            soussite: item.properties.sous_site_nom,
+                            superficie: item.properties.superficie_calculee // ✅ Extraire la superficie
                         };
                     });
 
@@ -510,7 +480,8 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                             type: item.properties.object_type,
                             nom: item.properties.nom || item.properties.famille || `${item.properties.object_type} #${objectId}`,
                             site: item.properties.site_nom,
-                            soussite: item.properties.sous_site_nom
+                            soussite: item.properties.sous_site_nom,
+                            superficie: item.properties.superficie_calculee // ✅ Extraire la superficie
                         };
                     });
 
@@ -596,6 +567,9 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         // Only if start date is valid
         if (!formData.date_debut_planifiee) return;
 
+        // Skip auto-calculation if recurrence is active (multi-day task)
+        if (formData.parametres_recurrence) return;
+
         let hours = 0;
         // In edit mode, prefer manual charge if set
         if (tache && formData.charge_estimee_heures) {
@@ -636,7 +610,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                 }
             }
         }
-    }, [formData.date_debut_planifiee, formData.charge_estimee_heures, chargePreview?.totalHeures]);
+    }, [formData.date_debut_planifiee, formData.charge_estimee_heures, chargePreview?.totalHeures, formData.parametres_recurrence]);
 
     const toggleObjectSelection = (obj: InventoryObjectOption) => {
         setSelectedObjects(prev => {
@@ -674,7 +648,8 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                 type: o.nom_type || '', // Now available from backend
                 nom: o.display || `Objet #${o.id}`, // Now available from backend
                 site: o.site_nom || '',
-                soussite: o.sous_site_nom
+                soussite: o.sous_site_nom,
+                superficie: o.superficie_calculee // ✅ Extraire la superficie
             })) || [];
 
             setSelectedObjects(newSelectedObjects);
@@ -706,7 +681,61 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
             return;
         }
 
-        onSubmit(formData);
+        // ⚠️ CRITICAL: Pre-submission validation for multi-day tasks
+        // If user selected dates on different days without recurrence, activate it NOW
+        if (formData.date_debut_planifiee && formData.date_fin_planifiee && !formData.parametres_recurrence) {
+            const start = new Date(formData.date_debut_planifiee);
+            const end = new Date(formData.date_fin_planifiee);
+            const startDay = format(start, 'yyyy-MM-dd');
+            const endDay = format(end, 'yyyy-MM-dd');
+
+            if (startDay !== endDay) {
+                // Different days detected - auto-activate recurrence
+                const diffTime = end.getTime() - start.getTime();
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+                console.warn(`⚠️ Multi-day task detected at submit! Auto-activating recurrence for ${diffDays} days`);
+
+                const adjustedData = {
+                    ...formData,
+                    parametres_recurrence: {
+                        frequence: 'daily' as const,
+                        interval: 1,
+                        nombre_occurrences: diffDays,
+                        date_fin: endDay
+                    },
+                    // Adjust end date to same day
+                    date_fin_planifiee: formatDateTimeLocal(
+                        new Date(start.getFullYear(), start.getMonth(), start.getDate(), 17, 0, 0)
+                    ),
+                    // ✅ PHASE 1: Ajouter les flags
+                    ...(calculerChargeAuto && chargePreview?.totalHeures && {
+                        charge_estimee_heures: chargePreview.totalHeures
+                    }),
+                    calculer_charge_auto: calculerChargeAuto,
+                    repartir_multi_jours: repartirMultiJours
+                };
+
+                console.log('📤 Submitting with auto-recurrence:', adjustedData);
+                onSubmit(adjustedData);
+                return;
+            }
+        }
+
+        // ✅ PHASE 1: Ajouter les flags de planification intelligente au payload
+        const payloadWithFlags = {
+            ...formData,
+            // Ajouter la charge calculée si option activée
+            ...(calculerChargeAuto && chargePreview?.totalHeures && {
+                charge_estimee_heures: chargePreview.totalHeures
+            }),
+            // Flags pour le backend
+            calculer_charge_auto: calculerChargeAuto,
+            repartir_multi_jours: repartirMultiJours
+        };
+
+        console.log('📤 Submitting task data:', payloadWithFlags);
+        onSubmit(payloadWithFlags);
     };
 
     return (
@@ -717,7 +746,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
             title={tache ? 'Modifier la tâche' : 'Nouvelle tâche'}
             icon={<Clock className="w-5 h-5 text-emerald-600" />}
             size="2xl"
-            loading={false}
+            loading={isSubmitting}
             error={validationError}
             submitLabel={tache ? 'Modifier' : 'Créer'}
             cancelLabel="Annuler"
@@ -778,125 +807,110 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                 )}
 
                 {/* Type de tâche avec création dynamique */}
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Type de tâche <span className="text-red-500">*</span>
-                        {selectedObjects.length > 0 && filteredTypesTaches.length < typesTaches.length && !loadingFilteredTypes && (
-                            <span className="ml-2 text-xs text-amber-600 font-normal">
-                                ({filteredTypesTaches.length} types applicables sur {typesTaches.length})
-                            </span>
-                        )}
-                        {loadingFilteredTypes && (
-                            <span className="ml-2 text-xs text-slate-400 font-normal">
-                                Chargement...
-                            </span>
-                        )}
-                    </label>
-                    <TypeTacheSelector
-                        value={formData.id_type_tache || null}
-                        typesTaches={filteredTypesTaches}
-                        onChange={(id) => setFormData({ ...formData, id_type_tache: id })}
-                    />
-                    {selectedObjects.length > 0 && filteredTypesTaches.length > 0 && filteredTypesTaches.length < typesTaches.length && (
-                        <p className="text-xs text-slate-500 mt-1">
-                            Seuls les types de tâches applicables aux objets sélectionnés sont affichés.
-                        </p>
-                    )}
-                </div>
+                <PremiumSearchableSelect
+                    value={formData.id_type_tache || null}
+                    onChange={(id) => setFormData({ ...formData, id_type_tache: Number(id) })}
+                    options={filteredTypesTaches.map(t => ({
+                        value: t.id,
+                        label: t.nom_tache
+                    }))}
+                    label="Type de tâche"
+                    placeholder="Sélectionner un type..."
+                    icon={<ClipboardList className="w-4 h-4" />}
+                    required
+                    variant="outlined"
+                    size="md"
+                    searchPlaceholder="Rechercher un type..."
+                    hint={
+                        loadingFilteredTypes
+                            ? 'Chargement...'
+                            : selectedObjects.length > 0 && filteredTypesTaches.length > 0 && filteredTypesTaches.length < typesTaches.length
+                                ? `${filteredTypesTaches.length} types applicables sur ${typesTaches.length}`
+                                : selectedObjects.length > 0 && filteredTypesTaches.length > 0 && filteredTypesTaches.length < typesTaches.length
+                                    ? 'Seuls les types de tâches applicables aux objets sélectionnés sont affichés.'
+                                    : undefined
+                    }
+                />
 
                 {/* Équipes avec sélection multiple (US-PLAN-013) */}
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Équipes
-                        {lockedSite && filteredEquipes.length < equipes.length && (
-                            <span className="ml-2 text-xs text-blue-600 font-normal">
-                                ({filteredEquipes.length} équipe{filteredEquipes.length > 1 ? 's' : ''} sur ce site)
-                            </span>
-                        )}
-                    </label>
-                    <MultiEquipeSelector
-                        values={formData.equipes_ids || []}
-                        equipes={filteredEquipes}
-                        onChange={(ids) => setFormData({ ...formData, equipes_ids: ids })}
-                    />
-                    {lockedSite && filteredEquipes.length === 0 && (
-                        <p className="text-xs text-amber-600 mt-1">
-                            Aucune équipe n'est affectée au site "{lockedSite.name}".
-                            Vous pouvez créer la tâche sans équipe ou affecter une équipe à ce site depuis la page Équipes.
+                <PremiumMultiSelect
+                    values={formData.equipes_ids || []}
+                    onChange={(ids) => setFormData({ ...formData, equipes_ids: ids.map(id => Number(id)) })}
+                    options={filteredEquipes.map(e => ({
+                        value: e.id,
+                        label: e.nomEquipe
+                    }))}
+                    label="Équipes"
+                    placeholder="Sélectionner des équipes..."
+                    icon={<Users className="w-4 h-4" />}
+                    variant="outlined"
+                    size="md"
+                    searchPlaceholder="Rechercher une équipe..."
+                    hint={
+                        lockedSite && filteredEquipes.length < equipes.length
+                            ? `${filteredEquipes.length} équipe${filteredEquipes.length > 1 ? 's' : ''} sur le site "${lockedSite.name}"`
+                            : lockedSite && filteredEquipes.length === 0
+                                ? `Aucune équipe affectée au site "${lockedSite.name}"`
+                                : undefined
+                    }
+                    error={lockedSite && filteredEquipes.length === 0 ? "Vous pouvez créer la tâche sans équipe ou affecter une équipe à ce site depuis la page Équipes." : undefined}
+                />
+
+                <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-4">
+                        <PremiumInput
+                            type="datetime-local"
+                            value={formData.date_debut_planifiee}
+                            onChange={(value) => setFormData({ ...formData, date_debut_planifiee: value })}
+                            label="Date début"
+                            icon={<Clock className="w-4 h-4" />}
+                            required
+                            variant="outlined"
+                            size="md"
+                            disabled={!!formData.parametres_recurrence}
+                        />
+                        <PremiumInput
+                            type="datetime-local"
+                            value={formData.date_fin_planifiee}
+                            onChange={(value) => setFormData({ ...formData, date_fin_planifiee: value })}
+                            label="Date fin"
+                            icon={<Clock className="w-4 h-4" />}
+                            required
+                            variant="outlined"
+                            size="md"
+                            disabled={!!formData.parametres_recurrence}
+                        />
+                    </div>
+                    {formData.parametres_recurrence && (
+                        <p className="text-xs text-slate-500 italic flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" />
+                            Les dates sont verrouillées car la récurrence est activée. Désactivez-la pour modifier les dates.
                         </p>
                     )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                            Date début <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                            ref={startDateRef}
-                            required
-                            type="datetime-local"
-                            value={formData.date_debut_planifiee}
-                            onChange={(e) => {
-                                setFormData({ ...formData, date_debut_planifiee: e.target.value });
-                                // Auto-fermeture du picker après sélection
-                                setTimeout(() => {
-                                    startDateRef.current?.blur();
-                                }, 100);
-                            }}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                            Date fin <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                            ref={endDateRef}
-                            required
-                            type="datetime-local"
-                            value={formData.date_fin_planifiee}
-                            onChange={(e) => {
-                                setFormData({ ...formData, date_fin_planifiee: e.target.value });
-                                // Auto-fermeture du picker après sélection
-                                setTimeout(() => {
-                                    endDateRef.current?.blur();
-                                }, 100);
-                            }}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                        />
-                    </div>
-                </div>
+                <PremiumSelect
+                    value={formData.priorite.toString()}
+                    onChange={(value) => setFormData({ ...formData, priorite: Number(value) as PrioriteTache })}
+                    options={Object.entries(PRIORITE_LABELS).map(([value, label]) => ({
+                        value: value,
+                        label: label
+                    }))}
+                    label="Priorité"
+                    icon={<Gauge className="w-4 h-4" />}
+                    variant="outlined"
+                    size="md"
+                />
 
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Priorité
-                    </label>
-                    <select
-                        value={formData.priorite}
-                        onChange={(e) => setFormData({ ...formData, priorite: Number(e.target.value) as PrioriteTache })}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                    >
-                        {Object.entries(PRIORITE_LABELS).map(([value, label]) => (
-                            <option key={value} value={value}>
-                                {label}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Commentaires
-                    </label>
-                    <textarea
-                        value={formData.commentaires}
-                        onChange={(e) => setFormData({ ...formData, commentaires: e.target.value })}
-                        rows={3}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                        placeholder="Détails de la tâche..."
-                    />
-                </div>
+                <PremiumTextarea
+                    value={formData.commentaires}
+                    onChange={(value) => setFormData({ ...formData, commentaires: value })}
+                    label="Commentaires"
+                    placeholder="Détails de la tâche..."
+                    rows={3}
+                    variant="outlined"
+                    size="md"
+                />
 
                 {/* Charge estimée (uniquement en mode édition) */}
                 {tache && (
@@ -932,21 +946,21 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                             )}
                         </div>
                         <div className="flex items-center gap-3">
-                            <div className="relative flex-1">
-                                <input
+                            <div className="flex-1">
+                                <PremiumInput
                                     type="number"
-                                    step="0.5"
-                                    min="0"
-                                    value={formData.charge_estimee_heures ?? ''}
-                                    onChange={(e) => {
-                                        const val = e.target.value ? parseFloat(e.target.value) : null;
+                                    value={formData.charge_estimee_heures?.toString() ?? ''}
+                                    onChange={(value) => {
+                                        const val = value ? parseFloat(value) : null;
                                         setFormData({ ...formData, charge_estimee_heures: val });
                                         if (val !== null) setChargeManuelle(true);
                                     }}
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none pr-16"
                                     placeholder="Auto"
+                                    icon={<Timer className="w-4 h-4" />}
+                                    hint="heures"
+                                    variant="outlined"
+                                    size="md"
                                 />
-                                <span className="absolute right-3 top-2.5 text-sm text-slate-400">heures</span>
                             </div>
                             {!chargeManuelle && tache.charge_estimee_heures !== null && (
                                 <span className="text-sm text-slate-500 whitespace-nowrap">
@@ -1022,6 +1036,11 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                     className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-xs px-2 py-1 rounded-full border border-emerald-200"
                                 >
                                     <span className="font-medium">{obj.nom}</span>
+                                    {obj.superficie && (
+                                        <span className="text-emerald-600 font-semibold">
+                                            • {obj.superficie.toFixed(0)}m²
+                                        </span>
+                                    )}
                                     <span className="text-emerald-500">#{obj.id}</span>
                                     <button
                                         type="button"
@@ -1143,6 +1162,11 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                             <div key={idx} className="flex items-center justify-between text-xs">
                                                 <span className="text-blue-700">
                                                     {detail.count}x {detail.type}
+                                                    {detail.superficie && (
+                                                        <span className="font-semibold text-blue-800">
+                                                            {' '}({detail.superficie.toFixed(0)}m²)
+                                                        </span>
+                                                    )}
                                                 </span>
                                                 {detail.ratio ? (
                                                     <span className="text-blue-600">
@@ -1186,36 +1210,110 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                     </div>
                 )}
 
-                {/* Smart Alert: Suggest recurrence for large workloads */}
-                {chargePreview && chargePreview.totalHeures > 10 && !formData.parametres_recurrence && (
-                    <div className="border-t pt-4">
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-                            <RefreshCw className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                {/* ✅ PHASE 1: Options de planification intelligente */}
+                {selectedObjects.length > 0 && chargePreview && (
+                    <div className="border-t pt-4 space-y-3">
+                        <label className="block text-sm font-semibold text-slate-800 mb-2">
+                            Options de planification
+                        </label>
+
+                        {/* Calculer charge automatiquement */}
+                        <label className="flex items-start gap-3 cursor-pointer group">
+                            <input
+                                type="checkbox"
+                                checked={calculerChargeAuto}
+                                onChange={(e) => setCalculerChargeAuto(e.target.checked)}
+                                className="mt-1 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                            />
                             <div className="flex-1">
-                                <h4 className="text-sm font-semibold text-blue-900">
-                                    Charge importante détectée ({chargePreview.totalHeures.toFixed(1)}h)
-                                </h4>
-                                <p className="text-sm text-blue-700 mt-1">
-                                    Cette tâche dépasse une journée de travail (10h max selon la loi marocaine). Pour respecter la règle d'or (1 tâche = 1 jour),
-                                    activez la récurrence quotidienne ci-dessous.
+                                <div className="text-sm font-medium text-slate-800 group-hover:text-emerald-700 transition-colors">
+                                    ✅ Calculer la charge automatiquement
+                                </div>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    La charge est calculée en fonction des superficies et ratios de productivité configurés
+                                    {chargePreview.totalHeures > 0 && (
+                                        <span className="font-semibold text-emerald-700"> ({chargePreview.totalHeures}h estimées)</span>
+                                    )}
                                 </p>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        const days = Math.ceil(chargePreview.totalHeures / 10);
-                                        setFormData({
-                                            ...formData,
-                                            parametres_recurrence: {
-                                                frequence: 'daily',
-                                                interval: 1,
-                                                nombre_occurrences: days,
-                                            }
-                                        });
-                                    }}
-                                    className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                                >
-                                    Activer récurrence ({Math.ceil(chargePreview.totalHeures / 10)} jours)
-                                </button>
+                            </div>
+                        </label>
+
+                        {/* Répartir sur plusieurs jours */}
+                        <label className="flex items-start gap-3 cursor-pointer group">
+                            <input
+                                type="checkbox"
+                                checked={repartirMultiJours}
+                                onChange={(e) => {
+                                    const isChecked = e.target.checked;
+                                    setRepartirMultiJours(isChecked);
+
+                                    // Si décoché et récurrence active, la désactiver
+                                    if (!isChecked && formData.parametres_recurrence) {
+                                        setFormData({ ...formData, parametres_recurrence: null });
+                                        setAutoRecurrenceActivated(false);
+                                        console.log('🚫 Répartition multi-jours désactivée - récurrence supprimée');
+                                    }
+                                }}
+                                className="mt-1 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                            />
+                            <div className="flex-1">
+                                <div className="text-sm font-medium text-slate-800 group-hover:text-emerald-700 transition-colors">
+                                    📅 Répartir sur plusieurs jours
+                                </div>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    Si la charge dépasse 10h, la tâche sera automatiquement divisée en plusieurs jours consécutifs
+                                    {chargePreview.totalHeures > 10 && (
+                                        <span className="font-semibold text-blue-700"> (recommandé: ~{Math.ceil(chargePreview.totalHeures / 8)} jours)</span>
+                                    )}
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+                )}
+
+
+                {/* ✅ Auto-Recurrence Banner */}
+                {autoRecurrenceActivated && formData.parametres_recurrence && (
+                    <div className="border-t pt-4">
+                        <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-300 rounded-xl p-4 shadow-sm">
+                            <div className="flex items-start gap-3">
+                                <div className="bg-blue-500 rounded-full p-2 flex-shrink-0">
+                                    <RefreshCw className="w-5 h-5 text-white" />
+                                </div>
+                                <div className="flex-1">
+                                    <h4 className="text-sm font-bold text-blue-900 mb-1">
+                                        🔄 Récurrence activée automatiquement
+                                    </h4>
+                                    <p className="text-sm text-blue-700 mb-2">
+                                        {chargePreview?.totalHeures ? (
+                                            <>
+                                                Charge totale : <strong>{chargePreview.totalHeures}h</strong> répartie sur <strong>{formData.parametres_recurrence.nombre_occurrences} jours</strong>
+                                                {' '}(≈ <strong>{(chargePreview.totalHeures / formData.parametres_recurrence.nombre_occurrences).toFixed(1)}h/jour</strong>)
+                                            </>
+                                        ) : (
+                                            <>
+                                                La tâche s'étend sur plusieurs jours. Elle sera créée <strong>{formData.parametres_recurrence.nombre_occurrences} fois</strong>
+                                            </>
+                                        )}
+                                        {' '}(du {formData.date_debut_planifiee ? format(new Date(formData.date_debut_planifiee), 'dd/MM/yyyy') : '—'} au {formData.parametres_recurrence.date_fin ? format(new Date(formData.parametres_recurrence.date_fin), 'dd/MM/yyyy') : '—'}).
+                                    </p>
+                                    <p className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded inline-block mb-2">
+                                        💡 La charge sera automatiquement répartie sur chaque jour
+                                    </p>
+                                    <div className="flex gap-2 mt-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setFormData({ ...formData, parametres_recurrence: null });
+                                                setAutoRecurrenceActivated(false);
+                                            }}
+                                            className="text-xs bg-white hover:bg-blue-50 text-blue-700 border border-blue-300 px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1"
+                                        >
+                                            <X className="w-3 h-3" />
+                                            Désactiver la récurrence
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1223,9 +1321,16 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
 
                 {/* Récurrence (Google Calendar style) */}
                 <div className="border-t pt-4">
+                    <label className="block text-sm font-semibold text-slate-800 mb-3">Récurrence</label>
                     <RecurrenceSelector
                         value={formData.parametres_recurrence as RecurrenceParams | null}
-                        onChange={(params) => setFormData({ ...formData, parametres_recurrence: params })}
+                        onChange={(params) => {
+                            setFormData({ ...formData, parametres_recurrence: params });
+                            // ✅ Reset auto-activated flag when user manually changes recurrence
+                            if (params === null) {
+                                setAutoRecurrenceActivated(false);
+                            }
+                        }}
                         startDate={formData.date_debut_planifiee || new Date().toISOString()}
                     />
                 </div>

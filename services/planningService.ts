@@ -36,13 +36,24 @@ export const planningService = {
         if (params.has_reclamation) query.append('has_reclamation', 'true');
         if (params.objet_id) query.append('objet_id', params.objet_id.toString());
 
-        const url = `${BASE_URL}/taches/?${query.toString()}`;
+        const queryString = query.toString();
+        const url = queryString ? `${BASE_URL}/taches/?${queryString}` : `${BASE_URL}/taches/`;
         const token = localStorage.getItem('token');
         console.log('[planningService] GET taches URL:', url);
         console.log('[planningService] Token present:', !!token, token ? `(${token.substring(0, 20)}...)` : '');
-        const response = await apiFetch(url);
-        if (!response.ok) throw new Error('Erreur lors du chargement des tâches');
-        return response.json();
+
+        try {
+            console.log('[planningService] Calling apiFetch...');
+            const response = await apiFetch(url);
+            console.log('[planningService] apiFetch response:', response.status, response.ok);
+            if (!response.ok) throw new Error('Erreur lors du chargement des tâches');
+            const data = await response.json();
+            console.log('[planningService] Taches loaded:', data.results?.length || 0);
+            return data;
+        } catch (error) {
+            console.error('[planningService] ERROR in getTaches:', error);
+            throw error;
+        }
     },
 
     async getTache(id: number): Promise<Tache> {
@@ -302,5 +313,45 @@ export const planningService = {
             method: 'DELETE'
         });
         if (!response.ok) throw new Error('Erreur suppression ratio');
+    },
+
+    // --- CALCUL RECURRENCE INTELLIGENTE (PHASE 2.2) ---
+
+    /**
+     * ✅ PHASE 2.2: Calcule le nombre d'occurrences recommandé basé sur les horaires réels de l'équipe.
+     *
+     * @param params - Paramètres du calcul (equipe_id, charge_totale_heures, date_debut, frequence)
+     * @returns Recommandation de récurrence avec détails des horaires
+     */
+    async calculateRecurrenceRecommendee(params: {
+        equipe_id: number;
+        charge_totale_heures: number;
+        date_debut: string;
+        frequence?: 'daily' | 'weekly' | 'monthly';
+    }): Promise<{
+        nombre_occurrences: number;
+        heures_par_jour_moyen: number;
+        charge_totale_heures: number;
+        charge_par_occurrence: number;
+        detail_horaires: Array<{
+            date: string;
+            jour: string;
+            heures_travaillables: number;
+        }>;
+        frequence: string;
+        message: string;
+    }> {
+        const response = await apiFetch(`${BASE_URL}/taches/calculer_recurrence_recommandee/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erreur lors du calcul de la récurrence');
+        }
+
+        return response.json();
     }
 };

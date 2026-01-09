@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
-import { Edit2 } from 'lucide-react';
+import {
+    Edit2, Tag, Activity, TreeDeciduous, Ruler, Maximize2,
+    ArrowDown, Circle, Zap, Droplets, Gauge as GaugeIcon,
+    Package, Calendar, FileText
+} from 'lucide-react';
 import { updateInventoryItem, ApiError } from '../services/api';
 import { FormModal } from './FormModal';
+import { PremiumInput, PremiumSelect, PremiumTextarea } from './modals/PremiumFormComponents';
 
 interface EditObjectModalProps {
     isOpen: boolean;
@@ -66,12 +71,15 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
         if (['arbre', 'palmier', 'gazon', 'arbuste', 'vivace', 'cactus', 'graminee', 'puit', 'pompe'].includes(type)) {
             fields.push(
                 <div key="nom" className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
-                    <input
+                    <PremiumInput
                         type="text"
                         value={getValue('nom')}
-                        onChange={(e) => handleChange('nom', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
+                        onChange={(value) => handleChange('nom', value)}
+                        label="Nom"
+                        placeholder="Nom de l'objet..."
+                        icon={<Tag className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
                     />
                 </div>
             );
@@ -80,12 +88,15 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
         if (['vanne', 'clapet', 'canalisation', 'aspersion', 'ballon'].includes(type)) {
             fields.push(
                 <div key="marque" className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Marque</label>
-                    <input
+                    <PremiumInput
                         type="text"
                         value={getValue('marque')}
-                        onChange={(e) => handleChange('marque', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
+                        onChange={(value) => handleChange('marque', value)}
+                        label="Marque"
+                        placeholder="Marque de l'équipement..."
+                        icon={<Tag className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
                     />
                 </div>
             );
@@ -94,17 +105,20 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
         // État (all types)
         fields.push(
             <div key="etat">
-                <label className="block text-sm font-medium text-gray-700 mb-1">État</label>
-                <select
+                <PremiumSelect
                     value={getValue('etat')}
-                    onChange={(e) => handleChange('etat', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
-                >
-                    <option value="bon">Bon</option>
-                    <option value="moyen">Moyen</option>
-                    <option value="mauvais">Mauvais</option>
-                    <option value="critique">Critique</option>
-                </select>
+                    onChange={(value) => handleChange('etat', value)}
+                    label="État"
+                    options={[
+                        { value: 'bon', label: 'Bon' },
+                        { value: 'moyen', label: 'Moyen' },
+                        { value: 'mauvais', label: 'Mauvais' },
+                        { value: 'critique', label: 'Critique' }
+                    ]}
+                    icon={<Activity className="w-4 h-4" />}
+                    variant="outlined"
+                    size="md"
+                />
             </div>
         );
 
@@ -112,12 +126,15 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
         if (['arbre', 'palmier', 'gazon', 'arbuste', 'vivace', 'cactus', 'graminee'].includes(type)) {
             fields.push(
                 <div key="famille">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Famille</label>
-                    <input
+                    <PremiumInput
                         type="text"
                         value={getValue('famille')}
-                        onChange={(e) => handleChange('famille', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
+                        onChange={(value) => handleChange('famille', value)}
+                        label="Famille"
+                        placeholder="Famille botanique..."
+                        icon={<TreeDeciduous className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
                     />
                 </div>
             );
@@ -126,17 +143,20 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
         if (['arbre', 'palmier'].includes(type)) {
             fields.push(
                 <div key="taille">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Taille</label>
-                    <select
+                    <PremiumSelect
                         value={getValue('taille')}
-                        onChange={(e) => handleChange('taille', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
-                    >
-                        <option value="">-</option>
-                        <option value="Petit">Petit</option>
-                        <option value="Moyen">Moyen</option>
-                        <option value="Grand">Grand</option>
-                    </select>
+                        onChange={(value) => handleChange('taille', value)}
+                        label="Taille"
+                        options={[
+                            { value: '', label: '-' },
+                            { value: 'Petit', label: 'Petit' },
+                            { value: 'Moyen', label: 'Moyen' },
+                            { value: 'Grand', label: 'Grand' }
+                        ]}
+                        icon={<Ruler className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
+                    />
                 </div>
             );
         }
@@ -144,13 +164,15 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
         if (type === 'gazon') {
             fields.push(
                 <div key="area_sqm">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Surface (m²)</label>
-                    <input
+                    <PremiumInput
                         type="number"
-                        step="0.01"
                         value={getValue('area_sqm')}
-                        onChange={(e) => handleChange('area_sqm', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
+                        onChange={(value) => handleChange('area_sqm', parseFloat(value) || 0)}
+                        label="Surface (m²)"
+                        placeholder="Surface en m²..."
+                        icon={<Maximize2 className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
                     />
                 </div>
             );
@@ -159,13 +181,15 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
         if (['arbuste', 'vivace', 'cactus', 'graminee'].includes(type)) {
             fields.push(
                 <div key="densite">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Densité</label>
-                    <input
+                    <PremiumInput
                         type="number"
-                        step="0.01"
                         value={getValue('densite')}
-                        onChange={(e) => handleChange('densite', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
+                        onChange={(value) => handleChange('densite', parseFloat(value) || 0)}
+                        label="Densité"
+                        placeholder="Densité..."
+                        icon={<Maximize2 className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
                     />
                 </div>
             );
@@ -175,43 +199,51 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
         if (type === 'puit') {
             fields.push(
                 <div key="profondeur">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Profondeur (m)</label>
-                    <input
+                    <PremiumInput
                         type="number"
-                        step="0.01"
                         value={getValue('profondeur')}
-                        onChange={(e) => handleChange('profondeur', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
+                        onChange={(value) => handleChange('profondeur', parseFloat(value) || 0)}
+                        label="Profondeur (m)"
+                        placeholder="Profondeur en mètres..."
+                        icon={<ArrowDown className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
                     />
                 </div>,
                 <div key="diametre_puit">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Diamètre (mm)</label>
-                    <input
+                    <PremiumInput
                         type="number"
-                        step="0.01"
                         value={getValue('diametre')}
-                        onChange={(e) => handleChange('diametre', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
+                        onChange={(value) => handleChange('diametre', parseFloat(value) || 0)}
+                        label="Diamètre (mm)"
+                        placeholder="Diamètre en mm..."
+                        icon={<Circle className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
                     />
                 </div>,
                 <div key="niveau_statique">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Niveau statique (m)</label>
-                    <input
+                    <PremiumInput
                         type="number"
-                        step="0.01"
                         value={getValue('niveau_statique')}
-                        onChange={(e) => handleChange('niveau_statique', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
+                        onChange={(value) => handleChange('niveau_statique', parseFloat(value) || 0)}
+                        label="Niveau statique (m)"
+                        placeholder="Niveau statique..."
+                        icon={<ArrowDown className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
                     />
                 </div>,
                 <div key="niveau_dynamique">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Niveau dynamique (m)</label>
-                    <input
+                    <PremiumInput
                         type="number"
-                        step="0.01"
                         value={getValue('niveau_dynamique')}
-                        onChange={(e) => handleChange('niveau_dynamique', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
+                        onChange={(value) => handleChange('niveau_dynamique', parseFloat(value) || 0)}
+                        label="Niveau dynamique (m)"
+                        placeholder="Niveau dynamique..."
+                        icon={<ArrowDown className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
                     />
                 </div>
             );
@@ -220,42 +252,51 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
         if (type === 'pompe') {
             fields.push(
                 <div key="type_pompe">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                    <input
+                    <PremiumInput
                         type="text"
                         value={getValue('type')}
-                        onChange={(e) => handleChange('type', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
+                        onChange={(value) => handleChange('type', value)}
+                        label="Type"
+                        placeholder="Type de pompe..."
+                        icon={<Tag className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
                     />
                 </div>,
                 <div key="diametre_pompe">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Diamètre (mm)</label>
-                    <input
+                    <PremiumInput
                         type="number"
-                        step="0.01"
                         value={getValue('diametre')}
-                        onChange={(e) => handleChange('diametre', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
+                        onChange={(value) => handleChange('diametre', parseFloat(value) || 0)}
+                        label="Diamètre (mm)"
+                        placeholder="Diamètre en mm..."
+                        icon={<Circle className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
                     />
                 </div>,
                 <div key="puissance">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Puissance (kW)</label>
-                    <input
+                    <PremiumInput
                         type="number"
-                        step="0.01"
                         value={getValue('puissance')}
-                        onChange={(e) => handleChange('puissance', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
+                        onChange={(value) => handleChange('puissance', parseFloat(value) || 0)}
+                        label="Puissance (kW)"
+                        placeholder="Puissance en kW..."
+                        icon={<Zap className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
                     />
                 </div>,
                 <div key="debit">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Débit (L/h)</label>
-                    <input
+                    <PremiumInput
                         type="number"
-                        step="0.01"
                         value={getValue('debit')}
-                        onChange={(e) => handleChange('debit', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
+                        onChange={(value) => handleChange('debit', parseFloat(value) || 0)}
+                        label="Débit (L/h)"
+                        placeholder="Débit en L/h..."
+                        icon={<Droplets className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
                     />
                 </div>
             );
@@ -264,41 +305,51 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
         if (['vanne', 'clapet', 'canalisation', 'aspersion', 'goutte'].includes(type)) {
             fields.push(
                 <div key={`type_${type}`}>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                    <input
+                    <PremiumInput
                         type="text"
                         value={getValue('type')}
-                        onChange={(e) => handleChange('type', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
+                        onChange={(value) => handleChange('type', value)}
+                        label="Type"
+                        placeholder="Type d'équipement..."
+                        icon={<Tag className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
                     />
                 </div>,
                 <div key={`diametre_${type}`}>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Diamètre (mm)</label>
-                    <input
+                    <PremiumInput
                         type="number"
-                        step="0.01"
                         value={getValue('diametre')}
-                        onChange={(e) => handleChange('diametre', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
+                        onChange={(value) => handleChange('diametre', parseFloat(value) || 0)}
+                        label="Diamètre (mm)"
+                        placeholder="Diamètre en mm..."
+                        icon={<Circle className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
                     />
                 </div>,
                 <div key="materiau">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Matériau</label>
-                    <input
+                    <PremiumInput
                         type="text"
                         value={getValue('materiau')}
-                        onChange={(e) => handleChange('materiau', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
+                        onChange={(value) => handleChange('materiau', value)}
+                        label="Matériau"
+                        placeholder="Matériau..."
+                        icon={<Package className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
                     />
                 </div>,
                 <div key="pression">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Pression (bar)</label>
-                    <input
+                    <PremiumInput
                         type="number"
-                        step="0.01"
                         value={getValue('pression')}
-                        onChange={(e) => handleChange('pression', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
+                        onChange={(value) => handleChange('pression', parseFloat(value) || 0)}
+                        label="Pression (bar)"
+                        placeholder="Pression en bar..."
+                        icon={<GaugeIcon className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
                     />
                 </div>
             );
@@ -307,13 +358,15 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
         if (type === 'ballon') {
             fields.push(
                 <div key="volume">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Volume (L)</label>
-                    <input
+                    <PremiumInput
                         type="number"
-                        step="0.01"
                         value={getValue('volume')}
-                        onChange={(e) => handleChange('volume', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
+                        onChange={(value) => handleChange('volume', parseFloat(value) || 0)}
+                        label="Volume (L)"
+                        placeholder="Volume en litres..."
+                        icon={<Package className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
                     />
                 </div>
             );
@@ -323,12 +376,14 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
         if (!['vanne', 'clapet', 'canalisation', 'aspersion', 'goutte', 'ballon'].includes(type)) {
             fields.push(
                 <div key="last_intervention_date">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Dernière intervention</label>
-                    <input
+                    <PremiumInput
                         type="date"
                         value={getValue('last_intervention_date')}
-                        onChange={(e) => handleChange('last_intervention_date', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors"
+                        onChange={(value) => handleChange('last_intervention_date', value)}
+                        label="Dernière intervention"
+                        icon={<Calendar className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
                     />
                 </div>
             );
@@ -337,12 +392,15 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
         // Observation (all types)
         fields.push(
             <div key="observation" className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Observation</label>
-                <textarea
+                <PremiumTextarea
                     value={getValue('observation')}
-                    onChange={(e) => handleChange('observation', e.target.value)}
+                    onChange={(value) => handleChange('observation', value)}
+                    label="Observation"
+                    placeholder="Observations et notes..."
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors resize-none"
+                    icon={<FileText className="w-4 h-4" />}
+                    variant="outlined"
+                    size="md"
                 />
             </div>
         );

@@ -11,8 +11,10 @@ import {
   Phone,
   MapPin,
   User,
-  CreditCard
+  CreditCard,
+  Hash
 } from 'lucide-react';
+import { PremiumInput } from '../modals/PremiumFormComponents';
 import {
   Role,
   NomRole,
@@ -147,82 +149,66 @@ export const CreateAdminModal: React.FC<CreateModalProps> = ({ onClose, onCreate
             )}
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Prénom <span className="text-red-500">*</span>
-                </label>
-                <input
-                  required
-                  type="text"
-                  value={formData.prenom}
-                  onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nom <span className="text-red-500">*</span>
-                </label>
-                <input
-                  required
-                  type="text"
-                  value={formData.nom}
-                  onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                />
-              </div>
+              <PremiumInput
+                type="text"
+                value={formData.prenom}
+                onChange={(value) => setFormData({ ...formData, prenom: value })}
+                label="Prénom"
+                placeholder="Jean"
+                icon={<User className="w-4 h-4" />}
+                required
+                variant="outlined"
+                size="md"
+              />
+
+              <PremiumInput
+                type="text"
+                value={formData.nom}
+                onChange={(value) => setFormData({ ...formData, nom: value })}
+                label="Nom"
+                placeholder="Dupont"
+                icon={<User className="w-4 h-4" />}
+                required
+                variant="outlined"
+                size="md"
+              />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  required
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                />
-              </div>
-            </div>
+            <PremiumInput
+              type="email"
+              value={formData.email}
+              onChange={(value) => setFormData({ ...formData, email: value })}
+              label="Email"
+              placeholder="admin@exemple.com"
+              icon={<Mail className="w-4 h-4" />}
+              required
+              variant="outlined"
+              size="md"
+            />
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Mot de passe <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    required
-                    type={showPassword ? 'text' : 'password'}
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Confirmer <span className="text-red-500">*</span>
-                </label>
-                <input
-                  required
-                  type={showPassword ? 'text' : 'password'}
-                  value={formData.passwordConfirm}
-                  onChange={(e) => setFormData({ ...formData, passwordConfirm: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                />
-              </div>
+              <PremiumInput
+                type="password"
+                value={formData.password}
+                onChange={(value) => setFormData({ ...formData, password: value })}
+                label="Mot de passe"
+                placeholder="Minimum 8 caractères"
+                required
+                variant="outlined"
+                size="md"
+                hint="Au moins 8 caractères"
+              />
+
+              <PremiumInput
+                type="password"
+                value={formData.passwordConfirm}
+                onChange={(value) => setFormData({ ...formData, passwordConfirm: value })}
+                label="Confirmer"
+                placeholder="Retapez le mot de passe"
+                required
+                variant="outlined"
+                size="md"
+              />
             </div>
           </div>
 
@@ -416,82 +402,68 @@ export const CreateClientModal: React.FC<CreateModalProps> = ({ onClose, onCreat
                 Informations personnelles
               </h3>
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Prénom <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    required
-                    type="text"
-                    value={formData.prenom}
-                    onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nom <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    required
-                    type="text"
-                    value={formData.nom}
-                    onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                  />
-                </div>
+                <PremiumInput
+                  type="text"
+                  value={formData.prenom}
+                  onChange={(value) => setFormData({ ...formData, prenom: value })}
+                  label="Prénom"
+                  placeholder="Jean"
+                  icon={<User className="w-4 h-4" />}
+                  required
+                  variant="outlined"
+                  size="md"
+                />
+
+                <PremiumInput
+                  type="text"
+                  value={formData.nom}
+                  onChange={(value) => setFormData({ ...formData, nom: value })}
+                  label="Nom"
+                  placeholder="Dupont"
+                  icon={<User className="w-4 h-4" />}
+                  required
+                  variant="outlined"
+                  size="md"
+                />
               </div>
 
               <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    required
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                  />
-                </div>
+                <PremiumInput
+                  type="email"
+                  value={formData.email}
+                  onChange={(value) => setFormData({ ...formData, email: value })}
+                  label="Email"
+                  placeholder="client@exemple.com"
+                  icon={<Mail className="w-4 h-4" />}
+                  required
+                  variant="outlined"
+                  size="md"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4 mt-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Mot de passe <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      required
-                      type={showPassword ? 'text' : 'password'}
-                      value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Confirmer <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    required
-                    type={showPassword ? 'text' : 'password'}
-                    value={formData.passwordConfirm}
-                    onChange={(e) => setFormData({ ...formData, passwordConfirm: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                  />
-                </div>
+                <PremiumInput
+                  type="password"
+                  value={formData.password}
+                  onChange={(value) => setFormData({ ...formData, password: value })}
+                  label="Mot de passe"
+                  placeholder="Minimum 8 caractères"
+                  required
+                  variant="outlined"
+                  size="md"
+                  hint="Au moins 8 caractères"
+                />
+
+                <PremiumInput
+                  type="password"
+                  value={formData.passwordConfirm}
+                  onChange={(value) => setFormData({ ...formData, passwordConfirm: value })}
+                  label="Confirmer"
+                  placeholder="Retapez le mot de passe"
+                  required
+                  variant="outlined"
+                  size="md"
+                />
               </div>
             </div>
 
@@ -593,72 +565,63 @@ export const CreateClientModal: React.FC<CreateModalProps> = ({ onClose, onCreat
               ) : (
                 /* Formulaire nouvelle structure */
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nom de l'organisation <span className="text-red-500">*</span>
-                    </label>
-                    <input
+                  <PremiumInput
+                    type="text"
+                    value={formData.nomStructure}
+                    onChange={(value) => setFormData({ ...formData, nomStructure: value })}
+                    label="Nom de l'organisation"
+                    placeholder="Ex: Résidence Les Jardins"
+                    icon={<Building2 className="w-4 h-4" />}
+                    required
+                    variant="outlined"
+                    size="md"
+                  />
+
+                  <PremiumInput
+                    type="text"
+                    value={formData.adresse}
+                    onChange={(value) => setFormData({ ...formData, adresse: value })}
+                    label="Adresse"
+                    placeholder="Adresse complète"
+                    icon={<MapPin className="w-4 h-4" />}
+                    variant="outlined"
+                    size="md"
+                  />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <PremiumInput
+                      type="tel"
+                      value={formData.telephone}
+                      onChange={(value) => setFormData({ ...formData, telephone: value })}
+                      label="Téléphone"
+                      placeholder="06 XX XX XX XX"
+                      icon={<Phone className="w-4 h-4" />}
+                      variant="outlined"
+                      size="md"
+                    />
+
+                    <PremiumInput
                       type="text"
-                      value={formData.nomStructure}
-                      onChange={(e) => setFormData({ ...formData, nomStructure: e.target.value })}
-                      placeholder="Ex: Résidence Les Jardins"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+                      value={formData.contactPrincipal}
+                      onChange={(value) => setFormData({ ...formData, contactPrincipal: value })}
+                      label="Contact principal"
+                      placeholder="Nom du contact"
+                      icon={<User className="w-4 h-4" />}
+                      variant="outlined"
+                      size="md"
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Adresse</label>
-                    <div className="relative">
-                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="text"
-                        value={formData.adresse}
-                        onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
-                        placeholder="Adresse complète"
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
-                      <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input
-                          type="tel"
-                          value={formData.telephone}
-                          onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
-                          placeholder="06 XX XX XX XX"
-                          className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Contact principal</label>
-                      <input
-                        type="text"
-                        value={formData.contactPrincipal}
-                        onChange={(e) => setFormData({ ...formData, contactPrincipal: e.target.value })}
-                        placeholder="Nom du contact"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Email de facturation</label>
-                    <div className="relative">
-                      <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="email"
-                        value={formData.emailFacturation}
-                        onChange={(e) => setFormData({ ...formData, emailFacturation: e.target.value })}
-                        placeholder="facturation@exemple.com"
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                      />
-                    </div>
-                  </div>
+                  <PremiumInput
+                    type="email"
+                    value={formData.emailFacturation}
+                    onChange={(value) => setFormData({ ...formData, emailFacturation: value })}
+                    label="Email de facturation"
+                    placeholder="facturation@exemple.com"
+                    icon={<CreditCard className="w-4 h-4" />}
+                    variant="outlined"
+                    size="md"
+                  />
                 </div>
               )}
             </div>
@@ -798,111 +761,91 @@ export const CreateChefEquipeModal: React.FC<CreateModalProps> = ({ onClose, onC
             )}
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Prénom <span className="text-red-500">*</span>
-                </label>
-                <input
-                  required
-                  type="text"
-                  value={formData.prenom}
-                  onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nom <span className="text-red-500">*</span>
-                </label>
-                <input
-                  required
-                  type="text"
-                  value={formData.nom}
-                  onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
-                />
-              </div>
+              <PremiumInput
+                type="text"
+                value={formData.prenom}
+                onChange={(value) => setFormData({ ...formData, prenom: value })}
+                label="Prénom"
+                placeholder="Jean"
+                icon={<User className="w-4 h-4" />}
+                required
+                variant="outlined"
+                size="md"
+              />
+
+              <PremiumInput
+                type="text"
+                value={formData.nom}
+                onChange={(value) => setFormData({ ...formData, nom: value })}
+                label="Nom"
+                placeholder="Dupont"
+                icon={<User className="w-4 h-4" />}
+                required
+                variant="outlined"
+                size="md"
+              />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  required
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
-                />
-              </div>
+            <PremiumInput
+              type="email"
+              value={formData.email}
+              onChange={(value) => setFormData({ ...formData, email: value })}
+              label="Email"
+              placeholder="superviseur@exemple.com"
+              icon={<Mail className="w-4 h-4" />}
+              required
+              variant="outlined"
+              size="md"
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <PremiumInput
+                type="password"
+                value={formData.password}
+                onChange={(value) => setFormData({ ...formData, password: value })}
+                label="Mot de passe"
+                placeholder="Minimum 8 caractères"
+                required
+                variant="outlined"
+                size="md"
+                hint="Au moins 8 caractères"
+              />
+
+              <PremiumInput
+                type="password"
+                value={formData.passwordConfirm}
+                onChange={(value) => setFormData({ ...formData, passwordConfirm: value })}
+                label="Confirmer"
+                placeholder="Retapez le mot de passe"
+                required
+                variant="outlined"
+                size="md"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Mot de passe <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    required
-                    type={showPassword ? 'text' : 'password'}
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Confirmer <span className="text-red-500">*</span>
-                </label>
-                <input
-                  required
-                  type={showPassword ? 'text' : 'password'}
-                  value={formData.passwordConfirm}
-                  onChange={(e) => setFormData({ ...formData, passwordConfirm: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
-                />
-              </div>
-            </div>
+              <PremiumInput
+                type="text"
+                value={formData.matricule}
+                onChange={(value) => setFormData({ ...formData, matricule: value })}
+                label="Matricule"
+                placeholder="Ex: CE-2024-001"
+                icon={<Hash className="w-4 h-4" />}
+                required
+                variant="outlined"
+                size="md"
+              />
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Matricule <span className="text-red-500">*</span>
-                </label>
-                <input
-                  required
-                  type="text"
-                  value={formData.matricule}
-                  onChange={(e) => setFormData({ ...formData, matricule: e.target.value })}
-                  placeholder="Ex: CE-2024-001"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="tel"
-                    value={formData.telephone}
-                    onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
-                    placeholder="06 XX XX XX XX"
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
-                  />
-                </div>
-              </div>
+              <PremiumInput
+                type="tel"
+                value={formData.telephone}
+                onChange={(value) => setFormData({ ...formData, telephone: value })}
+                label="Téléphone"
+                placeholder="06 XX XX XX XX"
+                icon={<Phone className="w-4 h-4" />}
+                variant="outlined"
+                size="md"
+              />
             </div>
           </div>
 

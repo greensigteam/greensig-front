@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Calendar, Hash, Ruler, Building2, Users, Loader2, Power, RefreshCw } from 'lucide-react';
+import { MapPin, Calendar, Hash, Ruler, Building2, Users, Loader2, Power, RefreshCw, UserPlus } from 'lucide-react';
 import { updateSite, UpdateSiteData, SiteFrontend, calculateGeometryMetrics } from '../../services/api';
 import { fetchClients, fetchSuperviseurs } from '../../services/usersApi';
 import { Client, SuperviseurList } from '../../types/users';
 import { useToast } from '../../contexts/ToastContext';
-import FormModal, { FormField, FormInput, FormTextarea, FormSelect, FormSection, FormGrid } from '../FormModal';
+import FormModal, { FormSection, FormGrid } from '../FormModal';
+import { PremiumInput, PremiumSelect, PremiumSearchableSelect, PremiumTextarea } from '../modals/PremiumFormComponents';
+import CreateSuperviseurModal from '../users/CreateSuperviseurModal';
 
 interface SiteEditModalProps {
     site: SiteFrontend;
@@ -25,6 +27,9 @@ export default function SiteEditModal({ site, isOpen, onClose, onSaved }: SiteEd
     // Superviseurs state
     const [superviseurs, setSuperviseurs] = useState<SuperviseurList[]>([]);
     const [isLoadingSuperviseurs, setIsLoadingSuperviseurs] = useState(false);
+
+    // Create superviseur modal state
+    const [showCreateSuperviseurModal, setShowCreateSuperviseurModal] = useState(false);
 
     const [formData, setFormData] = useState<UpdateSiteData>({
         nom_site: '',
@@ -92,6 +97,25 @@ export default function SiteEditModal({ site, isOpen, onClose, onSaved }: SiteEd
 
     const handleChange = (field: keyof UpdateSiteData, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    // Handler pour la création d'un nouveau superviseur
+    const handleSuperviseurCreated = async (newSuperviseur: SuperviseurList) => {
+        // Rafraîchir la liste des superviseurs
+        try {
+            const response = await fetchSuperviseurs();
+            setSuperviseurs(response.results || []);
+
+            // Pré-sélectionner le nouveau superviseur
+            handleChange('superviseur', newSuperviseur.utilisateur);
+
+            showToast(`Superviseur ${newSuperviseur.fullName} créé et sélectionné`, 'success');
+        } catch (error) {
+            console.error('Error refreshing superviseurs:', error);
+            // En cas d'erreur, ajouter manuellement à la liste
+            setSuperviseurs(prev => [...prev, newSuperviseur]);
+            handleChange('superviseur', newSuperviseur.utilisateur);
+        }
     };
 
     // Helper pour formater la date pour l'input (YYYY-MM-DD)
@@ -167,6 +191,7 @@ export default function SiteEditModal({ site, isOpen, onClose, onSaved }: SiteEd
     }));
 
     return (
+        <>
         <FormModal
             isOpen={isOpen}
             onClose={onClose}
@@ -187,67 +212,75 @@ export default function SiteEditModal({ site, isOpen, onClose, onSaved }: SiteEd
                 description="Informations de base du site"
             >
                 <FormGrid columns={2}>
-                    <FormField label="Nom du site" required icon={<Building2 className="w-4 h-4" />}>
-                        <FormInput
-                            type="text"
-                            value={formData.nom_site || ''}
-                            onChange={(value) => handleChange('nom_site', value)}
-                            placeholder="Ex: Parc Central"
-                            disabled={loading}
-                            required
-                        />
-                    </FormField>
+                    <PremiumInput
+                        type="text"
+                        value={formData.nom_site || ''}
+                        onChange={(value) => handleChange('nom_site', value)}
+                        label="Nom du site"
+                        placeholder="Ex: Parc Central"
+                        icon={<Building2 className="w-4 h-4" />}
+                        disabled={loading}
+                        required
+                        variant="outlined"
+                        size="md"
+                    />
 
-                    <FormField label="Code du site" icon={<Hash className="w-4 h-4" />}>
-                        <FormInput
-                            type="text"
-                            value={formData.code_site || ''}
-                            onChange={(value) => handleChange('code_site', value)}
-                            placeholder="Ex: SITE_001"
-                            disabled={loading}
-                        />
-                    </FormField>
+                    <PremiumInput
+                        type="text"
+                        value={formData.code_site || ''}
+                        onChange={(value) => handleChange('code_site', value)}
+                        label="Code du site"
+                        placeholder="Ex: SITE_001"
+                        icon={<Hash className="w-4 h-4" />}
+                        disabled={loading}
+                        variant="outlined"
+                        size="md"
+                    />
                 </FormGrid>
 
-                <FormField label="Adresse" icon={<MapPin className="w-4 h-4" />}>
-                    <FormTextarea
+                <FormGrid columns={1}>
+                    <PremiumTextarea
                         value={formData.adresse || ''}
                         onChange={(value) => handleChange('adresse', value)}
+                        label="Adresse"
                         placeholder="Adresse complète du site"
+                        icon={<MapPin className="w-4 h-4" />}
                         rows={2}
                         disabled={loading}
+                        variant="outlined"
+                        size="md"
                     />
-                </FormField>
+                </FormGrid>
 
-                <FormField
-                    label="Superficie totale"
-                    icon={<Ruler className="w-4 h-4" />}
-                    hint="Surface en mètres carrés"
-                >
-                    <div className="flex gap-2">
+                <FormGrid columns={1}>
+                    <div className="flex items-end gap-2">
                         <div className="flex-1">
-                            <FormInput
+                            <PremiumInput
                                 type="number"
                                 value={formData.superficie_totale || ''}
                                 onChange={(value) => handleChange('superficie_totale', value ? parseFloat(value) : null)}
+                                label="Superficie totale (m²)"
                                 placeholder="0.00"
+                                icon={<Ruler className="w-4 h-4" />}
+                                hint="Surface en mètres carrés"
                                 min={0}
                                 step={0.01}
                                 disabled={loading}
+                                variant="outlined"
+                                size="md"
                             />
                         </div>
                         <button
                             type="button"
                             onClick={handleRecalculateArea}
                             disabled={loading || !site.geometry}
-                            className="px-4 py-2.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-medium border border-slate-200"
+                            className="mb-5 h-[2.875rem] px-3 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center border border-slate-200 hover:shadow-sm"
                             title="Recalculer à partir de la géométrie sur la carte"
                         >
                             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                            Recalculer
                         </button>
                     </div>
-                </FormField>
+                </FormGrid>
             </FormSection>
 
             {/* Section Affectations */}
@@ -256,39 +289,50 @@ export default function SiteEditModal({ site, isOpen, onClose, onSaved }: SiteEd
                 description="Client propriétaire et superviseur responsable"
             >
                 <FormGrid columns={2}>
-                    <FormField label="Client propriétaire" icon={<Users className="w-4 h-4" />}>
-                        {isLoadingClients ? (
-                            <div className="flex items-center gap-2 text-sm text-slate-500 py-3 px-3 bg-slate-50 rounded-lg border border-slate-200">
-                                <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
-                                Chargement des clients...
-                            </div>
-                        ) : (
-                            <FormSelect
-                                value={formData.client?.toString() || ''}
-                                onChange={(value) => handleChange('client', value ? parseInt(value) : undefined)}
-                                options={clientOptions}
-                                placeholder="Sélectionner un client"
-                                disabled={loading}
-                            />
-                        )}
-                    </FormField>
+                    {isLoadingClients ? (
+                        <div className="flex items-center gap-2 text-sm text-slate-500 py-3 px-3 bg-slate-50 rounded-lg border border-slate-200">
+                            <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                            Chargement des clients...
+                        </div>
+                    ) : (
+                        <PremiumSelect
+                            value={formData.client?.toString() || ''}
+                            onChange={(value) => handleChange('client', value ? parseInt(value) : undefined)}
+                            options={clientOptions}
+                            label="Client propriétaire"
+                            placeholder="Sélectionner un client"
+                            icon={<Users className="w-4 h-4" />}
+                            disabled={loading}
+                            variant="outlined"
+                            size="md"
+                        />
+                    )}
 
-                    <FormField label="Superviseur affecté" icon={<Users className="w-4 h-4" />}>
-                        {isLoadingSuperviseurs ? (
-                            <div className="flex items-center gap-2 text-sm text-slate-500 py-3 px-3 bg-slate-50 rounded-lg border border-slate-200">
-                                <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
-                                Chargement des superviseurs...
-                            </div>
-                        ) : (
-                            <FormSelect
-                                value={formData.superviseur?.toString() || ''}
-                                onChange={(value) => handleChange('superviseur', value ? parseInt(value) : undefined)}
-                                options={superviseurOptions}
-                                placeholder="Sélectionner un superviseur"
-                                disabled={loading}
-                            />
-                        )}
-                    </FormField>
+                    {isLoadingSuperviseurs ? (
+                        <div className="flex items-center gap-2 text-sm text-slate-500 py-3 px-3 bg-slate-50 rounded-lg border border-slate-200">
+                            <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                            Chargement des superviseurs...
+                        </div>
+                    ) : (
+                        <PremiumSearchableSelect
+                            value={formData.superviseur?.toString() || ''}
+                            onChange={(value) => handleChange('superviseur', value ? parseInt(value) : undefined)}
+                            options={superviseurOptions}
+                            label="Superviseur affecté"
+                            placeholder="Sélectionner un superviseur"
+                            icon={<Users className="w-4 h-4" />}
+                            disabled={loading}
+                            variant="outlined"
+                            size="md"
+                            searchPlaceholder="Rechercher un superviseur..."
+                            emptyMessage="Aucun superviseur trouvé"
+                            footerAction={{
+                                label: "Créer un nouveau superviseur",
+                                icon: <UserPlus className="w-4 h-4" />,
+                                onClick: () => setShowCreateSuperviseurModal(true)
+                            }}
+                        />
+                    )}
                 </FormGrid>
             </FormSection>
 
@@ -298,23 +342,27 @@ export default function SiteEditModal({ site, isOpen, onClose, onSaved }: SiteEd
                 description="Dates de début et fin du contrat de maintenance"
             >
                 <FormGrid columns={2}>
-                    <FormField label="Date de début" icon={<Calendar className="w-4 h-4" />}>
-                        <FormInput
-                            type="date"
-                            value={formatDateForInput(formData.date_debut_contrat)}
-                            onChange={(value) => handleChange('date_debut_contrat', value || null)}
-                            disabled={loading}
-                        />
-                    </FormField>
+                    <PremiumInput
+                        type="date"
+                        value={formatDateForInput(formData.date_debut_contrat)}
+                        onChange={(value) => handleChange('date_debut_contrat', value || null)}
+                        label="Date de début"
+                        icon={<Calendar className="w-4 h-4" />}
+                        disabled={loading}
+                        variant="outlined"
+                        size="md"
+                    />
 
-                    <FormField label="Date de fin" icon={<Calendar className="w-4 h-4" />}>
-                        <FormInput
-                            type="date"
-                            value={formatDateForInput(formData.date_fin_contrat)}
-                            onChange={(value) => handleChange('date_fin_contrat', value || null)}
-                            disabled={loading}
-                        />
-                    </FormField>
+                    <PremiumInput
+                        type="date"
+                        value={formatDateForInput(formData.date_fin_contrat)}
+                        onChange={(value) => handleChange('date_fin_contrat', value || null)}
+                        label="Date de fin"
+                        icon={<Calendar className="w-4 h-4" />}
+                        disabled={loading}
+                        variant="outlined"
+                        size="md"
+                    />
                 </FormGrid>
             </FormSection>
 
@@ -373,5 +421,13 @@ export default function SiteEditModal({ site, isOpen, onClose, onSaved }: SiteEd
                 </div>
             </FormSection>
         </FormModal>
+
+        {/* Modale de création de superviseur */}
+        <CreateSuperviseurModal
+            isOpen={showCreateSuperviseurModal}
+            onClose={() => setShowCreateSuperviseurModal(false)}
+            onCreated={handleSuperviseurCreated}
+        />
+    </>
     );
 }

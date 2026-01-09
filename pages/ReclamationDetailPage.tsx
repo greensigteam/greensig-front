@@ -11,14 +11,19 @@ import {
     Star,
     Eye,
     X,
-    Info
+    Info,
+    Edit2,
+    Trash2
 } from 'lucide-react';
 import { Reclamation } from '../types/reclamations';
 import {
     fetchReclamationById,
     cloturerReclamation,
     validerCloture,
-    createSatisfaction
+    refuserCloture,
+    rejeterReclamation,
+    createSatisfaction,
+    deleteReclamation
 } from '../services/reclamationsApi';
 import { planningService } from '../services/planningService';
 import { fetchEquipes, fetchCurrentUser } from '../services/usersApi';
@@ -33,6 +38,8 @@ import ConfirmModal from '../components/ConfirmModal';
 import { ReclamationTimeline } from '../components/ReclamationTimeline';
 import OLMap from '../components/OLMap';
 import { RECLAMATION_STATUS_COLORS, MAP_LAYERS } from '../constants';
+import { PremiumTextarea } from '../components/modals/PremiumFormComponents';
+import { useToast } from '../contexts/ToastContext';
 
 /**
  * Calculate the center coordinates from any GeoJSON geometry.
@@ -137,6 +144,7 @@ function getGeometryCenter(geometry: any): { lat: number; lng: number } | null {
 const ReclamationDetailPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const { showToast } = useToast();
 
     // Data state
     const [reclamation, setReclamation] = useState<Reclamation | null>(null);
@@ -158,6 +166,19 @@ const ReclamationDetailPage: React.FC = () => {
 
     // Photo preview
     const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+
+    // Delete confirmation
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+    // Refus de clôture
+    const [showRefuserClotureModal, setShowRefuserClotureModal] = useState(false);
+    const [commentaireRefus, setCommentaireRefus] = useState('');
+    const [isSubmittingRefus, setIsSubmittingRefus] = useState(false);
+
+    // Rejet de réclamation
+    const [showRejeterModal, setShowRejeterModal] = useState(false);
+    const [justificationRejet, setJustificationRejet] = useState('');
+    const [isSubmittingRejet, setIsSubmittingRejet] = useState(false);
 
     // Modal de confirmation/notification
     const [modalConfig, setModalConfig] = useState<{
@@ -257,13 +278,8 @@ const ReclamationDetailPage: React.FC = () => {
             setTaskInitialValues({});
             setTaskSiteFilter(undefined);
 
-            setModalConfig({
-                isOpen: true,
-                title: 'Succès',
-                message: `Une tâche a été créée pour la réclamation ${reclamation.numero_reclamation}.`,
-                variant: 'success',
-                onConfirm: () => setModalConfig(p => ({ ...p, isOpen: false }))
-            });
+            // Notification toast
+            showToast(`Une tâche a été créée pour la réclamation ${reclamation.numero_reclamation}.`, 'success');
 
             // Recharger les données
             loadData();
@@ -303,12 +319,8 @@ const ReclamationDetailPage: React.FC = () => {
             const updatedRec = await cloturerReclamation(reclamation.id);
             setReclamation(updatedRec);
 
-            setModalConfig({
-                isOpen: true,
-                title: 'Succès',
-                message: 'Clôture proposée avec succès. En attente de validation par le créateur.',
-                variant: 'success'
-            });
+            // Notification toast
+            showToast('Clôture proposée avec succès. En attente de validation par le créateur.', 'success');
         } catch (error: any) {
             console.error(error);
             setModalConfig({
@@ -330,12 +342,8 @@ const ReclamationDetailPage: React.FC = () => {
 
             window.dispatchEvent(new Event('refresh-reclamations'));
 
-            setModalConfig({
-                isOpen: true,
-                title: 'Succès',
-                message: 'Clôture validée avec succès. La réclamation est définitivement clôturée.',
-                variant: 'success'
-            });
+            // Notification toast
+            showToast('Clôture validée avec succès. La réclamation est définitivement clôturée.', 'success');
         } catch (error: any) {
             console.error(error);
             setModalConfig({
@@ -344,6 +352,88 @@ const ReclamationDetailPage: React.FC = () => {
                 message: error.message || 'Erreur lors de la validation de la clôture.',
                 variant: 'danger'
             });
+        }
+    };
+
+    // Refus de clôture par le créateur
+    const handleRefuserCloture = async () => {
+        if (!reclamation) return;
+
+        // Validation du commentaire
+        if (!commentaireRefus.trim()) {
+            setModalConfig({
+                isOpen: true,
+                title: 'Commentaire requis',
+                message: 'Vous devez obligatoirement expliquer pourquoi vous refusez la clôture.',
+                variant: 'warning'
+            });
+            return;
+        }
+
+        setIsSubmittingRefus(true);
+        try {
+            const updatedRec = await refuserCloture(reclamation.id, commentaireRefus.trim());
+            setReclamation(updatedRec);
+
+            // Fermer le modal et réinitialiser
+            setShowRefuserClotureModal(false);
+            setCommentaireRefus('');
+
+            window.dispatchEvent(new Event('refresh-reclamations'));
+
+            // Notification toast
+            showToast('Votre refus a bien été enregistré. La réclamation retourne au statut "Résolue".', 'info');
+        } catch (error: any) {
+            console.error(error);
+            setModalConfig({
+                isOpen: true,
+                title: 'Erreur',
+                message: error.message || 'Erreur lors du refus de la clôture.',
+                variant: 'danger'
+            });
+        } finally {
+            setIsSubmittingRefus(false);
+        }
+    };
+
+    // Rejet de réclamation par l'admin
+    const handleRejeter = async () => {
+        if (!reclamation) return;
+
+        // Validation de la justification
+        if (!justificationRejet.trim()) {
+            setModalConfig({
+                isOpen: true,
+                title: 'Justification requise',
+                message: 'Vous devez obligatoirement justifier le rejet de cette réclamation.',
+                variant: 'warning'
+            });
+            return;
+        }
+
+        setIsSubmittingRejet(true);
+        try {
+            const updatedRec = await rejeterReclamation(reclamation.id, justificationRejet.trim());
+            setReclamation(updatedRec);
+
+            // Fermer le modal et réinitialiser
+            setShowRejeterModal(false);
+            setJustificationRejet('');
+
+            window.dispatchEvent(new Event('refresh-reclamations'));
+
+            // Notification toast au lieu de modal
+            showToast('La réclamation a été rejetée avec succès.', 'success');
+        } catch (error: any) {
+            console.error(error);
+            setModalConfig({
+                isOpen: true,
+                title: 'Erreur',
+                message: error.message || 'Erreur lors du rejet de la réclamation.',
+                variant: 'danger'
+            });
+        } finally {
+            setIsSubmittingRejet(false);
         }
     };
 
@@ -358,18 +448,59 @@ const ReclamationDetailPage: React.FC = () => {
                 setReclamation(updatedRec);
             }
 
-            setModalConfig({
-                isOpen: true,
-                title: 'Merci !',
-                message: 'Votre évaluation a été enregistrée avec succès.',
-                variant: 'success'
-            });
+            // Notification toast
+            showToast('Votre évaluation a été enregistrée avec succès.', 'success');
         } catch (error: any) {
             console.error(error);
             setModalConfig({
                 isOpen: true,
                 title: 'Erreur',
                 message: error.message || 'Erreur lors de l\'enregistrement.',
+                variant: 'danger'
+            });
+        }
+    };
+
+    // Éditer la réclamation
+    const handleEdit = () => {
+        if (!reclamation) return;
+        navigate('/reclamations', {
+            state: {
+                editReclamationId: reclamation.id,
+                editReclamationData: {
+                    type_reclamation: reclamation.type_reclamation,
+                    urgence: reclamation.urgence,
+                    description: reclamation.description,
+                    zone: reclamation.zone,
+                    date_constatation: reclamation.date_constatation,
+                    photos: reclamation.photos || []
+                }
+            }
+        });
+    };
+
+    // Supprimer la réclamation
+    const handleDelete = async () => {
+        if (!reclamation) return;
+
+        try {
+            await deleteReclamation(reclamation.id);
+
+            setModalConfig({
+                isOpen: true,
+                title: 'Suppression réussie',
+                message: 'La réclamation a été supprimée avec succès.',
+                variant: 'success',
+                onConfirm: () => {
+                    navigate('/reclamations');
+                }
+            });
+        } catch (error: any) {
+            console.error(error);
+            setModalConfig({
+                isOpen: true,
+                title: 'Erreur',
+                message: error.message || 'Erreur lors de la suppression.',
                 variant: 'danger'
             });
         }
@@ -428,6 +559,28 @@ const ReclamationDetailPage: React.FC = () => {
 
                         {/* Actions */}
                         <div className="flex items-center gap-3">
+                            {/* Bouton Modifier - visible pour Admin ou créateur si pas clôturée */}
+                            {(isAdmin || (currentUser && reclamation.createur === currentUser.id)) && reclamation.statut !== 'CLOTUREE' && (
+                                <button
+                                    onClick={handleEdit}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2 text-sm transition-colors"
+                                >
+                                    <Edit2 className="w-4 h-4" />
+                                    Modifier
+                                </button>
+                            )}
+
+                            {/* Bouton Supprimer - visible pour Admin seulement */}
+                            {isAdmin && (
+                                <button
+                                    onClick={() => setShowDeleteConfirm(true)}
+                                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium flex items-center gap-2 text-sm transition-colors"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                    Supprimer
+                                </button>
+                            )}
+
                             {isAdmin && reclamation.statut !== 'CLOTUREE' && (
                                 <button
                                     onClick={handleOpenTaskModal}
@@ -453,14 +606,36 @@ const ReclamationDetailPage: React.FC = () => {
                                     Proposer clôture
                                 </button>
                             )}
-                            {reclamation.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' && currentUser && reclamation.createur === currentUser.id && (
+                            {/* Bouton Rejeter - visible pour Admin uniquement si pas clôturée ou déjà rejetée */}
+                            {isAdmin && reclamation.statut !== 'CLOTUREE' && reclamation.statut !== 'REJETEE' && (
                                 <button
-                                    onClick={handleValiderCloture}
-                                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-2 text-sm animate-pulse"
+                                    onClick={() => setShowRejeterModal(true)}
+                                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium flex items-center gap-2 text-sm transition-colors"
+                                    title="Rejeter cette réclamation (justification obligatoire)"
                                 >
-                                    <Star className="w-4 h-4" />
-                                    Valider clôture
+                                    <X className="w-4 h-4" />
+                                    Rejeter la réclamation
                                 </button>
+                            )}
+                            {reclamation.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' && currentUser && reclamation.createur === currentUser.id && (
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={handleValiderCloture}
+                                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-2 text-sm animate-pulse"
+                                        title="Accepter la clôture de la réclamation"
+                                    >
+                                        <Star className="w-4 h-4" />
+                                        Valider clôture
+                                    </button>
+                                    <button
+                                        onClick={() => setShowRefuserClotureModal(true)}
+                                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium flex items-center gap-2 text-sm"
+                                        title="Refuser la clôture (commentaire obligatoire)"
+                                    >
+                                        <X className="w-4 h-4" />
+                                        Refuser clôture
+                                    </button>
+                                </div>
                             )}
                             {currentUser && reclamation.createur === currentUser.id && reclamation.statut === 'CLOTUREE' && !reclamation.satisfaction && (
                                 <button
@@ -525,7 +700,7 @@ const ReclamationDetailPage: React.FC = () => {
                                             color: RECLAMATION_STATUS_COLORS[reclamation.statut] || '#6b7280'
                                         }}
                                     >
-                                        {reclamation.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'En attente validation' : reclamation.statut.toLowerCase().replace('_', ' ')}
+                                        {reclamation.statut_display || reclamation.statut}
                                     </span>
                                 </div>
                                 <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
@@ -788,6 +963,22 @@ const ReclamationDetailPage: React.FC = () => {
                 onCancel={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}
             />
 
+            {/* Delete Confirmation Modal */}
+            {showDeleteConfirm && (
+                <ConfirmModal
+                    isOpen={showDeleteConfirm}
+                    title="Supprimer la réclamation ?"
+                    message={`Êtes-vous sûr de vouloir supprimer la réclamation ${reclamation?.numero_reclamation} ? Cette action est irréversible.`}
+                    variant="danger"
+                    confirmLabel="Supprimer"
+                    onConfirm={() => {
+                        setShowDeleteConfirm(false);
+                        handleDelete();
+                    }}
+                    onCancel={() => setShowDeleteConfirm(false)}
+                />
+            )}
+
             {/* Photo Preview Modal */}
             {selectedPhoto && (
                 <div
@@ -808,6 +999,190 @@ const ReclamationDetailPage: React.FC = () => {
                         alt="Aperçu"
                         className="max-w-full max-h-full object-contain rounded shadow-2xl animate-in zoom-in-95 duration-300"
                     />
+                </div>
+            )}
+
+            {/* Modal de refus de clôture */}
+            {showRefuserClotureModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl max-w-lg w-full shadow-xl border border-slate-200 animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                    <AlertCircle className="w-5 h-5 text-red-600" />
+                                    Refuser la clôture
+                                </h2>
+                                <p className="text-sm text-slate-500 mt-1">
+                                    Expliquez pourquoi vous refusez cette clôture
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setShowRefuserClotureModal(false);
+                                    setCommentaireRefus('');
+                                }}
+                                className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+                                disabled={isSubmittingRefus}
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                                <Info className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                                <div className="text-sm text-red-800">
+                                    <p className="font-semibold mb-1">Commentaire obligatoire</p>
+                                    <p>
+                                        Vous devez expliquer les raisons de votre refus pour permettre à l'équipe d'effectuer les corrections nécessaires.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <PremiumTextarea
+                                value={commentaireRefus}
+                                onChange={(value) => setCommentaireRefus(value)}
+                                label="Motif du refus"
+                                placeholder="Décrivez les raisons du refus et les actions attendues..."
+                                icon={<Edit2 className="w-4 h-4" />}
+                                required
+                                variant="outlined"
+                                size="md"
+                                rows={5}
+                            />
+
+                            <div className="text-xs text-slate-500 bg-slate-50 rounded-lg p-3">
+                                <p className="font-semibold mb-1">Après validation de votre refus :</p>
+                                <ul className="list-disc list-inside space-y-1">
+                                    <li>La réclamation retournera au statut "Résolue"</li>
+                                    <li>L'équipe sera notifiée de votre refus avec votre commentaire</li>
+                                    <li>De nouvelles interventions pourront être planifiées</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowRefuserClotureModal(false);
+                                    setCommentaireRefus('');
+                                }}
+                                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors font-medium"
+                                disabled={isSubmittingRefus}
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleRefuserCloture}
+                                disabled={isSubmittingRefus || !commentaireRefus.trim()}
+                                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
+                            >
+                                {isSubmittingRefus ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        Envoi...
+                                    </>
+                                ) : (
+                                    <>
+                                        <AlertCircle className="w-4 h-4" />
+                                        Confirmer le refus
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de rejet de réclamation */}
+            {showRejeterModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl max-w-lg w-full shadow-xl border border-slate-200 animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                    <AlertCircle className="w-5 h-5 text-red-600" />
+                                    Rejeter la réclamation
+                                </h2>
+                                <p className="text-sm text-slate-500 mt-1">
+                                    Expliquez pourquoi vous rejetez cette réclamation
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setShowRejeterModal(false);
+                                    setJustificationRejet('');
+                                }}
+                                className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+                                disabled={isSubmittingRejet}
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                                <Info className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                                <div className="text-sm text-red-800">
+                                    <p className="font-semibold mb-1">Justification obligatoire</p>
+                                    <p>
+                                        Une réclamation rejetée sera définitivement archivée. Vous devez justifier cette décision.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <PremiumTextarea
+                                value={justificationRejet}
+                                onChange={(value) => setJustificationRejet(value)}
+                                label="Motif du rejet"
+                                placeholder="Décrivez les raisons du rejet de cette réclamation..."
+                                icon={<Edit2 className="w-4 h-4" />}
+                                required
+                                variant="outlined"
+                                size="md"
+                                rows={5}
+                            />
+
+                            <div className="text-xs text-slate-500 bg-slate-50 rounded-lg p-3">
+                                <p className="font-semibold mb-1 text-red-700">⚠️ Attention :</p>
+                                <ul className="list-disc list-inside space-y-1">
+                                    <li>La réclamation passera au statut "Rejetée" (définitif)</li>
+                                    <li>Le créateur sera notifié de ce rejet avec votre justification</li>
+                                    <li>Aucune intervention ne pourra être planifiée sur cette réclamation</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowRejeterModal(false);
+                                    setJustificationRejet('');
+                                }}
+                                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors font-medium"
+                                disabled={isSubmittingRejet}
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleRejeter}
+                                disabled={isSubmittingRejet || !justificationRejet.trim()}
+                                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
+                            >
+                                {isSubmittingRejet ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        Envoi...
+                                    </>
+                                ) : (
+                                    <>
+                                        <AlertCircle className="w-4 h-4" />
+                                        Confirmer le rejet
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

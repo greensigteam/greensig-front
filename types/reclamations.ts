@@ -18,7 +18,9 @@ export interface Urgence {
 export interface HistoriqueReclamation {
     id: number;
     statut_precedent: string | null;
+    statut_precedent_display?: string | null;
     statut_nouveau: string;
+    statut_nouveau_display?: string;
     date_changement: string;
     auteur_nom: string;
     commentaire: string;
@@ -56,6 +58,7 @@ export interface Reclamation {
     date_constatation: string;
 
     statut: string;
+    statut_display?: string;
 
     date_cloture_prevue?: string | null;
     date_prise_en_compte?: string | null;

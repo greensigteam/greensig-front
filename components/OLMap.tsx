@@ -510,7 +510,7 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     // Reclamations layer - renders all geometry types directly (no clustering)
     const reclamationsLayer = new VectorLayer({
       source: reclamationsSource,
-      zIndex: 25, // En-dessous des objets (50) mais au-dessus des sites (1)
+      zIndex: 100, // Au-dessus des objets (50) et des clusters pour être toujours visibles
       style: (feature) => getReclamationStyle(feature as Feature)
     });
     reclamationsLayerRef.current = reclamationsLayer;
@@ -518,7 +518,7 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     // Create map (without hook layers to avoid "Duplicate item" error)
     const map = new Map({
       target: innerMapRef.current,
-      layers: [baseLayer, sitesLayer, reclamationsLayer, dataLayer, selectionLayer], // ✅ Order: sites < reclamations < objects < selection
+      layers: [baseLayer, sitesLayer, dataLayer, reclamationsLayer, selectionLayer], // ✅ Order: sites(1) < objects(50) < reclamations(100) < selection(1000)
       overlays: [overlay], // ✅ Only our own overlay
       view: new View({
         center: fromLonLat([INITIAL_POSITION.lng, INITIAL_POSITION.lat]),
@@ -896,6 +896,7 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
         feature.set('type_reclamation_symbole', feat.properties.type_reclamation_symbole);
         feature.set('type_reclamation_categorie', feat.properties.type_reclamation_categorie);
         feature.set('description', feat.properties.description);
+        feature.set('site', feat.properties.site); // ✅ ID du site (pour filtrage)
         feature.set('site_nom', feat.properties.site_nom);
         feature.set('id', feat.properties.id);
 

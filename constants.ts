@@ -70,24 +70,30 @@ export const SITE_LEGEND = [
 
 // Légende Réclamations - Couleurs par statut (synchronisé avec le backend)
 export const RECLAMATION_STATUS_COLORS: Record<string, string> = {
-  'NOUVELLE': '#ef4444',        // Rouge vif - nouvelle réclamation
+  'NOUVELLE': '#ef4444',        // Rouge - en attente de lecture
   'PRISE_EN_COMPTE': '#f97316', // Orange - prise en compte
-  'EN_COURS': '#eab308',        // Jaune - en cours de traitement
-  'RESOLUE': '#22c55e',         // Vert - résolue, en attente de clôture
+  'EN_COURS': '#f97316',        // Orange - en attente de réalisation
+  'RESOLUE': '#22c55e',         // Vert - tâche terminée côté administrateur
+  'EN_ATTENTE_VALIDATION_CLOTURE': '#22c55e', // Vert - en attente de validation client
+  'CLOTUREE': '#22c55e',        // Vert - validée côté client
   'REJETEE': '#6b7280',         // Gris - rejetée
 };
 
 export const RECLAMATION_STATUS_LABELS: Record<string, string> = {
-  'NOUVELLE': 'Nouvelle',
+  'NOUVELLE': 'En attente de lecture',
   'PRISE_EN_COMPTE': 'Prise en compte',
-  'EN_COURS': 'En cours',
-  'RESOLUE': 'Résolue',
+  'EN_COURS': 'En attente de réalisation',
+  'RESOLUE': 'Tâche terminée côté administrateur',
+  'EN_ATTENTE_VALIDATION_CLOTURE': 'En attente de validation de clôture',
+  'CLOTUREE': 'Validée côté client',
   'REJETEE': 'Rejetée',
 };
 
 export const RECLAMATION_LEGEND = [
-  { type: "NOUVELLE", color: "#ef4444", label: "Nouvelle" },
+  { type: "NOUVELLE", color: "#ef4444", label: "En attente de lecture" },
   { type: "PRISE_EN_COMPTE", color: "#f97316", label: "Prise en compte" },
-  { type: "EN_COURS", color: "#eab308", label: "En cours" },
-  { type: "RESOLUE", color: "#22c55e", label: "Résolue" },
+  { type: "EN_COURS", color: "#f97316", label: "En attente de réalisation" },
+  { type: "RESOLUE", color: "#22c55e", label: "Tâche terminée côté administrateur" },
+  { type: "EN_ATTENTE_VALIDATION_CLOTURE", color: "#22c55e", label: "En attente de validation de clôture" },
+  { type: "CLOTUREE", color: "#22c55e", label: "Validée côté client" },
 ];

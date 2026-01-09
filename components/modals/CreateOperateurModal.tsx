@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, AlertCircle, Loader2, User, Phone, Mail, Calendar, Hash, Users } from 'lucide-react';
+import { X, AlertCircle, Loader2, User, Phone, Mail, Calendar, Hash, Users, RefreshCw } from 'lucide-react';
 import { OperateurCreate, EquipeList } from '../../types/users';
 import { createOperateur, fetchEquipes } from '../../services/usersApi';
+import { PremiumInput, PremiumSelect, PremiumButton } from '../modals/PremiumFormComponents';
 
 interface CreateOperateurModalProps {
   onClose: () => void;
@@ -141,169 +142,135 @@ const CreateOperateurModal: React.FC<CreateOperateurModalProps> = ({
 
             {/* Nom et Prenom */}
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Nom <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    required
-                    type="text"
-                    name="nom"
-                    value={formData.nom}
-                    onChange={handleChange}
-                    className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                    placeholder="Dupont"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Prenom <span className="text-red-500">*</span>
-                </label>
-                <input
-                  required
-                  type="text"
-                  name="prenom"
-                  value={formData.prenom}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                  placeholder="Jean"
-                />
-              </div>
+              <PremiumInput
+                type="text"
+                value={formData.nom}
+                onChange={(value) => setFormData(prev => ({ ...prev, nom: value }))}
+                label="Nom"
+                placeholder="Dupont"
+                icon={<User className="w-4 h-4" />}
+                required
+                variant="outlined"
+                size="md"
+              />
+              <PremiumInput
+                type="text"
+                value={formData.prenom}
+                onChange={(value) => setFormData(prev => ({ ...prev, prenom: value }))}
+                label="Prénom"
+                placeholder="Jean"
+                icon={<User className="w-4 h-4" />}
+                required
+                variant="outlined"
+                size="md"
+              />
             </div>
 
             {/* Matricule */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Matricule <span className="text-red-500">*</span>
-              </label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    required
-                    type="text"
-                    name="numeroImmatriculation"
-                    value={formData.numeroImmatriculation}
-                    onChange={handleChange}
-                    className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                    placeholder="OP-2024-0001"
-                  />
-                </div>
-                <button
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <PremiumInput
+                  type="text"
+                  value={formData.numeroImmatriculation}
+                  onChange={(value) => setFormData(prev => ({ ...prev, numeroImmatriculation: value }))}
+                  label="Matricule"
+                  placeholder="OP-2024-0001"
+                  icon={<Hash className="w-4 h-4" />}
+                  required
+                  variant="outlined"
+                  size="md"
+                />
+              </div>
+              <div className="flex items-end pb-2">
+                <PremiumButton
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, numeroImmatriculation: generateMatricule() }))}
-                  className="px-3 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium whitespace-nowrap"
+                  variant="ghost"
+                  size="md"
+                  icon={<RefreshCw className="w-4 h-4" />}
                 >
-                  Generer
-                </button>
+                  Générer
+                </PremiumButton>
               </div>
             </div>
 
             {/* Email et Telephone */}
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Email
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email || ''}
-                    onChange={handleChange}
-                    className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                    placeholder="jean.dupont@email.com"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Telephone
-                </label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="tel"
-                    name="telephone"
-                    value={formData.telephone || ''}
-                    onChange={handleChange}
-                    className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                    placeholder="06 12 34 56 78"
-                  />
-                </div>
-              </div>
+              <PremiumInput
+                type="email"
+                value={formData.email || ''}
+                onChange={(value) => setFormData(prev => ({ ...prev, email: value }))}
+                label="Email"
+                placeholder="jean.dupont@email.com"
+                icon={<Mail className="w-4 h-4" />}
+                variant="outlined"
+                size="md"
+              />
+              <PremiumInput
+                type="tel"
+                value={formData.telephone || ''}
+                onChange={(value) => setFormData(prev => ({ ...prev, telephone: value }))}
+                label="Téléphone"
+                placeholder="06 12 34 56 78"
+                icon={<Phone className="w-4 h-4" />}
+                variant="outlined"
+                size="md"
+              />
             </div>
 
             {/* Date d'embauche */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Date d'embauche <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  required
-                  type="date"
-                  name="dateEmbauche"
-                  value={formData.dateEmbauche}
-                  onChange={handleChange}
-                  className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                />
-              </div>
-            </div>
+            <PremiumInput
+              type="date"
+              value={formData.dateEmbauche}
+              onChange={(value) => setFormData(prev => ({ ...prev, dateEmbauche: value }))}
+              label="Date d'embauche"
+              icon={<Calendar className="w-4 h-4" />}
+              required
+              variant="outlined"
+              size="md"
+            />
 
             {/* Statut */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Statut
-              </label>
-              <select
-                name="statut"
-                value={formData.statut}
-                onChange={handleChange}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-              >
-                <option value="ACTIF">Actif</option>
-                <option value="INACTIF">Inactif</option>
-                <option value="EN_CONGE">En congé</option>
-              </select>
-            </div>
+            <PremiumSelect
+              value={formData.statut}
+              onChange={(value) => setFormData(prev => ({ ...prev, statut: value as 'ACTIF' | 'INACTIF' | 'EN_CONGE' }))}
+              options={[
+                { value: 'ACTIF', label: 'Actif' },
+                { value: 'INACTIF', label: 'Inactif' },
+                { value: 'EN_CONGE', label: 'En congé' }
+              ]}
+              label="Statut"
+              placeholder="Sélectionner un statut"
+              variant="outlined"
+              size="md"
+            />
 
             {/* Equipe */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Equipe (optionnel)
-              </label>
               {loadingEquipes ? (
-                <div className="flex items-center gap-2 text-sm text-gray-500 py-2.5">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Chargement des equipes...
+                <div className="flex items-center gap-2 text-sm text-slate-500 py-3 px-3 bg-slate-50 rounded-lg border border-slate-200">
+                  <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                  Chargement des équipes...
                 </div>
               ) : (
-                <div className="relative">
-                  <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <select
-                    name="equipe"
-                    value={formData.equipe ?? ''}
-                    onChange={handleChange}
-                    className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none appearance-none"
-                  >
-                    <option value="">Aucune equipe</option>
-                    {equipes.map((eq) => (
-                      <option key={eq.id} value={eq.id}>
-                        {eq.nomEquipe}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <PremiumSelect
+                  value={formData.equipe?.toString() ?? ''}
+                  onChange={(value) => setFormData(prev => ({ ...prev, equipe: value === '' ? null : Number(value) }))}
+                  options={[
+                    { value: '', label: 'Aucune équipe' },
+                    ...equipes.map((eq) => ({
+                      value: eq.id.toString(),
+                      label: eq.nomEquipe
+                    }))
+                  ]}
+                  label="Équipe (optionnel)"
+                  placeholder="Sélectionner une équipe"
+                  icon={<Users className="w-4 h-4" />}
+                  hint="Vous pourrez affecter l'opérateur à une équipe plus tard"
+                  variant="outlined"
+                  size="md"
+                />
               )}
-              <p className="mt-1 text-xs text-gray-500">
-                Vous pourrez affecter l'operateur a une equipe plus tard
-              </p>
             </div>
           </div>
 

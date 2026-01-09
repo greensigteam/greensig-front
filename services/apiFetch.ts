@@ -49,6 +49,7 @@ export function clearAuthTokens() {
 
 // Fonction principale de fetch avec gestion automatique du refresh
 export async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  console.log('[apiFetch] START -', url);
   let token = localStorage.getItem('token');
 
   // Debug: afficher si le token est présent
@@ -57,6 +58,7 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
   }
 
   // Premiere tentative
+  console.log('[apiFetch] Calling fetch() -', url);
   let response = await fetch(url, {
     ...options,
     headers: {
@@ -64,6 +66,7 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
+  console.log('[apiFetch] fetch() returned -', url, 'Status:', response.status);
 
   // Si 401 Unauthorized, tenter de refresh le token
   if (response.status === 401) {

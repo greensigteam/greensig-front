@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, AlertCircle, Loader2 } from 'lucide-react';
+import { X, AlertCircle, Loader2, Users as UsersIcon, Building2 } from 'lucide-react';
 import { OperateurList } from '../../types/users';
-import { createEquipe, affecterMembres } from '../../services/usersApi';
+import { createEquipe, affecterMembres, fetchOperateurs } from '../../services/usersApi';
 import { fetchAllSites, SiteFrontend } from '../../services/api';
 import TransferList from '../TransferList';
+import { PremiumInput, PremiumSelect } from '../modals/PremiumFormComponents';
+import CreateOperateurModal from './CreateOperateurModal';
 
 interface CreateTeamModalProps {
   onClose: () => void;
@@ -20,14 +22,34 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
 }) => {
   const [formData, setFormData] = useState({
     nomEquipe: '',
-    chefEquipe: 0,
-    site: 0
+    chefEquipe: null as number | null,
+    sitePrincipal: null as number | null
   });
   const [selectedMembres, setSelectedMembres] = useState<OperateurList[]>([]);
   const [sites, setSites] = useState<SiteFrontend[]>([]);
   const [loadingSites, setLoadingSites] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // État pour la modale de création d'opérateur
+  const [showCreateOperateur, setShowCreateOperateur] = useState(false);
+  const [availableOperateurs, setAvailableOperateurs] = useState<OperateurList[]>(operateursSansEquipe);
+
+  // Rafraîchir la liste des opérateurs disponibles
+  const refreshOperateurs = async () => {
+    try {
+      const response = await fetchOperateurs({ pageSize: 1000 });
+      const sansEquipe = response.results.filter(op => !op.equipe);
+      setAvailableOperateurs(sansEquipe);
+    } catch (error) {
+      console.error('Erreur rafraîchissement opérateurs:', error);
+    }
+  };
+
+  // Callback quand un nouvel opérateur est créé
+  const handleOperateurCreated = async () => {
+    await refreshOperateurs();
+  };
 
   useEffect(() => {
     const loadSites = async () => {
@@ -59,8 +81,8 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
 
       const equipe = await createEquipe({
         nomEquipe: formData.nomEquipe,
-        chefEquipe: formData.chefEquipe && formData.chefEquipe !== 0 ? formData.chefEquipe : undefined,
-        site: formData.site && formData.site !== 0 ? formData.site : undefined,
+        chefEquipe: formData.chefEquipe || undefined,
+        sitePrincipal: formData.sitePrincipal || undefined,
         membres: membresIds.length > 0 ? membresIds : undefined
       });
 
@@ -112,10 +134,10 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto flex flex-col">
-          <div className="p-4 space-y-4 flex-1">
+          <div className="p-6 space-y-6 flex-1">
             {/* Erreur */}
             {error && (
-              <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm whitespace-pre-line">
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm whitespace-pre-line">
                 <div className="flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <span>{error}</span>
@@ -123,88 +145,101 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
               </div>
             )}
 
-            {/* Row 1: Nom + Chef d'équipe */}
-            <div className="grid grid-cols-2 gap-4">
-              {/* Nom de l'équipe */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nom de l'équipe <span className="text-red-500">*</span>
-                </label>
-                <input
-                  required
-                  type="text"
-                  value={formData.nomEquipe}
-                  onChange={(e) => setFormData({ ...formData, nomEquipe: e.target.value })}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                  placeholder="Ex: Équipe C - Irrigation"
-                />
+            {/* Section 1: Informations générales */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                <UsersIcon className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-sm font-semibold text-slate-800">Informations générales</h3>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+              {/* Nom de l'équipe */}
+              <PremiumInput
+                type="text"
+                value={formData.nomEquipe}
+                onChange={(value) => setFormData({ ...formData, nomEquipe: value })}
+                label="Nom de l'équipe"
+                placeholder="Ex: Équipe C - Irrigation"
+                icon={<UsersIcon className="w-4 h-4" />}
+                required
+                variant="outlined"
+                size="md"
+              />
+
               {/* Chef d'équipe */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Chef d'équipe (optionnel)
-                </label>
-                <select
-                  value={formData.chefEquipe}
-                  onChange={(e) => setFormData({ ...formData, chefEquipe: Number(e.target.value) })}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                >
-                  <option value={0}>Sélectionner un chef</option>
-                  {chefsPotentiels.map((op) => (
-                    <option key={op.id} value={op.id}>
-                      {op.fullName} ({op.numeroImmatriculation})
-                    </option>
-                  ))}
-                </select>
+              <PremiumSelect
+                value={formData.chefEquipe?.toString() || ''}
+                onChange={(value) => setFormData({ ...formData, chefEquipe: value ? Number(value) : null })}
+                options={chefsPotentiels.map((op) => ({
+                  value: op.id.toString(),
+                  label: `${op.fullName} (${op.numeroImmatriculation})`
+                }))}
+                label="Chef d'équipe (optionnel)"
+                placeholder="Sélectionner un chef"
+                icon={<UsersIcon className="w-4 h-4" />}
+                variant="outlined"
+                size="md"
+              />
               </div>
             </div>
 
-            {/* Row 2: Site d'affectation */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Site d'affectation contractuelle (optionnel)
-              </label>
+            {/* Section 2: Site d'affectation */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                <Building2 className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-sm font-semibold text-slate-800">Site d'affectation</h3>
+              </div>
+
               {loadingSites ? (
-                <div className="flex items-center gap-2 text-sm text-gray-500 py-1.5">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Chargement des sites...
+                <div className="flex items-center gap-2 text-sm text-slate-500 py-3 px-3 bg-slate-50 rounded-lg border border-slate-200">
+                  <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                  Chargement...
                 </div>
               ) : (
-                <select
-                  value={formData.site}
-                  onChange={(e) => setFormData({ ...formData, site: Number(e.target.value) })}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                >
-                  <option value={0}>Aucun site</option>
-                  {sites.map((site) => (
-                    <option key={site.id} value={parseInt(site.id)}>
-                      {site.name} {site.code_site ? `(${site.code_site})` : ''}
-                    </option>
-                  ))}
-                </select>
+                <PremiumSelect
+                  value={formData.sitePrincipal?.toString() || ''}
+                  onChange={(value) => setFormData({ ...formData, sitePrincipal: value ? Number(value) : null })}
+                  options={sites.map((site) => ({
+                    value: site.id,
+                    label: `${site.name}${site.code_site ? ` (${site.code_site})` : ''}`
+                  }))}
+                  label="Site principal (optionnel)"
+                  placeholder="Sélectionner un site"
+                  icon={<Building2 className="w-4 h-4" />}
+                  hint="Détermine le superviseur de l'équipe"
+                  variant="outlined"
+                  size="md"
+                />
               )}
             </div>
 
-            {/* Membres à affecter - TransferList (prend le reste de l'espace) */}
-            <div className="flex-1 flex flex-col min-h-0">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Membres à affecter ({operateursSansEquipe.length} disponibles)
-              </label>
-              <TransferList
-                available={operateursSansEquipe}
-                selected={selectedMembres}
-                onChange={setSelectedMembres}
-                getItemId={(op) => op.id}
-                getItemLabel={(op) => op.fullName || `${op.nom} ${op.prenom}`}
-                getItemSubtitle={(op) => `${op.numeroImmatriculation}${op.equipeNom ? ` • ${op.equipeNom}` : ''}`}
-                availableLabel="Opérateurs disponibles"
-                selectedLabel="Membres de l'équipe"
-                searchPlaceholder="Rechercher (nom, matricule)..."
-                emptyAvailableMessage="Aucun opérateur disponible"
-                emptySelectedMessage="Aucun membre sélectionné"
-                height="240px"
-              />
+            {/* Section 3: Membres de l'équipe */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                <UsersIcon className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-sm font-semibold text-slate-800">Membres de l'équipe</h3>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs text-slate-500">
+                  {availableOperateurs.length} opérateur{availableOperateurs.length > 1 ? 's' : ''} disponible{availableOperateurs.length > 1 ? 's' : ''}
+                </p>
+                <TransferList
+                  available={availableOperateurs}
+                  selected={selectedMembres}
+                  onChange={setSelectedMembres}
+                  getItemId={(op) => op.id}
+                  getItemLabel={(op) => op.fullName || `${op.nom} ${op.prenom}`}
+                  getItemSubtitle={(op) => `${op.numeroImmatriculation}${op.equipeNom ? ` • ${op.equipeNom}` : ''}`}
+                  availableLabel="Opérateurs disponibles"
+                  selectedLabel="Membres de l'équipe"
+                  searchPlaceholder="Rechercher (nom, matricule)..."
+                  emptyAvailableMessage="Aucun opérateur disponible"
+                  emptySelectedMessage="Aucun membre sélectionné"
+                  onAddNew={() => setShowCreateOperateur(true)}
+                  height="240px"
+                />
+              </div>
             </div>
           </div>
 
@@ -227,6 +262,14 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Modale de création d'opérateur */}
+      {showCreateOperateur && (
+        <CreateOperateurModal
+          onClose={() => setShowCreateOperateur(false)}
+          onCreated={handleOperateurCreated}
+        />
+      )}
     </div>
   );
 };

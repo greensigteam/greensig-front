@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, type FC } from 'react';
 import { addDays, addWeeks, addMonths, format } from 'date-fns';
-import { Repeat, ChevronDown, X } from 'lucide-react';
+import { Repeat, ChevronDown, X, Hash, Calendar } from 'lucide-react';
 import { FrequenceRecurrence } from '../../types/planning';
+import { PremiumInput, PremiumSelect } from '../modals/PremiumFormComponents';
 
 // ============================================================================
 // TYPES
@@ -182,24 +183,28 @@ export const RecurrenceSelector: FC<RecurrenceSelectorProps> = ({
             <button
                 type="button"
                 onClick={() => setShowDropdown(!showDropdown)}
-                className="w-full flex items-center justify-between px-3 py-2.5 bg-white border border-gray-300 rounded-lg hover:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-left"
+                className={`w-full flex items-center justify-between px-4 py-3 bg-white border-2 rounded-lg focus:outline-none transition-all text-left shadow-sm ${
+                    showDropdown
+                        ? 'border-emerald-500 ring-4 ring-emerald-500/20'
+                        : 'border-slate-200 hover:border-slate-300'
+                }`}
             >
-                <div className="flex items-center gap-2">
-                    <Repeat className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm text-gray-700">{summary}</span>
+                <div className="flex items-center gap-3">
+                    <Repeat className={`w-4 h-4 transition-colors ${showDropdown ? 'text-emerald-600' : 'text-slate-400'}`} />
+                    <span className={`text-sm font-medium ${value ? 'text-slate-900' : 'text-slate-500'}`}>{summary}</span>
                 </div>
-                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-4 h-4 transition-all ${showDropdown ? 'rotate-180 text-emerald-600' : 'text-slate-400'}`} />
             </button>
 
             {/* Dropdown Menu */}
             {showDropdown && (
-                <div className="absolute z-[150] mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-xl py-1 max-h-64 overflow-y-auto">
+                <div className="absolute z-[150] mt-2 w-full bg-white border border-slate-200 rounded-xl shadow-2xl py-1.5 max-h-64 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
                     {RECURRENCE_PRESETS.map((preset) => (
                         <button
                             key={preset.id || 'none'}
                             type="button"
                             onClick={() => handlePresetClick(preset.id)}
-                            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors"
+                            className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
                         >
                             {preset.label}
                         </button>
@@ -212,45 +217,57 @@ export const RecurrenceSelector: FC<RecurrenceSelectorProps> = ({
                 <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                     <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md">
                         {/* Header */}
-                        <div className="flex items-center justify-between p-4 border-b">
-                            <h3 className="text-lg font-semibold text-gray-900">Récurrence personnalisée</h3>
+                        <div className="flex items-center justify-between p-6 border-b border-slate-200">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                                    <Repeat className="w-5 h-5 text-emerald-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-900">Récurrence personnalisée</h3>
+                                    <p className="text-xs text-slate-500">Configurez la périodicité de la tâche</p>
+                                </div>
+                            </div>
                             <button
                                 onClick={() => setShowCustomModal(false)}
-                                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                             >
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
 
                         {/* Body */}
-                        <div className="p-4 space-y-4">
+                        <div className="p-6 space-y-6">
                             {/* Interval + Frequency */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Se répète tous les</label>
-                                <div className="flex gap-2">
-                                    <input
+                                <label className="block text-sm font-semibold text-slate-800 mb-3">Se répète tous les</label>
+                                <div className="grid grid-cols-[100px_1fr] gap-3">
+                                    <PremiumInput
                                         type="number"
-                                        min="1"
                                         value={customParams.interval}
-                                        onChange={(e) => setCustomParams({ ...customParams, interval: Number(e.target.value) })}
-                                        className="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                                        onChange={(value) => setCustomParams({ ...customParams, interval: Number(value) || 1 })}
+                                        min={1}
+                                        icon={<Hash className="w-4 h-4" />}
+                                        variant="outlined"
+                                        size="md"
                                     />
-                                    <select
+                                    <PremiumSelect
                                         value={customParams.frequence}
-                                        onChange={(e) => setCustomParams({ ...customParams, frequence: e.target.value as FrequenceRecurrence })}
-                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                    >
-                                        <option value="daily">Jours</option>
-                                        <option value="weekly">Semaines</option>
-                                        <option value="monthly">Mois</option>
-                                    </select>
+                                        onChange={(value) => setCustomParams({ ...customParams, frequence: value as FrequenceRecurrence })}
+                                        options={[
+                                            { value: 'daily', label: 'Jours' },
+                                            { value: 'weekly', label: 'Semaines' },
+                                            { value: 'monthly', label: 'Mois' }
+                                        ]}
+                                        variant="outlined"
+                                        size="md"
+                                    />
                                 </div>
                             </div>
 
                             {/* Days of Week (for weekly) */}
                             {customParams.frequence === 'weekly' && (
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Se répète le</label>
+                                    <label className="block text-sm font-semibold text-slate-800 mb-3">Se répète le</label>
                                     <div className="flex flex-wrap gap-2">
                                         {DAYS_OF_WEEK.map((day) => {
                                             const isSelected = customParams.jours?.includes(day.id);
@@ -265,10 +282,10 @@ export const RecurrenceSelector: FC<RecurrenceSelectorProps> = ({
                                                             : [...currentDays, day.id];
                                                         setCustomParams({ ...customParams, jours: newDays });
                                                     }}
-                                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                                    className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
                                                         isSelected
-                                                            ? 'bg-emerald-600 text-white'
-                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                            ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20'
+                                                            : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
                                                     }`}
                                                 >
                                                     {day.label}
@@ -281,75 +298,114 @@ export const RecurrenceSelector: FC<RecurrenceSelectorProps> = ({
 
                             {/* End condition */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Se termine</label>
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="radio"
-                                            id="end-after"
-                                            name="end-type"
-                                            checked={!!customParams.nombre_occurrences}
-                                            onChange={() => setCustomParams({ ...customParams, nombre_occurrences: 5, date_fin: undefined })}
-                                            className="w-4 h-4 text-emerald-600"
-                                        />
-                                        <label htmlFor="end-after" className="text-sm text-gray-700">Après</label>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            disabled={!customParams.nombre_occurrences}
-                                            value={customParams.nombre_occurrences || ''}
-                                            onChange={(e) => setCustomParams({ ...customParams, nombre_occurrences: Number(e.target.value) })}
-                                            className="w-20 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 outline-none disabled:bg-gray-100"
-                                        />
-                                        <span className="text-sm text-gray-600">occurrence(s)</span>
+                                <label className="block text-sm font-semibold text-slate-800 mb-3">Se termine</label>
+                                <div className="space-y-3">
+                                    {/* Option: Après X occurrences */}
+                                    <div
+                                        onClick={() => !customParams.nombre_occurrences && setCustomParams({ ...customParams, nombre_occurrences: 5, date_fin: undefined })}
+                                        className={`p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                                            !!customParams.nombre_occurrences
+                                                ? 'border-emerald-500 bg-emerald-50/50'
+                                                : 'border-slate-200 bg-white hover:border-slate-300'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                                                !!customParams.nombre_occurrences
+                                                    ? 'border-emerald-600'
+                                                    : 'border-slate-300'
+                                            }`}>
+                                                {!!customParams.nombre_occurrences && (
+                                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
+                                                )}
+                                            </div>
+                                            <span className="text-sm font-medium text-slate-700">Après</span>
+                                            <div className="flex-1" onClick={(e) => e.stopPropagation()}>
+                                                <PremiumInput
+                                                    type="number"
+                                                    min={1}
+                                                    disabled={!customParams.nombre_occurrences}
+                                                    value={customParams.nombre_occurrences || ''}
+                                                    onChange={(value) => setCustomParams({ ...customParams, nombre_occurrences: Number(value) || undefined })}
+                                                    icon={<Hash className="w-4 h-4" />}
+                                                    variant="outlined"
+                                                    size="md"
+                                                />
+                                            </div>
+                                            <span className="text-sm text-slate-500 whitespace-nowrap">occurrence(s)</span>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="radio"
-                                            id="end-on"
-                                            name="end-type"
-                                            checked={!!customParams.date_fin}
-                                            onChange={() => {
+
+                                    {/* Option: Jusqu'à une date */}
+                                    <div
+                                        onClick={() => {
+                                            if (!customParams.date_fin) {
                                                 const defaultEndDate = format(addDays(new Date(startDate), 7), 'yyyy-MM-dd');
                                                 setCustomParams({ ...customParams, date_fin: defaultEndDate, nombre_occurrences: undefined });
-                                            }}
-                                            className="w-4 h-4 text-emerald-600"
-                                        />
-                                        <label htmlFor="end-on" className="text-sm text-gray-700">Le</label>
-                                        <input
-                                            type="date"
-                                            disabled={!customParams.date_fin}
-                                            value={customParams.date_fin?.slice(0, 10) || ''}
-                                            onChange={(e) => setCustomParams({ ...customParams, date_fin: e.target.value })}
-                                            className="flex-1 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 outline-none disabled:bg-gray-100"
-                                        />
+                                            }
+                                        }}
+                                        className={`p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                                            !!customParams.date_fin
+                                                ? 'border-emerald-500 bg-emerald-50/50'
+                                                : 'border-slate-200 bg-white hover:border-slate-300'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                                                !!customParams.date_fin
+                                                    ? 'border-emerald-600'
+                                                    : 'border-slate-300'
+                                            }`}>
+                                                {!!customParams.date_fin && (
+                                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
+                                                )}
+                                            </div>
+                                            <span className="text-sm font-medium text-slate-700">Le</span>
+                                            <div className="flex-1" onClick={(e) => e.stopPropagation()}>
+                                                <PremiumInput
+                                                    type="date"
+                                                    disabled={!customParams.date_fin}
+                                                    value={customParams.date_fin?.slice(0, 10) || ''}
+                                                    onChange={(value) => setCustomParams({ ...customParams, date_fin: value })}
+                                                    icon={<Calendar className="w-4 h-4" />}
+                                                    variant="outlined"
+                                                    size="md"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Summary Preview */}
-                            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-                                <p className="text-sm text-emerald-800 font-medium">
-                                    {getRecurrenceSummary(customParams, startDate)}
-                                </p>
+                            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-2 border-emerald-200 rounded-xl p-4 shadow-sm">
+                                <div className="flex items-start gap-3">
+                                    <Repeat className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                                    <div>
+                                        <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">Aperçu</p>
+                                        <p className="text-sm text-emerald-900 font-medium leading-relaxed">
+                                            {getRecurrenceSummary(customParams, startDate)}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
                         {/* Footer */}
-                        <div className="flex gap-3 p-4 border-t">
+                        <div className="flex gap-3 p-6 border-t border-slate-200 bg-slate-50">
                             <button
                                 type="button"
                                 onClick={() => setShowCustomModal(false)}
-                                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                                className="flex-1 px-4 py-2.5 text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors font-medium"
                             >
                                 Annuler
                             </button>
                             <button
                                 type="button"
                                 onClick={handleCustomSave}
-                                className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                                className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium shadow-sm"
                             >
-                                OK
+                                Appliquer
                             </button>
                         </div>
                     </div>

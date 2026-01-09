@@ -19,6 +19,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { DetailRow, DetailGrid, DetailCard, DetailEmptyState } from '../components/DetailModal';
 import LoadingWrapper from '../components/LoadingWrapper';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
+import { PremiumInput } from '../components/modals/PremiumFormComponents';
 
 // ============================================================================
 // TYPES
@@ -610,42 +611,41 @@ const EditUserModal: React.FC<{
                     </button>
                 </div>
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">
-                            Prénom *
-                        </label>
-                        <input
-                            type="text"
-                            value={formData.prenom}
-                            onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-800"
-                            placeholder="Jean"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">
-                            Nom *
-                        </label>
-                        <input
-                            type="text"
-                            value={formData.nom}
-                            onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-800"
-                            placeholder="Dupont"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">
-                            Email *
-                        </label>
-                        <input
-                            type="email"
-                            value={formData.email}
-                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-800"
-                            placeholder="jean.dupont@exemple.com"
-                        />
-                    </div>
+                    <PremiumInput
+                        type="text"
+                        value={formData.prenom}
+                        onChange={(value) => setFormData({ ...formData, prenom: value })}
+                        label="Prénom"
+                        placeholder="Jean"
+                        icon={<User className="w-4 h-4" />}
+                        required
+                        variant="outlined"
+                        size="md"
+                    />
+
+                    <PremiumInput
+                        type="text"
+                        value={formData.nom}
+                        onChange={(value) => setFormData({ ...formData, nom: value })}
+                        label="Nom"
+                        placeholder="Dupont"
+                        icon={<User className="w-4 h-4" />}
+                        required
+                        variant="outlined"
+                        size="md"
+                    />
+
+                    <PremiumInput
+                        type="email"
+                        value={formData.email}
+                        onChange={(value) => setFormData({ ...formData, email: value })}
+                        label="Email"
+                        placeholder="jean.dupont@exemple.com"
+                        icon={<Mail className="w-4 h-4" />}
+                        required
+                        variant="outlined"
+                        size="md"
+                    />
                     <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-6">
                         <button
                             type="button"

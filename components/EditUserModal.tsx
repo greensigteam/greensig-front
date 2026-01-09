@@ -4,9 +4,12 @@ import {
   AlertCircle,
   Mail,
   UserCheck,
-  Building2
+  Building2,
+  Phone,
+  Hash
 } from 'lucide-react';
-import FormModal, { FormField, FormInput, FormSection } from './FormModal';
+import FormModal, { FormField, FormSection } from './FormModal';
+import { PremiumInput, PremiumSelect } from './modals/PremiumFormComponents';
 import {
   Utilisateur,
   Client,
@@ -271,30 +274,42 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
       {/* Informations générales */}
       <FormSection title="Informations générales" icon={<Mail className="w-4 h-4" />}>
         <div className="grid grid-cols-2 gap-4">
-          <FormField label="Prénom">
-            <FormInput
-              type="text"
-              value={formData.prenom}
-              onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
-            />
-          </FormField>
+          <PremiumInput
+            type="text"
+            value={formData.prenom}
+            onChange={(value) => setFormData({ ...formData, prenom: value })}
+            label="Prénom"
+            placeholder="Jean"
+            icon={<UserCheck className="w-4 h-4" />}
+            required
+            variant="outlined"
+            size="md"
+          />
 
-          <FormField label="Nom">
-            <FormInput
-              type="text"
-              value={formData.nom}
-              onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
-            />
-          </FormField>
+          <PremiumInput
+            type="text"
+            value={formData.nom}
+            onChange={(value) => setFormData({ ...formData, nom: value })}
+            label="Nom"
+            placeholder="Dupont"
+            icon={<UserCheck className="w-4 h-4" />}
+            required
+            variant="outlined"
+            size="md"
+          />
         </div>
 
-        <FormField label="Email">
-          <FormInput
-            type="email"
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          />
-        </FormField>
+        <PremiumInput
+          type="email"
+          value={formData.email}
+          onChange={(value) => setFormData({ ...formData, email: value })}
+          label="Email"
+          placeholder="email@exemple.com"
+          icon={<Mail className="w-4 h-4" />}
+          required
+          variant="outlined"
+          size="md"
+        />
 
         <div className="flex items-center gap-3">
           <label className="text-sm font-medium text-gray-700">Statut du compte</label>
@@ -322,21 +337,27 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
       {(userRoles.includes('SUPERVISEUR') || userRoles.includes('SUPERVISEUR')) && (
         <FormSection title="Informations opérateur" icon={<UserCheck className="w-4 h-4" />}>
           <div className="grid grid-cols-2 gap-4">
-            <FormField label="Matricule">
-              <FormInput
-                type="text"
-                value={operateurFields.numeroImmatriculation}
-                onChange={(e) => setOperateurFields({ ...operateurFields, numeroImmatriculation: e.target.value })}
-              />
-            </FormField>
+            <PremiumInput
+              type="text"
+              value={operateurFields.numeroImmatriculation}
+              onChange={(value) => setOperateurFields({ ...operateurFields, numeroImmatriculation: value })}
+              label="Matricule"
+              placeholder="OP-2024-0001"
+              icon={<Hash className="w-4 h-4" />}
+              variant="outlined"
+              size="md"
+            />
 
-            <FormField label="Téléphone">
-              <FormInput
-                type="tel"
-                value={operateurFields.telephone}
-                onChange={(e) => setOperateurFields({ ...operateurFields, telephone: e.target.value })}
-              />
-            </FormField>
+            <PremiumInput
+              type="tel"
+              value={operateurFields.telephone}
+              onChange={(value) => setOperateurFields({ ...operateurFields, telephone: value })}
+              label="Téléphone"
+              placeholder="06 XX XX XX XX"
+              icon={<Phone className="w-4 h-4" />}
+              variant="outlined"
+              size="md"
+            />
           </div>
 
           {!operateurInfo && (
@@ -394,11 +415,11 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
                       </div>
                       <div className="text-xs text-gray-500">{c.competenceDetail?.categorieDisplay}</div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <select
+                    <div className="flex items-center gap-2 w-48">
+                      <PremiumSelect
                         value={c.niveau}
-                        onChange={async (e) => {
-                          const niveau = e.target.value as any;
+                        onChange={async (value) => {
+                          const niveau = value as any;
                           try {
                             await affecterCompetence(c.operateur, { competenceId: c.competence, niveau });
                             const refreshed = await fetchCompetencesOperateur(c.operateur);
@@ -407,14 +428,16 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
                             console.error('Erreur mise à jour competence', err);
                           }
                         }}
-                        className="border border-gray-300 px-2 py-1 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                      >
-                        <option value="">Niveau...</option>
-                        <option value="NON">Non maîtrisé</option>
-                        <option value="DEBUTANT">Débutant</option>
-                        <option value="INTERMEDIAIRE">Intermédiaire</option>
-                        <option value="EXPERT">Expert</option>
-                      </select>
+                        options={[
+                          { value: 'NON', label: 'Non maîtrisé' },
+                          { value: 'DEBUTANT', label: 'Débutant' },
+                          { value: 'INTERMEDIAIRE', label: 'Intermédiaire' },
+                          { value: 'EXPERT', label: 'Expert' }
+                        ]}
+                        placeholder="Niveau..."
+                        variant="outlined"
+                        size="sm"
+                      />
                     </div>
                   </div>
                 ))}
@@ -423,36 +446,41 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
 
             {/* Ajouter une compétence */}
             <div className="mt-3 border-t pt-3">
-              <label className="text-sm text-gray-600">Ajouter une compétence</label>
+              <label className="text-sm text-gray-600 mb-2 block">Ajouter une compétence</label>
               <div className="flex gap-2 mt-2">
-                <select
-                  value={newCompetenceId}
-                  onChange={(e) => setNewCompetenceId(e.target.value ? Number(e.target.value) : '')}
-                  className="border border-gray-300 px-2 py-1 rounded-lg flex-1 focus:ring-2 focus:ring-emerald-500 outline-none"
-                >
-                  <option value="">-- Choisir --</option>
-                  {allCompetences
-                    .filter((ac) => !operateurCompetences.some((oc) => oc.competence === ac.id))
-                    .map((ac) => (
-                      <option key={ac.id} value={ac.id}>
-                        {ac.nomCompetence}
-                      </option>
-                    ))}
-                </select>
-                <select
-                  value={newCompetenceNiveau}
-                  onChange={(e) => setNewCompetenceNiveau(e.target.value)}
-                  className="border border-gray-300 px-2 py-1 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                >
-                  <option value="">Niveau</option>
-                  <option value="NON">Non maîtrisé</option>
-                  <option value="DEBUTANT">Débutant</option>
-                  <option value="INTERMEDIAIRE">Intermédiaire</option>
-                  <option value="EXPERT">Expert</option>
-                </select>
+                <div className="flex-1">
+                  <PremiumSelect
+                    value={newCompetenceId ? newCompetenceId.toString() : ''}
+                    onChange={(value) => setNewCompetenceId(value ? Number(value) : '')}
+                    options={allCompetences
+                      .filter((ac) => !operateurCompetences.some((oc) => oc.competence === ac.id))
+                      .map((ac) => ({
+                        value: ac.id.toString(),
+                        label: ac.nomCompetence
+                      }))}
+                    placeholder="-- Choisir --"
+                    variant="outlined"
+                    size="sm"
+                  />
+                </div>
+                <div className="w-40">
+                  <PremiumSelect
+                    value={newCompetenceNiveau}
+                    onChange={(value) => setNewCompetenceNiveau(value)}
+                    options={[
+                      { value: 'NON', label: 'Non maîtrisé' },
+                      { value: 'DEBUTANT', label: 'Débutant' },
+                      { value: 'INTERMEDIAIRE', label: 'Intermédiaire' },
+                      { value: 'EXPERT', label: 'Expert' }
+                    ]}
+                    placeholder="Niveau"
+                    variant="outlined"
+                    size="sm"
+                  />
+                </div>
                 <button
                   type="button"
-                  className="px-3 py-1 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                  className="px-3 py-1 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 self-start"
                   onClick={async () => {
                     if (!operateurInfo || !newCompetenceId || !newCompetenceNiveau) return;
                     try {

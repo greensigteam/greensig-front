@@ -33,8 +33,13 @@ import {
   MoreVertical,
   Eye,
   EyeOff,
-  Key
+  Key,
+  User,
+  Phone,
+  MapPin,
+  Lock
 } from 'lucide-react';
+import { PremiumInput } from '../components/modals/PremiumFormComponents';
 import { DataTable } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
 import { useNavigate } from 'react-router-dom';
@@ -402,35 +407,41 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, onClose, o
             </h3>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Prenom</label>
-                <input
-                  type="text"
-                  value={formData.prenom}
-                  onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
-                <input
-                  type="text"
-                  value={formData.nom}
-                  onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+              <PremiumInput
+                type="text"
+                value={formData.prenom}
+                onChange={(value) => setFormData({ ...formData, prenom: value })}
+                label="Prénom"
+                placeholder="Jean"
+                icon={<User className="w-4 h-4" />}
+                variant="outlined"
+                size="md"
+                required
+              />
+              <PremiumInput
+                type="text"
+                value={formData.nom}
+                onChange={(value) => setFormData({ ...formData, nom: value })}
+                label="Nom"
+                placeholder="Dupont"
+                icon={<User className="w-4 h-4" />}
+                variant="outlined"
+                size="md"
+                required
               />
             </div>
+
+            <PremiumInput
+              type="email"
+              value={formData.email}
+              onChange={(value) => setFormData({ ...formData, email: value })}
+              label="Email"
+              placeholder="jean.dupont@exemple.com"
+              icon={<Mail className="w-4 h-4" />}
+              variant="outlined"
+              size="md"
+              required
+            />
 
             <div className="flex items-center gap-3">
               <label className="text-sm font-medium text-gray-700">Statut du compte</label>
@@ -481,22 +492,22 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, onClose, o
                       )}
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Nouveau mot de passe
-                        </label>
                         <div className="relative">
-                          <input
+                          <PremiumInput
                             type={showPassword ? "text" : "password"}
                             value={passwordData.newPassword}
-                            onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                            className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none"
+                            onChange={(value) => setPasswordData({ ...passwordData, newPassword: value })}
+                            label="Nouveau mot de passe"
                             placeholder="Minimum 8 caractères"
+                            icon={<Lock className="w-4 h-4" />}
+                            variant="outlined"
+                            size="md"
                             minLength={8}
                           />
                           <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700 transition-colors"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700 transition-colors z-10"
                             title={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
                           >
                             {showPassword ? (
@@ -535,22 +546,23 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, onClose, o
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Confirmer le mot de passe
-                        </label>
                         <div className="relative">
-                          <input
+                          <PremiumInput
                             type={showPasswordConfirm ? "text" : "password"}
                             value={passwordData.newPasswordConfirm}
-                            onChange={(e) => setPasswordData({ ...passwordData, newPasswordConfirm: e.target.value })}
-                            className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none"
+                            onChange={(value) => setPasswordData({ ...passwordData, newPasswordConfirm: value })}
+                            label="Confirmer le mot de passe"
                             placeholder="Confirmer le mot de passe"
+                            icon={<Lock className="w-4 h-4" />}
+                            variant="outlined"
+                            size="md"
                             minLength={8}
+                            error={passwordData.newPasswordConfirm && passwordData.newPassword !== passwordData.newPasswordConfirm ? 'Les mots de passe ne correspondent pas' : undefined}
                           />
                           <button
                             type="button"
                             onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700 transition-colors"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700 transition-colors z-10"
                             title={showPasswordConfirm ? "Masquer le mot de passe" : "Afficher le mot de passe"}
                           >
                             {showPasswordConfirm ? (
@@ -560,12 +572,6 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, onClose, o
                             )}
                           </button>
                         </div>
-                        {passwordData.newPasswordConfirm && passwordData.newPassword !== passwordData.newPasswordConfirm && (
-                          <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3" />
-                            Les mots de passe ne correspondent pas
-                          </p>
-                        )}
                       </div>
                     </div>
                   )}
@@ -582,56 +588,61 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, onClose, o
                   Informations structure
                 </h3>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nom de la structure</label>
-                  <input
-                    type="text"
-                    value={clientFields.nomStructure}
-                    onChange={(e) => setClientFields({ ...clientFields, nomStructure: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                  />
-                </div>
+                <PremiumInput
+                  type="text"
+                  value={clientFields.nomStructure}
+                  onChange={(value) => setClientFields({ ...clientFields, nomStructure: value })}
+                  label="Nom de la structure"
+                  placeholder="Nom de l'entreprise ou organisation"
+                  icon={<Building2 className="w-4 h-4" />}
+                  variant="outlined"
+                  size="md"
+                />
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Adresse</label>
-                  <input
-                    type="text"
-                    value={clientFields.adresse}
-                    onChange={(e) => setClientFields({ ...clientFields, adresse: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                  />
-                </div>
+                <PremiumInput
+                  type="text"
+                  value={clientFields.adresse}
+                  onChange={(value) => setClientFields({ ...clientFields, adresse: value })}
+                  label="Adresse"
+                  placeholder="123 Avenue Mohammed V, Casablanca"
+                  icon={<MapPin className="w-4 h-4" />}
+                  variant="outlined"
+                  size="md"
+                />
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Telephone</label>
-                    <input
-                      type="tel"
-                      value={clientFields.telephone}
-                      onChange={(e) => setClientFields({ ...clientFields, telephone: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Contact principal</label>
-                    <input
-                      type="text"
-                      value={clientFields.contactPrincipal}
-                      onChange={(e) => setClientFields({ ...clientFields, contactPrincipal: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email de facturation</label>
-                  <input
-                    type="email"
-                    value={clientFields.emailFacturation}
-                    onChange={(e) => setClientFields({ ...clientFields, emailFacturation: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                  <PremiumInput
+                    type="tel"
+                    value={clientFields.telephone}
+                    onChange={(value) => setClientFields({ ...clientFields, telephone: value })}
+                    label="Téléphone"
+                    placeholder="+212 6XX XXX XXX"
+                    icon={<Phone className="w-4 h-4" />}
+                    variant="outlined"
+                    size="md"
+                  />
+                  <PremiumInput
+                    type="text"
+                    value={clientFields.contactPrincipal}
+                    onChange={(value) => setClientFields({ ...clientFields, contactPrincipal: value })}
+                    label="Contact principal"
+                    placeholder="Nom du contact"
+                    icon={<UserCheck className="w-4 h-4" />}
+                    variant="outlined"
+                    size="md"
                   />
                 </div>
+
+                <PremiumInput
+                  type="email"
+                  value={clientFields.emailFacturation}
+                  onChange={(value) => setClientFields({ ...clientFields, emailFacturation: value })}
+                  label="Email de facturation"
+                  placeholder="facturation@exemple.com"
+                  icon={<Mail className="w-4 h-4" />}
+                  variant="outlined"
+                  size="md"
+                />
               </>
             )}
 

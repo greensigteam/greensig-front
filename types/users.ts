@@ -387,8 +387,18 @@ export interface EquipeList {
   chefEquipeNom: string | null;
   superviseur: number | null;
   superviseurNom: string | null;
+
+  // ✅ NOUVEAU : Système multi-sites
+  sitePrincipal: number | null;
+  sitePrincipalNom: string | null;
+  sitesSecondaires: number[];
+  sitesSecondairesNoms: string[];
+  tousLesSites: { id: number; nom: string; code: string | null }[];
+
+  // ⚠️ LEGACY : Anciens champs (conservés temporairement)
   site: number | null;
   siteNom: string | null;
+
   actif: boolean;
   dateCreation: string;
   nombreMembres: number;
@@ -404,8 +414,14 @@ export interface EquipeDetail extends EquipeList {
 export interface EquipeCreate {
   nomEquipe: string;
   chefEquipe?: number | null;
-  superviseur?: number | null;
+
+  // ✅ NOUVEAU : Système multi-sites
+  sitePrincipal?: number | null;
+  sitesSecondaires?: number[];
+
+  // ⚠️ LEGACY : Ancien champ (optionnel)
   site?: number | null;
+
   actif?: boolean;
   membres?: number[];
 }
@@ -413,8 +429,14 @@ export interface EquipeCreate {
 export interface EquipeUpdate {
   nomEquipe?: string;
   chefEquipe?: number | null;
-  // ⚠️ superviseur supprimé : désormais déduit automatiquement du site
+
+  // ✅ NOUVEAU : Système multi-sites
+  sitePrincipal?: number | null;
+  sitesSecondaires?: number[];
+
+  // ⚠️ LEGACY : Ancien champ (optionnel)
   site?: number | null;
+
   actif?: boolean;
 }
 

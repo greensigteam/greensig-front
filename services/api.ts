@@ -1552,3 +1552,87 @@ export function getExportMimeType(format: ExportFormat): string {
     default: return 'application/octet-stream';
   }
 }
+
+// ==============================================================================
+// API CLIENT OBJECT (axios-like interface)
+// ==============================================================================
+
+/**
+ * Simple API client object with axios-like interface
+ * Uses apiFetch internally for all HTTP calls
+ */
+export const api = {
+  /**
+   * GET request
+   */
+  async get(url: string, config?: { params?: Record<string, any> }) {
+    let fullUrl = url;
+    if (config?.params) {
+      const params = new URLSearchParams();
+      Object.entries(config.params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          params.append(key, String(value));
+        }
+      });
+      fullUrl = `${url}?${params.toString()}`;
+    }
+    const response = await apiFetch(fullUrl, { method: 'GET' });
+    const data = await response.json();
+    return { data };
+  },
+
+  /**
+   * POST request
+   */
+  async post(url: string, data?: any, config?: RequestInit) {
+    const response = await apiFetch(url, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      ...config,
+    });
+    const responseData = await response.json();
+    return { data: responseData };
+  },
+
+  /**
+   * PATCH request
+   */
+  async patch(url: string, data?: any, config?: RequestInit) {
+    const response = await apiFetch(url, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+      ...config,
+    });
+    const responseData = await response.json();
+    return { data: responseData };
+  },
+
+  /**
+   * PUT request
+   */
+  async put(url: string, data?: any, config?: RequestInit) {
+    const response = await apiFetch(url, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      ...config,
+    });
+    const responseData = await response.json();
+    return { data: responseData };
+  },
+
+  /**
+   * DELETE request
+   */
+  async delete(url: string, config?: RequestInit) {
+    const response = await apiFetch(url, {
+      method: 'DELETE',
+      ...config,
+    });
+    // DELETE may return 204 No Content, so check before parsing JSON
+    if (response.status === 204) {
+      return { data: null };
+    }
+    const data = await response.json();
+    return { data };
+  },
+};

@@ -98,6 +98,7 @@ const SuiviTaches: React.FC = () => {
     const [showEditModal, setShowEditModal] = useState(false);
     const [typesTaches, setTypesTaches] = useState<TypeTache[]>([]);
     const [loadingTypesTaches, setLoadingTypesTaches] = useState(false);
+    const [updatingTask, setUpdatingTask] = useState(false);
 
     // Set search placeholder
     useEffect(() => {
@@ -190,14 +191,29 @@ const SuiviTaches: React.FC = () => {
 
     const handleTaskUpdate = async (data: TacheCreate) => {
         if (!selectedTache) return;
+        setUpdatingTask(true);
         try {
-            const updatedTache = await planningService.updateTache(selectedTache.id, data);
-            setSelectedTache(updatedTache);
-            setTaches(prev => prev.map(t => t.id === updatedTache.id ? updatedTache : t));
+            await planningService.updateTache(selectedTache.id, data);
+
+            // Recharger toutes les tâches pour avoir les détails (_detail fields)
+            // C'est plus rapide que getTache() car la liste utilise des serializers optimisés
+            await loadTaches();
+
+            // Trouver la tâche mise à jour dans la nouvelle liste
+            setTaches(prev => {
+                const updatedTache = prev.find(t => t.id === selectedTache.id);
+                if (updatedTache) {
+                    setSelectedTache(updatedTache);
+                }
+                return prev;
+            });
+
             setShowEditModal(false);
         } catch (error) {
             console.error("Erreur mise à jour tâche", error);
             throw error;
+        } finally {
+            setUpdatingTask(false);
         }
     };
 
@@ -602,12 +618,12 @@ const SuiviTaches: React.FC = () => {
                                             </span>
                                             <span className="flex items-center gap-1 truncate max-w-[200px]" title={
                                                 tache.objets_detail?.length
-                                                    ? tache.objets_detail.map(o => o.site_nom || 'Site inconnu').join(', ')
+                                                    ? `${tache.objets_detail[0]?.site_nom || 'Site'} - ${tache.objets_detail.length} objet${tache.objets_detail.length > 1 ? 's' : ''}`
                                                     : 'Aucune localisation'
                                             }>
                                                 <MapPin className="w-3.5 h-3.5 shrink-0" />
                                                 {tache.objets_detail?.length
-                                                    ? (tache.objets_detail[0]?.site_nom || 'Site') + (tache.objets_detail.length > 1 ? ` (+${tache.objets_detail.length - 1})` : '')
+                                                    ? `${tache.objets_detail[0]?.site_nom || 'Site'} (${tache.objets_detail.length} obj.)`
                                                     : 'Non localisé'
                                                 }
                                             </span>
@@ -755,26 +771,64 @@ const SuiviTaches: React.FC = () => {
                                         {/* Sites et Sous-sites */}
                                         {selectedTache.objets_detail && selectedTache.objets_detail.length > 0 ? (
                                             <div className="space-y-2">
-                                                {selectedTache.objets_detail.map((obj, idx) => (
-                                                    <div key={idx} className="flex items-center gap-2 text-sm">
-                                                        <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></div>
-                                                        <span className="font-medium text-slate-800">{obj.site_nom || `Site #${obj.site}`}</span>
-                                                        {obj.sous_site && obj.sous_site_nom && (
-                                                            <>
-                                                                <ChevronRight className="w-3 h-3 text-slate-400" />
-                                                                <span className="text-slate-600">{obj.sous_site_nom}</span>
-                                                            </>
-                                                        )}
-                                                        {obj.nom_type && (
-                                                            <span className="text-slate-400 ml-auto">({obj.nom_type})</span>
-                                                        )}
-                                                    </div>
-                                                ))}
+                                                {/* Afficher le site une seule fois avec le nombre d'objets */}
+                                                <div className="flex items-center gap-2 text-sm">
+                                                    <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></div>
+                                                    <span className="font-medium text-slate-800">
+                                                        {selectedTache.objets_detail[0]?.site_nom || `Site #${selectedTache.objets_detail[0]?.site}`}
+                                                    </span>
+                                                    <span className="text-slate-500 text-xs">
+                                                        ({selectedTache.objets_detail.length} objet{selectedTache.objets_detail.length > 1 ? 's' : ''})
+                                                    </span>
+                                                </div>
                                             </div>
                                         ) : (
                                             <p className="text-sm text-slate-500 italic">Aucun objet d'inventaire associé</p>
                                         )}
                                     </div>
+
+                                    {/* Objets concernés */}
+                                    {selectedTache.objets_detail && selectedTache.objets_detail.length > 0 && (
+                                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                            <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center justify-between">
+                                                <span className="flex items-center gap-2">
+                                                    <Package className="w-4 h-4 text-emerald-600" />
+                                                    Objets concernés
+                                                </span>
+                                                <span className="text-xs font-normal text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
+                                                    {selectedTache.objets_detail.length}
+                                                </span>
+                                            </h3>
+
+                                            {/* Liste scrollable des objets */}
+                                            <div
+                                                className="max-h-48 overflow-y-auto pr-2 space-y-2"
+                                                style={{
+                                                    scrollbarWidth: 'thin',
+                                                    scrollbarColor: '#cbd5e1 #f1f5f9'
+                                                }}
+                                            >
+                                                {selectedTache.objets_detail.map((obj, idx) => (
+                                                    <div
+                                                        key={idx}
+                                                        className="flex items-center gap-3 p-2.5 bg-white rounded-lg border border-slate-200 hover:border-emerald-300 hover:shadow-sm transition-all group"
+                                                    >
+                                                        <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0 group-hover:bg-emerald-200 transition-colors">
+                                                            <Package className="w-4 h-4 text-emerald-600" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-medium text-slate-800 truncate">
+                                                                {obj.nom_type || obj.display || `Objet #${obj.id}`}
+                                                            </p>
+                                                            <p className="text-xs text-slate-500">
+                                                                ID: {obj.id}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Dates */}
                                     <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
@@ -1207,6 +1261,7 @@ const SuiviTaches: React.FC = () => {
                     typesTaches={typesTaches}
                     equipes={equipes}
                     tache={selectedTache}
+                    isSubmitting={updatingTask}
                 />
             )}
         </div>

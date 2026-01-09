@@ -62,8 +62,6 @@ export const ReclamationTimeline: React.FC<ReclamationTimelineProps> = ({
         }
     };
 
-    const formatStatus = (s: string) => s ? s.toLowerCase().replace(/_/g, ' ') : '';
-
     // Toutes les photos combinées pour la galerie
     const allPhotos = [...photos, ...photosTaches];
 
@@ -91,12 +89,12 @@ export const ReclamationTimeline: React.FC<ReclamationTimelineProps> = ({
                             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                                 <div>
                                     <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide border ${getStatusColor(event.statut_nouveau)}`}>
-                                        {formatStatus(event.statut_nouveau)}
+                                        {event.statut_nouveau_display || event.statut_nouveau}
                                     </span>
 
                                     {event.statut_precedent && (
                                         <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                                            Précédemment : {formatStatus(event.statut_precedent)}
+                                            Précédemment : {event.statut_precedent_display || event.statut_precedent}
                                         </p>
                                     )}
                                 </div>

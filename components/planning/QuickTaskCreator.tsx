@@ -1,9 +1,9 @@
-import { useState, useMemo, useEffect, useRef, type FC } from 'react';
+import { useState, useMemo, useEffect, type FC } from 'react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
     X, Search, ChevronRight, ChevronLeft, MapPin, TreePine, Users,
-    CheckCircle2, Calendar, Clock, Sparkles, AlertCircle, Filter
+    CheckCircle2, Calendar, Clock, Sparkles, AlertCircle, Filter, RefreshCw
 } from 'lucide-react';
 import { TypeTache, TacheCreate, PrioriteTache } from '../../types/planning';
 import { EquipeList } from '../../types/users';
@@ -11,6 +11,18 @@ import { InventoryObjectOption } from './TaskFormModal';
 import { RecurrenceSelector, type RecurrenceParams } from './RecurrenceSelector';
 import { DataTable, Column } from '../DataTable';
 import { StatusBadge } from '../StatusBadge';
+import { PremiumInput } from '../modals/PremiumFormComponents';
+import { planningService } from '../../services/planningService';
+
+// ✅ PHASE 1: Interface pour les ratios de productivité
+interface RatioProductivite {
+    id: number;
+    id_type_tache: number;
+    type_objet: string;
+    ratio: number;
+    unite_mesure: string;
+    actif: boolean;
+}
 
 // ============================================================================
 // TYPES
@@ -218,6 +230,13 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
     const [priorite, setPriorite] = useState<PrioriteTache>(3);
     const [recurrence, setRecurrence] = useState<RecurrenceParams | null>(null);
 
+    // ✅ PHASE 1: États pour planification intelligente
+    const [ratios, setRatios] = useState<RatioProductivite[]>([]);
+    const [loadingRatios, setLoadingRatios] = useState(false);
+    const [calculerChargeAuto, setCalculerChargeAuto] = useState(true); // Default: ON
+    const [repartirMultiJours, setRepartirMultiJours] = useState(true); // Default: ON
+    const [autoRecurrenceActivated, setAutoRecurrenceActivated] = useState(false); // Track if recurrence was auto-activated
+
     // Loading states
     const [loadingObjects, setLoadingObjects] = useState(false);
     const [availableObjects, setAvailableObjects] = useState<InventoryObjectOption[]>([]);
@@ -233,18 +252,56 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
     const [objectEtatFilter, setObjectEtatFilter] = useState<string>('all');
 
     // Date/Time from slot selection (editable)
-    const [startTime, setStartTime] = useState(initialStartTime || format(initialDate, 'HH:mm'));
-    const [endTime, setEndTime] = useState(initialEndTime || format(new Date(initialDate.getTime() + 3600000), 'HH:mm'));
+    // ✅ HARMONIZED WITH TaskFormModal: Use current time if initialDate is midnight
+    const [startTime, setStartTime] = useState(() => {
+        // Check if initialStartTime is provided AND not midnight
+        if (initialStartTime && initialStartTime !== '00:00') {
+            return initialStartTime;
+        }
 
-    // Refs for time inputs (auto-close pickers)
-    const startTimeRef = useRef<HTMLInputElement>(null);
-    const endTimeRef = useRef<HTMLInputElement>(null);
+        const hours = initialDate.getHours();
+        const minutes = initialDate.getMinutes();
+
+        // If initialDate has a significant time (not midnight) → use it
+        if (hours > 0 || minutes > 0) {
+            return format(initialDate, 'HH:mm');
+        }
+
+        // Otherwise (midnight), use current time NOW (like TaskFormModal)
+        return format(new Date(), 'HH:mm');
+    });
+
+    const [endTime, setEndTime] = useState(() => {
+        // Check if initialEndTime is provided AND not midnight/early morning
+        if (initialEndTime && initialEndTime !== '00:00' && initialEndTime !== '01:00') {
+            return initialEndTime;
+        }
+
+        // Calculate end time: 17:00 or +1h if after 16h (like TaskFormModal)
+        const now = new Date();
+        if (now.getHours() >= 16) {
+            // If after 16h, end time = now + 1 hour
+            return format(new Date(now.getTime() + 60 * 60 * 1000), 'HH:mm');
+        }
+
+        // Otherwise, end at 17:00 (end of workday)
+        return '17:00';
+    });
 
     // Debug: Log sites prop
     useEffect(() => {
         console.log('[QuickTaskCreator] Sites prop received:', sites);
         console.log('[QuickTaskCreator] Sites count:', sites.length);
     }, [sites]);
+
+    // ✅ PHASE 1: Charger les ratios de productivité au montage
+    useEffect(() => {
+        setLoadingRatios(true);
+        planningService.getRatios({ actif: true })
+            .then(setRatios)
+            .catch(err => console.error('Erreur chargement ratios:', err))
+            .finally(() => setLoadingRatios(false));
+    }, []);
 
     // Filter types by search
     const filteredTypes = useMemo(() => {
@@ -297,11 +354,152 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
     }, [availableObjects]);
 
     // Filter equipes by selected site
+    // ✅ NOUVEAU : Prend en compte le système multi-sites (principal + secondaires + legacy)
     const filteredEquipes = useMemo(() => {
         if (!selectedSite) return equipes;
-        // Filter equipes assigned to the selected site
-        return equipes.filter(e => e.siteNom === selectedSite.name);
+        // Filter equipes that can work on the selected site (site principal, secondaires, or legacy)
+        return equipes.filter(e => {
+            // Check site principal
+            if (e.sitePrincipalNom === selectedSite.name) return true;
+
+            // Check sites secondaires
+            if (e.sitesSecondairesNoms && e.sitesSecondairesNoms.includes(selectedSite.name)) return true;
+
+            // Legacy fallback
+            if (e.siteNom === selectedSite.name) return true;
+
+            return false;
+        });
     }, [equipes, selectedSite]);
+
+    // ✅ PHASE 1: Calculer l'aperçu de charge basé sur les objets sélectionnés et les ratios
+    const chargePreview = useMemo(() => {
+        if (!selectedType || selectedObjects.length === 0 || ratios.length === 0) {
+            return null;
+        }
+
+        // Grouper les objets par type et calculer la superficie totale si surfacique
+        const objectsByType = selectedObjects.reduce((acc, obj) => {
+            if (!acc[obj.type]) {
+                acc[obj.type] = { count: 0, superficie: 0, objects: [] };
+            }
+            acc[obj.type].count += 1;
+            acc[obj.type].superficie += obj.superficie || 0;
+            acc[obj.type].objects.push(obj);
+            return acc;
+        }, {} as Record<string, { count: number; superficie: number; objects: InventoryObjectOption[] }>);
+
+        let totalHeures = 0;
+        const details: { type: string; count: number; superficie?: number; ratio: RatioProductivite | null; heures: number }[] = [];
+
+        for (const [type, data] of Object.entries(objectsByType)) {
+            // Trouver le ratio correspondant pour ce type de tâche et ce type d'objet
+            const ratio = ratios.find(r =>
+                r.id_type_tache === selectedType.id &&
+                r.type_objet.toLowerCase() === type.toLowerCase()
+            );
+
+            if (ratio) {
+                let heures = 0;
+
+                // Calculer selon l'unité de mesure
+                if (ratio.unite_mesure === 'm2' && data.superficie > 0) {
+                    // Objets surfaciques: heures = superficie / ratio
+                    heures = data.superficie / ratio.ratio;
+                } else if (ratio.unite_mesure === 'ml') {
+                    // Objets linéaires: fallback sur le count
+                    heures = data.count / ratio.ratio;
+                } else {
+                    // Mesure 'unite': heures = count / ratio
+                    heures = data.count / ratio.ratio;
+                }
+
+                totalHeures += heures;
+                details.push({
+                    type,
+                    count: data.count,
+                    superficie: data.superficie > 0 ? data.superficie : undefined,
+                    ratio,
+                    heures
+                });
+            } else {
+                details.push({ type, count: data.count, ratio: null, heures: 0 });
+            }
+        }
+
+        return {
+            totalHeures: Math.round(totalHeures * 100) / 100,
+            details,
+            hasUnconfiguredTypes: details.some(d => d.ratio === null)
+        };
+    }, [selectedType, selectedObjects, ratios]);
+
+    // ✅ PHASE 2.2: Auto-activate recurrence when charge > 10h (intelligent calculation)
+    useEffect(() => {
+        // Skip if recurrence already active, or no charge preview
+        if (recurrence || !chargePreview?.totalHeures) return;
+
+        // Skip if user disabled auto-calculation or multi-day splitting
+        if (!calculerChargeAuto || !repartirMultiJours) return;
+
+        // Skip if charge is reasonable for one day (≤ 10h)
+        if (chargePreview.totalHeures <= 10) return;
+
+        // Skip if no team selected (need team to calculate work hours)
+        const equipeId = selectedEquipes.length > 0 ? selectedEquipes[0] : null;
+        if (!equipeId) {
+            console.log('⚠️ No team selected, skipping intelligent recurrence calculation');
+            return;
+        }
+
+        // Call API to calculate recommended occurrences based on real work hours
+        const dateDebut = format(initialDate, 'yyyy-MM-dd');
+
+        console.log(`🔄 Calculating intelligent recurrence: ${chargePreview.totalHeures}h for team ${equipeId}`);
+
+        planningService.calculateRecurrenceRecommendee({
+            equipe_id: equipeId,
+            charge_totale_heures: chargePreview.totalHeures,
+            date_debut: dateDebut,
+            frequence: 'daily'
+        })
+            .then(response => {
+                const days = response.nombre_occurrences;
+                const endDate = new Date(initialDate);
+                endDate.setDate(endDate.getDate() + (days - 1));
+
+                console.log(`✅ Intelligent recurrence calculated: ${days} days (avg ${response.heures_par_jour_moyen}h/day)`);
+
+                // Auto-activate DAILY recurrence
+                setRecurrence({
+                    frequence: 'daily',
+                    interval: 1,
+                    nombre_occurrences: days,
+                    date_fin: format(endDate, 'yyyy-MM-dd')
+                });
+
+                // Mark that recurrence was auto-activated
+                setAutoRecurrenceActivated(true);
+            })
+            .catch(err => {
+                console.error('❌ Error calculating intelligent recurrence, falling back to 10h/day:', err);
+
+                // Fallback to hardcoded 10h/day if API fails
+                const days = Math.ceil(chargePreview.totalHeures / 10);
+                const endDate = new Date(initialDate);
+                endDate.setDate(endDate.getDate() + (days - 1));
+
+                setRecurrence({
+                    frequence: 'daily',
+                    interval: 1,
+                    nombre_occurrences: days,
+                    date_fin: format(endDate, 'yyyy-MM-dd')
+                });
+
+                setAutoRecurrenceActivated(true);
+            });
+
+    }, [chargePreview?.totalHeures, recurrence, initialDate, selectedEquipes, calculerChargeAuto, repartirMultiJours]);
 
     const handleSelectType = (type: TypeTache) => {
         setSelectedType(type);
@@ -381,7 +579,12 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
             objets: selectedObjects.map(o => o.id),
             id_client: null,
             reclamation: null,
-            charge_estimee_heures: null
+            // ✅ PHASE 1: Ajouter la charge calculée si option activée
+            charge_estimee_heures: calculerChargeAuto && chargePreview?.totalHeures ? chargePreview.totalHeures : null,
+            // @ts-ignore - Flags pour le backend
+            calculer_charge_auto: calculerChargeAuto,
+            // @ts-ignore - Flags pour le backend
+            repartir_multi_jours: repartirMultiJours
         };
 
         onSubmit(taskData);
@@ -767,55 +970,41 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
 
                                     <div className="bg-white rounded-lg p-4 border border-emerald-100">
                                         <div className="grid grid-cols-3 gap-4">
-                                            {/* Date (lecture seule) */}
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                                                    Date
-                                                </label>
-                                                <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 font-medium">
-                                                    {format(initialDate, 'dd/MM/yyyy', { locale: fr })}
-                                                </div>
-                                            </div>
+                                            {/* Date (lecture seule) - ✅ Consistent design with PremiumInput */}
+                                            <PremiumInput
+                                                type="text"
+                                                value={format(initialDate, 'dd/MM/yyyy', { locale: fr })}
+                                                onChange={() => {}} // Read-only
+                                                label="Date"
+                                                icon={<Calendar className="w-4 h-4" />}
+                                                variant="outlined"
+                                                size="sm"
+                                                disabled={true}
+                                            />
 
                                             {/* Heure début */}
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                                                    Heure début
-                                                </label>
-                                                <input
-                                                    ref={startTimeRef}
-                                                    type="time"
-                                                    value={startTime}
-                                                    onChange={(e) => {
-                                                        setStartTime(e.target.value);
-                                                        // Auto-fermeture du picker après sélection
-                                                        setTimeout(() => {
-                                                            startTimeRef.current?.blur();
-                                                        }, 100);
-                                                    }}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-sm font-medium"
-                                                />
-                                            </div>
+                                            <PremiumInput
+                                                type="time"
+                                                value={startTime}
+                                                onChange={(value) => setStartTime(value)}
+                                                label="Heure début"
+                                                icon={<Clock className="w-4 h-4" />}
+                                                variant="outlined"
+                                                size="sm"
+                                                required
+                                            />
 
                                             {/* Heure fin */}
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                                                    Heure fin
-                                                </label>
-                                                <input
-                                                    ref={endTimeRef}
-                                                    type="time"
-                                                    value={endTime}
-                                                    onChange={(e) => {
-                                                        setEndTime(e.target.value);
-                                                        // Auto-fermeture du picker après sélection
-                                                        setTimeout(() => {
-                                                            endTimeRef.current?.blur();
-                                                        }, 100);
-                                                    }}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-sm font-medium"
-                                                />
-                                            </div>
+                                            <PremiumInput
+                                                type="time"
+                                                value={endTime}
+                                                onChange={(value) => setEndTime(value)}
+                                                label="Heure fin"
+                                                icon={<Clock className="w-4 h-4" />}
+                                                variant="outlined"
+                                                size="sm"
+                                                required
+                                            />
                                         </div>
 
                                         {/* Validation Error */}
@@ -859,6 +1048,19 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                                         <div className="space-y-2">
                                             {filteredEquipes.map(equipe => {
                                                 const isSelected = selectedEquipes.includes(equipe.id);
+                                                // Afficher les sites couverts par l'équipe
+                                                const sitesCouverture = [];
+                                                if (equipe.sitePrincipalNom) sitesCouverture.push(equipe.sitePrincipalNom);
+                                                if (equipe.sitesSecondairesNoms && equipe.sitesSecondairesNoms.length > 0) {
+                                                    sitesCouverture.push(...equipe.sitesSecondairesNoms);
+                                                }
+                                                if (sitesCouverture.length === 0 && equipe.siteNom) {
+                                                    sitesCouverture.push(equipe.siteNom);
+                                                }
+                                                const sitesText = sitesCouverture.length > 0
+                                                    ? sitesCouverture.join(', ')
+                                                    : 'Aucun site affecté';
+
                                                 return (
                                                     <button
                                                         key={equipe.id}
@@ -876,13 +1078,18 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                                                                 : 'border-gray-200 bg-white hover:border-gray-300'
                                                         }`}
                                                     >
-                                                        <div className="flex items-center gap-3">
-                                                            <Users className={`w-5 h-5 ${isSelected ? 'text-emerald-600' : 'text-gray-400'}`} />
-                                                            <span className={`font-medium ${isSelected ? 'text-emerald-900' : 'text-gray-700'}`}>
-                                                                {equipe.nomEquipe}
-                                                            </span>
+                                                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                            <Users className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-emerald-600' : 'text-gray-400'}`} />
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className={`font-medium ${isSelected ? 'text-emerald-900' : 'text-gray-700'}`}>
+                                                                    {equipe.nomEquipe}
+                                                                </div>
+                                                                <div className={`text-xs truncate ${isSelected ? 'text-emerald-600' : 'text-gray-500'}`}>
+                                                                    {sitesText}
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                        {isSelected && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
+                                                        {isSelected && <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />}
                                                     </button>
                                                 );
                                             })}
@@ -926,6 +1133,184 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                                         placeholder="Ajoutez des notes ou instructions..."
                                     />
                                 </div>
+
+                                {/* ✅ PHASE 1: Aperçu de charge et options de planification */}
+                                {selectedObjects.length > 0 && (
+                                    <div className="space-y-4">
+                                        {/* Aperçu de charge */}
+                                        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <Sparkles className="w-5 h-5 text-blue-600" />
+                                                <h4 className="font-semibold text-gray-900">Charge estimée</h4>
+                                            </div>
+
+                                            {loadingRatios ? (
+                                                <div className="bg-white p-3 rounded-lg text-center text-sm text-gray-500">
+                                                    Chargement des ratios...
+                                                </div>
+                                            ) : chargePreview ? (
+                                                <div className="bg-white rounded-lg p-3 space-y-2 border border-blue-100">
+                                                    {/* Total */}
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-sm font-medium text-blue-800">
+                                                            Charge totale
+                                                        </span>
+                                                        <span className="text-lg font-bold text-blue-700">
+                                                            {chargePreview.totalHeures > 0 ? `${chargePreview.totalHeures}h` : '—'}
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Détails par type */}
+                                                    {chargePreview.details.length > 0 && (
+                                                        <div className="border-t border-blue-200 pt-2 space-y-1">
+                                                            {chargePreview.details.map((detail, idx) => (
+                                                                <div key={idx} className="flex items-center justify-between text-xs">
+                                                                    <span className="text-blue-700">
+                                                                        {detail.count}x {detail.type}
+                                                                        {detail.superficie && (
+                                                                            <span className="font-semibold text-blue-800">
+                                                                                {' '}({detail.superficie.toFixed(0)}m²)
+                                                                            </span>
+                                                                        )}
+                                                                    </span>
+                                                                    {detail.ratio ? (
+                                                                        <span className="text-blue-600">
+                                                                            {detail.ratio.ratio} {detail.ratio.unite_mesure === 'm2' ? 'm²' : detail.ratio.unite_mesure === 'ml' ? 'ml' : 'unités'}/h
+                                                                            → <strong>{Math.round(detail.heures * 100) / 100}h</strong>
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-amber-600 italic">
+                                                                            Ratio non configuré
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Avertissement types non configurés */}
+                                                    {chargePreview.hasUnconfiguredTypes && (
+                                                        <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded mt-2">
+                                                            Certains types d'objets n'ont pas de ratio configuré pour ce type de tâche.
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="bg-white p-3 rounded-lg text-center text-sm text-gray-500">
+                                                    {ratios.length === 0
+                                                        ? 'Aucun ratio configuré'
+                                                        : 'Sélectionnez un type de tâche et des objets'}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Options de planification intelligente */}
+                                        {chargePreview && (
+                                            <div className="space-y-3">
+                                                <label className="block text-sm font-medium text-gray-700">
+                                                    Options de planification
+                                                </label>
+
+                                                {/* Calculer charge automatiquement */}
+                                                <label className="flex items-start gap-3 cursor-pointer group p-3 border border-gray-200 rounded-lg hover:border-emerald-300 transition-colors">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={calculerChargeAuto}
+                                                        onChange={(e) => setCalculerChargeAuto(e.target.checked)}
+                                                        className="mt-1 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                                    />
+                                                    <div className="flex-1">
+                                                        <div className="text-sm font-medium text-gray-800 group-hover:text-emerald-700 transition-colors">
+                                                            ✅ Calculer la charge automatiquement
+                                                        </div>
+                                                        <p className="text-xs text-gray-500 mt-0.5">
+                                                            La charge est calculée en fonction des superficies et ratios de productivité
+                                                            {chargePreview.totalHeures > 0 && (
+                                                                <span className="font-semibold text-emerald-700"> ({chargePreview.totalHeures}h estimées)</span>
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                </label>
+
+                                                {/* Répartir sur plusieurs jours */}
+                                                <label className="flex items-start gap-3 cursor-pointer group p-3 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={repartirMultiJours}
+                                                        onChange={(e) => {
+                                                            const isChecked = e.target.checked;
+                                                            setRepartirMultiJours(isChecked);
+
+                                                            // Si décoché et récurrence active, la désactiver
+                                                            if (!isChecked && recurrence) {
+                                                                setRecurrence(null);
+                                                                setAutoRecurrenceActivated(false);
+                                                                console.log('🚫 Répartition multi-jours désactivée - récurrence supprimée');
+                                                            }
+                                                        }}
+                                                        className="mt-1 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                                    />
+                                                    <div className="flex-1">
+                                                        <div className="text-sm font-medium text-gray-800 group-hover:text-blue-700 transition-colors">
+                                                            📅 Répartir sur plusieurs jours
+                                                        </div>
+                                                        <p className="text-xs text-gray-500 mt-0.5">
+                                                            Si la charge dépasse 10h, utilisez la récurrence ci-dessous pour diviser sur plusieurs jours
+                                                            {chargePreview.totalHeures > 10 && (
+                                                                <span className="font-semibold text-blue-700"> (recommandé: ~{Math.ceil(chargePreview.totalHeures / 8)} jours)</span>
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                </label>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* ✅ Auto-Recurrence Banner */}
+                                {autoRecurrenceActivated && recurrence && (
+                                    <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-300 rounded-xl p-4 shadow-sm">
+                                        <div className="flex items-start gap-3">
+                                            <div className="bg-blue-500 rounded-full p-2 flex-shrink-0">
+                                                <RefreshCw className="w-5 h-5 text-white" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <h4 className="text-sm font-bold text-blue-900 mb-1">
+                                                    🔄 Récurrence activée automatiquement
+                                                </h4>
+                                                <p className="text-sm text-blue-700 mb-2">
+                                                    {chargePreview?.totalHeures ? (
+                                                        <>
+                                                            Charge totale : <strong>{chargePreview.totalHeures}h</strong> répartie sur <strong>{recurrence.nombre_occurrences} jours</strong>
+                                                            {' '}(≈ <strong>{(chargePreview.totalHeures / recurrence.nombre_occurrences).toFixed(1)}h/jour</strong>)
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            La tâche s'étend sur plusieurs jours. Elle sera créée <strong>{recurrence.nombre_occurrences} fois</strong>
+                                                        </>
+                                                    )}
+                                                    {' '}(du {format(initialDate, 'dd/MM/yyyy', { locale: fr })} au {recurrence.date_fin ? format(new Date(recurrence.date_fin), 'dd/MM/yyyy', { locale: fr }) : '—'}).
+                                                </p>
+                                                <p className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded inline-block mb-2">
+                                                    💡 La charge sera automatiquement répartie sur chaque jour
+                                                </p>
+                                                <div className="flex gap-2 mt-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setRecurrence(null);
+                                                            setAutoRecurrenceActivated(false);
+                                                        }}
+                                                        className="text-xs bg-white hover:bg-blue-50 text-blue-700 border border-blue-300 px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1"
+                                                    >
+                                                        <X className="w-3 h-3" />
+                                                        Désactiver la récurrence
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Récurrence */}
                                 <div>

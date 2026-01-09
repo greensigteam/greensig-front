@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { AlertCircle, Edit2, Trash2, X, MapPin, ClipboardList, Calendar, TrendingUp, RefreshCw, Loader2, Settings, MoreVertical, Clock, Star, BarChart3, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { AlertCircle, Edit2, Trash2, X, MapPin, ClipboardList, Calendar, TrendingUp, RefreshCw, Loader2, Settings, MoreVertical, Clock, Star, BarChart3, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText, AlertOctagon, Camera, Filter, Check, ChevronDown } from 'lucide-react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useSearch } from '../contexts/SearchContext';
 import { Reclamation, TypeReclamation, Urgence, ReclamationCreate, ReclamationStats } from '../types/reclamations';
@@ -17,6 +17,7 @@ import {
 } from '../services/reclamationsApi';
 import { planningService } from '../services/planningService';
 import { fetchEquipes, fetchCurrentUser } from '../services/usersApi';
+import { fetchAllSites, SiteFrontend } from '../services/api';
 import { TypeTache, TacheCreate, PRIORITE_LABELS, Tache, STATUT_TACHE_COLORS } from '../types/planning';
 import { EquipeList, Utilisateur } from '../types/users';
 import { PhotoUpload } from '../components/shared/PhotoUpload';
@@ -24,9 +25,75 @@ import TaskFormModal from '../components/planning/TaskFormModal';
 import { utcToLocalInput, localInputToUTC } from '../utils/dateHelpers';
 import { format } from 'date-fns';
 import LoadingScreen from '../components/LoadingScreen';
+import { PremiumInput, PremiumSelect, PremiumTextarea } from '../components/modals/PremiumFormComponents';
+import { RECLAMATION_STATUS_LABELS } from '../constants';
 
 import ConfirmModal from '../components/ConfirmModal';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
+
+// Composant CustomSelect pour des dropdowns modernes
+interface CustomSelectProps {
+    value: string;
+    onChange: (value: string) => void;
+    options: { value: string; label: string }[];
+    icon?: React.ReactNode;
+    placeholder?: string;
+    className?: string;
+}
+
+const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, options, icon, placeholder, className = '' }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const selectedLabel = options.find(opt => opt.value === value)?.label || placeholder || 'Sélectionner';
+
+    return (
+        <div className={`relative ${className}`} ref={containerRef}>
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className={`w-full flex items-center justify-between bg-white border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm hover:border-slate-400 ${isOpen ? 'ring-2 ring-emerald-500/20 border-emerald-500' : ''}`}
+            >
+                <div className="flex items-center gap-2 truncate">
+                    {icon && <span className="text-slate-500 flex-shrink-0">{icon}</span>}
+                    <span className={`truncate ${value === '' ? 'text-slate-600' : 'text-slate-900 font-medium'}`}>
+                        {selectedLabel}
+                    </span>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 flex-shrink-0 ml-2 ${isOpen ? 'transform rotate-180' : ''}`} />
+            </button>
+
+            {isOpen && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-auto animate-in fade-in zoom-in-95 duration-100">
+                    <div className="py-1">
+                        {options.map((option) => (
+                            <button
+                                key={option.value}
+                                onClick={() => {
+                                    onChange(option.value);
+                                    setIsOpen(false);
+                                }}
+                                className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between hover:bg-slate-50 transition-colors ${value === option.value ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-slate-700'}`}
+                            >
+                                <span className="truncate">{option.label}</span>
+                                {value === option.value && <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 const Reclamations: React.FC = () => {
     const navigate = useNavigate();
@@ -99,6 +166,14 @@ const Reclamations: React.FC = () => {
     const [currentPageTache, setCurrentPageTache] = useState(1);
     const [itemsPerPageTache, setItemsPerPageTache] = useState(10);
 
+    // Filtres
+    const [sites, setSites] = useState<SiteFrontend[]>([]);
+    const [filterStatut, setFilterStatut] = useState<string>('');
+    const [filterSite, setFilterSite] = useState<string>('');
+    const [filterDateDebut, setFilterDateDebut] = useState<string>('');
+    const [filterDateFin, setFilterDateFin] = useState<string>('');
+    const [showFilters, setShowFilters] = useState(false);
+
     // Set search placeholder
     useEffect(() => {
         setPlaceholder('Rechercher une réclamation par numéro, description...');
@@ -160,6 +235,13 @@ const Reclamations: React.FC = () => {
         setCurrentPageTache(1);
     }, [searchQuery, activeTab]);
 
+    // Reload reclamations when filters change
+    useEffect(() => {
+        if (sites.length > 0) { // S'assurer que les données de base sont chargées
+            loadReclamations();
+        }
+    }, [filterStatut, filterSite, filterDateDebut, filterDateFin]); // eslint-disable-line react-hooks/exhaustive-deps
+
     // Handle navigation from MapPage with site pre-selected
     useEffect(() => {
         const state = location.state as {
@@ -167,6 +249,8 @@ const Reclamations: React.FC = () => {
             siteId?: number | string;
             siteName?: string;
             openReclamationId?: number | string;
+            editReclamationId?: number;
+            editReclamationData?: any;
         } | null;
 
         if (state?.createFromSite && state?.siteId) {
@@ -178,25 +262,61 @@ const Reclamations: React.FC = () => {
             navigate(location.pathname, { replace: true, state: {} });
         }
 
+        // Éditer une réclamation depuis la page de détails
+        if (state?.editReclamationId) {
+            // Si les données sont déjà fournies, ouvrir immédiatement
+            if (state.editReclamationData) {
+                setEditingId(Number(state.editReclamationId));
+                setFormData({
+                    type_reclamation: state.editReclamationData.type_reclamation,
+                    urgence: state.editReclamationData.urgence,
+                    description: state.editReclamationData.description,
+                    zone: state.editReclamationData.zone,
+                    date_constatation: state.editReclamationData.date_constatation,
+                });
+                setExistingPhotos(state.editReclamationData.photos || []);
+                setIsCreateModalOpen(true);
+            } else {
+                // Sinon, charger les données
+                handleEdit(Number(state.editReclamationId));
+            }
+            // Clear the navigation state
+            navigate(location.pathname, { replace: true, state: {} });
+        }
+
         // Ouvrir une réclamation spécifique depuis la carte - naviguer vers la page de détails
         if (state?.openReclamationId) {
             navigate(`/reclamations/${state.openReclamationId}`, { replace: true });
         }
     }, [location.state, navigate]);
 
+    const loadReclamations = async () => {
+        try {
+            const params: any = {};
+            if (filterStatut) params.statut = filterStatut;
+            if (filterSite) params.site = Number(filterSite);
+            if (filterDateDebut) params.date_debut = filterDateDebut;
+            if (filterDateFin) params.date_fin = filterDateFin;
+
+            const recsData = await fetchReclamations(params);
+            setReclamations(recsData);
+        } catch (error) {
+            console.error("Erreur chargement réclamations", error);
+        }
+    };
+
     const loadData = async () => {
         setLoading(true);
         try {
-            const [recsData, typesData, urgencesData, typesTachesData, equipesData, tachesLieesData, currentUserData] = await Promise.all([
-                fetchReclamations(),
+            const [typesData, urgencesData, typesTachesData, equipesData, tachesLieesData, currentUserData, sitesData] = await Promise.all([
                 fetchTypesReclamations(),
                 fetchUrgences(),
                 planningService.getTypesTaches(),
                 fetchEquipes(),
                 planningService.getTaches({ has_reclamation: true }),
-                fetchCurrentUser()
+                fetchCurrentUser(),
+                fetchAllSites()
             ]);
-            setReclamations(recsData);
             setTypes(typesData);
             setUrgences(urgencesData);
             setTypesTaches(typesTachesData);
@@ -208,6 +328,12 @@ const Reclamations: React.FC = () => {
             // Taches liées retourne PaginatedResponse ou tableau
             const tData = (tachesLieesData as any).results || tachesLieesData;
             setTachesLiees(Array.isArray(tData) ? tData : []);
+
+            // Sites - fetchAllSites retourne directement SiteFrontend[]
+            setSites(sitesData);
+
+            // Charger les réclamations avec les filtres
+            await loadReclamations();
 
         } catch (error) {
             console.error("Erreur chargement données", error);
@@ -308,9 +434,12 @@ const Reclamations: React.FC = () => {
     };
 
     const handleEdit = async (id: number) => {
+        // Ouvrir la modale immédiatement
+        setEditingId(id);
+        setIsCreateModalOpen(true);
+
         try {
             const fullRec = await fetchReclamationById(id);
-            setEditingId(fullRec.id);
             setFormData({
                 type_reclamation: fullRec.type_reclamation,
                 urgence: fullRec.urgence,
@@ -319,9 +448,10 @@ const Reclamations: React.FC = () => {
                 date_constatation: fullRec.date_constatation,
             });
             setExistingPhotos(fullRec.photos || []);
-            setIsCreateModalOpen(true);
         } catch (error) {
             console.error(error);
+            setIsCreateModalOpen(false);
+            setEditingId(null);
             setModalConfig({ isOpen: true, title: 'Erreur', message: "Impossible de charger pour édition.", variant: 'danger' });
         }
     };
@@ -429,6 +559,10 @@ const Reclamations: React.FC = () => {
         );
     }, [tachesLiees, searchQuery]);
 
+    // Active filters check
+    const hasActiveFilters = !!(filterStatut || filterSite || filterDateDebut || filterDateFin);
+    const activeFiltersCount = [filterStatut, filterSite, filterDateDebut, filterDateFin].filter(Boolean).length;
+
     // Pagination calculations
     const totalPagesRec = Math.ceil(filteredReclamations.length / itemsPerPageRec);
     const startIndexRec = (currentPageRec - 1) * itemsPerPageRec;
@@ -491,7 +625,24 @@ const Reclamations: React.FC = () => {
                         </span>
                     )}
 
-
+                    {/* Filters Button (only for reclamations tab) */}
+                    {activeTab === 'reclamations' && (
+                        <button
+                            onClick={() => setShowFilters(!showFilters)}
+                            className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${showFilters || hasActiveFilters
+                                ? 'bg-emerald-50 border-emerald-600 text-emerald-700'
+                                : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                                }`}
+                        >
+                            <Filter className="w-4 h-4" />
+                            <span>Filtres</span>
+                            {hasActiveFilters && (
+                                <span className="bg-emerald-600 text-white text-xs px-2 py-0.5 rounded-full">
+                                    {activeFiltersCount}
+                                </span>
+                            )}
+                        </button>
+                    )}
 
                     {/* Actions Dropdown */}
                     <div className="relative" ref={actionsMenuRef}>
@@ -525,6 +676,87 @@ const Reclamations: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Filters Panel */}
+            {showFilters && activeTab === 'reclamations' && (
+                <div className="mb-6 pb-4 border-b border-slate-200 bg-slate-50 p-4 rounded-lg">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* Filtre Statut */}
+                        <CustomSelect
+                            value={filterStatut}
+                            onChange={(val) => setFilterStatut(val)}
+                            options={[
+                                { value: '', label: 'Statut: Tous' },
+                                { value: 'NOUVELLE', label: 'En attente de lecture' },
+                                { value: 'PRISE_EN_COMPTE', label: 'Prise en compte' },
+                                { value: 'EN_COURS', label: 'En attente de réalisation' },
+                                { value: 'RESOLUE', label: 'Tâche terminée côté admin.' },
+                                { value: 'EN_ATTENTE_VALIDATION_CLOTURE', label: 'En attente validation clôture' },
+                                { value: 'CLOTUREE', label: 'Validée côté client' },
+                                { value: 'REJETEE', label: 'Rejetée' }
+                            ]}
+                            icon={<AlertOctagon className="w-4 h-4" />}
+                        />
+
+                        {/* Filtre Site */}
+                        <CustomSelect
+                            value={filterSite}
+                            onChange={(val) => setFilterSite(val)}
+                            options={[
+                                { value: '', label: 'Site: Tous' },
+                                ...sites.map(s => ({ value: s.id, label: s.name }))
+                            ]}
+                            icon={<MapPin className="w-4 h-4" />}
+                        />
+
+                        {/* Filtre Date Début */}
+                        <div className="relative">
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                <Calendar className="w-4 h-4 text-slate-500" />
+                            </div>
+                            <input
+                                type="date"
+                                value={filterDateDebut}
+                                onChange={(e) => setFilterDateDebut(e.target.value)}
+                                placeholder="Date début"
+                                className="w-full pl-10 pr-3 py-2.5 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm hover:border-slate-400"
+                            />
+                        </div>
+
+                        {/* Filtre Date Fin */}
+                        <div className="relative">
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                <Calendar className="w-4 h-4 text-slate-500" />
+                            </div>
+                            <input
+                                type="date"
+                                value={filterDateFin}
+                                onChange={(e) => setFilterDateFin(e.target.value)}
+                                placeholder="Date fin"
+                                className="w-full pl-10 pr-3 py-2.5 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm hover:border-slate-400"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Reset Button */}
+                    {hasActiveFilters && (
+                        <div className="mt-4 flex justify-end">
+                            <button
+                                onClick={() => {
+                                    setFilterStatut('');
+                                    setFilterSite('');
+                                    setFilterDateDebut('');
+                                    setFilterDateFin('');
+                                }}
+                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            >
+                                <X className="w-4 h-4" />
+                                Réinitialiser les filtres
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Table Reclamations */}
             {activeTab === 'reclamations' && (
@@ -608,7 +840,7 @@ const Reclamations: React.FC = () => {
                                                                 rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'bg-orange-500' :
                                                                     'bg-slate-400'
                                                         }`} />
-                                                    {rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'Validation' : rec.statut.toLowerCase().replace('_', ' ')}
+                                                    {rec.statut_display || rec.statut}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4">
@@ -949,9 +1181,7 @@ const Reclamations: React.FC = () => {
                                             <PieChart>
                                                 <Pie
                                                     data={Object.entries(stats.par_statut).map(([statut, count]) => ({
-                                                        name: statut === 'PRISE_EN_COMPTE' ? 'Prise en compte' :
-                                                            statut === 'EN_COURS' ? 'En cours' :
-                                                                statut.charAt(0) + statut.slice(1).toLowerCase(),
+                                                        name: RECLAMATION_STATUS_LABELS[statut] || statut,
                                                         value: count
                                                     }))}
                                                     cx="50%"
@@ -1075,79 +1305,64 @@ const Reclamations: React.FC = () => {
                                         </span>
                                     </div>
                                 )}
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Type de réclamation <span className="text-red-500">*</span></label>
-                                    <select
-                                        required
-                                        value={formData.type_reclamation || ''}
-                                        className="w-full rounded-lg border-slate-300 border p-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
-                                        onChange={e => setFormData({ ...formData, type_reclamation: Number(e.target.value) })}
-                                    >
-                                        <option value="">Sélectionner un type...</option>
-                                        {types.map(t => <option key={t.id} value={t.id}>{t.nom_reclamation}</option>)}
-                                    </select>
-                                </div>
+                                <PremiumSelect
+                                    value={formData.type_reclamation?.toString() || ''}
+                                    onChange={(value) => setFormData({ ...formData, type_reclamation: Number(value) })}
+                                    options={types.map(t => ({
+                                        value: t.id.toString(),
+                                        label: t.nom_reclamation
+                                    }))}
+                                    label="Type de réclamation"
+                                    placeholder="Sélectionner un type..."
+                                    icon={<FileText className="w-4 h-4" />}
+                                    required
+                                    variant="outlined"
+                                    size="md"
+                                />
 
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Urgence <span className="text-red-500">*</span></label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {urgences.map(u => (
-                                            <button
-                                                key={u.id}
-                                                type="button"
-                                                onClick={() => setFormData({ ...formData, urgence: u.id })}
-                                                className={`
-                                                    flex items-center justify-center p-2 rounded-lg border text-sm font-medium transition-all
-                                                    ${formData.urgence === u.id
-                                                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500'
-                                                        : 'border-slate-200 hover:border-slate-300 text-slate-600'}
-                                                `}
-                                            >
-                                                {u.niveau_urgence}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
+                                <PremiumSelect
+                                    value={formData.urgence?.toString() || ''}
+                                    onChange={(value) => setFormData({ ...formData, urgence: Number(value) })}
+                                    options={urgences.map(u => ({
+                                        value: u.id.toString(),
+                                        label: u.niveau_urgence
+                                    }))}
+                                    label="Urgence"
+                                    placeholder="Sélectionner un niveau d'urgence..."
+                                    icon={<AlertOctagon className="w-4 h-4" />}
+                                    required
+                                    variant="outlined"
+                                    size="md"
+                                />
 
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Description <span className="text-red-500">*</span></label>
-                                    <textarea
-                                        required
-                                        rows={4}
-                                        value={formData.description || ''}
-                                        className="w-full rounded-lg border-slate-300 border p-3 focus:ring-2 focus:ring-emerald-500 outline-none"
-                                        placeholder="Décrivez le problème..."
-                                        onChange={e => setFormData({ ...formData, description: e.target.value })}
-                                    />
-                                </div>
+                                <PremiumTextarea
+                                    value={formData.description || ''}
+                                    onChange={(value) => setFormData({ ...formData, description: value })}
+                                    label="Description"
+                                    placeholder="Décrivez le problème rencontré..."
+                                    rows={4}
+                                    required
+                                    variant="outlined"
+                                    size="md"
+                                />
 
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                                        Date de constatation <span className="text-red-500">*</span>
-                                    </label>
-                                    <div className="relative">
-                                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                        <input
-                                            type="datetime-local"
-                                            required
-                                            value={utcToLocalInput(formData.date_constatation)}
-                                            className="w-full pl-10 pr-4 py-2.5 rounded-lg border-slate-300 border focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
-                                            onChange={e => {
-                                                const utcValue = localInputToUTC(e.target.value);
-                                                setFormData({ ...formData, date_constatation: utcValue || undefined });
-                                            }}
-                                            onBlur={e => {
-                                                // Forcer la mise à jour au cas où le changement n'a pas été capturé
-                                                if (e.target.value && !formData.date_constatation) {
-                                                    const utcValue = localInputToUTC(e.target.value);
-                                                    setFormData({ ...formData, date_constatation: utcValue || undefined });
-                                                }
-                                            }}
-                                            step="60"
-                                        />
-                                    </div>
-                                    <p className="text-xs text-slate-500 mt-1">Date et heure où le problème a été constaté</p>
-                                </div>
+                                <PremiumInput
+                                    type="datetime-local"
+                                    value={utcToLocalInput(formData.date_constatation)}
+                                    onChange={(value) => {
+                                        const utcValue = localInputToUTC(value);
+                                        setFormData({
+                                            ...formData,
+                                            date_constatation: utcValue || undefined
+                                        });
+                                    }}
+                                    label="Date de constatation"
+                                    icon={<Calendar className="w-4 h-4" />}
+                                    hint="Date et heure où le problème a été constaté"
+                                    required
+                                    variant="outlined"
+                                    size="md"
+                                />
 
                                 {/* Section Photos Existantes (Edition) */}
                                 {existingPhotos.length > 0 && (
@@ -1169,10 +1384,13 @@ const Reclamations: React.FC = () => {
                                     </div>
                                 )}
 
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                                        {editingId ? 'Ajouter des photos' : 'Photos (optionnel)'}
-                                    </label>
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2 pb-2">
+                                        <Camera className="w-4 h-4 text-slate-600" />
+                                        <label className="text-sm font-semibold text-slate-800">
+                                            {editingId ? 'Ajouter des photos' : 'Photos'} <span className="text-xs text-slate-500 font-normal">(optionnel)</span>
+                                        </label>
+                                    </div>
                                     <PhotoUpload
                                         photos={photos}
                                         onChange={setPhotos}

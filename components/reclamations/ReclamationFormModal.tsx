@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Calendar, Circle, Pentagon, Target, AlertTriangle, Loader2, CheckCircle2 } from 'lucide-react';
+import { MapPin, Calendar, Circle, Pentagon, Target, AlertTriangle, Loader2, CheckCircle2, FileText, AlertOctagon, Camera } from 'lucide-react';
 import { TypeReclamation, Urgence, ReclamationCreate, Reclamation } from '../../types/reclamations';
 import { GeoJSONGeometry } from '../../types';
 import { createReclamation, uploadPhoto, detectSiteFromGeometry, DetectedSiteInfo } from '../../services/reclamationsApi';
 import { PhotoUpload } from '../shared/PhotoUpload';
 import { FormModal } from '../FormModal';
 import { utcToLocalInput, localInputToUTC } from '../../utils/dateHelpers';
+import { PremiumInput, PremiumSelect, PremiumTextarea } from '../modals/PremiumFormComponents';
 
 interface ReclamationFormModalProps {
     isOpen: boolean;
@@ -273,91 +274,79 @@ export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
 
             <div className="space-y-4">
                 {/* Type de réclamation */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Type de réclamation <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                        required
-                        value={formData.type_reclamation || ''}
-                        className="w-full rounded-lg border-gray-300 border p-2.5 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
-                        onChange={e => setFormData({ ...formData, type_reclamation: Number(e.target.value) })}
-                    >
-                        <option value="">Sélectionner un type...</option>
-                        {types.map(t => (
-                            <option key={t.id} value={t.id}>{t.nom_reclamation}</option>
-                        ))}
-                    </select>
-                </div>
+                <PremiumSelect
+                    value={formData.type_reclamation?.toString() || ''}
+                    onChange={(value) => setFormData({ ...formData, type_reclamation: Number(value) })}
+                    options={[
+                        { value: '', label: 'Sélectionner un type...' },
+                        ...types.map(t => ({
+                            value: t.id.toString(),
+                            label: t.nom_reclamation
+                        }))
+                    ]}
+                    label="Type de réclamation"
+                    placeholder="Sélectionner un type..."
+                    icon={<FileText className="w-4 h-4" />}
+                    required
+                    variant="outlined"
+                    size="md"
+                />
 
                 {/* Urgence */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Urgence <span className="text-red-500">*</span>
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                        {urgences.map(u => (
-                            <button
-                                key={u.id}
-                                type="button"
-                                onClick={() => setFormData({ ...formData, urgence: u.id })}
-                                className={`
-                                    flex items-center justify-center p-2 rounded-lg border text-sm font-medium transition-all
-                                    ${formData.urgence === u.id
-                                        ? 'border-orange-500 bg-orange-50 text-orange-700 ring-1 ring-orange-500'
-                                        : 'border-gray-200 hover:border-gray-300 text-gray-600'}
-                                `}
-                            >
-                                {u.niveau_urgence}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                <PremiumSelect
+                    value={formData.urgence?.toString() || ''}
+                    onChange={(value) => setFormData({ ...formData, urgence: Number(value) })}
+                    options={urgences.map(u => ({
+                        value: u.id.toString(),
+                        label: u.niveau_urgence
+                    }))}
+                    label="Urgence"
+                    placeholder="Sélectionner un niveau d'urgence..."
+                    icon={<AlertOctagon className="w-4 h-4" />}
+                    required
+                    variant="outlined"
+                    size="md"
+                />
 
                 {/* Description */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Description <span className="text-red-500">*</span>
-                    </label>
-                    <textarea
-                        required
-                        rows={4}
-                        value={formData.description || ''}
-                        className="w-full rounded-lg border-gray-300 border p-3 focus:ring-2 focus:ring-orange-500 outline-none resize-none"
-                        placeholder="Décrivez le problème rencontré..."
-                        onChange={e => setFormData({ ...formData, description: e.target.value })}
-                    />
-                </div>
+                <PremiumTextarea
+                    value={formData.description || ''}
+                    onChange={(value) => setFormData({ ...formData, description: value })}
+                    label="Description"
+                    placeholder="Décrivez le problème rencontré..."
+                    rows={4}
+                    required
+                    variant="outlined"
+                    size="md"
+                />
 
                 {/* Date de constatation */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Date de constatation <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input
-                            type="datetime-local"
-                            required
-                            value={utcToLocalInput(formData.date_constatation)}
-                            className="w-full pl-10 pr-4 py-2.5 rounded-lg border-gray-300 border focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
-                            onChange={e => {
-                                const utcValue = localInputToUTC(e.target.value);
-                                setFormData({
-                                    ...formData,
-                                    date_constatation: utcValue || undefined
-                                });
-                            }}
-                        />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">Date et heure où le problème a été constaté</p>
-                </div>
+                <PremiumInput
+                    type="datetime-local"
+                    value={utcToLocalInput(formData.date_constatation)}
+                    onChange={(value) => {
+                        const utcValue = localInputToUTC(value);
+                        setFormData({
+                            ...formData,
+                            date_constatation: utcValue || undefined
+                        });
+                    }}
+                    label="Date de constatation"
+                    icon={<Calendar className="w-4 h-4" />}
+                    hint="Date et heure où le problème a été constaté"
+                    required
+                    variant="outlined"
+                    size="md"
+                />
 
                 {/* Photos */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Photos (optionnel)
-                    </label>
+                <div className="space-y-2">
+                    <div className="flex items-center gap-2 pb-2">
+                        <Camera className="w-4 h-4 text-slate-600" />
+                        <label className="text-sm font-semibold text-slate-800">
+                            Photos <span className="text-xs text-slate-500 font-normal">(optionnel)</span>
+                        </label>
+                    </div>
                     <PhotoUpload
                         photos={photos}
                         onChange={setPhotos}

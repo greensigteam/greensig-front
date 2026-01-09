@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { format } from 'date-fns';
-import { Calendar, AlertCircle } from 'lucide-react';
+import { Calendar, AlertCircle, FileText } from 'lucide-react';
 import {
   Absence,
   AbsenceUpdate,
@@ -11,7 +11,8 @@ import {
   getBadgeColors
 } from '../types/users';
 import { updateAbsence } from '../services/usersApi';
-import FormModal, { FormField, FormInput, FormSelect, FormTextarea } from '../components/FormModal';
+import FormModal from '../components/FormModal';
+import { PremiumInput, PremiumSelect, PremiumTextarea } from '../components/modals/PremiumFormComponents';
 
 interface EditAbsenceModalProps {
   absence: Absence;
@@ -33,11 +34,8 @@ const EditAbsenceModal: React.FC<EditAbsenceModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setForm(f => ({ ...f, [name]: value }));
+  const handleChange = (field: keyof AbsenceUpdate, value: string) => {
+    setForm(f => ({ ...f, [field]: value }));
   };
 
   const validateForm = (): string | null => {
@@ -150,45 +148,47 @@ const EditAbsenceModal: React.FC<EditAbsenceModalProps> = ({
       )}
 
       {/* Type d'absence */}
-      <FormField label="Type d'absence" required>
-        <FormSelect
-          name="typeAbsence"
-          value={form.typeAbsence}
-          onChange={handleChange}
-          required
-          disabled={!canEdit}
-          options={(Object.keys(TYPE_ABSENCE_LABELS) as TypeAbsence[]).map((type) => ({
-            value: type,
-            label: TYPE_ABSENCE_LABELS[type]
-          }))}
-        />
-      </FormField>
+      <PremiumSelect
+        value={form.typeAbsence}
+        onChange={(value) => handleChange('typeAbsence', value as TypeAbsence)}
+        options={(Object.keys(TYPE_ABSENCE_LABELS) as TypeAbsence[]).map((type) => ({
+          value: type,
+          label: TYPE_ABSENCE_LABELS[type]
+        }))}
+        label="Type d'absence"
+        placeholder="Sélectionner un type"
+        icon={<FileText className="w-4 h-4" />}
+        required
+        disabled={!canEdit}
+        variant="outlined"
+        size="md"
+      />
 
       {/* Dates */}
       <div className="grid grid-cols-2 gap-4">
-        <FormField label="Date de debut" required>
-          <FormInput
-            type="date"
-            name="dateDebut"
-            value={form.dateDebut}
-            onChange={handleChange}
-            min={canEdit ? format(new Date(), 'yyyy-MM-dd') : undefined}
-            required
-            disabled={!canEdit}
-          />
-        </FormField>
+        <PremiumInput
+          type="date"
+          value={form.dateDebut}
+          onChange={(value) => handleChange('dateDebut', value)}
+          label="Date de début"
+          icon={<Calendar className="w-4 h-4" />}
+          required
+          disabled={!canEdit}
+          variant="outlined"
+          size="md"
+        />
 
-        <FormField label="Date de fin" required>
-          <FormInput
-            type="date"
-            name="dateFin"
-            value={form.dateFin}
-            onChange={handleChange}
-            min={form.dateDebut || undefined}
-            required
-            disabled={!canEdit}
-          />
-        </FormField>
+        <PremiumInput
+          type="date"
+          value={form.dateFin}
+          onChange={(value) => handleChange('dateFin', value)}
+          label="Date de fin"
+          icon={<Calendar className="w-4 h-4" />}
+          required
+          disabled={!canEdit}
+          variant="outlined"
+          size="md"
+        />
       </div>
 
       {/* Duration indicator */}
@@ -201,16 +201,16 @@ const EditAbsenceModal: React.FC<EditAbsenceModalProps> = ({
       )}
 
       {/* Motif */}
-      <FormField label="Motif">
-        <FormTextarea
-          name="motif"
-          value={form.motif || ''}
-          onChange={handleChange}
-          rows={3}
-          placeholder="Description ou raison de l'absence (optionnel)"
-          disabled={!canEdit}
-        />
-      </FormField>
+      <PremiumTextarea
+        value={form.motif || ''}
+        onChange={(value) => handleChange('motif', value)}
+        label="Motif"
+        placeholder="Description ou raison de l'absence (optionnel)"
+        rows={3}
+        disabled={!canEdit}
+        variant="outlined"
+        size="md"
+      />
 
       {/* Info validation */}
       {absence.dateValidation && (

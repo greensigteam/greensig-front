@@ -238,6 +238,7 @@ export const MapPage: React.FC<MapPageProps> = ({
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [taskModalInitialValues, setTaskModalInitialValues] = useState<Partial<TacheCreate>>({});
   const [taskPreSelectedObjects, setTaskPreSelectedObjects] = useState<InventoryObjectOption[]>([]);
+  const [taskSiteFilter, setTaskSiteFilter] = useState<{ id: number; name: string } | undefined>(undefined);
   const [typesTaches, setTypesTaches] = useState<TypeTache[]>([]);
   const [equipes, setEquipes] = useState<EquipeList[]>([]);
 
@@ -366,12 +367,31 @@ export const MapPage: React.FC<MapPageProps> = ({
       // Check if this is a Reclamation
       if (object.type === 'Reclamation') {
         // Link the task to this reclamation
-        // The site is determined from the reclamation itself in the backend
         if (!isNaN(objId)) {
           initialValues.reclamation = objId;
+
+          // ✅ Pré-remplir le champ commentaires avec le numéro de réclamation
+          const numeroReclamation = object.attributes?.numero_reclamation || object.title;
+          initialValues.commentaires = `Tâche liée à la réclamation ${numeroReclamation}`;
+
+          // ✅ Définir le filtre de site pour ne montrer que les objets de ce site
+          const siteId = object.attributes?.site;
+          const siteNom = object.attributes?.site_nom;
+
+          if (siteId) {
+            setTaskSiteFilter({
+              id: Number(siteId),
+              name: siteNom || `Site #${siteId}`
+            });
+          } else {
+            setTaskSiteFilter(undefined);
+          }
         }
       } else if (!isNaN(objId)) {
         // Regular inventory object - add to pre-selected objects
+        // Clear site filter for regular objects
+        setTaskSiteFilter(undefined);
+
         // Try to get superficie from attributes (various possible keys)
         const superficieStr = object.attributes?.['superficie_calculee']
           || object.attributes?.['Surface (m²)']
@@ -387,6 +407,9 @@ export const MapPage: React.FC<MapPageProps> = ({
           superficie: !isNaN(superficie as number) ? superficie : undefined
         });
       }
+    } else {
+      // No object selected - clear site filter
+      setTaskSiteFilter(undefined);
     }
 
     setTaskPreSelectedObjects(preSelected);
@@ -1122,6 +1145,7 @@ export const MapPage: React.FC<MapPageProps> = ({
         <TaskFormModal
           initialValues={taskModalInitialValues}
           preSelectedObjects={taskPreSelectedObjects}
+          siteFilter={taskSiteFilter}
           typesTaches={typesTaches}
           equipes={equipes}
           onClose={() => setIsTaskModalOpen(false)}

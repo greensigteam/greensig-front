@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
-import { Users as UsersIcon, Award, Gauge, UserPlus, Plus } from 'lucide-react';
+import { Users as UsersIcon, Award, Gauge, UserPlus, Plus, Clock, Calendar } from 'lucide-react';
 
 // Import des composants de configuration
 import CompetencesConfig from './CompetencesConfig';
 import Users from './Users';
 import RatiosProductivite from './RatiosProductivite';
+import HorairesConfig from './HorairesConfig';
+import JoursFeriesConfig from './JoursFeriesConfig';
 
 /**
  * Page centralisée des paramètres et configurations système
  * Accessible uniquement aux administrateurs
- * Organisée en sections : Utilisateurs, Compétences, Ratios de productivité
+ * Organisée en sections : Utilisateurs, Compétences, Ratios de productivité, Horaires de travail
  */
 
-type ParametresTab = 'utilisateurs' | 'competences' | 'ratios';
+type ParametresTab = 'utilisateurs' | 'competences' | 'ratios' | 'horaires' | 'jours-feries';
 
 const Parametres: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ParametresTab>('utilisateurs');
@@ -61,6 +63,28 @@ const Parametres: React.FC = () => {
               <Gauge className="w-4 h-4" />
               Ratios de productivité
             </button>
+            <button
+              onClick={() => setActiveTab('horaires')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${
+                activeTab === 'horaires'
+                  ? 'bg-white text-slate-800 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-800'
+              }`}
+            >
+              <Clock className="w-4 h-4" />
+              Horaires de travail
+            </button>
+            <button
+              onClick={() => setActiveTab('jours-feries')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${
+                activeTab === 'jours-feries'
+                  ? 'bg-white text-slate-800 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-800'
+              }`}
+            >
+              <Calendar className="w-4 h-4" />
+              Jours fériés
+            </button>
           </div>
 
           {/* Action Buttons */}
@@ -99,6 +123,8 @@ const Parametres: React.FC = () => {
         {activeTab === 'utilisateurs' && <Users triggerCreate={createTrigger} />}
         {activeTab === 'competences' && <CompetencesConfig triggerCreate={createTrigger} />}
         {activeTab === 'ratios' && <RatiosProductivite triggerCreate={createTrigger} />}
+        {activeTab === 'horaires' && <HorairesConfig triggerCreate={createTrigger} />}
+        {activeTab === 'jours-feries' && <JoursFeriesConfig triggerCreate={createTrigger} />}
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Search, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, X } from 'lucide-react';
+import { Search, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, X, Plus } from 'lucide-react';
+import { PremiumInput } from './modals/PremiumFormComponents';
 
 /**
  * TransferList - Composant de sélection multiple avec double liste
@@ -30,6 +31,9 @@ export interface TransferListProps<T> {
   emptyAvailableMessage?: string;
   emptySelectedMessage?: string;
 
+  // Actions
+  onAddNew?: () => void;  // Callback pour créer un nouvel élément
+
   // Style
   height?: string;  // Hauteur des listes (default: '300px')
 }
@@ -46,6 +50,7 @@ export function TransferList<T>({
   searchPlaceholder = 'Rechercher...',
   emptyAvailableMessage = 'Aucun élément disponible',
   emptySelectedMessage = 'Aucun élément sélectionné',
+  onAddNew,
   height = '300px'
 }: TransferListProps<T>) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -97,24 +102,38 @@ export function TransferList<T>({
             <span className="text-sm font-medium text-gray-700">
               {availableLabel}
             </span>
-            <span className="text-xs text-gray-500">
-              {filteredAvailable.length} / {availableItems.length}
-            </span>
+            <div className="flex items-center gap-2">
+              {onAddNew && (
+                <button
+                  type="button"
+                  onClick={onAddNew}
+                  className="p-1 rounded-md bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
+                  title="Créer un nouveau"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              )}
+              <span className="text-xs text-gray-500">
+                {filteredAvailable.length} / {availableItems.length}
+              </span>
+            </div>
           </div>
           {/* Recherche */}
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
+            <PremiumInput
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(value) => setSearchQuery(value)}
               placeholder={searchPlaceholder}
-              className="w-full pl-9 pr-8 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+              icon={<Search className="w-4 h-4" />}
+              variant="outlined"
+              size="sm"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10"
+                title="Effacer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -123,7 +142,7 @@ export function TransferList<T>({
         </div>
 
         {/* Liste */}
-        <div className="flex-1 overflow-y-auto" style={{ height }}>
+        <div className="overflow-y-auto" style={{ height, maxHeight: height }}>
           {filteredAvailable.length === 0 ? (
             <div className="flex items-center justify-center h-full text-sm text-gray-500">
               {searchQuery ? 'Aucun résultat' : emptyAvailableMessage}
@@ -204,7 +223,7 @@ export function TransferList<T>({
         </div>
 
         {/* Liste */}
-        <div className="flex-1 overflow-y-auto" style={{ height }}>
+        <div className="overflow-y-auto" style={{ height, maxHeight: height }}>
           {selected.length === 0 ? (
             <div className="flex items-center justify-center h-full text-sm text-gray-500">
               {emptySelectedMessage}

@@ -9,12 +9,14 @@ import {
     AlertTriangle,
     TreeDeciduous,
     Droplets,
+    Hash,
+    Tag,
 } from 'lucide-react';
 import { useDrawing, getObjectTypeById } from '../contexts/DrawingContext';
 import { GeoJSONGeometry, GeometryMetrics, ObjectFieldConfig } from '../types';
 import { createInventoryItem, detectSiteFromGeometry, DetectedSiteResult } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
-import { FormModal } from './FormModal';
+import { PremiumInput, PremiumSelect, PremiumTextarea } from './modals/PremiumFormComponents';
 
 interface CreateObjectModalProps {
     isOpen: boolean;
@@ -186,65 +188,89 @@ export default function CreateObjectModal({
         onClose();
     };
 
+    // Get icon for field based on name
+    const getFieldIcon = (fieldName: string) => {
+        if (fieldName.includes('nom') || fieldName.includes('famille')) return Tag;
+        if (fieldName.includes('code')) return Hash;
+        return MapPin;
+    };
+
     // Render field input
     const renderField = (field: ObjectFieldConfig) => {
         const value = formData[field.name] || '';
         const error = errors[field.name];
-
-        const baseInputClass = `w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors ${
-            error ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
-        }`;
+        const FieldIcon = getFieldIcon(field.name);
 
         switch (field.type) {
             case 'select':
+                const selectOptions = field.options?.map(option => ({
+                    value: option,
+                    label: option.charAt(0).toUpperCase() + option.slice(1)
+                })) || [];
+
                 return (
-                    <select
+                    <PremiumSelect
                         value={value}
-                        onChange={e => handleFieldChange(field.name, e.target.value)}
-                        className={baseInputClass}
-                    >
-                        <option value="">Sélectionner...</option>
-                        {field.options?.map(option => (
-                            <option key={option} value={option}>
-                                {option.charAt(0).toUpperCase() + option.slice(1)}
-                            </option>
-                        ))}
-                    </select>
+                        onChange={(newValue) => handleFieldChange(field.name, newValue)}
+                        options={selectOptions}
+                        label={field.label}
+                        placeholder="Sélectionner..."
+                        icon={<FieldIcon className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
+                        error={error}
+                        required={field.required}
+                    />
                 );
 
             case 'number':
                 return (
-                    <input
+                    <PremiumInput
                         type="number"
                         value={value}
-                        onChange={e => handleFieldChange(field.name, e.target.value)}
+                        onChange={(newValue) => handleFieldChange(field.name, newValue)}
+                        label={field.label}
+                        placeholder={field.placeholder}
+                        icon={<FieldIcon className="w-4 h-4" />}
                         min={field.min}
                         max={field.max}
                         step={field.step}
-                        placeholder={field.placeholder}
-                        className={baseInputClass}
+                        variant="outlined"
+                        size="md"
+                        error={error}
+                        required={field.required}
                     />
                 );
 
             case 'textarea':
                 return (
-                    <textarea
+                    <PremiumTextarea
                         value={value}
-                        onChange={e => handleFieldChange(field.name, e.target.value)}
+                        onChange={(newValue) => handleFieldChange(field.name, newValue)}
+                        label={field.label}
                         placeholder={field.placeholder}
+                        icon={<FieldIcon className="w-4 h-4" />}
                         rows={3}
-                        className={`${baseInputClass} resize-none`}
+                        variant="outlined"
+                        size="md"
+                        error={error}
+                        required={field.required}
                     />
                 );
 
             default:
                 return (
-                    <input
+                    <PremiumInput
                         type="text"
                         value={value}
-                        onChange={e => handleFieldChange(field.name, e.target.value)}
+                        onChange={(newValue) => handleFieldChange(field.name, newValue)}
+                        label={field.label}
                         placeholder={field.placeholder}
-                        className={baseInputClass}
+                        icon={<FieldIcon className="w-4 h-4" />}
+                        variant="outlined"
+                        size="md"
+                        error={error}
+                        required={field.required}
                     />
                 );
         }
@@ -372,18 +398,7 @@ export default function CreateObjectModal({
                     {/* Dynamic Fields */}
                     {typeInfo?.fields.map(field => (
                         <div key={field.name}>
-                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
-                                <MapPin className="w-4 h-4 text-gray-400" />
-                                {field.label}
-                                {field.required && <span className="text-red-500">*</span>}
-                            </label>
                             {renderField(field)}
-                            {errors[field.name] && (
-                                <p className="mt-1.5 text-sm text-red-500 flex items-center gap-1">
-                                    <AlertTriangle className="w-4 h-4" />
-                                    {errors[field.name]}
-                                </p>
-                            )}
                         </div>
                     ))}
                 </div>

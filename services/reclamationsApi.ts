@@ -79,12 +79,16 @@ export const fetchReclamations = async (params?: {
     search?: string;
     site?: number;
     ordering?: string;
+    date_debut?: string;
+    date_fin?: string;
 }): Promise<Reclamation[]> => {
     const queryParams = new URLSearchParams();
     if (params?.statut) queryParams.append('statut', params.statut);
     if (params?.search) queryParams.append('search', params.search);
     if (params?.site) queryParams.append('site', String(params.site));
     if (params?.ordering) queryParams.append('ordering', params.ordering);
+    if (params?.date_debut) queryParams.append('date_debut', params.date_debut);
+    if (params?.date_fin) queryParams.append('date_fin', params.date_fin);
 
     const url = `${API_BASE_URL}/reclamations/${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
     const response = await fetch(url, { headers: getAuthHeaders() });
@@ -230,6 +234,26 @@ export const validerCloture = async (id: number): Promise<Reclamation> => {
     const response = await fetch(`${API_BASE_URL}/reclamations/${id}/valider_cloture/`, {
         method: 'POST',
         headers: getAuthHeaders()
+    });
+    const result = await handleResponse<any>(response);
+    return result.reclamation || result;
+};
+
+export const refuserCloture = async (id: number, commentaireRefus: string): Promise<Reclamation> => {
+    const response = await fetch(`${API_BASE_URL}/reclamations/${id}/refuser_cloture/`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ commentaire_refus: commentaireRefus })
+    });
+    const result = await handleResponse<any>(response);
+    return result.reclamation || result;
+};
+
+export const rejeterReclamation = async (id: number, justification: string): Promise<Reclamation> => {
+    const response = await fetch(`${API_BASE_URL}/reclamations/${id}/rejeter/`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ justification })
     });
     const result = await handleResponse<any>(response);
     return result.reclamation || result;

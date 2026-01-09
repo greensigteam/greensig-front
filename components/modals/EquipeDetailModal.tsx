@@ -54,10 +54,31 @@ const EquipeDetailModal: React.FC<EquipeDetailModalProps> = ({ equipe, onClose }
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-500 mb-2 block">Site d'affectation</label>
-              <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
-                <p className="font-medium text-gray-900">{equipe.siteNom || 'Non affecté'}</p>
-                <p className="text-xs text-gray-500">Affectation contractuelle</p>
+              <label className="text-sm font-medium text-gray-500 mb-2 block">Sites d'affectation</label>
+              <div className="space-y-2">
+                {/* Site principal */}
+                <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                  <p className="text-xs text-gray-500 mb-1">Site principal</p>
+                  <p className="font-medium text-gray-900">
+                    {equipe.sitePrincipalNom || equipe.siteNom || 'Non affecté'}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Détermine le superviseur</p>
+                </div>
+
+                {/* Sites secondaires */}
+                {equipe.sitesSecondairesNoms && equipe.sitesSecondairesNoms.length > 0 && (
+                  <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <p className="text-xs text-gray-500 mb-1">
+                      Sites secondaires ({equipe.sitesSecondairesNoms.length})
+                    </p>
+                    <div className="space-y-1">
+                      {equipe.sitesSecondairesNoms.map((nom, index) => (
+                        <p key={index} className="text-sm text-gray-900">• {nom}</p>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Sites proches géographiquement</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

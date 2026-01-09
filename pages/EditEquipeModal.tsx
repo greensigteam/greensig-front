@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, UserPlus, UserMinus, AlertCircle, Save, UserCheck } from 'lucide-react';
+import { Users, UserPlus, UserMinus, AlertCircle, Save, UserCheck, Loader2, MapPin, Building2 } from 'lucide-react';
 import { EquipeList, EquipeUpdate, OperateurList } from '../types/users';
 import {
   updateEquipe,
@@ -10,6 +10,8 @@ import {
 } from '../services/usersApi';
 import { invalidateCacheByPrefix } from '../hooks/useDataCache';
 import DetailModal from '../components/DetailModal';
+import { fetchAllSites, SiteFrontend } from '../services/api';
+import { PremiumInput, PremiumSelect, PremiumMultiSelect } from '../components/modals/PremiumFormComponents';
 
 interface EditEquipeModalProps {
   equipe: EquipeList;
@@ -29,11 +31,17 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
   const [form, setForm] = useState<EquipeUpdate>({
     nomEquipe: equipe.nomEquipe,
     chefEquipe: cleanNumericValue(equipe.chefEquipe),
+    sitePrincipal: equipe.sitePrincipal,
+    sitesSecondaires: equipe.sitesSecondaires || [],
     actif: equipe.actif,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'membres'>('info');
+
+  // Sites management
+  const [sites, setSites] = useState<SiteFrontend[]>([]);
+  const [loadingSites, setLoadingSites] = useState(false);
 
   // Members management
   const [membres, setMembres] = useState<OperateurList[]>([]);
@@ -43,7 +51,20 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
 
   useEffect(() => {
     loadMembres();
+    loadSites();
   }, [equipe.id]);
+
+  const loadSites = async () => {
+    setLoadingSites(true);
+    try {
+      const sitesData = await fetchAllSites();
+      setSites(sitesData.filter(s => s.actif !== false));
+    } catch (error) {
+      console.error('Erreur chargement sites:', error);
+    } finally {
+      setLoadingSites(false);
+    }
+  };
 
   const loadMembres = async () => {
     setLoadingMembres(true);
@@ -64,24 +85,10 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
-    let newValue: string | boolean | number | null = value;
-    if (type === 'checkbox') {
-      newValue = (e.target as HTMLInputElement).checked;
-    }
-    if (name === 'chefEquipe') {
-      // Treat empty string as null to allow removing the chef
-      if (value === '') {
-        newValue = null;
-      } else {
-        const numValue = Number(value);
-        newValue = cleanNumericValue(numValue);
-      }
-    }
+  const handleChange = (field: string, value: any) => {
     setForm(f => ({
       ...f,
-      [name]: newValue
+      [field]: value
     }));
   };
 
@@ -144,45 +151,81 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
         </div>
       )}
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Nom de l'equipe <span className="text-red-500">*</span>
-        </label>
-        <input
-          name="nomEquipe"
-          value={form.nomEquipe || ''}
-          onChange={handleChange}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-          required
-        />
-      </div>
+      <PremiumInput
+        type="text"
+        value={form.nomEquipe || ''}
+        onChange={(value) => handleChange('nomEquipe', value)}
+        label="Nom de l'équipe"
+        placeholder="Ex: Équipe Nord"
+        icon={<Users className="w-4 h-4" />}
+        variant="outlined"
+        size="md"
+        required
+      />
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Chef d'equipe sur le terrain (optionnel)
-        </label>
-        <select
-          name="chefEquipe"
-          value={form.chefEquipe ?? ''}
-          onChange={handleChange}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-        >
-          <option key="chef-none" value="">-- Aucun --</option>
-          {membresActifs.length === 0 && (
-            <option key="chef-no-membres" value="" disabled>
-              Aucun membre actif dans l'équipe
-            </option>
-          )}
-          {membresActifs.map((op) => (
-            <option key={`chef-${op.id}`} value={op.id}>
-              {op.fullName} ({op.numeroImmatriculation})
-              {op.id === equipe.chefEquipe ? ' (actuel)' : ''}
-            </option>
-          ))}
-        </select>
-        <p className="mt-1 text-xs text-gray-500">
-          Tout membre actif de l'équipe peut être nommé chef
-        </p>
+      <PremiumSelect
+        value={form.chefEquipe?.toString() ?? ''}
+        onChange={(value) => handleChange('chefEquipe', value ? parseInt(value) : null)}
+        options={membresActifs.map(op => ({
+          value: op.id.toString(),
+          label: `${op.fullName} (${op.numeroImmatriculation})${op.id === equipe.chefEquipe ? ' (actuel)' : ''}`
+        }))}
+        label="Chef d'équipe sur le terrain"
+        placeholder={membresActifs.length === 0 ? "Aucun membre actif dans l'équipe" : "Sélectionner un chef d'équipe"}
+        icon={<UserCheck className="w-4 h-4" />}
+        variant="outlined"
+        size="md"
+        hint="Tout membre actif de l'équipe peut être nommé chef"
+      />
+
+      <div className="grid grid-cols-2 gap-4">
+        {/* Site principal */}
+        {loadingSites ? (
+          <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Chargement des sites...
+          </div>
+        ) : (
+          <PremiumSelect
+            value={form.sitePrincipal?.toString() ?? ''}
+            onChange={(value) => handleChange('sitePrincipal', value ? parseInt(value) : null)}
+            options={sites.map(site => ({
+              value: site.id,
+              label: `${site.name}${site.code_site ? ` (${site.code_site})` : ''}`
+            }))}
+            label="Site principal"
+            placeholder="Sélectionner un site"
+            icon={<Building2 className="w-4 h-4" />}
+            variant="outlined"
+            size="md"
+            hint="Détermine le superviseur de l'équipe"
+          />
+        )}
+
+        {/* Sites secondaires */}
+        {loadingSites ? (
+          <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Chargement des sites...
+          </div>
+        ) : (
+          <PremiumMultiSelect
+            value={(form.sitesSecondaires || []).map(String)}
+            onChange={(values) => handleChange('sitesSecondaires', values.map(Number))}
+            options={sites
+              .filter(site => form.sitePrincipal ? parseInt(site.id) !== form.sitePrincipal : true)
+              .map(site => ({
+                value: site.id,
+                label: `${site.name}${site.code_site ? ` (${site.code_site})` : ''}`
+              }))}
+            label="Sites secondaires"
+            placeholder="Sélectionner les sites"
+            icon={<MapPin className="w-4 h-4" />}
+            variant="outlined"
+            size="md"
+            hint="Sites proches géographiquement"
+          />
+        )}
       </div>
 
       <div className="flex items-center gap-3 py-2">

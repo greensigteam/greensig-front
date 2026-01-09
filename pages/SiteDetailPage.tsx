@@ -8,6 +8,7 @@ import { MAP_LAYERS } from '../constants';
 import { useToast } from '../contexts/ToastContext';
 import SiteEditModal from '../components/sites/SiteEditModal';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
+import CreateSuperviseurModal from '../components/users/CreateSuperviseurModal';
 import LoadingScreen from '../components/LoadingScreen';
 import {
     ChevronLeft,
@@ -137,6 +138,7 @@ const SiteDetailPage: React.FC = () => {
     const [superviseurs, setSuperviseurs] = useState<SuperviseurList[]>([]);
     const [isLoadingSuperviseurs, setIsLoadingSuperviseurs] = useState(false);
     const [superviseurSearchQuery, setSuperviseurSearchQuery] = useState('');
+    const [showCreateSuperviseurModal, setShowCreateSuperviseurModal] = useState(false);
 
     // Équipe assignment modal
     const [showAssignEquipeModal, setShowAssignEquipeModal] = useState(false);
@@ -352,6 +354,26 @@ const SiteDetailPage: React.FC = () => {
         s.fullName?.toLowerCase().includes(superviseurSearchQuery.toLowerCase()) ||
         s.email?.toLowerCase().includes(superviseurSearchQuery.toLowerCase())
     );
+
+    const handleSuperviseurCreated = async (newSuperviseur: SuperviseurList) => {
+        // Rafraîchir la liste des superviseurs
+        await loadSuperviseurs();
+
+        // Assigner automatiquement le nouveau superviseur au site
+        if (site) {
+            try {
+                await updateSite(Number(site.id), { superviseur: newSuperviseur.utilisateur });
+                showToast(`Superviseur ${newSuperviseur.fullName} créé et assigné avec succès`, 'success');
+                setRefreshKey(prev => prev + 1); // Trigger reload
+                setShowAssignSuperviseurModal(false);
+                setShowCreateSuperviseurModal(false);
+                setSuperviseurSearchQuery('');
+            } catch (error: any) {
+                showToast('Superviseur créé mais erreur lors de l\'assignation', 'error');
+                setShowCreateSuperviseurModal(false);
+            }
+        }
+    };
 
     // Load available équipes when modal opens
     useEffect(() => {
@@ -1199,15 +1221,24 @@ const SiteDetailPage: React.FC = () => {
 
                         {/* Search bar */}
                         <div className="p-4 border-b">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Rechercher un superviseur..."
-                                    value={superviseurSearchQuery}
-                                    onChange={(e) => setSuperviseurSearchQuery(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                />
+                            <div className="flex items-center gap-2">
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Rechercher un superviseur..."
+                                        value={superviseurSearchQuery}
+                                        onChange={(e) => setSuperviseurSearchQuery(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                </div>
+                                <button
+                                    onClick={() => setShowCreateSuperviseurModal(true)}
+                                    className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm flex-shrink-0"
+                                    title="Créer un nouveau superviseur"
+                                >
+                                    <Plus className="w-5 h-5" />
+                                </button>
                             </div>
                         </div>
 
@@ -1356,6 +1387,13 @@ const SiteDetailPage: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* Create Superviseur Modal */}
+            <CreateSuperviseurModal
+                isOpen={showCreateSuperviseurModal}
+                onClose={() => setShowCreateSuperviseurModal(false)}
+                onCreated={handleSuperviseurCreated}
+            />
         </div>
     );
 };

@@ -6,10 +6,12 @@ import {
     Loader2,
     MapPin,
     Crosshair,
+    Building2,
 } from 'lucide-react';
 import { AttributeMapping, fetchAllSites, SiteFrontend } from '../../services/api';
 import { OBJECT_TYPES, getObjectTypesByGeometry } from '../../contexts/DrawingContext';
 import { ObjectTypeInfo } from '../../types';
+import { PremiumSelect } from '../modals/PremiumFormComponents';
 
 interface AttributeMapperProps {
     sourceProperties: string[];
@@ -253,18 +255,19 @@ export default function AttributeMapper({
                                     <span>Aucun site disponible. Importez d'abord un fichier de Sites.</span>
                                 </div>
                             ) : (
-                                <select
-                                    value={siteId || ''}
-                                    onChange={(e) => onSiteIdChange(e.target.value ? parseInt(e.target.value) : null)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                >
-                                    <option value="">Sélectionner un site...</option>
-                                    {sites.map(site => (
-                                        <option key={site.id} value={site.id}>
-                                            {site.name}
-                                        </option>
-                                    ))}
-                                </select>
+                                <PremiumSelect
+                                    value={siteId?.toString() || ''}
+                                    onChange={(value) => onSiteIdChange(value ? parseInt(value) : null)}
+                                    options={sites.map(site => ({
+                                        value: site.id,
+                                        label: site.name
+                                    }))}
+                                    placeholder="Sélectionner un site..."
+                                    icon={<Building2 className="w-4 h-4" />}
+                                    variant="outlined"
+                                    size="md"
+                                    required
+                                />
                             )}
                         </>
                     )}
@@ -312,23 +315,17 @@ export default function AttributeMapper({
                             >
                                 {/* Source Selector */}
                                 <div className="w-1/3">
-                                    <select
+                                    <PremiumSelect
                                         value={mapping[field.name] || ''}
-                                        onChange={(e) =>
-                                            handleFieldMapping(
-                                                field.name,
-                                                e.target.value || null
-                                            )
-                                        }
-                                        className="w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    >
-                                        <option value="">-- Non mappé --</option>
-                                        {sourceProperties.map(prop => (
-                                            <option key={prop} value={prop}>
-                                                {prop}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onChange={(value) => handleFieldMapping(field.name, value || null)}
+                                        options={sourceProperties.map(prop => ({
+                                            value: prop,
+                                            label: prop
+                                        }))}
+                                        placeholder="-- Non mappé --"
+                                        variant="outlined"
+                                        size="sm"
+                                    />
                                 </div>
 
                                 {/* Arrow */}

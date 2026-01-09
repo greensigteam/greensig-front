@@ -151,7 +151,7 @@ const TaskEvent = memo(function TaskEvent({ event }: { event: CalendarEvent, tit
                         </span>
                         {tache.equipes_detail?.length > 0 && (
                             <span className="text-[9px] px-1 py-0.5 bg-gray-100 rounded text-gray-500 truncate max-w-[80px]">
-                                {tache.equipes_detail.length > 1 ? `${tache.equipes_detail.length} éq.` : tache.equipes_detail[0]?.nomEquipe}
+                                {tache.equipes_detail.length > 1 ? `${tache.equipes_detail.length} éq.` : ((tache.equipes_detail[0] as any)?.nom_equipe || tache.equipes_detail[0]?.nomEquipe)}
                             </span>
                         )}
                     </div>
@@ -1142,7 +1142,8 @@ const Planning: FC = () => {
                 type: item.properties.object_type,
                 nom: item.properties.nom || item.properties.famille || `${item.properties.object_type} #${item.id}`,
                 site: item.properties.site_nom,
-                soussite: item.properties.sous_site_nom
+                soussite: item.properties.sous_site_nom,
+                superficie: item.properties.superficie_calculee // ✅ FIX: Ajouter superficie pour calcul de charge
             }));
         } catch (err) {
             console.error('Erreur chargement objets:', err);
