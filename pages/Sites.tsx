@@ -96,7 +96,7 @@ const ActionDropdown = ({
 export default function Sites() {
     const { showToast } = useToast();
     const navigate = useNavigate();
-    const { searchQuery, setPlaceholder } = useSearch();
+    const { searchQuery, setSearchQuery, setPlaceholder } = useSearch();
     const [sites, setSites] = useState<SiteFrontend[]>([]);
     const [filteredSites, setFilteredSites] = useState<SiteFrontend[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -162,10 +162,14 @@ export default function Sites() {
         return permissions.isAdmin;
     }, [permissions]);
 
-    // Set search placeholder
+    // Set search placeholder and cleanup on unmount
     useEffect(() => {
         setPlaceholder('Rechercher un site par nom, code, adresse ou propriétaire...');
-    }, [setPlaceholder]);
+        return () => {
+            setPlaceholder('Rechercher...');
+            setSearchQuery('');
+        };
+    }, [setPlaceholder, setSearchQuery]);
 
     // Load sites
     const loadSites = useCallback(async () => {

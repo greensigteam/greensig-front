@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Award, Tag, FileText, ArrowUpDown } from 'lucide-react';
+import { Award, Tag, FileText } from 'lucide-react';
 import { Competence, CategorieCompetence, CATEGORIE_COMPETENCE_LABELS } from '../../types/users';
 import { createCompetence, updateCompetence } from '../../services/usersApi';
 import { useToast } from '../../contexts/ToastContext';
@@ -102,7 +102,7 @@ const CompetenceModal: React.FC<CompetenceModalProps> = ({ initial = null, onClo
           />
         </FormGrid>
 
-        <FormGrid columns={2}>
+        <FormGrid columns={1}>
           <PremiumSelect
             value={form.categorie}
             onChange={(value) => setForm({ ...form, categorie: value as CategorieCompetence })}
@@ -114,19 +114,6 @@ const CompetenceModal: React.FC<CompetenceModalProps> = ({ initial = null, onClo
             required
             variant="outlined"
             size="md"
-          />
-
-          <PremiumInput
-            type="number"
-            value={form.ordreAffichage.toString()}
-            onChange={(value) => setForm({ ...form, ordreAffichage: Number(value) || 0 })}
-            label="Ordre d'affichage"
-            placeholder="0"
-            icon={<ArrowUpDown className="w-4 h-4" />}
-            disabled={loading}
-            variant="outlined"
-            size="md"
-            hint="Position dans la liste (0 = premier)"
           />
         </FormGrid>
 

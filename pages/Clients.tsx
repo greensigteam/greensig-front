@@ -398,7 +398,7 @@ const StructureModal: React.FC<StructureModalProps> = ({ isOpen, onClose, onSave
 
 export default function Clients() {
     const { showToast } = useToast();
-    const { searchQuery, setPlaceholder } = useSearch();
+    const { searchQuery, setSearchQuery, setPlaceholder } = useSearch();
 
     // State management
     const [structures, setStructures] = useState<StructureClient[]>([]);
@@ -417,10 +417,14 @@ export default function Clients() {
     const [deletingStructure, setDeletingStructure] = useState<StructureClient | null>(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
 
-    // Set search placeholder
+    // Set search placeholder and cleanup on unmount
     useEffect(() => {
         setPlaceholder('Rechercher une structure par nom, telephone, contact...');
-    }, [setPlaceholder]);
+        return () => {
+            setPlaceholder('Rechercher...');
+            setSearchQuery('');
+        };
+    }, [setPlaceholder, setSearchQuery]);
 
     // Load structures
     const loadStructures = useCallback(async () => {

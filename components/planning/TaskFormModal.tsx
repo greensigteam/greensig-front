@@ -21,12 +21,14 @@ import {
     Tache, TacheCreate, TypeTache,
     PRIORITE_LABELS,
     PrioriteTache,
-    RatioProductivite
+    RatioProductivite,
+    DistributionChargeData
 } from '../../types/planning';
 import { EquipeList } from '../../types/users';
 import FormModal from '../FormModal';
 import { RecurrenceSelector, type RecurrenceParams } from './RecurrenceSelector';
 import { PremiumInput, PremiumSelect, PremiumTextarea, PremiumSearchableSelect, PremiumMultiSelect } from '../modals/PremiumFormComponents';
+import { DistributionChargeEditor } from './DistributionChargeEditor';
 
 
 // ============================================================================
@@ -109,11 +111,15 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
 
     const [chargeManuelle, setChargeManuelle] = useState(tache?.charge_manuelle || false);
     const [isResettingCharge, setIsResettingCharge] = useState(false);
-    const [autoRecurrenceActivated, setAutoRecurrenceActivated] = useState(false); // Track if recurrence was auto-activated
 
-    // ✅ PHASE 1: Flags pour calcul auto et répartition multi-jours
-    const [calculerChargeAuto, setCalculerChargeAuto] = useState(true); // Default: ON
-    const [repartirMultiJours, setRepartirMultiJours] = useState(true); // Default: ON
+    // ✅ NOUVEAU: Distributions de charge pour tâches multi-jours
+    const [distributionsCharge, setDistributionsCharge] = useState<DistributionChargeData[]>(
+        tache?.distributions_charge?.map(d => ({
+            date: d.date,
+            heures_planifiees: d.heures_planifiees,
+            commentaire: d.commentaire
+        })) || []
+    );
 
     // State for ratios and charge preview
     const [ratios, setRatios] = useState<RatioProductivite[]>([]);
@@ -210,42 +216,9 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         setValidationWarnings(warnings);
     }, [formData.date_debut_planifiee, formData.date_fin_planifiee]);
 
-    // Auto-activate recurrence when task spans multiple days
-    useEffect(() => {
-        // Only for new tasks (not editing) or when manually changing dates
-        if (!formData.date_debut_planifiee || !formData.date_fin_planifiee) return;
-
-        const start = new Date(formData.date_debut_planifiee);
-        const end = new Date(formData.date_fin_planifiee);
-
-        // Check if dates are on different calendar days
-        const startDay = format(start, 'yyyy-MM-dd');
-        const endDay = format(end, 'yyyy-MM-dd');
-
-        if (startDay !== endDay && !formData.parametres_recurrence) {
-            // Calculate number of days
-            const diffTime = end.getTime() - start.getTime();
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end days
-
-            console.log(`🔄 Auto-activating recurrence: ${diffDays} days (${startDay} to ${endDay})`);
-
-            // Auto-activate DAILY recurrence
-            setFormData(prev => ({
-                ...prev,
-                parametres_recurrence: {
-                    frequence: 'daily',
-                    interval: 1,
-                    nombre_occurrences: diffDays,
-                    date_fin: endDay
-                },
-                // Adjust end date to same day to avoid backend validation error
-                date_fin_planifiee: formatDateTimeLocal(new Date(start.getFullYear(), start.getMonth(), start.getDate(), 17, 0, 0))
-            }));
-
-            // ✅ Mark that recurrence was auto-activated
-            setAutoRecurrenceActivated(true);
-        }
-    }, [formData.date_debut_planifiee, formData.date_fin_planifiee]); // ⚠️ Removed parametres_recurrence to avoid loop
+    // ❌ SUPPRIMÉ: Auto-activation récurrence multi-jours
+    // Remplacé par système de distribution de charge (DistributionChargeEditor)
+    // Les tâches multi-jours utilisent maintenant distributions_charge au lieu de récurrence
 
     // Calculate estimated charge preview based on selected objects and ratios
     // ⚠️ MUST be declared BEFORE the useEffect that uses it (to avoid "Cannot access before initialization")
@@ -311,82 +284,9 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         };
     }, [formData.id_type_tache, selectedObjects, ratios]);
 
-    // ✅ PHASE 2.2: Auto-activate recurrence when charge > 10h (with intelligent calculation based on team work hours)
-    useEffect(() => {
-        // Skip if recurrence already active, or no charge preview
-        if (formData.parametres_recurrence || !chargePreview?.totalHeures) return;
-
-        // ✅ PHASE 1: Skip if user disabled auto-calculation or multi-day splitting
-        if (!calculerChargeAuto || !repartirMultiJours) return;
-
-        // Skip if charge is reasonable for one day (≤ 10h)
-        if (chargePreview.totalHeures <= 10) return;
-
-        // Skip if no team selected (need team to calculate work hours)
-        const equipeId = formData.id_equipe || (formData.equipes_ids && formData.equipes_ids.length > 0 ? formData.equipes_ids[0] : null);
-        if (!equipeId) {
-            console.log('⚠️ No team selected, skipping intelligent recurrence calculation');
-            return;
-        }
-
-        // ✅ PHASE 2.2: Call API to calculate recommended occurrences based on real work hours
-        const startDate = formData.date_debut_planifiee ? new Date(formData.date_debut_planifiee) : new Date();
-        const dateDebut = format(startDate, 'yyyy-MM-dd');
-
-        console.log(`🔄 Calculating intelligent recurrence: ${chargePreview.totalHeures}h for team ${equipeId}`);
-
-        planningService.calculateRecurrenceRecommendee({
-            equipe_id: equipeId,
-            charge_totale_heures: chargePreview.totalHeures,
-            date_debut: dateDebut,
-            frequence: 'daily'
-        })
-            .then(response => {
-                const days = response.nombre_occurrences;
-                const endDate = new Date(startDate);
-                endDate.setDate(endDate.getDate() + (days - 1));
-
-                console.log(`✅ Intelligent recurrence calculated: ${days} days (avg ${response.heures_par_jour_moyen}h/day)`);
-
-                // Auto-activate DAILY recurrence
-                setFormData(prev => ({
-                    ...prev,
-                    parametres_recurrence: {
-                        frequence: 'daily',
-                        interval: 1,
-                        nombre_occurrences: days,
-                        date_fin: format(endDate, 'yyyy-MM-dd')
-                    },
-                    // Keep end date within same day to avoid backend validation error
-                    date_fin_planifiee: formatDateTimeLocal(new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 17, 0, 0))
-                }));
-
-                // ✅ Mark that recurrence was auto-activated
-                setAutoRecurrenceActivated(true);
-            })
-            .catch(err => {
-                console.error('❌ Error calculating intelligent recurrence, falling back to 10h/day:', err);
-
-                // Fallback to hardcoded 10h/day if API fails
-                const days = Math.ceil(chargePreview.totalHeures / 10);
-                const endDate = new Date(startDate);
-                endDate.setDate(endDate.getDate() + (days - 1));
-
-                setFormData(prev => ({
-                    ...prev,
-                    parametres_recurrence: {
-                        frequence: 'daily',
-                        interval: 1,
-                        nombre_occurrences: days,
-                        date_fin: format(endDate, 'yyyy-MM-dd')
-                    },
-                    date_fin_planifiee: formatDateTimeLocal(new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 17, 0, 0))
-                }));
-
-                setAutoRecurrenceActivated(true);
-            });
-
-    }, [chargePreview?.totalHeures, formData.parametres_recurrence, formData.date_debut_planifiee, formData.id_equipe, formData.equipes_ids, calculerChargeAuto, repartirMultiJours]);
+    // ❌ SUPPRIMÉ: Auto-activation récurrence si charge > 10h
+    // Remplacé par système de distribution de charge qui permet contrôle manuel précis
+    // Les tâches avec charge élevée utilisent maintenant l'éditeur de distribution
 
     // Fetch ratios on mount for charge preview
     useEffect(() => {
@@ -561,56 +461,9 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         formData.date_debut_planifiee
     ]);
 
-    // Auto-calculate task end date from estimated charge
-    // RÈGLE D'OR: Une tâche ne peut dépasser un jour calendaire
-    useEffect(() => {
-        // Only if start date is valid
-        if (!formData.date_debut_planifiee) return;
-
-        // Skip auto-calculation if recurrence is active (multi-day task)
-        if (formData.parametres_recurrence) return;
-
-        let hours = 0;
-        // In edit mode, prefer manual charge if set
-        if (tache && formData.charge_estimee_heures) {
-            hours = formData.charge_estimee_heures;
-        }
-        // In create mode or if no manual charge, use preview
-        else if ((!tache || !formData.charge_estimee_heures) && chargePreview?.totalHeures) {
-            hours = chargePreview.totalHeures;
-        }
-
-        if (hours > 0) {
-            const start = new Date(formData.date_debut_planifiee);
-            if (!isNaN(start.getTime())) {
-                // Calculate end date: add hours but STAY on the same day
-                let end = new Date(start.getTime() + hours * 60 * 60 * 1000);
-
-                // RÈGLE D'OR: Si la fin dépasse le jour calendaire, la limiter à 17:00 du même jour
-                const endOfDay = new Date(start);
-                endOfDay.setHours(17, 0, 0, 0); // Fin de journée par défaut: 17:00
-
-                if (end.getDate() !== start.getDate()) {
-                    // La charge dépasse un jour -> limiter à 17:00
-                    end = endOfDay;
-
-                    // Avertir l'utilisateur
-                    const exceededHours = hours - ((end.getTime() - start.getTime()) / (60 * 60 * 1000));
-                    console.warn(
-                        `⚠️ Charge estimée (${hours}h) dépasse une journée de travail. ` +
-                        `Date de fin limitée à ${end.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}. ` +
-                        `Utilisez la récurrence pour planifier les ${exceededHours.toFixed(1)}h restantes.`
-                    );
-                }
-
-                const formattedEnd = formatDateTimeLocal(end);
-
-                if (formData.date_fin_planifiee !== formattedEnd) {
-                    setFormData(prev => ({ ...prev, date_fin_planifiee: formattedEnd }));
-                }
-            }
-        }
-    }, [formData.date_debut_planifiee, formData.charge_estimee_heures, chargePreview?.totalHeures, formData.parametres_recurrence]);
+    // ❌ SUPPRIMÉ: Limitation "même jour calendaire" (RÈGLE D'OR)
+    // Les tâches peuvent maintenant s'étendre sur plusieurs jours via distributions_charge
+    // La date de fin n'est plus automatiquement limitée à 17:00 du jour de début
 
     const toggleObjectSelection = (obj: InventoryObjectOption) => {
         setSelectedObjects(prev => {
@@ -681,61 +534,20 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
             return;
         }
 
-        // ⚠️ CRITICAL: Pre-submission validation for multi-day tasks
-        // If user selected dates on different days without recurrence, activate it NOW
-        if (formData.date_debut_planifiee && formData.date_fin_planifiee && !formData.parametres_recurrence) {
-            const start = new Date(formData.date_debut_planifiee);
-            const end = new Date(formData.date_fin_planifiee);
-            const startDay = format(start, 'yyyy-MM-dd');
-            const endDay = format(end, 'yyyy-MM-dd');
+        // ❌ SUPPRIMÉ: Validation multi-jours qui forçait la récurrence
+        // Les tâches multi-jours sont maintenant gérées nativement via distributions_charge
 
-            if (startDay !== endDay) {
-                // Different days detected - auto-activate recurrence
-                const diffTime = end.getTime() - start.getTime();
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-
-                console.warn(`⚠️ Multi-day task detected at submit! Auto-activating recurrence for ${diffDays} days`);
-
-                const adjustedData = {
-                    ...formData,
-                    parametres_recurrence: {
-                        frequence: 'daily' as const,
-                        interval: 1,
-                        nombre_occurrences: diffDays,
-                        date_fin: endDay
-                    },
-                    // Adjust end date to same day
-                    date_fin_planifiee: formatDateTimeLocal(
-                        new Date(start.getFullYear(), start.getMonth(), start.getDate(), 17, 0, 0)
-                    ),
-                    // ✅ PHASE 1: Ajouter les flags
-                    ...(calculerChargeAuto && chargePreview?.totalHeures && {
-                        charge_estimee_heures: chargePreview.totalHeures
-                    }),
-                    calculer_charge_auto: calculerChargeAuto,
-                    repartir_multi_jours: repartirMultiJours
-                };
-
-                console.log('📤 Submitting with auto-recurrence:', adjustedData);
-                onSubmit(adjustedData);
-                return;
-            }
-        }
-
-        // ✅ PHASE 1: Ajouter les flags de planification intelligente au payload
-        const payloadWithFlags = {
+        // Préparer les données pour soumission
+        const payload = {
             ...formData,
-            // Ajouter la charge calculée si option activée
-            ...(calculerChargeAuto && chargePreview?.totalHeures && {
-                charge_estimee_heures: chargePreview.totalHeures
-            }),
-            // Flags pour le backend
-            calculer_charge_auto: calculerChargeAuto,
-            repartir_multi_jours: repartirMultiJours
+            // ✅ Distributions de charge pour tâches multi-jours
+            ...(distributionsCharge.length > 0 && {
+                distributions_charge_data: distributionsCharge
+            })
         };
 
-        console.log('📤 Submitting task data:', payloadWithFlags);
-        onSubmit(payloadWithFlags);
+        console.log('📤 Submitting task data:', payload);
+        onSubmit(payload);
     };
 
     return (
@@ -792,7 +604,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                 </div>
                                 <div className="mt-2">
                                     <Link
-                                        to="/ratios"
+                                        to="/parametres?tab=ratios"
                                         target="_blank"
                                         className="text-sm text-red-600 hover:text-red-800 underline flex items-center gap-1"
                                     >
@@ -889,6 +701,36 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                     )}
                 </div>
 
+                {/* ✅ NOUVEAU: Éditeur de distribution de charge pour tâches multi-jours */}
+                {(() => {
+                    // Vérifier si la tâche s'étend sur plusieurs jours
+                    if (!formData.date_debut_planifiee || !formData.date_fin_planifiee) return null;
+
+                    // ⚠️ Incompatibilité: Ne pas afficher si récurrence activée
+                    if (formData.parametres_recurrence) return null;
+
+                    const startDate = new Date(formData.date_debut_planifiee);
+                    const endDate = new Date(formData.date_fin_planifiee);
+
+                    // Vérifier que les dates sont sur des jours calendaires différents
+                    const startDay = format(startDate, 'yyyy-MM-dd');
+                    const endDay = format(endDate, 'yyyy-MM-dd');
+
+                    if (startDay === endDay) return null; // Same day task
+
+                    // Multi-day task detected - show editor
+                    return (
+                        <div className="border-t pt-4">
+                            <DistributionChargeEditor
+                                dateDebut={startDate}
+                                dateFin={endDate}
+                                distributions={distributionsCharge}
+                                onChange={setDistributionsCharge}
+                            />
+                        </div>
+                    );
+                })()}
+
                 <PremiumSelect
                     value={formData.priorite.toString()}
                     onChange={(value) => setFormData({ ...formData, priorite: Number(value) as PrioriteTache })}
@@ -974,7 +816,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                 : (
                                     <>
                                         Calculée automatiquement selon les objets liés et les{' '}
-                                        <Link to="/ratios" target="_blank" className="text-emerald-600 hover:underline">
+                                        <Link to="/parametres?tab=ratios" target="_blank" className="text-emerald-600 hover:underline">
                                             ratios de productivité
                                         </Link>.
                                     </>
@@ -1129,7 +971,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                 Aperçu de la charge estimée
                             </label>
                             <Link
-                                to="/ratios"
+                                to="/parametres?tab=ratios"
                                 target="_blank"
                                 className="text-sm text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
                             >
@@ -1187,7 +1029,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                 {chargePreview.hasUnconfiguredTypes && (
                                     <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded mt-2">
                                         Certains types d'objets n'ont pas de ratio configuré pour ce type de tâche.
-                                        <Link to="/ratios" target="_blank" className="underline ml-1">
+                                        <Link to="/parametres?tab=ratios" target="_blank" className="underline ml-1">
                                             Configurer les ratios
                                         </Link>
                                     </p>
@@ -1198,7 +1040,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                 {ratios.length === 0 ? (
                                     <span>
                                         Aucun ratio configuré.{' '}
-                                        <Link to="/ratios" target="_blank" className="text-emerald-600 underline">
+                                        <Link to="/parametres?tab=ratios" target="_blank" className="text-emerald-600 underline">
                                             Configurer les ratios
                                         </Link>
                                     </span>
@@ -1210,127 +1052,16 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                     </div>
                 )}
 
-                {/* ✅ PHASE 1: Options de planification intelligente */}
-                {selectedObjects.length > 0 && chargePreview && (
-                    <div className="border-t pt-4 space-y-3">
-                        <label className="block text-sm font-semibold text-slate-800 mb-2">
-                            Options de planification
-                        </label>
-
-                        {/* Calculer charge automatiquement */}
-                        <label className="flex items-start gap-3 cursor-pointer group">
-                            <input
-                                type="checkbox"
-                                checked={calculerChargeAuto}
-                                onChange={(e) => setCalculerChargeAuto(e.target.checked)}
-                                className="mt-1 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                            />
-                            <div className="flex-1">
-                                <div className="text-sm font-medium text-slate-800 group-hover:text-emerald-700 transition-colors">
-                                    ✅ Calculer la charge automatiquement
-                                </div>
-                                <p className="text-xs text-slate-500 mt-0.5">
-                                    La charge est calculée en fonction des superficies et ratios de productivité configurés
-                                    {chargePreview.totalHeures > 0 && (
-                                        <span className="font-semibold text-emerald-700"> ({chargePreview.totalHeures}h estimées)</span>
-                                    )}
-                                </p>
-                            </div>
-                        </label>
-
-                        {/* Répartir sur plusieurs jours */}
-                        <label className="flex items-start gap-3 cursor-pointer group">
-                            <input
-                                type="checkbox"
-                                checked={repartirMultiJours}
-                                onChange={(e) => {
-                                    const isChecked = e.target.checked;
-                                    setRepartirMultiJours(isChecked);
-
-                                    // Si décoché et récurrence active, la désactiver
-                                    if (!isChecked && formData.parametres_recurrence) {
-                                        setFormData({ ...formData, parametres_recurrence: null });
-                                        setAutoRecurrenceActivated(false);
-                                        console.log('🚫 Répartition multi-jours désactivée - récurrence supprimée');
-                                    }
-                                }}
-                                className="mt-1 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                            />
-                            <div className="flex-1">
-                                <div className="text-sm font-medium text-slate-800 group-hover:text-emerald-700 transition-colors">
-                                    📅 Répartir sur plusieurs jours
-                                </div>
-                                <p className="text-xs text-slate-500 mt-0.5">
-                                    Si la charge dépasse 10h, la tâche sera automatiquement divisée en plusieurs jours consécutifs
-                                    {chargePreview.totalHeures > 10 && (
-                                        <span className="font-semibold text-blue-700"> (recommandé: ~{Math.ceil(chargePreview.totalHeures / 8)} jours)</span>
-                                    )}
-                                </p>
-                            </div>
-                        </label>
-                    </div>
-                )}
-
-
-                {/* ✅ Auto-Recurrence Banner */}
-                {autoRecurrenceActivated && formData.parametres_recurrence && (
-                    <div className="border-t pt-4">
-                        <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-300 rounded-xl p-4 shadow-sm">
-                            <div className="flex items-start gap-3">
-                                <div className="bg-blue-500 rounded-full p-2 flex-shrink-0">
-                                    <RefreshCw className="w-5 h-5 text-white" />
-                                </div>
-                                <div className="flex-1">
-                                    <h4 className="text-sm font-bold text-blue-900 mb-1">
-                                        🔄 Récurrence activée automatiquement
-                                    </h4>
-                                    <p className="text-sm text-blue-700 mb-2">
-                                        {chargePreview?.totalHeures ? (
-                                            <>
-                                                Charge totale : <strong>{chargePreview.totalHeures}h</strong> répartie sur <strong>{formData.parametres_recurrence.nombre_occurrences} jours</strong>
-                                                {' '}(≈ <strong>{(chargePreview.totalHeures / formData.parametres_recurrence.nombre_occurrences).toFixed(1)}h/jour</strong>)
-                                            </>
-                                        ) : (
-                                            <>
-                                                La tâche s'étend sur plusieurs jours. Elle sera créée <strong>{formData.parametres_recurrence.nombre_occurrences} fois</strong>
-                                            </>
-                                        )}
-                                        {' '}(du {formData.date_debut_planifiee ? format(new Date(formData.date_debut_planifiee), 'dd/MM/yyyy') : '—'} au {formData.parametres_recurrence.date_fin ? format(new Date(formData.parametres_recurrence.date_fin), 'dd/MM/yyyy') : '—'}).
-                                    </p>
-                                    <p className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded inline-block mb-2">
-                                        💡 La charge sera automatiquement répartie sur chaque jour
-                                    </p>
-                                    <div className="flex gap-2 mt-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setFormData({ ...formData, parametres_recurrence: null });
-                                                setAutoRecurrenceActivated(false);
-                                            }}
-                                            className="text-xs bg-white hover:bg-blue-50 text-blue-700 border border-blue-300 px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1"
-                                        >
-                                            <X className="w-3 h-3" />
-                                            Désactiver la récurrence
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {/* ❌ SUPPRIMÉ: Checkboxes "Calculer charge auto" et "Répartir multi-jours" */}
+                {/* ❌ SUPPRIMÉ: Banner auto-récurrence */}
+                {/* La planification multi-jours est maintenant gérée via l'éditeur de distribution */}
 
                 {/* Récurrence (Google Calendar style) */}
                 <div className="border-t pt-4">
                     <label className="block text-sm font-semibold text-slate-800 mb-3">Récurrence</label>
                     <RecurrenceSelector
                         value={formData.parametres_recurrence as RecurrenceParams | null}
-                        onChange={(params) => {
-                            setFormData({ ...formData, parametres_recurrence: params });
-                            // ✅ Reset auto-activated flag when user manually changes recurrence
-                            if (params === null) {
-                                setAutoRecurrenceActivated(false);
-                            }
-                        }}
+                        onChange={(params) => setFormData({ ...formData, parametres_recurrence: params })}
                         startDate={formData.date_debut_planifiee || new Date().toISOString()}
                     />
                 </div>

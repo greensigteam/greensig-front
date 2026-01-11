@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Save, X, Plus, Trash2, Calendar } from 'lucide-react';
+import { Clock, Save, X, Plus, Trash2, Calendar, Edit2, Settings, Globe, Users, ChevronDown, ChevronUp } from 'lucide-react';
 import { api } from '@/services/api';
+import { useToast } from '../contexts/ToastContext';
 
 /**
- * ✅ PHASE 2.2: Configuration des horaires de travail des équipes
+ * ✅ REFONTE: Configuration des horaires de travail
  *
- * Permet de définir les horaires hebdomadaires par équipe.
- * Utilisé pour calculer la charge de travail réelle dans la planification automatique.
+ * Deux modes:
+ * 1. Configuration Globale - horaires par défaut pour toutes les équipes
+ * 2. Par Équipe - configurations personnalisées qui écrasent la config globale
  */
 
 interface HoraireTravail {
   id: number;
-  equipe: number;
+  equipe: number | null; // null = global
   equipe_nom: string;
   jour_semaine: string;
   jour_semaine_display: string;
@@ -29,15 +31,10 @@ interface Equipe {
 }
 
 interface HoraireFormData {
+  jour_semaine: string;
   heure_debut: string;
   heure_fin: string;
   duree_pause_minutes: number;
-}
-
-interface SemaineCompleteData {
-  lundi_vendredi: HoraireFormData;
-  samedi: HoraireFormData | null;
-  dimanche: HoraireFormData | null;
 }
 
 const JOURS_SEMAINE = [
@@ -50,456 +47,572 @@ const JOURS_SEMAINE = [
   { code: 'DIM', label: 'Dimanche' },
 ];
 
-const HorairesConfig: React.FC<{ triggerCreate?: number }> = ({ triggerCreate }) => {
-  const [equipes, setEquipes] = useState<Equipe[]>([]);
-  const [horaires, setHoraires] = useState<HoraireTravail[]>([]);
-  const [selectedEquipe, setSelectedEquipe] = useState<number | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [editingHoraire, setEditingHoraire] = useState<HoraireTravail | null>(null);
+type TabType = 'global' | 'par-equipe';
 
-  // Form pour création rapide (toute la semaine)
-  const [semaineComplete, setSemaineComplete] = useState<SemaineCompleteData>({
-    lundi_vendredi: { heure_debut: '08:00', heure_fin: '17:00', duree_pause_minutes: 60 },
-    samedi: { heure_debut: '08:00', heure_fin: '12:00', duree_pause_minutes: 0 },
-    dimanche: null,
+const HorairesConfig: React.FC<{ triggerCreate?: number }> = ({ triggerCreate }) => {
+  const { showToast } = useToast();
+  const [activeTab, setActiveTab] = useState<TabType>('global');
+  const [equipes, setEquipes] = useState<Equipe[]>([]);
+  const [horairesGlobaux, setHorairesGlobaux] = useState<HoraireTravail[]>([]);
+  const [horairesEquipes, setHorairesEquipes] = useState<HoraireTravail[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // États pour les modals
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingHoraire, setEditingHoraire] = useState<HoraireTravail | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createForEquipe, setCreateForEquipe] = useState<number | null>(null);
+
+  // Form state
+  const [formData, setFormData] = useState<HoraireFormData>({
+    jour_semaine: 'LUN',
+    heure_debut: '08:00',
+    heure_fin: '17:00',
+    duree_pause_minutes: 60,
   });
 
-  // Charger les équipes
+  // Équipes expanded
+  const [expandedEquipes, setExpandedEquipes] = useState<number[]>([]);
+
   useEffect(() => {
-    loadEquipes();
+    loadData();
   }, []);
 
-  // Charger les horaires quand une équipe est sélectionnée
-  useEffect(() => {
-    if (selectedEquipe) {
-      loadHoraires();
-    }
-  }, [selectedEquipe]);
-
-  const loadEquipes = async () => {
-    try {
-      const response = await api.get('/api/users/equipes/');
-      setEquipes(response.data.results || response.data);
-      if (response.data.results?.length > 0 || response.data.length > 0) {
-        setSelectedEquipe((response.data.results || response.data)[0].id);
-      }
-    } catch (error) {
-      console.error('Erreur chargement équipes:', error);
-    }
-  };
-
-  const loadHoraires = async () => {
-    if (!selectedEquipe) return;
-
+  const loadData = async () => {
     setLoading(true);
     try {
-      const response = await api.get(`/api/users/horaires/?equipe=${selectedEquipe}`);
-      setHoraires(response.data.results || response.data);
+      // Charger équipes
+      const equipesRes = await api.get('/api/users/equipes/');
+      setEquipes(equipesRes.data.results || equipesRes.data);
+
+      // Charger TOUS les horaires
+      const horairesRes = await api.get('/api/users/horaires/');
+      const allHoraires = horairesRes.data.results || horairesRes.data;
+
+      // Séparer globaux (equipe = null) et par équipe
+      setHorairesGlobaux(allHoraires.filter((h: HoraireTravail) => h.equipe === null));
+      setHorairesEquipes(allHoraires.filter((h: HoraireTravail) => h.equipe !== null));
     } catch (error) {
-      console.error('Erreur chargement horaires:', error);
+      console.error('Erreur chargement:', error);
+      showToast('Erreur lors du chargement des horaires', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreerSemaineComplete = async () => {
-    if (!selectedEquipe) return;
+  const getHorairesForEquipe = (equipeId: number): HoraireTravail[] => {
+    return horairesEquipes.filter(h => h.equipe === equipeId);
+  };
+
+  const hasCustomConfig = (equipeId: number): boolean => {
+    return getHorairesForEquipe(equipeId).length > 0;
+  };
+
+  const toggleEquipe = (equipeId: number) => {
+    setExpandedEquipes(prev =>
+      prev.includes(equipeId)
+        ? prev.filter(id => id !== equipeId)
+        : [...prev, equipeId]
+    );
+  };
+
+  const handleEdit = (horaire: HoraireTravail) => {
+    setEditingHoraire(horaire);
+    setFormData({
+      jour_semaine: horaire.jour_semaine,
+      heure_debut: horaire.heure_debut,
+      heure_fin: horaire.heure_fin,
+      duree_pause_minutes: horaire.duree_pause_minutes,
+    });
+    setShowEditModal(true);
+  };
+
+  const handleCreate = (equipeId: number | null = null) => {
+    setCreateForEquipe(equipeId);
+    setFormData({
+      jour_semaine: 'LUN',
+      heure_debut: '08:00',
+      heure_fin: '17:00',
+      duree_pause_minutes: 60,
+    });
+    setShowCreateModal(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingHoraire) return;
 
     setLoading(true);
     try {
-      await api.post('/api/users/horaires/creer_semaine_complete/', {
-        equipe: selectedEquipe,
-        lundi_vendredi: semaineComplete.lundi_vendredi,
-        samedi: semaineComplete.samedi,
-        dimanche: semaineComplete.dimanche,
-      });
-
-      alert('Horaires créés avec succès !');
-      loadHoraires();
-      setShowModal(false);
+      await api.patch(`/api/users/horaires/${editingHoraire.id}/`, formData);
+      showToast('Horaire modifié avec succès', 'success');
+      setShowEditModal(false);
+      setEditingHoraire(null);
+      loadData();
     } catch (error: any) {
-      console.error('Erreur création horaires:', error);
-      alert(error.response?.data?.error || 'Erreur lors de la création des horaires');
+      console.error('Erreur modification:', error);
+      showToast(error.response?.data?.error || 'Erreur lors de la modification', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteHoraire = async (horaireId: number) => {
+  const handleSaveCreate = async () => {
+    setLoading(true);
+    try {
+      // Construire le payload : ne pas inclure 'equipe' si null (config globale)
+      const payload: any = {
+        ...formData,
+        actif: true,
+      };
+
+      // Ajouter equipe uniquement si c'est une config par équipe
+      if (createForEquipe !== null) {
+        payload.equipe = createForEquipe;
+      }
+
+      await api.post('/api/users/horaires/', payload);
+      showToast('Horaire créé avec succès', 'success');
+      setShowCreateModal(false);
+      setCreateForEquipe(null);
+      loadData();
+    } catch (error: any) {
+      console.error('Erreur création:', error);
+      showToast(error.response?.data?.error || 'Erreur lors de la création', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (horaireId: number) => {
     if (!confirm('Supprimer cet horaire ?')) return;
 
     try {
       await api.delete(`/api/users/horaires/${horaireId}/`);
-      loadHoraires();
+      showToast('Horaire supprimé avec succès', 'success');
+      loadData();
     } catch (error) {
-      console.error('Erreur suppression horaire:', error);
-      alert('Erreur lors de la suppression');
+      console.error('Erreur suppression:', error);
+      showToast('Erreur lors de la suppression', 'error');
     }
   };
 
-  const getHoraireForDay = (jourCode: string): HoraireTravail | undefined => {
-    return horaires.find(h => h.jour_semaine === jourCode && h.actif);
-  };
+  const renderHoraireRow = (jour: { code: string; label: string }, horaire: HoraireTravail | undefined, isGlobal: boolean) => (
+    <tr key={jour.code} className="hover:bg-slate-50 transition-colors">
+      <td className="px-6 py-4 whitespace-nowrap">
+        <span className={`font-medium ${horaire ? 'text-slate-800' : 'text-slate-400'}`}>
+          {jour.label}
+        </span>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        {horaire ? (
+          <span className="text-sm text-slate-600">
+            {horaire.heure_debut} - {horaire.heure_fin}
+          </span>
+        ) : (
+          <span className="text-sm text-slate-400 italic">Non configuré</span>
+        )}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        {horaire ? (
+          <span className="text-sm text-slate-600">{horaire.duree_pause_minutes} min</span>
+        ) : (
+          <span className="text-sm text-slate-400">-</span>
+        )}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        {horaire ? (
+          <span className="text-sm font-semibold text-emerald-600">
+            {horaire.heures_travaillables.toFixed(1)}h
+          </span>
+        ) : (
+          <span className="text-sm text-slate-400">-</span>
+        )}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="flex items-center gap-2">
+          {horaire ? (
+            <>
+              <button
+                onClick={() => handleEdit(horaire)}
+                className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                title="Modifier"
+              >
+                <Edit2 className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => handleDelete(horaire.id)}
+                className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors"
+                title="Supprimer"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => handleCreate(isGlobal ? null : horaire?.equipe || null)}
+              className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded transition-colors"
+              title="Ajouter"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
 
   return (
-    <div className="space-y-6">
-      {/* Sélection équipe */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-emerald-600" />
-            Horaires de travail
-          </h2>
-          <button
-            onClick={() => setShowModal(true)}
-            disabled={!selectedEquipe}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-          >
-            <Calendar className="w-4 h-4" />
-            Configurer la semaine
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Équipe
-            </label>
-            <select
-              value={selectedEquipe || ''}
-              onChange={(e) => setSelectedEquipe(Number(e.target.value))}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-            >
-              {equipes.map(equipe => (
-                <option key={equipe.id} value={equipe.id}>
-                  {equipe.nom_equipe}
-                </option>
-              ))}
-            </select>
+    <div className="p-4 sm:p-6 space-y-6">
+      {/* Header avec onglets */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="border-b border-slate-200">
+          <div className="flex items-center justify-between p-6 pb-0">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <Clock className="w-5 h-5 text-emerald-600" />
+              Horaires de Travail
+            </h2>
           </div>
 
-          {!selectedEquipe && (
-            <div className="text-center py-8 text-slate-500">
-              Sélectionnez une équipe pour voir ses horaires
+          {/* Tabs */}
+          <div className="flex gap-1 px-6 mt-4">
+            <button
+              onClick={() => setActiveTab('global')}
+              className={`flex items-center gap-2 px-4 py-3 font-medium text-sm transition-all duration-200 border-b-2 ${
+                activeTab === 'global'
+                  ? 'text-emerald-600 border-emerald-600 bg-emerald-50/50'
+                  : 'text-slate-600 border-transparent hover:text-slate-800 hover:bg-slate-50'
+              }`}
+            >
+              <Globe className="w-4 h-4" />
+              Configuration Globale
+            </button>
+            <button
+              onClick={() => setActiveTab('par-equipe')}
+              className={`flex items-center gap-2 px-4 py-3 font-medium text-sm transition-all duration-200 border-b-2 ${
+                activeTab === 'par-equipe'
+                  ? 'text-blue-600 border-blue-600 bg-blue-50/50'
+                  : 'text-slate-600 border-transparent hover:text-slate-800 hover:bg-slate-50'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Par Équipe
+              {horairesEquipes.length > 0 && (
+                <span className="ml-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">
+                  {new Set(horairesEquipes.map(h => h.equipe)).size}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        <div className="p-6">
+          {activeTab === 'global' && (
+            <div className="space-y-4">
+              {/* Info */}
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 flex items-start gap-3">
+                <Globe className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h3 className="font-semibold text-emerald-900 mb-1">Configuration par défaut</h3>
+                  <p className="text-sm text-emerald-700">
+                    Ces horaires s'appliquent à toutes les équipes qui n'ont pas de configuration personnalisée.
+                  </p>
+                </div>
+              </div>
+
+              {/* Button */}
+              <div className="flex justify-end">
+                <button
+                  onClick={() => handleCreate(null)}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+                >
+                  <Plus className="w-4 h-4" />
+                  Ajouter un jour
+                </button>
+              </div>
+
+              {/* Table */}
+              <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Jour</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Horaires</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Pause</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Heures travaillables</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {JOURS_SEMAINE.map(jour => {
+                      const horaire = horairesGlobaux.find(h => h.jour_semaine === jour.code);
+                      return renderHoraireRow(jour, horaire, true);
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'par-equipe' && (
+            <div className="space-y-4">
+              {/* Info */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+                <Users className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h3 className="font-semibold text-blue-900 mb-1">Configurations personnalisées</h3>
+                  <p className="text-sm text-blue-700">
+                    Configurez des horaires spécifiques pour certaines équipes. Ces configurations écrasent la configuration globale.
+                  </p>
+                </div>
+              </div>
+
+              {/* Liste des équipes */}
+              <div className="space-y-3">
+                {equipes.map(equipe => {
+                  const hasCustom = hasCustomConfig(equipe.id);
+                  const isExpanded = expandedEquipes.includes(equipe.id);
+                  const horaires = getHorairesForEquipe(equipe.id);
+
+                  return (
+                    <div key={equipe.id} className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                      {/* Header */}
+                      <div
+                        className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 transition-colors"
+                        onClick={() => toggleEquipe(equipe.id)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <button className="text-slate-400 hover:text-slate-600">
+                            {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                          </button>
+                          <h3 className="font-semibold text-slate-800">{equipe.nom_equipe}</h3>
+                          {hasCustom ? (
+                            <span className="px-2.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                              Config Personnalisée ({horaires.length} jours)
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-0.5 bg-slate-100 text-slate-600 text-xs font-medium rounded-full">
+                              Config Globale
+                            </span>
+                          )}
+                        </div>
+                        {!hasCustom && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCreate(equipe.id);
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Personnaliser
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Content */}
+                      {isExpanded && (
+                        <div className="border-t border-slate-200">
+                          {hasCustom ? (
+                            <div className="p-4">
+                              <div className="flex justify-end mb-3">
+                                <button
+                                  onClick={() => handleCreate(equipe.id)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                                >
+                                  <Plus className="w-4 h-4" />
+                                  Ajouter un jour
+                                </button>
+                              </div>
+                              <table className="w-full">
+                                <thead>
+                                  <tr className="bg-slate-50 border-b border-slate-200">
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Jour</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Horaires</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Pause</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Heures travaillables</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Actions</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-200">
+                                  {JOURS_SEMAINE.map(jour => {
+                                    const horaire = horaires.find(h => h.jour_semaine === jour.code);
+                                    return renderHoraireRow(jour, horaire, false);
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : (
+                            <div className="p-8 text-center text-slate-500">
+                              <Clock className="w-12 h-12 mx-auto mb-2 text-slate-300" />
+                              <p className="font-medium">Utilise la configuration globale</p>
+                              <p className="text-sm mt-1">Cliquez sur "Personnaliser" pour créer une configuration spécifique</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Tableau des horaires */}
-      {selectedEquipe && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
-                    Jour
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
-                    Horaires
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
-                    Pause
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
-                    Heures travaillables
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {JOURS_SEMAINE.map(jour => {
-                  const horaire = getHoraireForDay(jour.code);
-
-                  return (
-                    <tr key={jour.code} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`font-medium ${horaire ? 'text-slate-800' : 'text-slate-400'}`}>
-                          {jour.label}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {horaire ? (
-                          <span className="text-sm text-slate-600">
-                            {horaire.heure_debut} - {horaire.heure_fin}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-slate-400 italic">
-                            Non configuré
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {horaire ? (
-                          <span className="text-sm text-slate-600">
-                            {horaire.duree_pause_minutes} min
-                          </span>
-                        ) : (
-                          <span className="text-sm text-slate-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {horaire ? (
-                          <span className="text-sm font-semibold text-emerald-600">
-                            {horaire.heures_travaillables.toFixed(1)}h
-                          </span>
-                        ) : (
-                          <span className="text-sm text-slate-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {horaire && (
-                          <button
-                            onClick={() => handleDeleteHoraire(horaire.id)}
-                            className="text-red-600 hover:text-red-800 transition-colors"
-                            title="Supprimer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {loading && (
-            <div className="text-center py-8">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-            </div>
-          )}
-
-          {!loading && horaires.length === 0 && (
-            <div className="text-center py-8 text-slate-500">
-              <Clock className="w-12 h-12 mx-auto mb-2 text-slate-300" />
-              <p>Aucun horaire configuré pour cette équipe</p>
-              <p className="text-sm">Cliquez sur "Configurer la semaine" pour commencer</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Modal création semaine complète */}
-      {showModal && (
+      {/* Modal Édition */}
+      {showEditModal && editingHoraire && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
               <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                <Calendar className="w-6 h-6 text-emerald-600" />
-                Configurer la semaine
+                <Edit2 className="w-5 h-5 text-blue-600" />
+                Modifier l'horaire
               </h3>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X className="w-6 h-6" />
+              <button onClick={() => setShowEditModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
-              {/* Lundi - Vendredi */}
-              <div className="bg-emerald-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-slate-800 mb-4">Lundi - Vendredi</h4>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Début
-                    </label>
-                    <input
-                      type="time"
-                      value={semaineComplete.lundi_vendredi.heure_debut}
-                      onChange={(e) => setSemaineComplete({
-                        ...semaineComplete,
-                        lundi_vendredi: { ...semaineComplete.lundi_vendredi, heure_debut: e.target.value }
-                      })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Fin
-                    </label>
-                    <input
-                      type="time"
-                      value={semaineComplete.lundi_vendredi.heure_fin}
-                      onChange={(e) => setSemaineComplete({
-                        ...semaineComplete,
-                        lundi_vendredi: { ...semaineComplete.lundi_vendredi, heure_fin: e.target.value }
-                      })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Pause (min)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={semaineComplete.lundi_vendredi.duree_pause_minutes}
-                      onChange={(e) => setSemaineComplete({
-                        ...semaineComplete,
-                        lundi_vendredi: { ...semaineComplete.lundi_vendredi, duree_pause_minutes: parseInt(e.target.value) }
-                      })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                    />
-                  </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Jour</label>
+                <input
+                  type="text"
+                  value={editingHoraire.jour_semaine_display}
+                  disabled
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-600"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Heure début</label>
+                  <input
+                    type="time"
+                    value={formData.heure_debut}
+                    onChange={(e) => setFormData({ ...formData, heure_debut: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Heure fin</label>
+                  <input
+                    type="time"
+                    value={formData.heure_fin}
+                    onChange={(e) => setFormData({ ...formData, heure_fin: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
                 </div>
               </div>
 
-              {/* Samedi */}
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="font-semibold text-slate-800">Samedi</h4>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={semaineComplete.samedi !== null}
-                      onChange={(e) => setSemaineComplete({
-                        ...semaineComplete,
-                        samedi: e.target.checked ? { heure_debut: '08:00', heure_fin: '12:00', duree_pause_minutes: 0 } : null
-                      })}
-                      className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                    />
-                    <span className="text-sm text-slate-600">Travail le samedi</span>
-                  </label>
-                </div>
-                {semaineComplete.samedi && (
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
-                        Début
-                      </label>
-                      <input
-                        type="time"
-                        value={semaineComplete.samedi.heure_debut}
-                        onChange={(e) => setSemaineComplete({
-                          ...semaineComplete,
-                          samedi: { ...semaineComplete.samedi!, heure_debut: e.target.value }
-                        })}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
-                        Fin
-                      </label>
-                      <input
-                        type="time"
-                        value={semaineComplete.samedi.heure_fin}
-                        onChange={(e) => setSemaineComplete({
-                          ...semaineComplete,
-                          samedi: { ...semaineComplete.samedi!, heure_fin: e.target.value }
-                        })}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
-                        Pause (min)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={semaineComplete.samedi.duree_pause_minutes}
-                        onChange={(e) => setSemaineComplete({
-                          ...semaineComplete,
-                          samedi: { ...semaineComplete.samedi!, duree_pause_minutes: parseInt(e.target.value) }
-                        })}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Dimanche */}
-              <div className="bg-purple-50 p-4 rounded-lg">
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="font-semibold text-slate-800">Dimanche</h4>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={semaineComplete.dimanche !== null}
-                      onChange={(e) => setSemaineComplete({
-                        ...semaineComplete,
-                        dimanche: e.target.checked ? { heure_debut: '08:00', heure_fin: '12:00', duree_pause_minutes: 0 } : null
-                      })}
-                      className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                    />
-                    <span className="text-sm text-slate-600">Travail le dimanche</span>
-                  </label>
-                </div>
-                {semaineComplete.dimanche && (
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
-                        Début
-                      </label>
-                      <input
-                        type="time"
-                        value={semaineComplete.dimanche.heure_debut}
-                        onChange={(e) => setSemaineComplete({
-                          ...semaineComplete,
-                          dimanche: { ...semaineComplete.dimanche!, heure_debut: e.target.value }
-                        })}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
-                        Fin
-                      </label>
-                      <input
-                        type="time"
-                        value={semaineComplete.dimanche.heure_fin}
-                        onChange={(e) => setSemaineComplete({
-                          ...semaineComplete,
-                          dimanche: { ...semaineComplete.dimanche!, heure_fin: e.target.value }
-                        })}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
-                        Pause (min)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={semaineComplete.dimanche.duree_pause_minutes}
-                        onChange={(e) => setSemaineComplete({
-                          ...semaineComplete,
-                          dimanche: { ...semaineComplete.dimanche!, duree_pause_minutes: parseInt(e.target.value) }
-                        })}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                      />
-                    </div>
-                  </div>
-                )}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Pause (minutes)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.duree_pause_minutes}
+                  onChange={(e) => setFormData({ ...formData, duree_pause_minutes: parseInt(e.target.value) || 0 })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
               </div>
             </div>
 
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3 sticky bottom-0 bg-white">
+            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
               <button
-                onClick={() => setShowModal(false)}
-                className="px-4 py-2 text-slate-600 hover:text-slate-800 font-medium transition-colors"
+                onClick={() => setShowEditModal(false)}
+                className="px-4 py-2 text-slate-600 hover:text-slate-800 font-medium"
               >
                 Annuler
               </button>
               <button
-                onClick={handleCreerSemaineComplete}
+                onClick={handleSaveEdit}
                 disabled={loading}
-                className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
               >
                 <Save className="w-4 h-4" />
                 {loading ? 'Enregistrement...' : 'Enregistrer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Création */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <Plus className="w-5 h-5 text-emerald-600" />
+                Ajouter un horaire
+              </h3>
+              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Jour</label>
+                <select
+                  value={formData.jour_semaine}
+                  onChange={(e) => setFormData({ ...formData, jour_semaine: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                >
+                  {JOURS_SEMAINE.map(jour => (
+                    <option key={jour.code} value={jour.code}>{jour.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Heure début</label>
+                  <input
+                    type="time"
+                    value={formData.heure_debut}
+                    onChange={(e) => setFormData({ ...formData, heure_debut: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Heure fin</label>
+                  <input
+                    type="time"
+                    value={formData.heure_fin}
+                    onChange={(e) => setFormData({ ...formData, heure_fin: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Pause (minutes)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.duree_pause_minutes}
+                  onChange={(e) => setFormData({ ...formData, duree_pause_minutes: parseInt(e.target.value) || 0 })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="px-4 py-2 text-slate-600 hover:text-slate-800 font-medium"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleSaveCreate}
+                disabled={loading}
+                className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 font-medium"
+              >
+                <Save className="w-4 h-4" />
+                {loading ? 'Création...' : 'Créer'}
               </button>
             </div>
           </div>

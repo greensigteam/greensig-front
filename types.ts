@@ -1,6 +1,6 @@
 
 export type Role = 'ADMIN' | 'SUPERVISEUR' | 'CLIENT';
-export type ViewState = 'LOGIN' | 'DASHBOARD' | 'MAP' | 'INVENTORY' | 'PLANNING' | 'INTERVENTIONS' | 'CLAIMS' | 'TEAMS' | 'USERS' | 'REPORTING' | 'CLIENT_PORTAL' | 'PRODUCTS' | 'SITES' | 'CLIENTS' | 'SUIVI_TACHES';
+export type ViewState = 'LOGIN' | 'DASHBOARD' | 'MAP' | 'INVENTORY' | 'PLANNING' | 'INTERVENTIONS' | 'CLAIMS' | 'TEAMS' | 'USERS' | 'REPORTING' | 'CLIENT_PORTAL' | 'PRODUCTS' | 'SITES' | 'CLIENTS' | 'SUIVI_TACHES' | 'PARAMETRES';
 
 export interface User {
   id: string;

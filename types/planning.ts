@@ -133,6 +133,27 @@ export interface RecurrenceParams {
 }
 
 // ============================================================================
+// DISTRIBUTION DE CHARGE (Multi-Day Tasks)
+// ============================================================================
+
+export interface DistributionCharge {
+    id: number;
+    tache: number;
+    date: string; // YYYY-MM-DD
+    heures_planifiees: number;
+    heures_reelles: number | null;
+    commentaire: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface DistributionChargeData {
+    date: string; // YYYY-MM-DD
+    heures_planifiees: number;
+    commentaire?: string;
+}
+
+// ============================================================================
 // TACHE
 // ============================================================================
 
@@ -182,6 +203,11 @@ export interface Tache {
     deleted_at: string | null;
     reclamation?: number | null;
     reclamation_numero?: string;
+
+    // ✅ NOUVEAU: Distributions de charge (tâches multi-jours)
+    distributions_charge?: DistributionCharge[];
+    charge_totale_distributions?: number;
+    nombre_jours_travail?: number;
 }
 
 export interface TacheCreate {
@@ -206,6 +232,9 @@ export interface TacheCreate {
 
     // Surcharge manuelle de la charge estimée
     charge_estimee_heures?: number | null;
+
+    // ✅ NOUVEAU: Distributions de charge (tâches multi-jours)
+    distributions_charge_data?: DistributionChargeData[];
 }
 
 export interface TacheUpdate {
@@ -223,6 +252,9 @@ export interface TacheUpdate {
     // Dates réelles pour le suivi
     date_debut_reelle?: string | null;
     date_fin_reelle?: string | null;
+
+    // ✅ NOUVEAU: Distributions de charge (tâches multi-jours)
+    distributions_charge_data?: DistributionChargeData[];
 }
 
 export interface ParticipationCreate {

@@ -31,7 +31,7 @@ const getFullImageUrl = (url: string | null): string => {
 };
 
 const SuiviTaches: React.FC = () => {
-    const { searchQuery, setPlaceholder } = useSearch();
+    const { searchQuery, setSearchQuery, setPlaceholder } = useSearch();
 
     // State UI
     const [loadingTasks, setLoadingTasks] = useState(true);
@@ -100,10 +100,14 @@ const SuiviTaches: React.FC = () => {
     const [loadingTypesTaches, setLoadingTypesTaches] = useState(false);
     const [updatingTask, setUpdatingTask] = useState(false);
 
-    // Set search placeholder
+    // Set search placeholder and cleanup on unmount
     useEffect(() => {
         setPlaceholder('Rechercher une tâche...');
-    }, [setPlaceholder]);
+        return () => {
+            setPlaceholder('Rechercher...');
+            setSearchQuery('');
+        };
+    }, [setPlaceholder, setSearchQuery]);
 
 
     // Chargement initial

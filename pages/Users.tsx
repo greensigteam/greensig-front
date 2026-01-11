@@ -708,7 +708,7 @@ interface UsersProps {
 
 const Users: React.FC<UsersProps> = ({ triggerCreate }) => {
   const navigate = useNavigate();
-  const { searchQuery, setPlaceholder } = useSearch();
+  const { searchQuery, setSearchQuery, setPlaceholder } = useSearch();
 
   // State
   const [loading, setLoading] = useState(true);
@@ -755,10 +755,14 @@ const Users: React.FC<UsersProps> = ({ triggerCreate }) => {
     loadData();
   }, []);
 
-  // Set search placeholder
+  // Set search placeholder and cleanup on unmount
   useEffect(() => {
     setPlaceholder('Rechercher un utilisateur (nom, prénom, email)...');
-  }, [setPlaceholder]);
+    return () => {
+      setPlaceholder('Rechercher...');
+      setSearchQuery('');
+    };
+  }, [setPlaceholder, setSearchQuery]);
 
   // Handle external trigger to open create modal
   useEffect(() => {

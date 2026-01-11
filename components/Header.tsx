@@ -27,7 +27,8 @@ const VIEW_TITLES: Record<ViewState, string> = {
   'PRODUCTS': 'Gestion des Produits',
   'SITES': 'Gestion des Sites',
   'CLIENTS': 'Clients',
-  'SUIVI_TACHES': 'Suivi des Tâches'
+  'SUIVI_TACHES': 'Suivi des Tâches',
+  'PARAMETRES': 'Paramètres'
 };
 
 const PATH_TO_VIEW: Record<string, ViewState> = {
@@ -46,7 +47,8 @@ const PATH_TO_VIEW: Record<string, ViewState> = {
   '/users': 'USERS',
   '/clients': 'CLIENTS',
   '/structures': 'CLIENTS',
-  '/suivi-taches': 'SUIVI_TACHES'
+  '/suivi-taches': 'SUIVI_TACHES',
+  '/parametres': 'PARAMETRES'
 };
 
 const Header: React.FC<HeaderProps> = ({ user }) => {

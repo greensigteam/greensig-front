@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users as UsersIcon, Award, Gauge, UserPlus, Plus, Clock, Calendar } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 
 // Import des composants de configuration
 import CompetencesConfig from './CompetencesConfig';
@@ -17,8 +18,22 @@ import JoursFeriesConfig from './JoursFeriesConfig';
 type ParametresTab = 'utilisateurs' | 'competences' | 'ratios' | 'horaires' | 'jours-feries';
 
 const Parametres: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<ParametresTab>('utilisateurs');
+  const [searchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get('tab') as ParametresTab | null;
+
+  const [activeTab, setActiveTab] = useState<ParametresTab>(
+    tabFromUrl && ['utilisateurs', 'competences', 'ratios', 'horaires', 'jours-feries'].includes(tabFromUrl)
+      ? tabFromUrl
+      : 'utilisateurs'
+  );
   const [createTrigger, setCreateTrigger] = useState(0);
+
+  // Mettre à jour l'onglet actif si le paramètre URL change
+  useEffect(() => {
+    if (tabFromUrl && ['utilisateurs', 'competences', 'ratios', 'horaires', 'jours-feries'].includes(tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
 
   const handleCreate = () => {
     setCreateTrigger(prev => prev + 1);

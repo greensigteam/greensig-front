@@ -397,13 +397,46 @@ const SiteDetailPage: React.FC = () => {
     const handleAssignEquipe = async (equipeId: number) => {
         if (!site) return;
         try {
-            // Update équipe with site using proper API function
-            await updateEquipe(equipeId, { site: Number(site.id) });
-            showToast('Équipe assignée avec succès', 'success');
+            // Récupérer l'équipe pour vérifier son état actuel
+            const equipe = availableEquipes.find(e => e.id === equipeId);
+            if (!equipe) return;
+
+            // Logique intelligente :
+            // 1. Si l'équipe n'a PAS de site principal → en faire le site principal
+            // 2. Sinon → ajouter aux sites secondaires
+            if (!equipe.sitePrincipal) {
+                // Aucun site principal → ce site devient le principal
+                await updateEquipe(equipeId, {
+                    sitePrincipal: Number(site.id)
+                });
+                showToast('Équipe assignée comme site principal', 'success');
+            } else {
+                // A déjà un site principal → ajouter aux secondaires
+                const currentSecondaires = equipe.sitesSecondaires || [];
+
+                // Vérifier si déjà dans les secondaires
+                if (currentSecondaires.includes(Number(site.id))) {
+                    showToast('Cette équipe est déjà assignée à ce site', 'info');
+                    return;
+                }
+
+                // Vérifier si c'est déjà le site principal
+                if (equipe.sitePrincipal === Number(site.id)) {
+                    showToast('Ce site est déjà le site principal de cette équipe', 'info');
+                    return;
+                }
+
+                await updateEquipe(equipeId, {
+                    sitesSecondaires: [...currentSecondaires, Number(site.id)]
+                });
+                showToast('Équipe assignée comme site secondaire', 'success');
+            }
+
             setRefreshKey(prev => prev + 1); // Trigger reload
             setShowAssignEquipeModal(false);
             setEquipeSearchQuery('');
         } catch (error: any) {
+            console.error('Erreur assignation équipe:', error);
             showToast('Erreur lors de l\'assignation de l\'équipe', 'error');
         }
     };
@@ -700,10 +733,24 @@ const SiteDetailPage: React.FC = () => {
                                                 <button
                                                     onClick={async () => {
                                                         try {
-                                                            await updateEquipe(equipe.id, { site: null });
-                                                            showToast('Équipe désassignée avec succès', 'success');
+                                                            // Vérifier si c'est le site principal ou secondaire
+                                                            if (equipe.sitePrincipal === Number(site.id)) {
+                                                                // C'est le site principal → retirer
+                                                                await updateEquipe(equipe.id, { sitePrincipal: null });
+                                                                showToast('Site principal retiré', 'success');
+                                                            } else if (equipe.sitesSecondaires?.includes(Number(site.id))) {
+                                                                // C'est un site secondaire → retirer de la liste
+                                                                const nouveauxSecondaires = equipe.sitesSecondaires.filter(
+                                                                    siteId => siteId !== Number(site.id)
+                                                                );
+                                                                await updateEquipe(equipe.id, {
+                                                                    sitesSecondaires: nouveauxSecondaires
+                                                                });
+                                                                showToast('Site secondaire retiré', 'success');
+                                                            }
                                                             setRefreshKey(prev => prev + 1);
                                                         } catch (error) {
+                                                            console.error('Erreur désassignation:', error);
                                                             showToast('Erreur lors de la désassignation', 'error');
                                                         }
                                                     }}

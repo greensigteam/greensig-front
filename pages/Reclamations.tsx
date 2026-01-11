@@ -98,7 +98,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, options, i
 const Reclamations: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { searchQuery, setPlaceholder } = useSearch();
+    const { searchQuery, setSearchQuery, setPlaceholder } = useSearch();
     const [reclamations, setReclamations] = useState<Reclamation[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentUser, setCurrentUser] = useState<Utilisateur | null>(null);
@@ -174,10 +174,14 @@ const Reclamations: React.FC = () => {
     const [filterDateFin, setFilterDateFin] = useState<string>('');
     const [showFilters, setShowFilters] = useState(false);
 
-    // Set search placeholder
+    // Set search placeholder and cleanup on unmount
     useEffect(() => {
         setPlaceholder('Rechercher une réclamation par numéro, description...');
-    }, [setPlaceholder]);
+        return () => {
+            setPlaceholder('Rechercher...');
+            setSearchQuery('');
+        };
+    }, [setPlaceholder, setSearchQuery]);
 
     // Close menus when clicking outside
     useEffect(() => {

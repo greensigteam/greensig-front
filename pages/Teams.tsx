@@ -131,7 +131,7 @@ type TabType = 'equipes' | 'operateurs' | 'absences' | 'competences';
 
 const Teams: React.FC = () => {
   // Search context from Header
-  const { searchQuery, setPlaceholder } = useSearch();
+  const { searchQuery, setSearchQuery, setPlaceholder } = useSearch();
   const { showToast } = useToast();
 
   // State
@@ -240,7 +240,7 @@ const Teams: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Update search placeholder based on active tab
+  // Update search placeholder based on active tab and cleanup on unmount
   useEffect(() => {
     const placeholders: Record<TabType, string> = {
       equipes: 'Rechercher une équipe...',
@@ -249,7 +249,11 @@ const Teams: React.FC = () => {
       absences: 'Rechercher une absence (opérateur, motif, type)...'
     };
     setPlaceholder(placeholders[activeTab]);
-  }, [activeTab, setPlaceholder]);
+    return () => {
+      setPlaceholder('Rechercher...');
+      setSearchQuery('');
+    };
+  }, [activeTab, setPlaceholder, setSearchQuery]);
 
   // Load stable data once (currentUser + stats - doesn't change during session)
   useEffect(() => {

@@ -189,7 +189,7 @@ const Inventory: React.FC<InventoryProps> = ({ user }) => {
   const isClient = user.role === 'CLIENT';
   const permissions = usePermissions(user);
   const { showToast } = useToast();
-  const { searchQuery, setPlaceholder } = useSearch();
+  const { searchQuery, setSearchQuery, setPlaceholder } = useSearch();
 
   // ✅ Restore main tab from sessionStorage
   const [mainTab, setMainTab] = useState<'tous' | 'vegetation' | 'hydraulique'>(
@@ -238,7 +238,11 @@ const Inventory: React.FC<InventoryProps> = ({ user }) => {
 
   useEffect(() => {
     setPlaceholder('Rechercher dans l\'inventaire...');
-  }, [setPlaceholder]);
+    return () => {
+      setPlaceholder('Rechercher...');
+      setSearchQuery('');
+    };
+  }, [setPlaceholder, setSearchQuery]);
 
   useEffect(() => {
     let mounted = true;

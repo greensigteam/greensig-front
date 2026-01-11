@@ -279,6 +279,18 @@ export const planningService = {
         return data.results || [];
     },
 
+    async getRatiosPaginated(page: number = 1, params: { search?: string; type_tache_id?: number; type_objet?: string } = {}): Promise<{ results: RatioProductivite[]; count: number; next: string | null; previous: string | null }> {
+        const query = new URLSearchParams();
+        query.append('page', page.toString());
+        if (params.search) query.append('search', params.search);
+        if (params.type_tache_id) query.append('type_tache_id', params.type_tache_id.toString());
+        if (params.type_objet) query.append('type_objet', params.type_objet);
+
+        const response = await apiFetch(`${BASE_URL}/ratios-productivite/?${query.toString()}`);
+        if (!response.ok) throw new Error('Erreur chargement ratios');
+        return response.json();
+    },
+
     async getRatio(id: number): Promise<RatioProductivite> {
         const response = await apiFetch(`${BASE_URL}/ratios-productivite/${id}/`);
         if (!response.ok) throw new Error('Ratio non trouvé');
@@ -293,6 +305,12 @@ export const planningService = {
         });
         if (!response.ok) {
             const error = await response.json();
+
+            // Gérer l'erreur de contrainte unique
+            if (error.non_field_errors && error.non_field_errors[0]?.includes('unique')) {
+                throw new Error('Un ratio existe déjà pour cette combinaison (Type de tâche × Type d\'objet). Veuillez modifier le ratio existant au lieu de créer un doublon.');
+            }
+
             throw new Error(error.detail || error.non_field_errors?.[0] || 'Erreur lors de la création du ratio');
         }
         return response.json();
