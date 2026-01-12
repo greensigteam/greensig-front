@@ -136,21 +136,39 @@ export interface RecurrenceParams {
 // DISTRIBUTION DE CHARGE (Multi-Day Tasks)
 // ============================================================================
 
+export type StatusDistribution = 'NON_REALISEE' | 'REALISEE';
+
+export const STATUS_DISTRIBUTION_LABELS: Record<StatusDistribution, string> = {
+    NON_REALISEE: 'Non Réalisée',
+    REALISEE: 'Réalisée'
+};
+
+export const STATUS_DISTRIBUTION_COLORS: Record<StatusDistribution, { bg: string; text: string }> = {
+    NON_REALISEE: { bg: 'bg-blue-100', text: 'text-blue-800' },
+    REALISEE: { bg: 'bg-green-100', text: 'text-green-800' }
+};
+
 export interface DistributionCharge {
     id: number;
     tache: number;
     date: string; // YYYY-MM-DD
     heures_planifiees: number;
     heures_reelles: number | null;
+    heure_debut?: string | null;  // "HH:MM:SS" (ISO time format)
+    heure_fin?: string | null;     // "HH:MM:SS"
     commentaire: string;
+    status: StatusDistribution;  // ✅ NOUVEAU: Statut de la distribution
     created_at: string;
     updated_at: string;
 }
 
 export interface DistributionChargeData {
     date: string; // YYYY-MM-DD
-    heures_planifiees: number;
+    heures_planifiees?: number;  // Calculé automatiquement côté backend depuis heure_debut et heure_fin
+    heure_debut?: string;  // "HH:MM" ou "HH:MM:SS"
+    heure_fin?: string;     // "HH:MM" ou "HH:MM:SS"
     commentaire?: string;
+    status?: StatusDistribution;  // ✅ NOUVEAU: Statut optionnel (défaut: NON_REALISEE)
 }
 
 // ============================================================================
@@ -170,16 +188,16 @@ export interface Tache {
     objets_detail: ObjetSimple[];
 
     // Champs
-    date_debut_planifiee: string; // ISO DateTime
-    date_fin_planifiee: string; // ISO DateTime
+    date_debut_planifiee: string; // ISO Date (YYYY-MM-DD uniquement, sans heures)
+    date_fin_planifiee: string; // ISO Date (YYYY-MM-DD uniquement, sans heures)
     date_echeance: string | null; // Date
 
     priorite: PrioriteTache;
     commentaires: string;
 
     date_affectation: string | null;
-    date_debut_reelle: string | null;
-    date_fin_reelle: string | null;
+    date_debut_reelle: string | null;  // ISO Date (YYYY-MM-DD uniquement, sans heures)
+    date_fin_reelle: string | null;    // ISO Date (YYYY-MM-DD uniquement, sans heures)
     duree_reelle_minutes: number | null;
     charge_estimee_heures: number | null;
     charge_manuelle: boolean;
@@ -216,8 +234,8 @@ export interface TacheCreate {
     id_equipe?: number | null; // Legacy single team (backwards compatibility)
     equipes_ids?: number[]; // Multi-teams (US-PLAN-013)
 
-    date_debut_planifiee: string;
-    date_fin_planifiee: string;
+    date_debut_planifiee: string;  // ISO Date (YYYY-MM-DD)
+    date_fin_planifiee: string;    // ISO Date (YYYY-MM-DD)
 
     priorite?: PrioriteTache;
     commentaires?: string;
@@ -240,8 +258,8 @@ export interface TacheCreate {
 export interface TacheUpdate {
     id_equipe?: number | null; // Legacy single team
     equipes_ids?: number[]; // Multi-teams (US-PLAN-013)
-    date_debut_planifiee?: string;
-    date_fin_planifiee?: string;
+    date_debut_planifiee?: string;  // ISO Date (YYYY-MM-DD)
+    date_fin_planifiee?: string;    // ISO Date (YYYY-MM-DD)
     priorite?: PrioriteTache;
     statut?: StatutTache;
     commentaires?: string;
@@ -249,9 +267,9 @@ export interface TacheUpdate {
     objets?: number[];
     // Surcharge manuelle de la charge estimée
     charge_estimee_heures?: number | null;
-    // Dates réelles pour le suivi
-    date_debut_reelle?: string | null;
-    date_fin_reelle?: string | null;
+    // Dates réelles pour le suivi (jour uniquement, sans heures)
+    date_debut_reelle?: string | null;  // ISO Date (YYYY-MM-DD)
+    date_fin_reelle?: string | null;    // ISO Date (YYYY-MM-DD)
 
     // ✅ NOUVEAU: Distributions de charge (tâches multi-jours)
     distributions_charge_data?: DistributionChargeData[];

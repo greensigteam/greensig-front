@@ -19,7 +19,9 @@ import { fetchCurrentUser } from '../services/api';
 import {
     Tache, TacheCreate, TacheUpdate, TypeTache,
     STATUT_TACHE_LABELS, STATUT_TACHE_COLORS,
-    PRIORITE_LABELS
+    PRIORITE_LABELS,
+    STATUS_DISTRIBUTION_LABELS, STATUS_DISTRIBUTION_COLORS,
+    type StatusDistribution
 } from '../types/planning';
 import { EquipeList, Client } from '../types/users';
 import { usePermissions } from '../hooks/usePermissions';
@@ -35,7 +37,6 @@ import {
     type ReferenceType,
     type VirtualElement,
 } from '@floating-ui/react';
-import { localInputToUTC } from '../utils/dateHelpers';
 
 // ============================================================================
 // STYLES CUSTOM (Google Tasks Look & Feel)
@@ -98,6 +99,8 @@ interface CalendarEvent {
     start: Date;
     end: Date;
     resource: Tache;
+    distributionStatus?: StatusDistribution;  // ✅ Statut de la distribution pour ce jour
+    distributionId?: number;  // ✅ ID de la distribution pour ce jour
 }
 
 // ============================================================================
@@ -106,7 +109,9 @@ interface CalendarEvent {
 
 const TaskEvent = memo(function TaskEvent({ event }: { event: CalendarEvent, title?: string }) {
     const tache = event.resource;
-    const isCompleted = tache.statut === 'TERMINEE';
+    // Si on a une distribution, on utilise son statut, sinon on utilise le statut de la tâche
+    const isCompleted = event.distributionStatus ? event.distributionStatus === 'REALISEE' : tache.statut === 'TERMINEE';
+    const isDistributionRealisee = event.distributionStatus === 'REALISEE';
     const isUrgent = tache.priorite === 5;
 
     return (
@@ -114,6 +119,7 @@ const TaskEvent = memo(function TaskEvent({ event }: { event: CalendarEvent, tit
             className={`
                 task-event-root group flex items-start gap-2 p-1.5 rounded-lg transition-all duration-200
                 ${isCompleted ? 'opacity-60' : 'hover:bg-gray-100'}
+                ${isDistributionRealisee ? 'bg-green-50 border-2 border-green-500 shadow-sm' : ''}
                 ${tache.charge_estimee_heures ? 'min-h-[28px]' : ''}
             `}
             style={{ pointerEvents: 'all' }}
@@ -167,15 +173,20 @@ const TaskEvent = memo(function TaskEvent({ event }: { event: CalendarEvent, tit
 
 interface PopoverProps {
     tache: Tache;
+    eventStart?: Date;
+    eventEnd?: Date;
+    distributionStatus?: StatusDistribution;  // ✅ Statut de la distribution pour ce jour
+    distributionId?: number;  // ✅ ID de la distribution pour ce jour
     onClose: () => void;
     onEdit: () => void;
     onDelete: () => void;
-    onToggleComplete: () => void;
+    onToggleDistribution?: () => void;  // ✅ Nouveau: toggle du statut de distribution
     isReadOnly?: boolean;
 }
 
-const TaskDetailPopover: FC<PopoverProps> = ({ tache, onClose, onEdit, onDelete, onToggleComplete, isReadOnly }) => {
-    const isCompleted = tache.statut === 'TERMINEE';
+const TaskDetailPopover: FC<PopoverProps> = ({ tache, eventStart, eventEnd, distributionStatus, distributionId, onClose, onEdit, onDelete, onToggleDistribution, isReadOnly }) => {
+    // Si on a une distribution, on utilise son statut, sinon on utilise le statut de la tâche
+    const isCompleted = distributionStatus ? distributionStatus === 'REALISEE' : tache.statut === 'TERMINEE';
 
     // Handle escape key and click outside
     useEffect(() => {
@@ -227,20 +238,23 @@ const TaskDetailPopover: FC<PopoverProps> = ({ tache, onClose, onEdit, onDelete,
                     <div className="px-6 py-5">
                         <div className="flex items-start gap-4">
                             {/* Big Checkbox - disabled for CLIENT (readOnly) */}
-                            <button
-                                onClick={isReadOnly ? undefined : onToggleComplete}
-                                disabled={isReadOnly}
-                                className={`
-                            mt-1 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300
-                            ${isCompleted
-                                        ? 'bg-emerald-600 border-emerald-600 text-white animate-check'
-                                        : 'bg-white border-gray-400 hover:border-emerald-500 hover:bg-emerald-50'
-                                    }
-                            ${isReadOnly ? 'cursor-not-allowed opacity-60' : ''}
-                        `}
-                            >
-                                {isCompleted && <CheckCircle2 className="w-4 h-4" />}
-                            </button>
+                            {onToggleDistribution && (
+                                <button
+                                    onClick={isReadOnly ? undefined : onToggleDistribution}
+                                    disabled={isReadOnly}
+                                    title={distributionStatus === 'REALISEE' ? 'Marquer cette journée comme non réalisée' : 'Marquer cette journée comme réalisée'}
+                                    className={`
+                                mt-1 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300
+                                ${isCompleted
+                                            ? 'bg-emerald-600 border-emerald-600 text-white animate-check'
+                                            : 'bg-white border-gray-400 hover:border-emerald-500 hover:bg-emerald-50'
+                                        }
+                                ${isReadOnly ? 'cursor-not-allowed opacity-60' : ''}
+                            `}
+                                >
+                                    {isCompleted && <CheckCircle2 className="w-4 h-4" />}
+                                </button>
+                            )}
 
                             <div className="flex-1">
                                 <h3 className={`text-lg font-medium leading-snug ${isCompleted ? 'line-through text-gray-500' : 'text-gray-900'}`}>
@@ -250,9 +264,15 @@ const TaskDetailPopover: FC<PopoverProps> = ({ tache, onClose, onEdit, onDelete,
                                     <div className="flex items-center gap-2">
                                         <Clock className="w-4 h-4 text-gray-400" />
                                         <span>
-                                            {format(new Date(tache.date_debut_planifiee), 'EEEE d MMMM', { locale: fr })}
+                                            {eventStart
+                                                ? format(eventStart, 'EEEE d MMMM', { locale: fr })
+                                                : format(new Date(tache.date_debut_planifiee), 'EEEE d MMMM', { locale: fr })
+                                            }
                                             <span className="mx-1">•</span>
-                                            {format(new Date(tache.date_debut_planifiee), 'HH:mm')} - {format(new Date(tache.date_fin_planifiee), 'HH:mm')}
+                                            {eventStart && eventEnd
+                                                ? `${format(eventStart, 'HH:mm')} - ${format(eventEnd, 'HH:mm')}`
+                                                : `${format(new Date(tache.date_debut_planifiee), 'HH:mm')} - ${format(new Date(tache.date_fin_planifiee), 'HH:mm')}`
+                                            }
                                         </span>
                                     </div>
                                     {(tache.equipes_detail?.length > 0 || tache.equipe_detail) && (
@@ -278,10 +298,15 @@ const TaskDetailPopover: FC<PopoverProps> = ({ tache, onClose, onEdit, onDelete,
                                     {tache.commentaires}
                                 </div>
                             )}
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                                 <StatusBadge status={tache.statut}>
                                     {STATUT_TACHE_LABELS[tache.statut]}
                                 </StatusBadge>
+                                {distributionStatus && (
+                                    <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${STATUS_DISTRIBUTION_COLORS[distributionStatus].bg} ${STATUS_DISTRIBUTION_COLORS[distributionStatus].text}`}>
+                                        {STATUS_DISTRIBUTION_LABELS[distributionStatus]}
+                                    </span>
+                                )}
                                 {tache.priorite > 1 && (
                                     <span className={`text-xs px-2 py-1 rounded-full border ${tache.priorite >= 4 ? 'bg-red-50 border-red-200 text-red-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
                                         {PRIORITE_LABELS[tache.priorite]}
@@ -319,7 +344,7 @@ const Planning: FC = () => {
     const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
 
     // Popover State
-    const [popoverInfo, setPopoverInfo] = useState<{ tache: Tache; reference: ReferenceType } | null>(null);
+    const [popoverInfo, setPopoverInfo] = useState<{ tache: Tache; reference: ReferenceType; eventStart?: Date; eventEnd?: Date; distributionStatus?: StatusDistribution; distributionId?: number } | null>(null);
 
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [tacheToDelete, setTacheToDelete] = useState<number | null>(null);
@@ -1076,10 +1101,17 @@ const Planning: FC = () => {
         const target = tacheToEdit || popoverInfo?.tache;
         if (!target) return;
         try {
+            // ✅ Ne pas utiliser localInputToUTC car les dates sont maintenant au format YYYY-MM-DD (DateField)
             const updateData: TacheUpdate = {
-                ...data,
-                date_debut_planifiee: localInputToUTC(data.date_debut_planifiee) || data.date_debut_planifiee,
-                date_fin_planifiee: localInputToUTC(data.date_fin_planifiee) || data.date_fin_planifiee
+                equipes_ids: data.equipes_ids,
+                date_debut_planifiee: data.date_debut_planifiee,
+                date_fin_planifiee: data.date_fin_planifiee,
+                priorite: data.priorite,
+                commentaires: data.commentaires,
+                parametres_recurrence: data.parametres_recurrence,
+                objets: data.objets,
+                charge_estimee_heures: data.charge_estimee_heures,
+                distributions_charge_data: data.distributions_charge_data
             };
             await planningService.updateTache(target.id, updateData);
             await loadTaches();
@@ -1091,12 +1123,8 @@ const Planning: FC = () => {
 
     const handleCreateTache = async (data: TacheCreate) => {
         try {
-            const createData = {
-                ...data,
-                date_debut_planifiee: localInputToUTC(data.date_debut_planifiee) || data.date_debut_planifiee,
-                date_fin_planifiee: localInputToUTC(data.date_fin_planifiee) || data.date_fin_planifiee
-            };
-            await planningService.createTache(createData);
+            // ✅ Ne pas utiliser localInputToUTC car les dates sont maintenant au format YYYY-MM-DD (DateField)
+            await planningService.createTache(data);
             await loadTaches();
             setShowCreateForm(false);
         } catch (err) { alert('Erreur création'); }
@@ -1161,7 +1189,7 @@ const Planning: FC = () => {
         }
     };
 
-    // MICRO-INTERACTION: Toggle Complete
+    // MICRO-INTERACTION: Toggle Complete (ancienne version - garde pour compatibilité)
     const handleToggleComplete = async (tache: Tache) => {
         const oldStatus = tache.statut;
         const newStatus = oldStatus === 'TERMINEE' ? 'PLANIFIEE' : 'TERMINEE';
@@ -1186,6 +1214,67 @@ const Planning: FC = () => {
             // Rollback on error
             setTaches(prev => prev.map(t => t.id === tache.id ? { ...t, statut: oldStatus } : t));
             alert("Erreur lors de la mise à jour");
+        }
+    };
+
+    // ✅ NOUVEAU: Toggle du statut d'une distribution de charge
+    const handleToggleDistribution = async (distributionId: number, currentStatus: StatusDistribution) => {
+        const newStatus: StatusDistribution = currentStatus === 'REALISEE' ? 'NON_REALISEE' : 'REALISEE';
+
+        // Optimistic Update
+        setTaches(prev => prev.map(t => ({
+            ...t,
+            distributions_charge: t.distributions_charge?.map(d =>
+                d.id === distributionId ? { ...d, status: newStatus } : d
+            )
+        })));
+
+        // Update popover
+        if (popoverInfo && popoverInfo.distributionId === distributionId) {
+            setPopoverInfo({ ...popoverInfo, distributionStatus: newStatus });
+        }
+
+        // Show Toast
+        setToast({
+            visible: true,
+            message: newStatus === 'REALISEE' ? 'Journée marquée comme réalisée' : 'Journée marquée comme non réalisée',
+            undoAction: () => handleToggleDistribution(distributionId, newStatus)
+        });
+        setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 4000);
+
+        try {
+            let result;
+            if (newStatus === 'REALISEE') {
+                result = await planningService.marquerDistributionRealisee(distributionId);
+            } else {
+                result = await planningService.marquerDistributionNonRealisee(distributionId);
+            }
+
+            // Recharger les tâches pour avoir les données à jour
+            await loadTaches();
+
+            // Afficher un message supplémentaire si le statut de la tâche a changé
+            if (result.tache_statut_modifie) {
+                setTimeout(() => {
+                    setToast({
+                        visible: true,
+                        message: newStatus === 'REALISEE'
+                            ? 'La tâche est maintenant en cours'
+                            : 'La tâche est repassée en planifiée',
+                        undoAction: undefined
+                    });
+                    setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
+                }, 500);
+            }
+        } catch (err) {
+            // Rollback on error
+            setTaches(prev => prev.map(t => ({
+                ...t,
+                distributions_charge: t.distributions_charge?.map(d =>
+                    d.id === distributionId ? { ...d, status: currentStatus } : d
+                )
+            })));
+            alert("Erreur lors de la mise à jour de la distribution");
         }
     };
 
@@ -1219,6 +1308,10 @@ const Planning: FC = () => {
         setPopoverInfo({
             tache: event.resource,
             reference: target, // Floating UI handles positioning automatically
+            eventStart: event.start,
+            eventEnd: event.end,
+            distributionStatus: event.distributionStatus,  // ✅ Statut de la distribution
+            distributionId: event.distributionId  // ✅ ID de la distribution
         });
     };
 
@@ -1243,17 +1336,77 @@ const Planning: FC = () => {
         }
     }, [currentDate, currentView]);
 
-    const events: CalendarEvent[] = useMemo(() => filteredTaches.map(t => ({ id: t.id, title: t.type_tache_detail.nom_tache, start: new Date(t.date_debut_planifiee), end: new Date(t.date_fin_planifiee), resource: t })), [filteredTaches]);
+    const events: CalendarEvent[] = useMemo(() => {
+        return filteredTaches.flatMap(t => {
+            // Si la tâche a des distributions de charge, créer un événement par jour
+            if (t.distributions_charge && t.distributions_charge.length > 0) {
+                return t.distributions_charge.map(dist => {
+                    // Construire les dates avec les heures depuis les distributions
+                    const dateStr = dist.date; // YYYY-MM-DD
+                    let startTime = dist.heure_debut || '08:00:00';
+                    let endTime = dist.heure_fin || '17:00:00';
+
+                    // Normaliser le format de l'heure (gérer HH:MM et HH:MM:SS)
+                    if (startTime.split(':').length === 2) startTime += ':00';
+                    if (endTime.split(':').length === 2) endTime += ':00';
+
+                    const start = new Date(`${dateStr}T${startTime}`);
+                    const end = new Date(`${dateStr}T${endTime}`);
+
+                    return {
+                        id: t.id,
+                        title: t.type_tache_detail.nom_tache,
+                        start,
+                        end,
+                        resource: t,
+                        distributionStatus: dist.status,  // ✅ Statut de la distribution
+                        distributionId: dist.id  // ✅ ID de la distribution
+                    };
+                });
+            }
+
+            // Fallback: utiliser les dates planifiées (pour les tâches sans distributions)
+            const startDate = new Date(t.date_debut_planifiee);
+            const endDate = new Date(t.date_fin_planifiee);
+
+            // Si pas d'heures, utiliser des heures par défaut
+            if (startDate.getHours() === 0 && startDate.getMinutes() === 0) {
+                startDate.setHours(8, 0, 0);
+            }
+            if (endDate.getHours() === 0 && endDate.getMinutes() === 0) {
+                endDate.setHours(17, 0, 0);
+            }
+
+            return [{
+                id: t.id,
+                title: t.type_tache_detail.nom_tache,
+                start: startDate,
+                end: endDate,
+                resource: t
+            }];
+        });
+    }, [filteredTaches]);
 
     // Group tasks by date for List View
     const tasksByDate = useMemo(() => {
         const groups: { [key: string]: Tache[] } = {};
-        const sorted = [...filteredTaches].sort((a, b) => new Date(a.date_debut_planifiee).getTime() - new Date(b.date_debut_planifiee).getTime());
-        sorted.forEach(t => {
-            const dateKey = format(new Date(t.date_debut_planifiee), 'yyyy-MM-dd');
-            if (!groups[dateKey]) groups[dateKey] = [];
-            groups[dateKey].push(t);
+
+        filteredTaches.forEach(t => {
+            // Si la tâche a des distributions de charge, l'ajouter pour chaque jour de distribution
+            if (t.distributions_charge && t.distributions_charge.length > 0) {
+                t.distributions_charge.forEach(dist => {
+                    const dateKey = dist.date; // déjà au format YYYY-MM-DD
+                    if (!groups[dateKey]) groups[dateKey] = [];
+                    groups[dateKey].push(t);
+                });
+            } else {
+                // Sinon, utiliser la date_debut_planifiee comme avant
+                const dateKey = format(new Date(t.date_debut_planifiee), 'yyyy-MM-dd');
+                if (!groups[dateKey]) groups[dateKey] = [];
+                groups[dateKey].push(t);
+            }
         });
+
         return groups;
     }, [filteredTaches]);
 
@@ -1450,6 +1603,15 @@ const Planning: FC = () => {
                                                     : (tache.equipe_detail as any)?.nom_equipe || tache.equipe_detail?.nomEquipe || '';
                                                 const hasEquipe = tache.equipes_detail?.length > 0 || tache.equipe_detail;
 
+                                                // Chercher la distribution de charge pour cette date
+                                                const distribution = tache.distributions_charge?.find(d => d.date === dateKey);
+                                                const heureDebut = distribution?.heure_debut || '08:00';
+                                                const heureFin = distribution?.heure_fin || '17:00';
+
+                                                // Créer les dates pour le popover
+                                                const eventStart = new Date(`${dateKey}T${heureDebut.split(':').length === 2 ? heureDebut + ':00' : heureDebut}`);
+                                                const eventEnd = new Date(`${dateKey}T${heureFin.split(':').length === 2 ? heureFin + ':00' : heureFin}`);
+
                                                 return (
                                                     <div
                                                         key={tache.id}
@@ -1491,14 +1653,18 @@ const Planning: FC = () => {
                                                             setPopoverInfo({
                                                                 tache: tache,
                                                                 reference: virtualReference,
+                                                                eventStart: eventStart,
+                                                                eventEnd: eventEnd,
+                                                                distributionStatus: distribution?.status,
+                                                                distributionId: distribution?.id
                                                             });
                                                         }}
-                                                        className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all cursor-pointer group flex flex-col sm:flex-row gap-4 items-start sm:items-center"
+                                                        className={`bg-white p-4 rounded-xl border shadow-sm hover:shadow-md hover:border-emerald-200 transition-all cursor-pointer group flex flex-col sm:flex-row gap-4 items-start sm:items-center ${distribution?.status === 'REALISEE' ? 'border-green-500 border-2 bg-green-50' : 'border-gray-200'}`}
                                                     >
                                                         {/* Time Column */}
                                                         <div className="min-w-[80px] text-sm text-gray-500 font-medium flex flex-col items-start">
-                                                            <span>{format(new Date(tache.date_debut_planifiee), 'HH:mm')}</span>
-                                                            <span className="text-xs text-gray-400">{format(new Date(tache.date_fin_planifiee), 'HH:mm')}</span>
+                                                            <span>{heureDebut.substring(0, 5)}</span>
+                                                            <span className="text-xs text-gray-400">{heureFin.substring(0, 5)}</span>
                                                         </div>
 
                                                         {/* Content */}
@@ -1530,11 +1696,17 @@ const Planning: FC = () => {
                                                             </div>
                                                         </div>
 
-                                                        {/* Status Badge */}
-                                                        <div className="flex-shrink-0">
+                                                        {/* Status Badges */}
+                                                        <div className="flex-shrink-0 flex flex-col gap-1.5 items-end">
                                                             <StatusBadge status={tache.statut}>
                                                                 {STATUT_TACHE_LABELS[tache.statut]}
                                                             </StatusBadge>
+                                                            {/* Badge statut distribution */}
+                                                            {distribution?.status && (
+                                                                <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${STATUS_DISTRIBUTION_COLORS[distribution.status].bg} ${STATUS_DISTRIBUTION_COLORS[distribution.status].text}`}>
+                                                                    {STATUS_DISTRIBUTION_LABELS[distribution.status]}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 );
@@ -1552,10 +1724,18 @@ const Planning: FC = () => {
             {popoverInfo && (
                 <TaskDetailPopover
                     tache={popoverInfo.tache}
+                    eventStart={popoverInfo.eventStart}
+                    eventEnd={popoverInfo.eventEnd}
+                    distributionStatus={popoverInfo.distributionStatus}
+                    distributionId={popoverInfo.distributionId}
                     onClose={() => setPopoverInfo(null)}
                     onEdit={() => { setTacheToEdit(popoverInfo.tache); setShowCreateForm(true); }}
                     onDelete={() => handleDeleteTache(popoverInfo.tache.id)}
-                    onToggleComplete={() => handleToggleComplete(popoverInfo.tache)}
+                    onToggleDistribution={
+                        popoverInfo.distributionId && popoverInfo.distributionStatus
+                            ? () => handleToggleDistribution(popoverInfo.distributionId!, popoverInfo.distributionStatus!)
+                            : undefined
+                    }
                     isReadOnly={isReadOnly}
                 />
             )}

@@ -5,10 +5,11 @@ import {
     X, Search, ChevronRight, ChevronLeft, MapPin, TreePine, Users,
     CheckCircle2, Calendar, Clock, Sparkles, AlertCircle, Filter, RefreshCw
 } from 'lucide-react';
-import { TypeTache, TacheCreate, PrioriteTache } from '../../types/planning';
+import { TypeTache, TacheCreate, PrioriteTache, DistributionChargeData } from '../../types/planning';
 import { EquipeList } from '../../types/users';
 import { InventoryObjectOption } from './TaskFormModal';
 import { RecurrenceSelector, type RecurrenceParams } from './RecurrenceSelector';
+import { DistributionChargeEditor } from './DistributionChargeEditor';
 import { DataTable, Column } from '../DataTable';
 import { StatusBadge } from '../StatusBadge';
 import { PremiumInput } from '../modals/PremiumFormComponents';
@@ -111,7 +112,9 @@ const SummaryPanel: FC<{
     date: Date;
     startTime: string;
     endTime: string;
-}> = ({ selectedType, selectedSite, selectedObjects, selectedEquipes, equipes, date, startTime, endTime }) => {
+    modeDistribution: 'simple' | 'multi-jours';
+    distributionsCharge: DistributionChargeData[];
+}> = ({ selectedType, selectedSite, selectedObjects, selectedEquipes, equipes, date, startTime, endTime, modeDistribution, distributionsCharge }) => {
     const selectedEquipesData = equipes.filter(e => selectedEquipes.includes(e.id));
 
     return (
@@ -126,16 +129,35 @@ const SummaryPanel: FC<{
             {/* Date & Time */}
             <div className="space-y-1">
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Quand</div>
-                <div className="flex items-center gap-2 text-sm">
-                    <Calendar className="w-4 h-4 text-gray-400" />
-                    <span className="font-medium text-gray-900">
-                        {format(date, 'EEEE d MMMM yyyy', { locale: fr })}
-                    </span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                    <Clock className="w-4 h-4 text-gray-400" />
-                    <span className="text-gray-600">{startTime} → {endTime}</span>
-                </div>
+                {modeDistribution === 'simple' ? (
+                    <>
+                        <div className="flex items-center gap-2 text-sm">
+                            <Calendar className="w-4 h-4 text-gray-400" />
+                            <span className="font-medium text-gray-900">
+                                {format(date, 'EEEE d MMMM yyyy', { locale: fr })}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                            <Clock className="w-4 h-4 text-gray-400" />
+                            <span className="text-gray-600">{startTime} → {endTime}</span>
+                        </div>
+                    </>
+                ) : (
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-sm">
+                            <Calendar className="w-4 h-4 text-gray-400" />
+                            <span className="font-medium text-gray-900">
+                                {distributionsCharge.length} jour{distributionsCharge.length > 1 ? 's' : ''} de travail
+                            </span>
+                        </div>
+                        {distributionsCharge.length > 0 && (
+                            <div className="text-xs text-gray-500 ml-6">
+                                Du {format(new Date([...distributionsCharge].sort((a, b) => a.date.localeCompare(b.date))[0].date), 'dd/MM/yyyy', { locale: fr })}
+                                {' '}au {format(new Date([...distributionsCharge].sort((a, b) => a.date.localeCompare(b.date))[distributionsCharge.length - 1].date), 'dd/MM/yyyy', { locale: fr })}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Type de tâche */}
@@ -229,6 +251,10 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
     const [commentaires, setCommentaires] = useState('');
     const [priorite, setPriorite] = useState<PrioriteTache>(3);
     const [recurrence, setRecurrence] = useState<RecurrenceParams | null>(null);
+    const [distributionsCharge, setDistributionsCharge] = useState<DistributionChargeData[]>([]);
+
+    // Mode de planification: 'simple' ou 'multi-jours'
+    const [modeDistribution, setModeDistribution] = useState<'simple' | 'multi-jours'>('simple');
 
     // ✅ PHASE 1: États pour planification intelligente
     const [ratios, setRatios] = useState<RatioProductivite[]>([]);
@@ -560,32 +586,59 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
     const handleSubmit = () => {
         if (!selectedType || !selectedSite) return;
 
-        const startDateTime = new Date(initialDate);
-        const [startHour, startMin] = startTime.split(':').map(Number);
-        startDateTime.setHours(startHour, startMin, 0, 0);
+        let taskData: TacheCreate;
 
-        const endDateTime = new Date(initialDate);
-        const [endHour, endMin] = endTime.split(':').map(Number);
-        endDateTime.setHours(endHour, endMin, 0, 0);
+        if (modeDistribution === 'multi-jours' && distributionsCharge.length > 0) {
+            // Mode multi-jours: utiliser les distributions
+            const sortedDistributions = [...distributionsCharge].sort((a, b) => a.date.localeCompare(b.date));
+            const dateDebut = sortedDistributions[0].date;
+            const dateFin = sortedDistributions[sortedDistributions.length - 1].date;
 
-        const taskData: TacheCreate = {
-            id_type_tache: selectedType.id,
-            equipes_ids: selectedEquipes,
-            date_debut_planifiee: startDateTime.toISOString(),
-            date_fin_planifiee: endDateTime.toISOString(),
-            priorite,
-            commentaires,
-            parametres_recurrence: recurrence,
-            objets: selectedObjects.map(o => o.id),
-            id_client: null,
-            reclamation: null,
-            // ✅ PHASE 1: Ajouter la charge calculée si option activée
-            charge_estimee_heures: calculerChargeAuto && chargePreview?.totalHeures ? chargePreview.totalHeures : null,
-            // @ts-ignore - Flags pour le backend
-            calculer_charge_auto: calculerChargeAuto,
-            // @ts-ignore - Flags pour le backend
-            repartir_multi_jours: repartirMultiJours
-        };
+            taskData = {
+                id_type_tache: selectedType.id,
+                equipes_ids: selectedEquipes,
+                date_debut_planifiee: dateDebut, // Format YYYY-MM-DD
+                date_fin_planifiee: dateFin,     // Format YYYY-MM-DD
+                priorite,
+                commentaires,
+                parametres_recurrence: null, // Pas de récurrence en mode distributions
+                objets: selectedObjects.map(o => o.id),
+                id_client: null,
+                reclamation: null,
+                charge_estimee_heures: calculerChargeAuto && chargePreview?.totalHeures ? chargePreview.totalHeures : null,
+                distributions_charge_data: sortedDistributions
+            };
+        } else {
+            // Mode simple: utiliser les horaires
+            const startDateTime = new Date(initialDate);
+            const [startHour, startMin] = startTime.split(':').map(Number);
+            startDateTime.setHours(startHour ?? 0, startMin ?? 0, 0, 0);
+
+            const endDateTime = new Date(initialDate);
+            const [endHour, endMin] = endTime.split(':').map(Number);
+            endDateTime.setHours(endHour ?? 0, endMin ?? 0, 0, 0);
+
+            taskData = {
+                id_type_tache: selectedType.id,
+                equipes_ids: selectedEquipes,
+                date_debut_planifiee: format(initialDate, 'yyyy-MM-dd'), // Format YYYY-MM-DD
+                date_fin_planifiee: format(initialDate, 'yyyy-MM-dd'),   // Format YYYY-MM-DD
+                priorite,
+                commentaires,
+                parametres_recurrence: recurrence,
+                objets: selectedObjects.map(o => o.id),
+                id_client: null,
+                reclamation: null,
+                charge_estimee_heures: calculerChargeAuto && chargePreview?.totalHeures ? chargePreview.totalHeures : null,
+                // En mode simple, on peut créer une distribution pour ce jour
+                distributions_charge_data: [{
+                    date: format(initialDate, 'yyyy-MM-dd'),
+                    heure_debut: startTime,
+                    heure_fin: endTime,
+                    commentaire: ''
+                }]
+            };
+        }
 
         onSubmit(taskData);
         onClose();
@@ -610,7 +663,8 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
         return null;
     }, [startTime, endTime]);
 
-    const canSubmit = selectedType && selectedSite && !timeError;
+    const canSubmit = selectedType && selectedSite &&
+        (modeDistribution === 'simple' ? !timeError : distributionsCharge.length > 0);
 
     if (!isOpen) return null;
 
@@ -961,71 +1015,99 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                                     </p>
                                 </div>
 
-                                {/* Date et Horaires */}
+                                {/* Date et Horaires / Distribution de charge */}
                                 <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <Calendar className="w-5 h-5 text-emerald-600" />
-                                        <h4 className="font-semibold text-gray-900">Date et horaires</h4>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-2">
+                                            <Calendar className="w-5 h-5 text-emerald-600" />
+                                            <h4 className="font-semibold text-gray-900">Planification</h4>
+                                        </div>
+                                        {/* Toggle mode */}
+                                        <div className="flex items-center gap-2 bg-white rounded-lg p-1 border border-emerald-200">
+                                            <button
+                                                type="button"
+                                                onClick={() => setModeDistribution('simple')}
+                                                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                                                    modeDistribution === 'simple'
+                                                        ? 'bg-emerald-600 text-white'
+                                                        : 'text-gray-600 hover:text-emerald-600'
+                                                }`}
+                                            >
+                                                Un jour
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setModeDistribution('multi-jours')}
+                                                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                                                    modeDistribution === 'multi-jours'
+                                                        ? 'bg-emerald-600 text-white'
+                                                        : 'text-gray-600 hover:text-emerald-600'
+                                                }`}
+                                            >
+                                                Multi-jours
+                                            </button>
+                                        </div>
                                     </div>
 
                                     <div className="bg-white rounded-lg p-4 border border-emerald-100">
-                                        <div className="grid grid-cols-3 gap-4">
-                                            {/* Date (lecture seule) - ✅ Consistent design with PremiumInput */}
-                                            <PremiumInput
-                                                type="text"
-                                                value={format(initialDate, 'dd/MM/yyyy', { locale: fr })}
-                                                onChange={() => {}} // Read-only
-                                                label="Date"
-                                                icon={<Calendar className="w-4 h-4" />}
-                                                variant="outlined"
-                                                size="sm"
-                                                disabled={true}
-                                            />
+                                        {modeDistribution === 'simple' ? (
+                                            <>
+                                                <div className="grid grid-cols-3 gap-4">
+                                                    {/* Date (lecture seule) */}
+                                                    <PremiumInput
+                                                        type="text"
+                                                        value={format(initialDate, 'dd/MM/yyyy', { locale: fr })}
+                                                        onChange={() => {}} // Read-only
+                                                        label="Date"
+                                                        icon={<Calendar className="w-4 h-4" />}
+                                                        variant="outlined"
+                                                        size="sm"
+                                                        disabled={true}
+                                                    />
 
-                                            {/* Heure début */}
-                                            <PremiumInput
-                                                type="time"
-                                                value={startTime}
-                                                onChange={(value) => setStartTime(value)}
-                                                label="Heure début"
-                                                icon={<Clock className="w-4 h-4" />}
-                                                variant="outlined"
-                                                size="sm"
-                                                required
-                                            />
+                                                    {/* Heure début */}
+                                                    <PremiumInput
+                                                        type="time"
+                                                        value={startTime}
+                                                        onChange={(value) => setStartTime(value)}
+                                                        label="Heure début"
+                                                        icon={<Clock className="w-4 h-4" />}
+                                                        variant="outlined"
+                                                        size="sm"
+                                                        required
+                                                    />
 
-                                            {/* Heure fin */}
-                                            <PremiumInput
-                                                type="time"
-                                                value={endTime}
-                                                onChange={(value) => setEndTime(value)}
-                                                label="Heure fin"
-                                                icon={<Clock className="w-4 h-4" />}
-                                                variant="outlined"
-                                                size="sm"
-                                                required
-                                            />
-                                        </div>
+                                                    {/* Heure fin */}
+                                                    <PremiumInput
+                                                        type="time"
+                                                        value={endTime}
+                                                        onChange={(value) => setEndTime(value)}
+                                                        label="Heure fin"
+                                                        icon={<Clock className="w-4 h-4" />}
+                                                        variant="outlined"
+                                                        size="sm"
+                                                        required
+                                                    />
+                                                </div>
 
-                                        {/* Validation Error */}
-                                        {timeError && (
-                                            <div className="mt-3 flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                                                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                                                <span className="text-xs font-medium">{timeError}</span>
-                                            </div>
+                                                {/* Validation Error */}
+                                                {timeError && (
+                                                    <div className="mt-3 flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                                                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                                        <span className="text-xs font-medium">{timeError}</span>
+                                                    </div>
+                                                )}
+                                            </>
+                                        ) : (
+                                            /* Mode multi-jours: Distribution de charge */
+                                            <DistributionChargeEditor
+                                                dateDebut={initialDate}
+                                                dateFin={new Date(initialDate.getTime() + 30 * 24 * 60 * 60 * 1000)} // +30 jours par défaut
+                                                distributions={distributionsCharge}
+                                                onChange={setDistributionsCharge}
+                                                readonly={false}
+                                            />
                                         )}
-
-                                        {/* Info: Règle d'or */}
-                                        <div className="mt-3 flex items-start gap-2 text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-                                            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                                            <div className="text-xs">
-                                                <p className="font-semibold">Règle d'or : 1 tâche = 1 jour</p>
-                                                <p className="text-blue-600 mt-0.5">
-                                                    Une tâche doit obligatoirement avoir lieu sur le même jour calendaire.
-                                                    Pour planifier sur plusieurs jours, utilisez la récurrence ci-dessous.
-                                                </p>
-                                            </div>
-                                        </div>
                                     </div>
                                 </div>
 
@@ -1312,17 +1394,19 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                                     </div>
                                 )}
 
-                                {/* Récurrence */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Récurrence
-                                    </label>
-                                    <RecurrenceSelector
-                                        value={recurrence}
-                                        onChange={setRecurrence}
-                                        startDate={initialDate.toISOString()}
-                                    />
-                                </div>
+                                {/* Récurrence (uniquement en mode simple) */}
+                                {modeDistribution === 'simple' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Récurrence
+                                        </label>
+                                        <RecurrenceSelector
+                                            value={recurrence}
+                                            onChange={setRecurrence}
+                                            startDate={initialDate.toISOString()}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -1338,6 +1422,8 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                             date={initialDate}
                             startTime={startTime}
                             endTime={endTime}
+                            modeDistribution={modeDistribution}
+                            distributionsCharge={distributionsCharge}
                         />
                     </div>
                 </div>

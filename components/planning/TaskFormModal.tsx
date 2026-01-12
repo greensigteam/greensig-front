@@ -78,29 +78,21 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         return [];
     };
 
-    // Default dates: current time (real-time) to end of day or +1h if late
+    // Default dates: today and today (dates only, no time)
     const getDefaultStartDate = () => {
-        return formatDateTimeLocal(new Date());
+        return formatDateLocal(new Date());
     };
     const getDefaultEndDate = () => {
-        const now = new Date();
-        const endOfDay = new Date();
-        endOfDay.setHours(17, 0, 0, 0);
-
-        // Si on est après 16h, mettre fin à +1h de maintenant
-        if (now.getHours() >= 16) {
-            const end = new Date(now.getTime() + 60 * 60 * 1000); // +1 heure
-            return formatDateTimeLocal(end);
-        }
-        return formatDateTimeLocal(endOfDay);
+        // Par défaut, même jour que le début
+        return formatDateLocal(new Date());
     };
 
     const [formData, setFormData] = useState<TacheCreate>({
         id_client: tache?.client_detail?.utilisateur || initialValues?.id_client || null,
         id_type_tache: tache?.type_tache_detail?.id || initialValues?.id_type_tache || 0,
         equipes_ids: initialEquipesIds(),
-        date_debut_planifiee: tache?.date_debut_planifiee ? formatDateTimeLocal(new Date(tache.date_debut_planifiee)) : (initialValues?.date_debut_planifiee || getDefaultStartDate()),
-        date_fin_planifiee: tache?.date_fin_planifiee ? formatDateTimeLocal(new Date(tache.date_fin_planifiee)) : (initialValues?.date_fin_planifiee || getDefaultEndDate()),
+        date_debut_planifiee: tache?.date_debut_planifiee ? formatDateLocal(new Date(tache.date_debut_planifiee)) : (initialValues?.date_debut_planifiee || getDefaultStartDate()),
+        date_fin_planifiee: tache?.date_fin_planifiee ? formatDateLocal(new Date(tache.date_fin_planifiee)) : (initialValues?.date_fin_planifiee || getDefaultEndDate()),
         priorite: tache?.priorite || initialValues?.priorite || 3,
         commentaires: tache?.commentaires || initialValues?.commentaires || '',
         parametres_recurrence: tache?.parametres_recurrence || null,
@@ -116,7 +108,8 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
     const [distributionsCharge, setDistributionsCharge] = useState<DistributionChargeData[]>(
         tache?.distributions_charge?.map(d => ({
             date: d.date,
-            heures_planifiees: d.heures_planifiees,
+            heure_debut: d.heure_debut ?? undefined, // normalize null -> undefined
+            heure_fin: d.heure_fin ?? undefined,     // normalize null -> undefined
             commentaire: d.commentaire
         })) || []
     );
@@ -511,8 +504,8 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                 id_client: tache.client_detail ? tache.client_detail.utilisateur : null,
                 id_type_tache: tache.type_tache_detail ? tache.type_tache_detail.id : 0,
                 equipes_ids: equipesIds(),
-                date_debut_planifiee: formatDateTimeLocal(new Date(tache.date_debut_planifiee)),
-                date_fin_planifiee: formatDateTimeLocal(new Date(tache.date_fin_planifiee)),
+                date_debut_planifiee: formatDateLocal(new Date(tache.date_debut_planifiee)),
+                date_fin_planifiee: formatDateLocal(new Date(tache.date_fin_planifiee)),
                 priorite: tache.priorite,
                 commentaires: tache.commentaires || '',
                 parametres_recurrence: tache.parametres_recurrence || null,
@@ -671,7 +664,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                 <div className="space-y-2">
                     <div className="grid grid-cols-2 gap-4">
                         <PremiumInput
-                            type="datetime-local"
+                            type="date"
                             value={formData.date_debut_planifiee}
                             onChange={(value) => setFormData({ ...formData, date_debut_planifiee: value })}
                             label="Date début"
@@ -682,7 +675,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                             disabled={!!formData.parametres_recurrence}
                         />
                         <PremiumInput
-                            type="datetime-local"
+                            type="date"
                             value={formData.date_fin_planifiee}
                             onChange={(value) => setFormData({ ...formData, date_fin_planifiee: value })}
                             label="Date fin"

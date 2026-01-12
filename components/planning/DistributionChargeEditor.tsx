@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar, AlertCircle, Info } from 'lucide-react';
+import { Calendar, AlertCircle, Info, Settings } from 'lucide-react';
 import { DistributionChargeData } from '@/types/planning';
+import SelectDaysModal from '../modals/SelectDaysModal';
 
 interface DistributionChargeEditorProps {
   dateDebut: Date;
@@ -17,6 +18,8 @@ interface DayRow {
   isSunday: boolean;
   dayName: string;
   heures: number;
+  heure_debut: string;  // "HH:MM"
+  heure_fin: string;     // "HH:MM"
   commentaire: string;
 }
 
@@ -40,58 +43,65 @@ export function DistributionChargeEditor({
   onChange,
   readonly = false
 }: DistributionChargeEditorProps) {
-  // Générer les lignes pour chaque jour
-  const dayRows = useMemo(() => {
-    const rows: DayRow[] = [];
-    const currentDate = new Date(dateDebut);
-    const endDate = new Date(dateFin);
+  // État pour le modal de sélection des jours
+  const [showSelectDaysModal, setShowSelectDaysModal] = useState(false);
 
-    while (currentDate <= endDate) {
-      const dateString = currentDate.toISOString().split('T')[0];
-      const dayOfWeek = currentDate.getDay(); // 0 = dimanche, 6 = samedi
+  // Fonction utilitaire pour calculer les heures entre deux horaires
+  const calculerHeures = (debut: string, fin: string): number => {
+    if (!debut || !fin) return 0;
+
+    const [hDebut, mDebut] = debut.split(':').map(Number);
+    const [hFin, mFin] = fin.split(':').map(Number);
+
+    const minutesDebut = (hDebut ?? 0) * 60 + (mDebut ?? 0);
+    const minutesFin = (hFin ?? 0) * 60 + (mFin ?? 0);
+
+    const diffMinutes = minutesFin - minutesDebut;
+    return Math.round((diffMinutes / 60) * 100) / 100; // Arrondi à 2 décimales
+  };
+
+  // Générer les lignes UNIQUEMENT pour les jours avec distributions
+  const dayRows = useMemo(() => {
+    // Si aucune distribution, retourner un tableau vide (affichera un message)
+    if (!distributions || distributions.length === 0) {
+      return [];
+    }
+
+    // Créer une ligne pour chaque distribution existante
+    const rows: DayRow[] = distributions.map(dist => {
+      const date = new Date(dist.date + 'T00:00:00');
+      const dayOfWeek = date.getDay(); // 0 = dimanche, 6 = samedi
       const isSunday = dayOfWeek === 0;
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-      // Trouver la distribution existante pour cette date
-      const existingDist = distributions.find(d => d.date === dateString);
+      // Heures par défaut si non définies
+      const heure_debut = dist.heure_debut ?? '08:00';
+      const heure_fin = dist.heure_fin ?? '17:00';
 
-      rows.push({
-        date: new Date(currentDate),
-        dateString,
+      // Calculer les heures
+      const heures = dist.heures_planifiees ?? calculerHeures(heure_debut, heure_fin);
+
+      return {
+        date,
+        dateString: dist.date,
         isWeekend,
         isSunday,
         dayName: JOUR_NAMES[dayOfWeek] ?? '',
-        heures: existingDist?.heures_planifiees ?? 0,
-        commentaire: existingDist?.commentaire ?? ''
-      });
+        heures,
+        heure_debut,
+        heure_fin,
+        commentaire: dist.commentaire ?? ''
+      };
+    });
 
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-
-    return rows;
-  }, [dateDebut, dateFin, distributions]);
+    // Trier par date
+    return rows.sort((a, b) => a.date.getTime() - b.date.getTime());
+  }, [distributions]);
 
   // Calculer le total des heures
   const totalHeures = useMemo(() => {
     return dayRows.reduce((sum, row) => sum + row.heures, 0);
   }, [dayRows]);
-
-  // Handler pour changement d'heures
-  const handleHeuresChange = (dateString: string, value: string) => {
-    const heures = parseFloat(value) || 0;
-
-    // Créer la nouvelle liste de distributions
-    const newDistributions: DistributionChargeData[] = dayRows.map(row => {
-      const h = row.dateString === dateString ? heures : row.heures;
-      return {
-        date: row.dateString,
-        heures_planifiees: h,
-        commentaire: row.commentaire
-      };
-    }).filter(d => d.heures_planifiees > 0); // Exclure les jours avec 0h
-
-    onChange(newDistributions);
-  };
 
   // Handler pour changement de commentaire
   const handleCommentaireChange = (dateString: string, value: string) => {
@@ -99,17 +109,63 @@ export function DistributionChargeEditor({
       const c = row.dateString === dateString ? value : row.commentaire;
       return {
         date: row.dateString,
-        heures_planifiees: row.heures,
+        heure_debut: row.heure_debut,
+        heure_fin: row.heure_fin,
         commentaire: c
       };
-    }).filter(d => d.heures_planifiees > 0);
+    });
 
     onChange(newDistributions);
   };
 
-  // Afficher avertissement si période > 30 jours
-  const nombreJours = dayRows.length;
-  const showWarning = nombreJours > 30;
+  // Handler pour changement heure_debut
+  const handleHeureDebutChange = (dateString: string, value: string) => {
+    const newDistributions: DistributionChargeData[] = dayRows.map(row => {
+      const nouveauDebut = row.dateString === dateString ? value : row.heure_debut;
+
+      return {
+        date: row.dateString,
+        heure_debut: nouveauDebut,
+        heure_fin: row.heure_fin,
+        commentaire: row.commentaire
+      };
+    });
+
+    onChange(newDistributions);
+  };
+
+  // Handler pour changement heure_fin
+  const handleHeureFinChange = (dateString: string, value: string) => {
+    const newDistributions: DistributionChargeData[] = dayRows.map(row => {
+      const nouvelleFin = row.dateString === dateString ? value : row.heure_fin;
+
+      return {
+        date: row.dateString,
+        heure_debut: row.heure_debut,
+        heure_fin: nouvelleFin,
+        commentaire: row.commentaire
+      };
+    });
+
+    onChange(newDistributions);
+  };
+
+  // Calculer la durée de la période totale
+  const periodeDays = Math.ceil((dateFin.getTime() - dateDebut.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  const showWarning = periodeDays > 30;
+
+  // Handler pour la sélection des jours depuis le modal
+  const handleDaysSelected = (selectedDays: any[]) => {
+    const newDistributions: DistributionChargeData[] = selectedDays.map(day => ({
+      date: day.date,
+      heure_debut: day.heure_debut,
+      heure_fin: day.heure_fin,
+      commentaire: day.commentaire || ''
+    }));
+
+    onChange(newDistributions);
+    setShowSelectDaysModal(false);
+  };
 
   return (
     <div className="space-y-3">
@@ -121,8 +177,22 @@ export function DistributionChargeEditor({
             Distribution de charge journalière
           </h3>
         </div>
-        <div className="text-sm font-semibold text-blue-600">
-          Total: {totalHeures.toFixed(2)}h
+        <div className="flex items-center gap-3">
+          {!readonly && (
+            <button
+              type="button"
+              onClick={() => setShowSelectDaysModal(true)}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Settings className="w-4 h-4" />
+              {dayRows.length > 0 ? 'Modifier les jours' : 'Sélectionner les jours'}
+            </button>
+          )}
+          {dayRows.length > 0 && (
+            <div className="text-sm font-semibold text-blue-600">
+              Total: {totalHeures.toFixed(2)}h
+            </div>
+          )}
         </div>
       </div>
 
@@ -145,7 +215,7 @@ export function DistributionChargeEditor({
         <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
           <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
           <p className="text-xs text-amber-700">
-            <span className="font-medium">Attention:</span> Cette tâche s'étend sur {nombreJours} jours.
+            <span className="font-medium">Attention:</span> Cette tâche s'étend sur {periodeDays} jours.
             Vérifiez que c'est bien intentionnel et considérez diviser en plusieurs tâches si nécessaire.
           </p>
         </div>
@@ -153,25 +223,50 @@ export function DistributionChargeEditor({
 
       {/* Tableau des distributions */}
       <div className="border border-gray-200 rounded-lg overflow-hidden max-h-[400px] overflow-y-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50 sticky top-0 z-10">
-            <tr>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Date
-              </th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Jour
-              </th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Heures
-              </th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Commentaire
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {dayRows.map((row) => (
+        {dayRows.length === 0 ? (
+          <div className="p-8 text-center">
+            <Calendar className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+            <h3 className="text-lg font-medium text-gray-700 mb-2">Aucun jour sélectionné</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Cliquez sur le bouton "Sélectionner les jours" pour choisir les jours de travail
+            </p>
+            {!readonly && (
+              <button
+                type="button"
+                onClick={() => setShowSelectDaysModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Settings className="w-4 h-4" />
+                Sélectionner les jours
+              </button>
+            )}
+          </div>
+        ) : (
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50 sticky top-0 z-10">
+              <tr>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Date
+                </th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Jour
+                </th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Heures
+                </th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Début
+                </th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Fin
+                </th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Commentaire
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {dayRows.map((row) => (
               <tr
                 key={row.dateString}
                 className={
@@ -209,17 +304,51 @@ export function DistributionChargeEditor({
                   )}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap">
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      max="24"
+                      step="0.5"
+                      value={row.heures || ''}
+                      readOnly
+                      disabled={row.isSunday}
+                      placeholder={row.isSunday ? '0' : '0.0'}
+                      title="Calculé automatiquement depuis les horaires (lecture seule)"
+                      className={`
+                        w-20 px-2 py-1 text-sm border rounded cursor-not-allowed
+                        ${row.isSunday
+                          ? 'bg-gray-100 text-gray-400 border-gray-200'
+                          : 'bg-blue-50 text-blue-900 border-blue-300 font-medium'
+                        }
+                      `}
+                    />
+                  </div>
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap">
                   <input
-                    type="number"
-                    min="0"
-                    max="24"
-                    step="0.5"
-                    value={row.heures || ''}
-                    onChange={(e) => handleHeuresChange(row.dateString, e.target.value)}
-                    disabled={readonly || row.isSunday} // Dimanche = disabled
-                    placeholder={row.isSunday ? '0' : '0.0'}
+                    type="time"
+                    value={row.heure_debut}
+                    onChange={(e) => handleHeureDebutChange(row.dateString, e.target.value)}
+                    disabled={readonly || row.isSunday}
                     className={`
-                      w-20 px-2 py-1 text-sm border rounded
+                      w-24 px-2 py-1 text-sm border rounded
+                      ${row.isSunday
+                        ? 'bg-gray-100 cursor-not-allowed text-gray-400'
+                        : 'border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
+                      }
+                      ${readonly ? 'bg-gray-50 cursor-not-allowed' : ''}
+                    `}
+                  />
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap">
+                  <input
+                    type="time"
+                    value={row.heure_fin}
+                    onChange={(e) => handleHeureFinChange(row.dateString, e.target.value)}
+                    disabled={readonly || row.isSunday}
+                    className={`
+                      w-24 px-2 py-1 text-sm border rounded
                       ${row.isSunday
                         ? 'bg-gray-100 cursor-not-allowed text-gray-400'
                         : 'border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
@@ -246,21 +375,35 @@ export function DistributionChargeEditor({
                   />
                 </td>
               </tr>
-            ))}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Résumé */}
-      <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-md">
-        <div className="text-xs text-gray-600">
-          {nombreJours} jour{nombreJours > 1 ? 's' : ''} dans la période
-          ({dayRows.filter(r => r.heures > 0).length} avec heures planifiées)
+      {dayRows.length > 0 && (
+        <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-md">
+          <div className="text-xs text-gray-600">
+            {dayRows.length} jour{dayRows.length > 1 ? 's' : ''} sélectionné{dayRows.length > 1 ? 's' : ''}
+            {' '}sur {periodeDays} dans la période
+          </div>
+          <div className="text-sm font-bold text-gray-900">
+            Total: {totalHeures.toFixed(2)} heures
+          </div>
         </div>
-        <div className="text-sm font-bold text-gray-900">
-          Total: {totalHeures.toFixed(2)} heures
-        </div>
-      </div>
+      )}
+
+      {/* Modal de sélection des jours */}
+      {showSelectDaysModal && (
+        <SelectDaysModal
+          dateDebut={new Date(dateDebut)}
+          dateFin={new Date(dateFin)}
+          onConfirm={handleDaysSelected}
+          onCancel={() => setShowSelectDaysModal(false)}
+          initialSelection={distributions.map(d => d.date)}
+        />
+      )}
     </div>
   );
 }

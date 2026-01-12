@@ -65,11 +65,10 @@ export const planningService = {
     async createTache(data: TacheCreate): Promise<Tache> {
         console.log('Creating task with data:', JSON.stringify(data, null, 2));
 
-        // Ensure dates are converted to UTC if they are local strings
+        // Les dates planifiées sont maintenant des dates simples (YYYY-MM-DD)
         const payload = {
-            ...data,
-            date_debut_planifiee: localInputToUTC(data.date_debut_planifiee) || data.date_debut_planifiee,
-            date_fin_planifiee: localInputToUTC(data.date_fin_planifiee) || data.date_fin_planifiee
+            ...data
+            // Pas de conversion nécessaire : date_debut_planifiee et date_fin_planifiee sont déjà au format YYYY-MM-DD
         };
 
         const response = await apiFetch(`${BASE_URL}/taches/`, {
@@ -86,12 +85,18 @@ export const planningService = {
     },
 
     async updateTache(id: number, data: TacheUpdate): Promise<Tache> {
-        // Ensure dates are converted to UTC if they are local strings
+        // Toutes les dates sont maintenant des dates simples (YYYY-MM-DD)
         const payload = { ...data };
-        if (data.date_debut_planifiee) payload.date_debut_planifiee = localInputToUTC(data.date_debut_planifiee) || data.date_debut_planifiee;
-        if (data.date_fin_planifiee) payload.date_fin_planifiee = localInputToUTC(data.date_fin_planifiee) || data.date_fin_planifiee;
-        if (data.date_debut_reelle) payload.date_debut_reelle = localInputToUTC(data.date_debut_reelle) || data.date_debut_reelle;
-        if (data.date_fin_reelle) payload.date_fin_reelle = localInputToUTC(data.date_fin_reelle) || data.date_fin_reelle;
+
+        // Dates planifiées : déjà au format YYYY-MM-DD, pas de conversion nécessaire
+
+        // Dates réelles : extraire uniquement la date (YYYY-MM-DD) si format datetime présent
+        if (data.date_debut_reelle) {
+            payload.date_debut_reelle = data.date_debut_reelle.split('T')[0];
+        }
+        if (data.date_fin_reelle) {
+            payload.date_fin_reelle = data.date_fin_reelle.split('T')[0];
+        }
 
         const response = await apiFetch(`${BASE_URL}/taches/${id}/`, {
             method: 'PATCH',
@@ -214,11 +219,11 @@ export const planningService = {
     async changeStatut(tacheId: number, nouveauStatut: 'EN_COURS' | 'TERMINEE' | 'ANNULEE' | 'PLANIFIEE'): Promise<Tache> {
         const updateData: TacheUpdate = { statut: nouveauStatut };
 
-        // Gestion automatique des dates réelles
+        // Gestion automatique des dates réelles (format YYYY-MM-DD uniquement)
         if (nouveauStatut === 'EN_COURS') {
-            updateData.date_debut_reelle = new Date().toISOString();
+            updateData.date_debut_reelle = new Date().toISOString().split('T')[0];
         } else if (nouveauStatut === 'TERMINEE') {
-            updateData.date_fin_reelle = new Date().toISOString();
+            updateData.date_fin_reelle = new Date().toISOString().split('T')[0];
         }
 
         const response = await apiFetch(`${BASE_URL}/taches/${tacheId}/`, {
@@ -368,6 +373,83 @@ export const planningService = {
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || 'Erreur lors du calcul de la récurrence');
+        }
+
+        return response.json();
+    },
+
+    // --- DISTRIBUTION DE CHARGE ---
+
+    /**
+     * Met à jour les distributions de charge pour une tâche.
+     * Permet de définir les jours de travail sélectionnés depuis le modal.
+     *
+     * @param tacheId - ID de la tâche
+     * @param distributions - Liste des distributions avec date, heure_debut, heure_fin
+     * @returns Réponse avec les distributions créées
+     */
+    async updateDistributions(tacheId: number, distributions: Array<{
+        date: string;
+        heure_debut: string;
+        heure_fin: string;
+        commentaire?: string;
+    }>): Promise<{
+        message: string;
+        distributions: any[];
+        total_heures: number;
+        nombre_jours: number;
+    }> {
+        const response = await apiFetch(`${BASE_URL}/taches/${tacheId}/update_distributions/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ distributions })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || error.detail || 'Erreur lors de la mise à jour des distributions');
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Marque une distribution de charge comme réalisée.
+     *
+     * @param distributionId - ID de la distribution
+     * @param heuresReelles - Heures réellement travaillées (optionnel)
+     * @returns Distribution mise à jour
+     */
+    async marquerDistributionRealisee(distributionId: number, heuresReelles?: number): Promise<any> {
+        const response = await apiFetch(`${BASE_URL}/distributions/${distributionId}/marquer-realisee/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ heures_reelles: heuresReelles })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || error.detail || 'Erreur lors du marquage de la distribution');
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Marque une distribution comme non réalisée.
+     *
+     * @param distributionId - ID de la distribution
+     * @returns Distribution mise à jour
+     */
+    async marquerDistributionNonRealisee(distributionId: number): Promise<any> {
+        const response = await apiFetch(`${BASE_URL}/distributions/${distributionId}/marquer-non-realisee/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || error.detail || 'Erreur lors du marquage de la distribution comme non réalisée');
         }
 
         return response.json();

@@ -13,7 +13,7 @@ import {
     fetchConsommationsParTache, createConsommation, deleteConsommation,
     fetchProduitsActifs
 } from '../services/suiviTachesApi';
-import { Tache, TacheCreate, TypeTache, STATUT_TACHE_COLORS, PRIORITE_LABELS, ETAT_VALIDATION_COLORS, ETAT_VALIDATION_LABELS, PlanningFilters, EMPTY_PLANNING_FILTERS } from '../types/planning';
+import { Tache, TacheCreate, TypeTache, STATUT_TACHE_COLORS, PRIORITE_LABELS, ETAT_VALIDATION_COLORS, ETAT_VALIDATION_LABELS, PlanningFilters, EMPTY_PLANNING_FILTERS, StatusDistribution, STATUS_DISTRIBUTION_LABELS, STATUS_DISTRIBUTION_COLORS } from '../types/planning';
 import { PhotoList, ConsommationProduit, ProduitList } from '../types/suiviTaches';
 import { StructureClient, EquipeList } from '../types/users';
 import { useSearch } from '../contexts/SearchContext';
@@ -163,6 +163,54 @@ const SuiviTaches: React.FC = () => {
             console.error("Erreur chargement tâches", error);
         } finally {
             setLoadingTasks(false);
+        }
+    };
+
+    // Toggle du statut d'une distribution de charge
+    const handleToggleDistribution = async (distributionId: number, currentStatus: StatusDistribution) => {
+        if (!selectedTache) return;
+
+        const newStatus: StatusDistribution = currentStatus === 'REALISEE' ? 'NON_REALISEE' : 'REALISEE';
+
+        // Optimistic Update
+        const updatedDistributions = selectedTache.distributions_charge?.map(d =>
+            d.id === distributionId ? { ...d, status: newStatus } : d
+        );
+
+        setSelectedTache({
+            ...selectedTache,
+            distributions_charge: updatedDistributions
+        });
+
+        setTaches(prev => prev.map(t =>
+            t.id === selectedTache.id
+                ? { ...t, distributions_charge: updatedDistributions }
+                : t
+        ));
+
+        try {
+            if (newStatus === 'REALISEE') {
+                await planningService.marquerDistributionRealisee(distributionId);
+            } else {
+                await planningService.marquerDistributionNonRealisee(distributionId);
+            }
+            // Recharger les tâches pour avoir les données à jour (incluant le statut de la tâche)
+            await loadTaches();
+            // Recharger la tâche sélectionnée pour mettre à jour l'affichage
+            const updatedTache = await planningService.getTache(selectedTache.id);
+            setSelectedTache(updatedTache);
+        } catch (err) {
+            // Rollback on error
+            setSelectedTache({
+                ...selectedTache,
+                distributions_charge: selectedTache.distributions_charge
+            });
+            setTaches(prev => prev.map(t =>
+                t.id === selectedTache.id
+                    ? { ...t, distributions_charge: selectedTache.distributions_charge }
+                    : t
+            ));
+            alert("Erreur lors de la mise à jour de la distribution");
         }
     };
 
@@ -844,20 +892,32 @@ const SuiviTaches: React.FC = () => {
                                             <div>
                                                 <span className="text-slate-500">Début prévu</span>
                                                 <p className="font-medium text-slate-800">
-                                                    {new Date(selectedTache.date_debut_planifiee).toLocaleString()}
+                                                    {new Date(selectedTache.date_debut_planifiee).toLocaleDateString('fr-FR', {
+                                                        day: '2-digit',
+                                                        month: '2-digit',
+                                                        year: 'numeric'
+                                                    })}
                                                 </p>
                                             </div>
                                             <div>
                                                 <span className="text-slate-500">Fin prévue</span>
                                                 <p className="font-medium text-slate-800">
-                                                    {new Date(selectedTache.date_fin_planifiee).toLocaleString()}
+                                                    {new Date(selectedTache.date_fin_planifiee).toLocaleDateString('fr-FR', {
+                                                        day: '2-digit',
+                                                        month: '2-digit',
+                                                        year: 'numeric'
+                                                    })}
                                                 </p>
                                             </div>
                                             {selectedTache.date_debut_reelle && (
                                                 <div>
                                                     <span className="text-emerald-600">Début réel</span>
                                                     <p className="font-medium text-slate-800">
-                                                        {new Date(selectedTache.date_debut_reelle).toLocaleString()}
+                                                        {new Date(selectedTache.date_debut_reelle).toLocaleDateString('fr-FR', {
+                                                            day: '2-digit',
+                                                            month: '2-digit',
+                                                            year: 'numeric'
+                                                        })}
                                                     </p>
                                                 </div>
                                             )}
@@ -865,12 +925,112 @@ const SuiviTaches: React.FC = () => {
                                                 <div>
                                                     <span className="text-blue-600">Fin réelle</span>
                                                     <p className="font-medium text-slate-800">
-                                                        {new Date(selectedTache.date_fin_reelle).toLocaleString()}
+                                                        {new Date(selectedTache.date_fin_reelle).toLocaleDateString('fr-FR', {
+                                                            day: '2-digit',
+                                                            month: '2-digit',
+                                                            year: 'numeric'
+                                                        })}
                                                     </p>
                                                 </div>
                                             )}
                                         </div>
                                     </div>
+
+                                    {/* Distribution de charge */}
+                                    {selectedTache.distributions_charge && selectedTache.distributions_charge.length > 0 && (
+                                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                            <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                                <Clock className="w-4 h-4 text-emerald-600" />
+                                                Distribution de charge ({selectedTache.distributions_charge.length} jour{selectedTache.distributions_charge.length > 1 ? 's' : ''})
+                                            </h3>
+                                            <div className="space-y-2">
+                                                {selectedTache.distributions_charge
+                                                    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                                                    .map((dist, index) => {
+                                                        const date = new Date(dist.date);
+                                                        const dayOfWeek = date.getDay();
+                                                        const isSunday = dayOfWeek === 0;
+                                                        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+                                                        const isRealisee = dist.status === 'REALISEE';
+
+                                                        return (
+                                                            <div
+                                                                key={dist.id || index}
+                                                                className={`
+                                                                    p-3 rounded-lg border text-sm transition-all
+                                                                    ${isRealisee ? 'bg-green-50 border-green-500 border-2' :
+                                                                        isSunday
+                                                                        ? 'bg-red-50 border-red-200'
+                                                                        : isWeekend
+                                                                        ? 'bg-blue-50 border-blue-200'
+                                                                        : 'bg-white border-slate-200'
+                                                                    }
+                                                                `}
+                                                            >
+                                                                <div className="flex items-start justify-between gap-3">
+                                                                    {/* Checkbox pour toggle le statut */}
+                                                                    <button
+                                                                        onClick={() => handleToggleDistribution(dist.id, dist.status)}
+                                                                        title={isRealisee ? 'Marquer comme non réalisée' : 'Marquer comme réalisée'}
+                                                                        className={`
+                                                                            mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0
+                                                                            ${isRealisee
+                                                                                ? 'bg-emerald-600 border-emerald-600 text-white'
+                                                                                : 'bg-white border-gray-400 hover:border-emerald-500 hover:bg-emerald-50'
+                                                                            }
+                                                                        `}
+                                                                    >
+                                                                        {isRealisee && <CheckCircle className="w-3 h-3" />}
+                                                                    </button>
+
+                                                                    <div className="flex-1">
+                                                                        <div className="font-medium text-slate-800 mb-1">
+                                                                            {date.toLocaleDateString('fr-FR', {
+                                                                                weekday: 'long',
+                                                                                day: '2-digit',
+                                                                                month: 'long',
+                                                                                year: 'numeric'
+                                                                            })}
+                                                                        </div>
+                                                                        <div className="flex items-center gap-4 text-xs text-slate-600">
+                                                                            <span className="flex items-center gap-1">
+                                                                                <Clock className="w-3 h-3" />
+                                                                                {dist.heure_debut ? dist.heure_debut.substring(0, 5) : '08:00'} - {dist.heure_fin ? dist.heure_fin.substring(0, 5) : '17:00'}
+                                                                            </span>
+                                                                            <span className="font-semibold text-emerald-600">
+                                                                                {dist.heures_planifiees?.toFixed(2) || '0.00'}h
+                                                                            </span>
+                                                                        </div>
+                                                                        {dist.commentaire && (
+                                                                            <p className="mt-2 text-xs text-slate-500 italic">
+                                                                                {dist.commentaire}
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
+
+                                                                    {/* Badge de statut */}
+                                                                    <div className="flex flex-col items-end gap-1">
+                                                                        <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${STATUS_DISTRIBUTION_COLORS[dist.status].bg} ${STATUS_DISTRIBUTION_COLORS[dist.status].text}`}>
+                                                                            {STATUS_DISTRIBUTION_LABELS[dist.status]}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                            </div>
+                                            <div className="mt-3 pt-3 border-t border-slate-200">
+                                                <div className="flex items-center justify-between text-sm">
+                                                    <span className="text-slate-600 font-medium">Total planifié</span>
+                                                    <span className="text-emerald-600 font-bold">
+                                                        {selectedTache.charge_totale_distributions?.toFixed(2) ||
+                                                         selectedTache.distributions_charge.reduce((sum, d) => sum + (d.heures_planifiees || 0), 0).toFixed(2)}h
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Équipes assignées */}
                                     <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
