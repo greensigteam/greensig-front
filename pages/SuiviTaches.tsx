@@ -13,7 +13,7 @@ import {
     fetchConsommationsParTache, createConsommation, deleteConsommation,
     fetchProduitsActifs
 } from '../services/suiviTachesApi';
-import { Tache, TacheCreate, TypeTache, STATUT_TACHE_COLORS, PRIORITE_LABELS, ETAT_VALIDATION_COLORS, ETAT_VALIDATION_LABELS, PlanningFilters, EMPTY_PLANNING_FILTERS, StatusDistribution, STATUS_DISTRIBUTION_LABELS, STATUS_DISTRIBUTION_COLORS } from '../types/planning';
+import { Tache, TacheCreate, TypeTache, STATUT_TACHE_COLORS, STATUT_TACHE_LABELS, PRIORITE_LABELS, ETAT_VALIDATION_COLORS, ETAT_VALIDATION_LABELS, PlanningFilters, EMPTY_PLANNING_FILTERS, StatusDistribution, STATUS_DISTRIBUTION_LABELS, STATUS_DISTRIBUTION_COLORS } from '../types/planning';
 import { PhotoList, ConsommationProduit, ProduitList } from '../types/suiviTaches';
 import { StructureClient, EquipeList } from '../types/users';
 import { useSearch } from '../contexts/SearchContext';
@@ -152,7 +152,7 @@ const SuiviTaches: React.FC = () => {
             loadTaskDetails(selectedTache.id);
             setActiveTab('info');
         }
-    }, [selectedTache]);
+    }, [selectedTache?.id]); // ✅ Ne se déclenche que si l'ID change, pas si l'objet change
 
     const loadTaches = async () => {
         setLoadingTasks(true);
@@ -170,6 +170,7 @@ const SuiviTaches: React.FC = () => {
     const handleToggleDistribution = async (distributionId: number, currentStatus: StatusDistribution) => {
         if (!selectedTache) return;
 
+        const tacheId = selectedTache.id;
         const newStatus: StatusDistribution = currentStatus === 'REALISEE' ? 'NON_REALISEE' : 'REALISEE';
 
         // Optimistic Update
@@ -183,7 +184,7 @@ const SuiviTaches: React.FC = () => {
         });
 
         setTaches(prev => prev.map(t =>
-            t.id === selectedTache.id
+            t.id === tacheId
                 ? { ...t, distributions_charge: updatedDistributions }
                 : t
         ));
@@ -197,8 +198,10 @@ const SuiviTaches: React.FC = () => {
             // Recharger les tâches pour avoir les données à jour (incluant le statut de la tâche)
             await loadTaches();
             // Recharger la tâche sélectionnée pour mettre à jour l'affichage
-            const updatedTache = await planningService.getTache(selectedTache.id);
+            const updatedTache = await planningService.getTache(tacheId);
             setSelectedTache(updatedTache);
+            // Recharger les détails (au cas où)
+            await loadTaskDetails(tacheId);
         } catch (err) {
             // Rollback on error
             setSelectedTache({
@@ -206,7 +209,7 @@ const SuiviTaches: React.FC = () => {
                 distributions_charge: selectedTache.distributions_charge
             });
             setTaches(prev => prev.map(t =>
-                t.id === selectedTache.id
+                t.id === tacheId
                     ? { ...t, distributions_charge: selectedTache.distributions_charge }
                     : t
             ));
@@ -385,6 +388,7 @@ const SuiviTaches: React.FC = () => {
     const executeConfirmedAction = async () => {
         if (!selectedTache || !confirmModal) return;
 
+        const tacheId = selectedTache.id;
         setConfirmModal(null);
         setChangingStatut(true);
 
@@ -397,9 +401,18 @@ const SuiviTaches: React.FC = () => {
                 case 'cancel': nouveauStatut = 'ANNULEE'; break;
             }
 
-            const updatedTache = await planningService.changeStatut(selectedTache.id, nouveauStatut);
-            setSelectedTache(updatedTache);
-            setTaches(prev => prev.map(t => t.id === updatedTache.id ? updatedTache : t));
+            // Changer le statut
+            await planningService.changeStatut(tacheId, nouveauStatut);
+
+            // Recharger complètement la liste des tâches
+            await loadTaches();
+
+            // Recharger la tâche sélectionnée avec toutes ses données fraîches
+            const refreshedTache = await planningService.getTache(tacheId);
+            setSelectedTache(refreshedTache);
+
+            // Recharger aussi les détails (photos, consommations)
+            await loadTaskDetails(tacheId);
         } catch (error) {
             console.error("Erreur changement statut", error);
             alert("Erreur lors du changement de statut");
@@ -417,15 +430,25 @@ const SuiviTaches: React.FC = () => {
     const handleValidation = async () => {
         if (!selectedTache || !validationModal) return;
 
+        const tacheId = selectedTache.id;
         setValidating(true);
         try {
-            const result = await planningService.validerTache(
-                selectedTache.id,
+            await planningService.validerTache(
+                tacheId,
                 validationModal.type,
                 validationComment
             );
-            setSelectedTache(result.tache);
-            setTaches(prev => prev.map(t => t.id === result.tache.id ? result.tache : t));
+
+            // Recharger complètement la liste des tâches
+            await loadTaches();
+
+            // Recharger la tâche sélectionnée avec toutes ses données fraîches
+            const refreshedTache = await planningService.getTache(tacheId);
+            setSelectedTache(refreshedTache);
+
+            // Recharger les détails
+            await loadTaskDetails(tacheId);
+
             setValidationModal(null);
             setValidationComment('');
         } catch (error) {
@@ -659,9 +682,11 @@ const SuiviTaches: React.FC = () => {
                                             <h3 className="font-semibold text-slate-800">
                                                 {tache.type_tache_detail?.nom_tache || 'Tâche sans nom'}
                                             </h3>
-                                            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUT_TACHE_COLORS[tache.statut]?.bg} ${STATUT_TACHE_COLORS[tache.statut]?.text}`}>
-                                                {tache.statut.replace('_', ' ')}
-                                            </span>
+                                            {tache.statut && (
+                                                <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUT_TACHE_COLORS[tache.statut]?.bg} ${STATUT_TACHE_COLORS[tache.statut]?.text}`}>
+                                                    {STATUT_TACHE_LABELS[tache.statut]}
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="flex items-center gap-4 text-sm text-slate-500">
                                             <span className="flex items-center gap-1">
