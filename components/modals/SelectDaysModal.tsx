@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { Calendar, X, CheckSquare, Clock, Settings2 } from 'lucide-react';
-import { DayPicker } from 'react-day-picker';
-import { fr } from 'date-fns/locale';
-import { isSunday, isSaturday, isWithinInterval, format, startOfDay } from 'date-fns';
-import 'react-day-picker/dist/style.css';
+import { Calendar, X, CheckSquare, Clock, Settings2, AlertTriangle } from 'lucide-react';
+import { DayPicker, Matcher } from 'react-day-picker';
+import { fr } from 'date-fns/locale/fr';
+import { isSunday, isSaturday, format } from 'date-fns';
+import 'react-day-picker/style.css';
 
 interface DaySelection {
   date: string; // YYYY-MM-DD
@@ -22,53 +22,39 @@ interface SelectDaysModalProps {
   onConfirm: (selectedDays: DaySelection[]) => void;
   onCancel: () => void;
   initialSelection?: string[]; // Liste des dates déjà sélectionnées (YYYY-MM-DD)
+  protectedDates?: string[]; // ✅ NOUVEAU: Dates qui ne peuvent pas être désélectionnées (réalisées)
 }
 
 const JOUR_NAMES = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 
-/**
- * 🎨 Modal de sélection des jours avec react-day-picker
- *
- * Features:
- * - Calendrier mensuel interactif (react-day-picker)
- * - Panneau latéral avec détails des jours sélectionnés
- * - Configuration horaires par défaut globale
- * - Raccourcis intelligents
- * - Stats en temps réel
- */
 const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
   dateDebut,
   dateFin,
   onConfirm,
   onCancel,
-  initialSelection = []
+  initialSelection = [],
+  protectedDates = [] // ✅ NOUVEAU: Dates protégées
 }) => {
-  // Configuration horaires par défaut
   const [defaultHeureDebut, setDefaultHeureDebut] = useState('08:00');
   const [defaultHeureFin, setDefaultHeureFin] = useState('17:00');
 
-  // Fonction pour calculer les heures entre deux horaires
   const calculerHeures = (debut: string, fin: string): number => {
     if (!debut || !fin) return 0;
-
     const [hDebut, mDebut] = debut.split(':').map(Number);
     const [hFin, mFin] = fin.split(':').map(Number);
-
     const minutesDebut = (hDebut ?? 0) * 60 + (mDebut ?? 0);
     const minutesFin = (hFin ?? 0) * 60 + (mFin ?? 0);
-
     const diffMinutes = minutesFin - minutesDebut;
     return Math.round((diffMinutes / 60) * 100) / 100;
   };
 
-  // Générer tous les jours de l'intervalle
   const allDays = useMemo(() => {
     const days: DaySelection[] = [];
     const currentDate = new Date(dateDebut);
     const endDate = new Date(dateFin);
 
     while (currentDate <= endDate) {
-      const dateString = currentDate.toISOString().split('T')[0];
+      const dateString = format(currentDate, 'yyyy-MM-dd');
       const dayOfWeek = currentDate.getDay();
       const isDimanche = dayOfWeek === 0;
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
@@ -86,20 +72,21 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
 
       currentDate.setDate(currentDate.getDate() + 1);
     }
-
     return days;
   }, [dateDebut, dateFin, initialSelection, defaultHeureDebut, defaultHeureFin]);
 
   const [selectedDays, setSelectedDays] = useState<DaySelection[]>(allDays);
 
-  // Calculer les jours sélectionnés pour react-day-picker
+  // ❌ SUPPRIMÉ: Ne plus appliquer automatiquement les horaires par défaut à tous les jours
+  // Les horaires par défaut s'appliquent uniquement lors de la sélection initiale ou de nouveaux jours
+  // Les jours déjà sélectionnés conservent leurs heures actuelles
+
   const selectedDates = useMemo(() => {
     return selectedDays
       .filter(d => d.selected)
       .map(d => new Date(d.date + 'T00:00:00'));
   }, [selectedDays]);
 
-  // Calculer les statistiques
   const stats = useMemo(() => {
     const selected = selectedDays.filter(d => d.selected);
     const totalHeures = selected.reduce((sum, day) => {
@@ -114,43 +101,82 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
     };
   }, [selectedDays, allDays]);
 
-  // Handlers
-  const handleDayClick = (day: Date) => {
-    const dateString = format(day, 'yyyy-MM-dd');
-    const dayInfo = selectedDays.find(d => d.date === dateString);
-
-    // Ne pas permettre de sélectionner les dimanches
-    if (dayInfo?.isSunday) return;
-
-    // Vérifier si le jour est dans l'intervalle
-    if (!isWithinInterval(day, { start: dateDebut, end: dateFin })) return;
+  const handleSelect = (days: Date[] | undefined) => {
+    const selectedDatesList = days || [];
+    const selectedDateStrings = selectedDatesList.map(d => format(d, 'yyyy-MM-dd'));
 
     setSelectedDays(prev =>
-      prev.map(d =>
-        d.date === dateString ? { ...d, selected: !d.selected } : d
-      )
+      prev.map(day => {
+        const wasSelected = day.selected;
+        const isNowSelected = selectedDateStrings.includes(day.date);
+
+        // Si le jour vient d'être sélectionné (transition false -> true), appliquer les horaires par défaut
+        // Sinon, garder les horaires actuels
+        if (!wasSelected && isNowSelected) {
+          return {
+            ...day,
+            selected: true,
+            heure_debut: defaultHeureDebut,
+            heure_fin: defaultHeureFin
+          };
+        }
+
+        // Pour les autres cas (déjà sélectionné ou désélectionné), garder les horaires existants
+        return {
+          ...day,
+          selected: isNowSelected
+        };
+      })
     );
   };
 
   const handleSelectJoursOuvres = () => {
     setSelectedDays(prev =>
-      prev.map(day => ({
-        ...day,
-        selected: !day.isSunday,
-        heure_debut: defaultHeureDebut,
-        heure_fin: defaultHeureFin
-      }))
+      prev.map(day => {
+        const shouldBeSelected = !day.isSunday;
+        const wasSelected = day.selected;
+
+        // Si le jour vient d'être sélectionné, appliquer les horaires par défaut
+        if (!wasSelected && shouldBeSelected) {
+          return {
+            ...day,
+            selected: true,
+            heure_debut: defaultHeureDebut,
+            heure_fin: defaultHeureFin
+          };
+        }
+
+        // Sinon, garder les horaires existants
+        return {
+          ...day,
+          selected: shouldBeSelected
+        };
+      })
     );
   };
 
   const handleSelectAll = () => {
     setSelectedDays(prev =>
-      prev.map(day => ({
-        ...day,
-        selected: !day.isSunday,
-        heure_debut: defaultHeureDebut,
-        heure_fin: defaultHeureFin
-      }))
+      prev.map(day => {
+        const shouldBeSelected = !day.isSunday;
+        const wasSelected = day.selected;
+
+        // Si le jour vient d'être sélectionné, appliquer les horaires par défaut
+        if (!wasSelected && shouldBeSelected) {
+          return {
+            ...day,
+            selected: true,
+            heure_debut: defaultHeureDebut,
+            heure_fin: defaultHeureFin
+          };
+        }
+
+        // Sinon, garder les horaires existants
+        return {
+          ...day,
+          selected: shouldBeSelected
+        };
+      })
     );
   };
 
@@ -169,6 +195,11 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
   };
 
   const handleToggle = (dateString: string) => {
+    // ✅ NOUVEAU: Empêcher la désélection des dates protégées
+    if (protectedDates.includes(dateString) && selectedDays.find(d => d.date === dateString)?.selected) {
+      return; // Ignore la désélection si la date est protégée
+    }
+
     setSelectedDays(prev =>
       prev.map(day =>
         day.date === dateString ? { ...day, selected: !day.selected } : day
@@ -176,19 +207,18 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
     );
   };
 
-  // Modifiers pour react-day-picker
-  const modifiers = {
-    selected: selectedDates,
+  const modifiers: Record<string, Matcher> = {
     sunday: (date: Date) => isSunday(date),
     saturday: (date: Date) => isSaturday(date),
-    outside: (date: Date) => !isWithinInterval(date, { start: dateDebut, end: dateFin })
+    // ✅ MODIFIÉ: Ne plus marquer les dates hors période comme "outside"
+    // Les dates sont maintenant disponibles pour sélection flexible
+    protected: (date: Date) => protectedDates.includes(format(date, 'yyyy-MM-dd'))
   };
 
   const modifiersClassNames = {
-    selected: 'rdp-day-selected',
     sunday: 'rdp-day-sunday',
     saturday: 'rdp-day-saturday',
-    outside: 'rdp-day-outside'
+    protected: 'rdp-day-protected'
   };
 
   return (
@@ -197,10 +227,10 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
-            <Calendar className="w-6 h-6 text-blue-600" />
+            <Calendar className="w-6 h-6 text-emerald-600" />
             <div>
               <h2 className="text-xl font-bold text-gray-800">Sélection des jours de travail</h2>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500 font-medium">
                 Du {dateDebut.toLocaleDateString('fr-FR')} au {dateFin.toLocaleDateString('fr-FR')}
               </p>
             </div>
@@ -208,49 +238,49 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
           <button
             type="button"
             onClick={onCancel}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-slate-100 rounded-full transition-all duration-200 text-slate-400 hover:text-slate-600"
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Stats & Config */}
-        <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+        <div className="px-6 py-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6 text-sm">
               <span className="flex items-center gap-2">
-                <CheckSquare className="w-4 h-4 text-blue-600" />
-                <strong className="text-blue-900">{stats.count}</strong>
-                <span className="text-gray-600">jours sélectionnés</span>
+                <CheckSquare className="w-4 h-4 text-emerald-600" />
+                <strong className="text-emerald-900">{stats.count}</strong>
+                <span className="text-emerald-700/70">jours sélectionnés</span>
               </span>
               <span className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-blue-600" />
-                <strong className="text-blue-900">{stats.totalHeures}h</strong>
-                <span className="text-gray-600">au total</span>
+                <Clock className="w-4 h-4 text-emerald-600" />
+                <strong className="text-emerald-900">{stats.totalHeures}h</strong>
+                <span className="text-emerald-700/70">au total</span>
               </span>
-              <span className="text-gray-600">
-                Moyenne: <strong className="text-blue-900">{stats.moyenneHeures}h/jour</strong>
+              <span className="text-emerald-700/70">
+                Moyenne: <strong className="text-emerald-900">{stats.moyenneHeures}h/jour</strong>
               </span>
             </div>
 
             {/* Config horaires par défaut */}
             <div className="flex items-center gap-3 text-sm">
-              <Settings2 className="w-4 h-4 text-gray-500" />
-              <span className="text-gray-600">Horaires par défaut:</span>
+              <Settings2 className="w-4 h-4 text-slate-500" />
+              <span className="text-slate-600 font-medium">Horaires par défaut:</span>
               <input
                 type="time"
                 value={defaultHeureDebut}
                 onChange={(e) => setDefaultHeureDebut(e.target.value)}
-                className="px-2 py-1 border border-gray-300 rounded text-sm"
+                className="px-2 py-1 border border-emerald-200 rounded text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
               />
-              <span className="text-gray-400">-</span>
+              <span className="text-slate-400">à</span>
               <input
                 type="time"
                 value={defaultHeureFin}
                 onChange={(e) => setDefaultHeureFin(e.target.value)}
-                className="px-2 py-1 border border-gray-300 rounded text-sm"
+                className="px-2 py-1 border border-emerald-200 rounded text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
               />
-              <span className="text-gray-600 ml-2">
+              <span className="text-emerald-700 font-bold ml-2">
                 ({calculerHeures(defaultHeureDebut, defaultHeureFin).toFixed(2)}h)
               </span>
             </div>
@@ -258,54 +288,82 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
         </div>
 
         {/* Action buttons */}
-        <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
+        <div className="px-6 py-3 bg-slate-50/50 border-b border-slate-200">
           <div className="flex gap-2">
             <button
               type="button"
               onClick={handleSelectJoursOuvres}
-              className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 text-sm font-semibold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-sm shadow-emerald-100 flex items-center gap-2"
             >
-              Jours ouvrés uniquement
+              <CheckSquare className="w-4 h-4" />
+              Jours ouvrés
             </button>
             <button
               type="button"
               onClick={handleSelectAll}
-              className="px-3 py-1.5 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+              className="px-4 py-2 text-sm font-semibold bg-emerald-100 text-emerald-700 rounded-xl hover:bg-emerald-200 transition-all"
             >
               Tous les jours
             </button>
             <button
               type="button"
               onClick={handleDeselectAll}
-              className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+              className="px-4 py-2 text-sm font-semibold bg-slate-200 text-slate-700 rounded-xl hover:bg-slate-300 transition-all"
             >
-              Aucun jour
+              Vider
             </button>
           </div>
         </div>
 
-        {/* Main Content: Calendar + Sidebar */}
+        {/* Main Content */}
         <div className="flex-1 overflow-hidden flex">
-          {/* CALENDRIER */}
           <div className="flex-1 p-8 overflow-y-auto flex items-center justify-center">
             <style>{`
               .rdp {
                 --rdp-cell-size: 75px;
-                --rdp-accent-color: #2563eb;
-                --rdp-background-color: #dbeafe;
+                --rdp-accent-color: #059669;
+                --rdp-background-color: #ecfdf5;
                 margin: 0;
                 width: 100%;
                 max-width: 650px;
               }
 
+              .rdp-selected:not(.rdp-day-sunday),
               .rdp-day-selected:not(.rdp-day-sunday) {
-                background-color: #2563eb !important;
+                background-color: #059669 !important;
                 color: white !important;
                 font-weight: 600;
               }
 
+              .rdp-selected:not(.rdp-day-sunday):hover,
               .rdp-day-selected:not(.rdp-day-sunday):hover {
-                background-color: #1d4ed8 !important;
+                background-color: #047857 !important;
+              }
+
+              /* Suppression totale des cercles bleus (focus, today, selection) */
+              .rdp-day_button,
+              .rdp-day_button:focus,
+              .rdp-day_button:focus-visible,
+              .rdp-day_button:active,
+              .rdp-day,
+              .rdp-selected,
+              .rdp-today {
+                outline: none !important;
+                border: none !important;
+                box-shadow: none !important;
+              }
+
+              .rdp-day_button::after,
+              .rdp-day_button::before,
+              .rdp-day::after,
+              .rdp-day::before {
+                display: none !important;
+              }
+
+              /* Couleur pour "Aujourd'hui" quand non sélectionné */
+              .rdp-today:not(.rdp-selected) {
+                color: #059669 !important;
+                font-weight: 700 !important;
               }
 
               .rdp-day-saturday:not(.rdp-day-selected):not(.rdp-day-outside) {
@@ -324,7 +382,24 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
               .rdp-day-outside {
                 background-color: #f9fafb !important;
                 color: #d1d5db !important;
+              }
+
+              /* ✅ NOUVEAU: Style pour les dates protégées (réalisées) */
+              .rdp-day-protected {
+                background-color: #d1fae5 !important;
+                border: 2px solid #10b981 !important;
+                color: #065f46 !important;
+                font-weight: 700 !important;
                 cursor: not-allowed !important;
+                position: relative;
+              }
+
+              .rdp-day-protected::after {
+                content: '🔒';
+                position: absolute;
+                top: 2px;
+                right: 2px;
+                font-size: 10px;
               }
 
               .rdp-day:not(.rdp-day-sunday):not(.rdp-day-outside) {
@@ -332,8 +407,9 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
               }
 
               .rdp-day:not(.rdp-day-selected):not(.rdp-day-sunday):not(.rdp-day-outside):not(.rdp-day-saturday):hover {
-                background-color: #dbeafe;
-                border: 2px solid #3b82f6;
+                background-color: #ecfdf5;
+                border: 2px solid #10b981;
+                color: #065f46;
               }
 
               .rdp-caption {
@@ -359,84 +435,86 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
                 font-weight: 500;
               }
 
-              .rdp-months {
-                width: 100%;
-              }
-
-              .rdp-month {
-                width: 100%;
-              }
-
-              .rdp-table {
-                width: 100%;
-                max-width: none;
-              }
+              .rdp-months { width: 100%; }
+              .rdp-month { width: 100%; }
+              .rdp-table { width: 100%; max-width: none; }
             `}</style>
 
             <div className="w-full flex flex-col items-center">
               <DayPicker
                 mode="multiple"
                 selected={selectedDates}
-                onDayClick={handleDayClick}
+                onSelect={handleSelect}
                 locale={fr}
                 modifiers={modifiers}
                 modifiersClassNames={modifiersClassNames}
+                classNames={{
+                  selected: 'rdp-selected rdp-day-selected',
+                  today: 'rdp-today',
+                }}
                 disabled={(date) =>
-                  isSunday(date) ||
-                  !isWithinInterval(date, { start: dateDebut, end: dateFin })
+                  isSunday(date) // ✅ MODIFIÉ: Seulement les dimanches sont désactivés
                 }
-                fromDate={dateDebut}
-                toDate={dateFin}
                 defaultMonth={dateDebut}
                 showOutsideDays
               />
 
               {/* Légende */}
-              <div className="mt-8 flex items-center gap-6 text-sm text-gray-700">
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 bg-blue-600 rounded"></div>
-                <span className="font-medium">Sélectionné</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 bg-yellow-50 border-2 border-yellow-300 rounded"></div>
-                <span className="font-medium">Weekend (Samedi)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 bg-red-100 rounded"></div>
-                <span className="font-medium">Dimanche (Repos)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 border-2 border-gray-300 rounded"></div>
-                <span className="font-medium">Disponible</span>
-              </div>
+              <div className="mt-10 flex flex-wrap items-center justify-center gap-8 text-[13px] text-slate-500 bg-slate-50/80 px-6 py-3 rounded-2xl border border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-4 h-4 bg-emerald-600 rounded-md shadow-sm shadow-emerald-100"></div>
+                  <span className="font-semibold text-slate-700">Sélectionné</span>
+                </div>
+                {protectedDates.length > 0 && (
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-4 h-4 bg-emerald-200 border-2 border-emerald-500 rounded-md relative">
+                      <span className="absolute -top-1 -right-1 text-[8px]">🔒</span>
+                    </div>
+                    <span className="font-semibold text-slate-700">Réalisée (protégée)</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2.5">
+                  <div className="w-4 h-4 bg-amber-50 border-2 border-amber-300 rounded-md"></div>
+                  <span className="font-semibold text-slate-700">Samedi (Optionnel)</span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-4 h-4 bg-red-100 border border-red-200 rounded-md"></div>
+                  <span className="font-semibold text-slate-700">Dimanche (Repos)</span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-4 h-4 border-2 border-slate-300 rounded-md bg-white"></div>
+                  <span className="font-semibold text-slate-700">Disponible</span>
+                </div>
               </div>
             </div>
           </div>
 
           {/* PANNEAU LATÉRAL - Jours sélectionnés */}
-          <div className="w-96 border-l border-gray-200 bg-gray-50 flex flex-col">
-            <div className="p-4 border-b border-gray-200">
-              <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-                <CheckSquare className="w-4 h-4 text-blue-600" />
+          <div className="w-96 border-l border-slate-200 bg-slate-50 flex flex-col">
+            <div className="p-5 border-b border-slate-200 bg-white">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                  <CheckSquare className="w-5 h-5 text-emerald-600" />
+                </div>
                 Jours sélectionnés ({stats.count})
               </h3>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {selectedDays.filter(d => d.selected).length === 0 ? (
-                <div className="text-center text-gray-400 py-8">
-                  <Calendar className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Aucun jour sélectionné</p>
+                <div className="flex flex-col items-center justify-center h-full text-slate-400 py-8 px-4 text-center">
+                  <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                    <Calendar className="w-8 h-8 opacity-40" />
+                  </div>
+                  <p className="text-sm font-medium">Aucun jour sélectionné</p>
+                  <p className="text-xs mt-1">Cliquez sur le calendrier pour ajouter des jours</p>
                 </div>
               ) : (
                 selectedDays.filter(d => d.selected).map((day) => (
-                  <div
-                    key={day.date}
-                    className="p-3 bg-white rounded-lg border border-gray-200 shadow-sm"
-                  >
-                    <div className="flex items-start justify-between mb-2">
+                  <div key={day.date} className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow group">
+                    <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-bold text-slate-800">
                           {new Date(day.date + 'T00:00:00').toLocaleDateString('fr-FR', {
                             weekday: 'long',
                             day: 'numeric',
@@ -444,24 +522,31 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
                           })}
                         </div>
                         {day.isWeekend && !day.isSunday && (
-                          <span className="text-xs text-yellow-600">Weekend</span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 mt-1 uppercase tracking-wider">
+                            Samedi
+                          </span>
                         )}
                       </div>
                       <button
                         type="button"
                         onClick={() => handleToggle(day.date)}
-                        className="p-1 hover:bg-red-50 rounded text-red-500"
+                        className="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                        title="Désélectionner"
                       >
                         <X className="w-4 h-4" />
                       </button>
                     </div>
-
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Clock className="w-3 h-3" />
-                      <span>{day.heure_debut} - {day.heure_fin}</span>
-                      <span className="ml-auto font-medium text-blue-600">
-                        {calculerHeures(day.heure_debut, day.heure_fin).toFixed(2)}h
-                      </span>
+                    <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-lg">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                        <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>{day.heure_debut} - {day.heure_fin}</span>
+                      </div>
+                      <div className="ml-auto flex items-center gap-1">
+                        <span className="text-[10px] text-slate-400 uppercase font-bold">Charge:</span>
+                        <span className="text-xs font-bold text-emerald-600">
+                          {calculerHeures(day.heure_debut, day.heure_fin).toFixed(1)}h
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))
@@ -471,11 +556,16 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
-          <div className="text-sm text-gray-600">
-            {stats.count === 0 && (
-              <span className="text-orange-600 font-medium">
-                ⚠️ Aucun jour sélectionné
+        <div className="flex items-center justify-between p-6 border-t border-slate-200 bg-white">
+          <div className="text-sm">
+            {stats.count === 0 ? (
+              <span className="text-amber-600 font-bold flex items-center gap-2 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100">
+                <AlertTriangle className="w-4 h-4" />
+                Aucun jour sélectionné
+              </span>
+            ) : (
+              <span className="text-slate-500 font-medium">
+                Période: <strong className="text-slate-800">{allDays.length} jours potentiels</strong>
               </span>
             )}
           </div>
@@ -483,7 +573,7 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
             <button
               type="button"
               onClick={onCancel}
-              className="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+              className="px-6 py-2.5 bg-white text-slate-700 border border-slate-300 rounded-xl hover:bg-slate-50 transition-all font-bold shadow-sm"
             >
               Annuler
             </button>
@@ -491,9 +581,10 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
               type="button"
               onClick={handleConfirm}
               disabled={stats.count === 0}
-              className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-md"
+              className="px-8 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-bold shadow-lg shadow-emerald-200 flex items-center gap-2"
             >
-              Confirmer ({stats.count} jour{stats.count > 1 ? 's' : ''})
+              <CheckSquare className="w-5 h-5" />
+              Confirmer ({stats.count})
             </button>
           </div>
         </div>

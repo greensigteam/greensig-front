@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar, AlertCircle, Info, Settings } from 'lucide-react';
-import { DistributionChargeData } from '@/types/planning';
+import { Calendar, AlertCircle, Info, Settings, Lock } from 'lucide-react';
+import { DistributionChargeData, StatusDistribution } from '@/types/planning';
 import SelectDaysModal from '../modals/SelectDaysModal';
 
 interface DistributionChargeEditorProps {
@@ -21,6 +21,8 @@ interface DayRow {
   heure_debut: string;  // "HH:MM"
   heure_fin: string;     // "HH:MM"
   commentaire: string;
+  status?: StatusDistribution; // ✅ NOUVEAU: Status pour verrouiller les distributions réalisées
+  isRealized: boolean; // ✅ NOUVEAU: Flag pour verrouillage
 }
 
 const JOUR_NAMES = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
@@ -81,6 +83,9 @@ export function DistributionChargeEditor({
       // Calculer les heures
       const heures = dist.heures_planifiees ?? calculerHeures(heure_debut, heure_fin);
 
+      // ✅ NOUVEAU: Vérifier si la distribution est réalisée
+      const isRealized = dist.status === 'REALISEE';
+
       return {
         date,
         dateString: dist.date,
@@ -90,7 +95,9 @@ export function DistributionChargeEditor({
         heures,
         heure_debut,
         heure_fin,
-        commentaire: dist.commentaire ?? ''
+        commentaire: dist.commentaire ?? '',
+        status: dist.status,
+        isRealized
       };
     });
 
@@ -171,9 +178,11 @@ export function DistributionChargeEditor({
     <div className="space-y-3">
       {/* En-tête */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-blue-600" />
-          <h3 className="text-sm font-medium text-gray-700">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+            <Calendar className="w-5 h-5 text-emerald-600" />
+          </div>
+          <h3 className="text-sm font-bold text-slate-800">
             Distribution de charge journalière
           </h3>
         </div>
@@ -182,14 +191,14 @@ export function DistributionChargeEditor({
             <button
               type="button"
               onClick={() => setShowSelectDaysModal(true)}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-bold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
             >
               <Settings className="w-4 h-4" />
               {dayRows.length > 0 ? 'Modifier les jours' : 'Sélectionner les jours'}
             </button>
           )}
           {dayRows.length > 0 && (
-            <div className="text-sm font-semibold text-blue-600">
+            <div className="px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-lg text-sm font-bold text-emerald-700">
               Total: {totalHeures.toFixed(2)}h
             </div>
           )}
@@ -197,44 +206,50 @@ export function DistributionChargeEditor({
       </div>
 
       {/* Info */}
-      <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
-        <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-        <div className="text-xs text-blue-700">
-          <p className="font-medium">Contrôle avancé multi-jours</p>
-          <p className="mt-1">
+      <div className="flex items-start gap-3 p-4 bg-emerald-50/50 border border-emerald-100 rounded-xl">
+        <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+          <Info className="w-4 h-4 text-emerald-600" />
+        </div>
+        <div className="text-xs text-emerald-800 leading-relaxed">
+          <p className="font-bold text-[13px] mb-0.5">Contrôle avancé multi-jours</p>
+          <p className="opacity-80">
             Répartissez manuellement les heures de travail sur chaque jour.
             Les jours à 0h ne seront pas enregistrés.
-            <span className="font-medium"> Samedi</span> est travaillé jusqu'à midi (demi-journée),
-            <span className="font-medium"> Dimanche</span> est repos.
+            <span className="font-bold text-amber-700"> Samedi</span> est optionnel,
+            <span className="font-bold text-red-600"> Dimanche</span> est repos.
           </p>
         </div>
       </div>
 
       {/* Avertissement si trop de jours */}
       {showWarning && (
-        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
-          <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-          <p className="text-xs text-amber-700">
-            <span className="font-medium">Attention:</span> Cette tâche s'étend sur {periodeDays} jours.
+        <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-100 rounded-xl">
+          <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+            <AlertCircle className="w-4 h-4 text-amber-600" />
+          </div>
+          <p className="text-xs text-amber-800 leading-relaxed">
+            <span className="font-bold">Attention:</span> Cette tâche s'étend sur {periodeDays} jours.
             Vérifiez que c'est bien intentionnel et considérez diviser en plusieurs tâches si nécessaire.
           </p>
         </div>
       )}
 
       {/* Tableau des distributions */}
-      <div className="border border-gray-200 rounded-lg overflow-hidden max-h-[400px] overflow-y-auto">
+      <div className="border border-slate-200 rounded-2xl overflow-hidden max-h-[400px] overflow-y-auto shadow-sm">
         {dayRows.length === 0 ? (
-          <div className="p-8 text-center">
-            <Calendar className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-            <h3 className="text-lg font-medium text-gray-700 mb-2">Aucun jour sélectionné</h3>
-            <p className="text-sm text-gray-500 mb-4">
-              Cliquez sur le bouton "Sélectionner les jours" pour choisir les jours de travail
+          <div className="p-12 text-center bg-slate-50/50">
+            <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Calendar className="w-10 h-10 text-slate-300" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-700 mb-2">Aucun jour sélectionné</h3>
+            <p className="text-sm text-slate-500 mb-6 max-w-sm mx-auto">
+              Cliquez sur le bouton pour choisir les jours de travail dans la période définie.
             </p>
             {!readonly && (
               <button
                 type="button"
                 onClick={() => setShowSelectDaysModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all font-bold shadow-lg shadow-emerald-100"
               >
                 <Settings className="w-4 h-4" />
                 Sélectionner les jours
@@ -242,139 +257,138 @@ export function DistributionChargeEditor({
             )}
           </div>
         ) : (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50 sticky top-0 z-10">
+          <table className="min-w-full divide-y divide-slate-200">
+            <thead className="bg-slate-50 sticky top-0 z-10">
               <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   Date
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   Jour
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">
                   Heures
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   Début
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   Fin
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   Commentaire
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-slate-200">
               {dayRows.map((row) => (
-              <tr
-                key={row.dateString}
-                className={
-                  row.isSunday
-                    ? 'bg-red-50' // Dimanche = repos
-                    : row.isWeekend
-                    ? 'bg-blue-50' // Samedi = demi-journée
-                    : 'hover:bg-gray-50'
-                }
-              >
-                <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
-                  {row.date.toLocaleDateString('fr-FR', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
-                  })}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap text-sm">
-                  <span
-                    className={
-                      row.isSunday
-                        ? 'text-red-700 font-medium'
+                <tr
+                  key={row.dateString}
+                  className={
+                    row.isRealized
+                      ? 'bg-emerald-50/70 border-l-4 border-emerald-500' // ✅ Réalisée = verrouillée
+                      : row.isSunday
+                        ? 'bg-red-50/50' // Dimanche = repos
                         : row.isWeekend
-                        ? 'text-blue-700 font-medium'
-                        : 'text-gray-700'
-                    }
-                  >
-                    {row.dayName}
-                  </span>
-                  {row.isSunday && (
-                    <span className="ml-1 text-xs text-red-500">(Repos)</span>
-                  )}
-                  {row.isWeekend && !row.isSunday && (
-                    <span className="ml-1 text-xs text-blue-500">(Demi-j.)</span>
-                  )}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap">
-                  <div className="relative">
-                    <input
-                      type="number"
-                      min="0"
-                      max="24"
-                      step="0.5"
-                      value={row.heures || ''}
-                      readOnly
-                      disabled={row.isSunday}
-                      placeholder={row.isSunday ? '0' : '0.0'}
-                      title="Calculé automatiquement depuis les horaires (lecture seule)"
-                      className={`
-                        w-20 px-2 py-1 text-sm border rounded cursor-not-allowed
+                          ? 'bg-amber-50/50' // Samedi = optionnel
+                          : 'hover:bg-slate-50 transition-colors'
+                  }
+                >
+                  <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-slate-700">
+                    {row.date.toLocaleDateString('fr-FR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric'
+                    })}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm">
+                    <span
+                      className={
+                        row.isSunday
+                          ? 'text-red-600 font-bold'
+                          : row.isWeekend
+                            ? 'text-amber-700 font-bold'
+                            : 'text-slate-600 font-medium'
+                      }
+                    >
+                      {row.dayName}
+                    </span>
+                    {row.isRealized && (
+                      <span className="ml-1.5 text-[10px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-1 inline-flex">
+                        <Lock className="w-3 h-3" />
+                        Réalisée
+                      </span>
+                    )}
+                    {row.isSunday && (
+                      <span className="ml-1.5 text-[10px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded uppercase tracking-wider">Repos</span>
+                    )}
+                    {row.isWeekend && !row.isSunday && !row.isRealized && (
+                      <span className="ml-1.5 text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded uppercase tracking-wider">Samedi</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-center">
+                    <div className="flex justify-center">
+                      <div className={`
+                        px-3 py-1 rounded-lg text-sm font-bold shadow-sm border
                         ${row.isSunday
-                          ? 'bg-gray-100 text-gray-400 border-gray-200'
-                          : 'bg-blue-50 text-blue-900 border-blue-300 font-medium'
+                          ? 'bg-slate-100 text-slate-400 border-slate-200'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-100'
                         }
+                      `}>
+                        {row.isSunday ? '0' : row.heures.toFixed(1)}h
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <input
+                      type="time"
+                      value={row.heure_debut}
+                      onChange={(e) => handleHeureDebutChange(row.dateString, e.target.value)}
+                      disabled={readonly || row.isSunday || row.isRealized}
+                      className={`
+                        w-24 px-3 py-1.5 text-sm border rounded-xl transition-all
+                        ${row.isSunday || row.isRealized
+                          ? 'bg-slate-100 cursor-not-allowed text-slate-400 border-slate-200'
+                          : 'border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
+                        }
+                        ${readonly ? 'bg-slate-50 cursor-not-allowed' : ''}
                       `}
                     />
-                  </div>
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap">
-                  <input
-                    type="time"
-                    value={row.heure_debut}
-                    onChange={(e) => handleHeureDebutChange(row.dateString, e.target.value)}
-                    disabled={readonly || row.isSunday}
-                    className={`
-                      w-24 px-2 py-1 text-sm border rounded
-                      ${row.isSunday
-                        ? 'bg-gray-100 cursor-not-allowed text-gray-400'
-                        : 'border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
-                      }
-                      ${readonly ? 'bg-gray-50 cursor-not-allowed' : ''}
-                    `}
-                  />
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap">
-                  <input
-                    type="time"
-                    value={row.heure_fin}
-                    onChange={(e) => handleHeureFinChange(row.dateString, e.target.value)}
-                    disabled={readonly || row.isSunday}
-                    className={`
-                      w-24 px-2 py-1 text-sm border rounded
-                      ${row.isSunday
-                        ? 'bg-gray-100 cursor-not-allowed text-gray-400'
-                        : 'border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
-                      }
-                      ${readonly ? 'bg-gray-50 cursor-not-allowed' : ''}
-                    `}
-                  />
-                </td>
-                <td className="px-3 py-2">
-                  <input
-                    type="text"
-                    value={row.commentaire}
-                    onChange={(e) => handleCommentaireChange(row.dateString, e.target.value)}
-                    disabled={readonly || row.isSunday}
-                    placeholder={row.isSunday ? '' : 'Optionnel'}
-                    className={`
-                      w-full px-2 py-1 text-sm border rounded
-                      ${row.isSunday
-                        ? 'bg-gray-100 cursor-not-allowed text-gray-400'
-                        : 'border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
-                      }
-                      ${readonly ? 'bg-gray-50 cursor-not-allowed' : ''}
-                    `}
-                  />
-                </td>
-              </tr>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <input
+                      type="time"
+                      value={row.heure_fin}
+                      onChange={(e) => handleHeureFinChange(row.dateString, e.target.value)}
+                      disabled={readonly || row.isSunday || row.isRealized}
+                      className={`
+                        w-24 px-3 py-1.5 text-sm border rounded-xl transition-all
+                        ${row.isSunday || row.isRealized
+                          ? 'bg-slate-100 cursor-not-allowed text-slate-400 border-slate-200'
+                          : 'border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
+                        }
+                        ${readonly ? 'bg-slate-50 cursor-not-allowed' : ''}
+                      `}
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <input
+                      type="text"
+                      value={row.commentaire}
+                      onChange={(e) => handleCommentaireChange(row.dateString, e.target.value)}
+                      disabled={readonly || row.isSunday || row.isRealized}
+                      placeholder={row.isSunday || row.isRealized ? '' : 'Détails...'}
+                      className={`
+                        w-full px-3 py-1.5 text-sm border rounded-xl transition-all
+                        ${row.isSunday || row.isRealized
+                          ? 'bg-slate-100 cursor-not-allowed text-slate-400 border-slate-200'
+                          : 'border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
+                        }
+                        ${readonly ? 'bg-slate-50 cursor-not-allowed' : ''}
+                      `}
+                    />
+                  </td>
+                </tr>
               ))}
             </tbody>
           </table>
@@ -383,13 +397,16 @@ export function DistributionChargeEditor({
 
       {/* Résumé */}
       {dayRows.length > 0 && (
-        <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-md">
-          <div className="text-xs text-gray-600">
-            {dayRows.length} jour{dayRows.length > 1 ? 's' : ''} sélectionné{dayRows.length > 1 ? 's' : ''}
-            {' '}sur {periodeDays} dans la période
+        <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-2xl shadow-sm">
+          <div className="text-xs font-bold text-slate-500 flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            <span>
+              {dayRows.length} jour{dayRows.length > 1 ? 's' : ''} sélectionné{dayRows.length > 1 ? 's' : ''}
+              {' '}sur {periodeDays} dans la période
+            </span>
           </div>
-          <div className="text-sm font-bold text-gray-900">
-            Total: {totalHeures.toFixed(2)} heures
+          <div className="text-sm font-black text-slate-900 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100">
+            Total: <span className="text-emerald-600">{totalHeures.toFixed(2)} heures</span>
           </div>
         </div>
       )}
@@ -402,6 +419,7 @@ export function DistributionChargeEditor({
           onConfirm={handleDaysSelected}
           onCancel={() => setShowSelectDaysModal(false)}
           initialSelection={distributions.map(d => d.date)}
+          protectedDates={dayRows.filter(row => row.isRealized).map(row => row.dateString)}
         />
       )}
     </div>

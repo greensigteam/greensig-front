@@ -305,6 +305,29 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
             .finally(() => setLoadingRatios(false));
     }, []);
 
+    // ✅ NOUVEAU: Auto-update task dates when distributions change
+    // If distributions extend beyond the current date range, expand the range
+    useEffect(() => {
+        if (distributionsCharge.length > 0 && formData.date_debut_planifiee && formData.date_fin_planifiee) {
+            const dates = distributionsCharge.map(d => d.date).filter(Boolean).sort();
+            if (dates.length === 0) return;
+
+            const minDate = dates[0]!;
+            const maxDate = dates[dates.length - 1]!;
+
+            // Update form dates if distributions extend beyond current range
+            const needsUpdate = minDate < formData.date_debut_planifiee || maxDate > formData.date_fin_planifiee;
+
+            if (needsUpdate) {
+                setFormData(prev => ({
+                    ...prev,
+                    date_debut_planifiee: minDate < prev.date_debut_planifiee ? minDate : prev.date_debut_planifiee,
+                    date_fin_planifiee: maxDate > prev.date_fin_planifiee ? maxDate : prev.date_fin_planifiee
+                }));
+            }
+        }
+    }, [distributionsCharge, formData.date_debut_planifiee, formData.date_fin_planifiee]);
+
     // Filter task types based on selected objects
     useEffect(() => {
         // If no objects selected, show all task types
@@ -542,7 +565,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
             submitDisabled={!!incompatibleObjectsError || filteredTypesTaches.length === 0}
         >
             <div className="space-y-4">
-                
+
 
                 {/* Validation Warnings */}
                 {validationWarnings.length > 0 && (

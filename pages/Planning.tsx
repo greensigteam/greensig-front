@@ -1583,36 +1583,27 @@ const Planning: FC = () => {
                     <div className="flex items-center gap-6 text-xs">
                         <span className="font-medium text-gray-600">Légende:</span>
 
-                        {/* Distribution de charge */}
+                        {/* Tâche planifiée */}
                         <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded border-l-4 border-blue-500 bg-gradient-to-r from-blue-50 to-transparent">
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded border-l-4 border-gray-400 bg-gradient-to-r from-gray-50 to-transparent">
+                                <CalendarIcon className="w-3 h-3 text-gray-500" />
+                                <span className="text-gray-700">Tâche planifiée</span>
+                            </div>
+                        </div>
+
+                        {/* Distribution (Dashed) */}
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded border-l-4 border-gray-400 border-dashed bg-white">
                                 <Clock className="w-3 h-3 text-blue-600" />
-                                <span className="text-gray-700">Distribution</span>
+                                <span className="text-gray-700">Distribution planifiée</span>
                             </div>
                         </div>
 
-                        {/* Tâche simple */}
+                        {/* Réalisée / Terminée */}
                         <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded border-l-4 border-gray-400 bg-gradient-to-r from-gray-50 to-transparent">
-                                <CalendarIcon className="w-3 h-3 text-gray-500" />
-                                <span className="text-gray-700">Tâche simple</span>
-                            </div>
-                        </div>
-
-                        {/* Tâche avec distributions multiples */}
-                        <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded border-l-4 border-gray-400 bg-gradient-to-r from-gray-50 to-transparent">
-                                <CalendarIcon className="w-3 h-3 text-gray-500" />
-                                <span className="text-gray-700">Tâche</span>
-                                <span className="text-[9px] px-1.5 py-0.5 bg-blue-500 text-white rounded-full font-semibold">3j</span>
-                            </div>
-                        </div>
-
-                        {/* Distribution réalisée */}
-                        <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded border-l-4 border-green-500 bg-green-50">
-                                <CheckCircle2 className="w-3 h-3 text-green-600" />
-                                <span className="text-gray-700">Réalisée</span>
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded border-l-4 border-emerald-500 bg-emerald-50">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span className="text-gray-700">Terminée / Réalisée</span>
                             </div>
                         </div>
                     </div>
