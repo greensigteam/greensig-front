@@ -14,7 +14,6 @@ export type StatutTache = 'PLANIFIEE' | 'NON_DEBUTEE' | 'EN_COURS' | 'TERMINEE' 
 
 export type EtatValidation = 'EN_ATTENTE' | 'VALIDEE' | 'REJETEE';
 
-export type FrequenceRecurrence = 'daily' | 'weekly' | 'monthly';
 
 export type RoleParticipation = 'CHEF' | 'MEMBRE';
 
@@ -123,14 +122,6 @@ export interface ParticipationTache {
     operateur_nom: string;
 }
 
-export interface RecurrenceParams {
-    frequence: FrequenceRecurrence;
-    interval: number;
-    jours?: string[]; // ["MO", "WE"]
-    date_debut?: string;
-    date_fin?: string; // YYYY-MM-DD
-    nombre_occurrences?: number;
-}
 
 // ============================================================================
 // DISTRIBUTION DE CHARGE (Multi-Day Tasks)
@@ -157,7 +148,8 @@ export interface DistributionCharge {
     heure_debut?: string | null;  // "HH:MM:SS" (ISO time format)
     heure_fin?: string | null;     // "HH:MM:SS"
     commentaire: string;
-    status: StatusDistribution;  // ✅ NOUVEAU: Statut de la distribution
+    status: StatusDistribution;
+    reference?: string; // ✅ NOUVEAU: Référence persistante
     created_at: string;
     updated_at: string;
 }
@@ -213,8 +205,6 @@ export interface Tache {
     validee_par: number | null;
     commentaire_validation: string;
 
-    parametres_recurrence: RecurrenceParams | null;
-    id_recurrence_parent: number | null;
 
     notifiee: boolean;
     confirmee: boolean;
@@ -226,6 +216,7 @@ export interface Tache {
     distributions_charge?: DistributionCharge[];
     charge_totale_distributions?: number;
     nombre_jours_travail?: number;
+    reference?: string;
 }
 
 export interface TacheCreate {
@@ -240,7 +231,6 @@ export interface TacheCreate {
     priorite?: PrioriteTache;
     commentaires?: string;
 
-    parametres_recurrence?: RecurrenceParams | null;
 
     // Pour l'inventaire (ManyToMany IDs)
     objets?: number[];
@@ -263,7 +253,6 @@ export interface TacheUpdate {
     priorite?: PrioriteTache;
     statut?: StatutTache;
     commentaires?: string;
-    parametres_recurrence?: RecurrenceParams | null;
     objets?: number[];
     // Surcharge manuelle de la charge estimée
     charge_estimee_heures?: number | null;

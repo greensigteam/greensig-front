@@ -5,7 +5,6 @@ import {
     TypeTache, ParticipationCreate, ParticipationTache,
     RatioProductivite, RatioProductiviteCreate
 } from '../types/planning';
-import { localInputToUTC } from '../utils/dateHelpers';
 
 const BASE_URL = '/api/planification';
 
@@ -336,46 +335,6 @@ export const planningService = {
             method: 'DELETE'
         });
         if (!response.ok) throw new Error('Erreur suppression ratio');
-    },
-
-    // --- CALCUL RECURRENCE INTELLIGENTE (PHASE 2.2) ---
-
-    /**
-     * ✅ PHASE 2.2: Calcule le nombre d'occurrences recommandé basé sur les horaires réels de l'équipe.
-     *
-     * @param params - Paramètres du calcul (equipe_id, charge_totale_heures, date_debut, frequence)
-     * @returns Recommandation de récurrence avec détails des horaires
-     */
-    async calculateRecurrenceRecommendee(params: {
-        equipe_id: number;
-        charge_totale_heures: number;
-        date_debut: string;
-        frequence?: 'daily' | 'weekly' | 'monthly';
-    }): Promise<{
-        nombre_occurrences: number;
-        heures_par_jour_moyen: number;
-        charge_totale_heures: number;
-        charge_par_occurrence: number;
-        detail_horaires: Array<{
-            date: string;
-            jour: string;
-            heures_travaillables: number;
-        }>;
-        frequence: string;
-        message: string;
-    }> {
-        const response = await apiFetch(`${BASE_URL}/taches/calculer_recurrence_recommandee/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(params)
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Erreur lors du calcul de la récurrence');
-        }
-
-        return response.json();
     },
 
     // --- DISTRIBUTION DE CHARGE ---

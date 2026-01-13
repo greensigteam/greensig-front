@@ -22,7 +22,7 @@ import { TypeTache, TacheCreate, PRIORITE_LABELS, Tache, STATUT_TACHE_COLORS } f
 import { EquipeList, Utilisateur } from '../types/users';
 import { PhotoUpload } from '../components/shared/PhotoUpload';
 import TaskFormModal from '../components/planning/TaskFormModal';
-import { utcToLocalInput, localInputToUTC } from '../utils/dateHelpers';
+import { utcToLocalInput } from '../utils/dateHelpers';
 import { format } from 'date-fns';
 import LoadingScreen from '../components/LoadingScreen';
 import { PremiumInput, PremiumSelect, PremiumTextarea } from '../components/modals/PremiumFormComponents';
@@ -505,9 +505,8 @@ const Reclamations: React.FC = () => {
             const payload: TacheCreate = {
                 ...data,
                 reclamation: reclamationTargetForTask?.id,
-                // Conversion Dates ISO
-                date_debut_planifiee: localInputToUTC(data.date_debut_planifiee) || data.date_debut_planifiee,
-                date_fin_planifiee: localInputToUTC(data.date_fin_planifiee) || data.date_fin_planifiee,
+                date_debut_planifiee: data.date_debut_planifiee,
+                date_fin_planifiee: data.date_fin_planifiee,
             };
 
             await planningService.createTache(payload);
@@ -1351,18 +1350,17 @@ const Reclamations: React.FC = () => {
                                 />
 
                                 <PremiumInput
-                                    type="datetime-local"
-                                    value={utcToLocalInput(formData.date_constatation)}
+                                    type="date"
+                                    value={formData.date_constatation || ''}
                                     onChange={(value) => {
-                                        const utcValue = localInputToUTC(value);
                                         setFormData({
                                             ...formData,
-                                            date_constatation: utcValue || undefined
+                                            date_constatation: value || undefined
                                         });
                                     }}
                                     label="Date de constatation"
                                     icon={<Calendar className="w-4 h-4" />}
-                                    hint="Date et heure où le problème a été constaté"
+                                    hint="Date où le problème a été constaté"
                                     required
                                     variant="outlined"
                                     size="md"

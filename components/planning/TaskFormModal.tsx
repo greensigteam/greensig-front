@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, type FC, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { addDays, addWeeks, addMonths, format } from 'date-fns';
+import { format } from 'date-fns';
 import {
     Clock, X, Search, ChevronDown, Timer, RefreshCw, Gauge, ExternalLink, Calculator, TreePine, AlertTriangle, MapPin, Ban, MessageSquare, ClipboardList, Users
 } from 'lucide-react';
@@ -26,7 +26,6 @@ import {
 } from '../../types/planning';
 import { EquipeList } from '../../types/users';
 import FormModal from '../FormModal';
-import { RecurrenceSelector, type RecurrenceParams } from './RecurrenceSelector';
 import { PremiumInput, PremiumSelect, PremiumTextarea, PremiumSearchableSelect, PremiumMultiSelect } from '../modals/PremiumFormComponents';
 import { DistributionChargeEditor } from './DistributionChargeEditor';
 
@@ -95,7 +94,6 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         date_fin_planifiee: tache?.date_fin_planifiee ? formatDateLocal(new Date(tache.date_fin_planifiee)) : (initialValues?.date_fin_planifiee || getDefaultEndDate()),
         priorite: tache?.priorite || initialValues?.priorite || 3,
         commentaires: tache?.commentaires || initialValues?.commentaires || '',
-        parametres_recurrence: tache?.parametres_recurrence || null,
         reclamation: tache?.reclamation || initialValues?.reclamation || null,
         objets: tache?.objets_detail?.map(o => o.id) || initialValues?.objets || preSelectedObjects?.map(o => o.id) || [],
         charge_estimee_heures: tache?.charge_estimee_heures || null
@@ -103,6 +101,23 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
 
     const [chargeManuelle, setChargeManuelle] = useState(tache?.charge_manuelle || false);
     const [isResettingCharge, setIsResettingCharge] = useState(false);
+
+    // ✅ Heures pour tâches d'un seul jour
+    const [startTime, setStartTime] = useState<string>(() => {
+        // Si la tâche existe et a une distribution, utiliser ses heures
+        if (tache?.distributions_charge && tache.distributions_charge.length > 0) {
+            const firstDist = tache.distributions_charge[0];
+            return firstDist.heure_debut ? firstDist.heure_debut.substring(0, 5) : '08:00';
+        }
+        return '08:00';
+    });
+    const [endTime, setEndTime] = useState<string>(() => {
+        if (tache?.distributions_charge && tache.distributions_charge.length > 0) {
+            const firstDist = tache.distributions_charge[0];
+            return firstDist.heure_fin ? firstDist.heure_fin.substring(0, 5) : '17:00';
+        }
+        return '17:00';
+    });
 
     // ✅ NOUVEAU: Distributions de charge pour tâches multi-jours
     const [distributionsCharge, setDistributionsCharge] = useState<DistributionChargeData[]>(
@@ -412,48 +427,6 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         return filtered;
     }, [availableObjects, objectSearchQuery, lockedSite]);
 
-    // Auto-calculate end date based on occurrences
-    useEffect(() => {
-        const p = formData.parametres_recurrence;
-        if (!p || !p.nombre_occurrences || !p.frequence || !formData.date_debut_planifiee) return;
-
-        try {
-            const start = new Date(formData.date_debut_planifiee);
-            if (isNaN(start.getTime())) return;
-
-            const interval = p.interval || 1;
-            const count = p.nombre_occurrences;
-            let endDate = new Date(start);
-
-            if (p.frequence === 'daily') {
-                endDate = addDays(start, (count - 1) * interval);
-            } else if (p.frequence === 'weekly') {
-                endDate = addWeeks(start, (count - 1) * interval);
-            } else if (p.frequence === 'monthly') {
-                endDate = addMonths(start, (count - 1) * interval);
-            }
-
-            const formattedDate = formatDateLocal(endDate);
-
-            if (p.date_fin !== formattedDate) {
-                setFormData(prev => ({
-                    ...prev,
-                    parametres_recurrence: {
-                        ...prev.parametres_recurrence!,
-                        date_fin: formattedDate
-                    }
-                }));
-            }
-        } catch (e) {
-            console.error("Error calculating recurrence end date", e);
-        }
-    }, [
-        formData.parametres_recurrence?.nombre_occurrences,
-        formData.parametres_recurrence?.frequence,
-        formData.parametres_recurrence?.interval,
-        formData.date_debut_planifiee
-    ]);
-
     // ❌ SUPPRIMÉ: Limitation "même jour calendaire" (RÈGLE D'OR)
     // Les tâches peuvent maintenant s'étendre sur plusieurs jours via distributions_charge
     // La date de fin n'est plus automatiquement limitée à 17:00 du jour de début
@@ -508,7 +481,6 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                 date_fin_planifiee: formatDateLocal(new Date(tache.date_fin_planifiee)),
                 priorite: tache.priorite,
                 commentaires: tache.commentaires || '',
-                parametres_recurrence: tache.parametres_recurrence || null,
                 charge_estimee_heures: tache.charge_estimee_heures,
                 reclamation: tache.reclamation || null,
                 objets: newSelectedObjects.map(o => o.id) // Ensure sync immediately
@@ -531,11 +503,23 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         // Les tâches multi-jours sont maintenant gérées nativement via distributions_charge
 
         // Préparer les données pour soumission
+        let distributionsToSend = distributionsCharge;
+
+        // ✅ Si c'est une tâche d'un seul jour et pas de distributions multi-jours, créer une distribution avec les heures
+        if (formData.date_debut_planifiee === formData.date_fin_planifiee && distributionsCharge.length === 0) {
+            distributionsToSend = [{
+                date: formData.date_debut_planifiee,
+                heure_debut: startTime,
+                heure_fin: endTime,
+                commentaire: ''
+            }];
+        }
+
         const payload = {
             ...formData,
-            // ✅ Distributions de charge pour tâches multi-jours
-            ...(distributionsCharge.length > 0 && {
-                distributions_charge_data: distributionsCharge
+            // ✅ Distributions de charge (multi-jours ou jour unique avec heures)
+            ...(distributionsToSend.length > 0 && {
+                distributions_charge_data: distributionsToSend
             })
         };
 
@@ -558,6 +542,8 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
             submitDisabled={!!incompatibleObjectsError || filteredTypesTaches.length === 0}
         >
             <div className="space-y-4">
+                
+
                 {/* Validation Warnings */}
                 {validationWarnings.length > 0 && (
                     <div className="bg-orange-50 border-l-4 border-orange-500 p-4 mb-4">
@@ -672,7 +658,6 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                             required
                             variant="outlined"
                             size="md"
-                            disabled={!!formData.parametres_recurrence}
                         />
                         <PremiumInput
                             type="date"
@@ -683,24 +668,78 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                             required
                             variant="outlined"
                             size="md"
-                            disabled={!!formData.parametres_recurrence}
                         />
                     </div>
-                    {formData.parametres_recurrence && (
-                        <p className="text-xs text-slate-500 italic flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3" />
-                            Les dates sont verrouillées car la récurrence est activée. Désactivez-la pour modifier les dates.
-                        </p>
-                    )}
                 </div>
+
+                {/* ✅ NOUVEAU: Champs d'heures pour tâches d'un seul jour */}
+                {(() => {
+                    if (!formData.date_debut_planifiee || !formData.date_fin_planifiee) return null;
+
+                    const startDate = new Date(formData.date_debut_planifiee);
+                    const endDate = new Date(formData.date_fin_planifiee);
+                    const startDay = format(startDate, 'yyyy-MM-dd');
+                    const endDay = format(endDate, 'yyyy-MM-dd');
+
+                    // Afficher les champs d'heures seulement pour les tâches d'un seul jour
+                    if (startDay !== endDay) return null;
+
+                    return (
+                        <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                            <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                <Clock className="w-4 h-4 text-emerald-600" />
+                                Horaires de la journée
+                            </h4>
+                            <div className="grid grid-cols-2 gap-4">
+                                <PremiumInput
+                                    type="time"
+                                    value={startTime}
+                                    onChange={setStartTime}
+                                    label="Heure de début"
+                                    icon={<Clock className="w-4 h-4" />}
+                                    variant="outlined"
+                                    size="md"
+                                />
+                                <PremiumInput
+                                    type="time"
+                                    value={endTime}
+                                    onChange={setEndTime}
+                                    label="Heure de fin"
+                                    icon={<Clock className="w-4 h-4" />}
+                                    variant="outlined"
+                                    size="md"
+                                />
+                            </div>
+                            {(() => {
+                                const [startHour, startMin] = startTime.split(':').map(Number);
+                                const [endHour, endMin] = endTime.split(':').map(Number);
+                                const startMinutes = startHour * 60 + startMin;
+                                const endMinutes = endHour * 60 + endMin;
+                                const duration = (endMinutes - startMinutes) / 60;
+
+                                if (duration <= 0) {
+                                    return (
+                                        <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
+                                            <AlertTriangle className="w-3 h-3" />
+                                            L'heure de fin doit être après l'heure de début
+                                        </p>
+                                    );
+                                }
+
+                                return (
+                                    <p className="text-xs text-slate-500 mt-2">
+                                        Durée: <strong>{duration.toFixed(2)}h</strong>
+                                    </p>
+                                );
+                            })()}
+                        </div>
+                    );
+                })()}
 
                 {/* ✅ NOUVEAU: Éditeur de distribution de charge pour tâches multi-jours */}
                 {(() => {
                     // Vérifier si la tâche s'étend sur plusieurs jours
                     if (!formData.date_debut_planifiee || !formData.date_fin_planifiee) return null;
-
-                    // ⚠️ Incompatibilité: Ne pas afficher si récurrence activée
-                    if (formData.parametres_recurrence) return null;
 
                     const startDate = new Date(formData.date_debut_planifiee);
                     const endDate = new Date(formData.date_fin_planifiee);
@@ -1049,15 +1088,6 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                 {/* ❌ SUPPRIMÉ: Banner auto-récurrence */}
                 {/* La planification multi-jours est maintenant gérée via l'éditeur de distribution */}
 
-                {/* Récurrence (Google Calendar style) */}
-                <div className="border-t pt-4">
-                    <label className="block text-sm font-semibold text-slate-800 mb-3">Récurrence</label>
-                    <RecurrenceSelector
-                        value={formData.parametres_recurrence as RecurrenceParams | null}
-                        onChange={(params) => setFormData({ ...formData, parametres_recurrence: params })}
-                        startDate={formData.date_debut_planifiee || new Date().toISOString()}
-                    />
-                </div>
             </div>
         </FormModal>
     );

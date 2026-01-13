@@ -5,7 +5,7 @@ import { GeoJSONGeometry } from '../../types';
 import { createReclamation, uploadPhoto, detectSiteFromGeometry, DetectedSiteInfo } from '../../services/reclamationsApi';
 import { PhotoUpload } from '../shared/PhotoUpload';
 import { FormModal } from '../FormModal';
-import { utcToLocalInput, localInputToUTC } from '../../utils/dateHelpers';
+import { utcToLocalInput } from '../../utils/dateHelpers';
 import { PremiumInput, PremiumSelect, PremiumTextarea } from '../modals/PremiumFormComponents';
 
 interface ReclamationFormModalProps {
@@ -322,18 +322,17 @@ export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
 
                 {/* Date de constatation */}
                 <PremiumInput
-                    type="datetime-local"
-                    value={utcToLocalInput(formData.date_constatation)}
+                    type="date"
+                    value={formData.date_constatation || ''}
                     onChange={(value) => {
-                        const utcValue = localInputToUTC(value);
                         setFormData({
                             ...formData,
-                            date_constatation: utcValue || undefined
+                            date_constatation: value || undefined
                         });
                     }}
                     label="Date de constatation"
                     icon={<Calendar className="w-4 h-4" />}
-                    hint="Date et heure où le problème a été constaté"
+                    hint="Date où le problème a été constaté"
                     required
                     variant="outlined"
                     size="md"

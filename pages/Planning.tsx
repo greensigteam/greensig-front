@@ -114,12 +114,24 @@ const TaskEvent = memo(function TaskEvent({ event }: { event: CalendarEvent, tit
     const isDistributionRealisee = event.distributionStatus === 'REALISEE';
     const isUrgent = tache.priorite === 5;
 
+    // ✅ NOUVEAU: Distinguer tâche simple vs distribution
+    const hasDistributions = tache.distributions_charge && tache.distributions_charge.length > 0;
+    const isDistribution = event.distributionId !== undefined;
+    const distributionCount = tache.distributions_charge?.length || 0;
+
     return (
         <div
             className={`
                 task-event-root group flex items-start gap-2 p-1.5 rounded-lg transition-all duration-200
-                ${isCompleted ? 'opacity-60' : 'hover:bg-gray-100'}
-                ${isDistributionRealisee ? 'bg-green-50 border-2 border-green-500 shadow-sm' : ''}
+                border-l-4 relative
+                ${isCompleted ? 'opacity-60' : 'hover:bg-gray-50'}
+                ${isDistributionRealisee ? 'bg-green-50 border-green-500 shadow-sm' : ''}
+                ${isDistribution && !isDistributionRealisee
+                    ? 'border-gray-400 border-dashed bg-white'
+                    : !isDistribution
+                        ? 'border-gray-400 bg-gradient-to-r from-gray-50 to-transparent'
+                        : ''
+                }
                 ${tache.charge_estimee_heures ? 'min-h-[28px]' : ''}
             `}
             style={{ pointerEvents: 'all' }}
@@ -138,16 +150,32 @@ const TaskEvent = memo(function TaskEvent({ event }: { event: CalendarEvent, tit
             </div>
 
             {/* Contenu Texte */}
-            <div className="task-event-content flex flex-col leading-tight min-w-0">
-                <span
-                    className={`
-                        text-xs font-medium truncate
-                        ${isCompleted ? 'line-through text-gray-500' : 'text-gray-700'}
-                        ${isUrgent && !isCompleted ? 'text-red-700 font-semibold' : ''}
-                    `}
-                >
-                    {tache.type_tache_detail.nom_tache}
-                </span>
+            <div className="task-event-content flex flex-col leading-tight min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                    {/* ✅ NOUVEAU: Icône distinctive */}
+                    {isDistribution ? (
+                        <Clock className="w-3 h-3 text-blue-600 shrink-0" />
+                    ) : (
+                        <CalendarIcon className="w-3 h-3 text-gray-500 shrink-0" />
+                    )}
+
+                    <span
+                        className={`
+                            text-xs font-medium truncate
+                            ${isCompleted ? 'line-through text-gray-500' : 'text-gray-700'}
+                            ${isUrgent && !isCompleted ? 'text-red-700 font-semibold' : ''}
+                        `}
+                    >
+                        {tache.type_tache_detail.nom_tache}
+                    </span>
+
+                    {/* ✅ NOUVEAU: Badge de comptage pour les tâches avec plusieurs distributions */}
+                    {hasDistributions && !isDistribution && distributionCount > 1 && (
+                        <span className="shrink-0 text-[9px] px-1.5 py-0.5 bg-blue-500 text-white rounded-full font-semibold">
+                            {distributionCount}j
+                        </span>
+                    )}
+                </div>
 
                 {/* Métadonnées (Heure si pas all-day, ou équipe) */}
                 {!isCompleted && (
@@ -187,6 +215,10 @@ interface PopoverProps {
 const TaskDetailPopover: FC<PopoverProps> = ({ tache, eventStart, eventEnd, distributionStatus, distributionId, onClose, onEdit, onDelete, onToggleDistribution, isReadOnly }) => {
     // Si on a une distribution, on utilise son statut, sinon on utilise le statut de la tâche
     const isCompleted = distributionStatus ? distributionStatus === 'REALISEE' : tache.statut === 'TERMINEE';
+    // Vérifier si la tâche a au moins une équipe
+    const hasEquipe = (tache.equipes_detail && tache.equipes_detail.length > 0) || tache.equipe_detail;
+    // Désactiver le toggle si la tâche est terminée ou si pas d'équipe
+    const isDistributionDisabled = isReadOnly || tache.statut === 'TERMINEE' || !hasEquipe;
 
     // Handle escape key and click outside
     useEffect(() => {
@@ -237,19 +269,27 @@ const TaskDetailPopover: FC<PopoverProps> = ({ tache, eventStart, eventEnd, dist
                     {/* Hero Content */}
                     <div className="px-6 py-5">
                         <div className="flex items-start gap-4">
-                            {/* Big Checkbox - disabled for CLIENT (readOnly) */}
+                            {/* Big Checkbox - disabled for CLIENT (readOnly), TERMINEE tasks, or tasks without team */}
                             {onToggleDistribution && (
                                 <button
-                                    onClick={isReadOnly ? undefined : onToggleDistribution}
-                                    disabled={isReadOnly}
-                                    title={distributionStatus === 'REALISEE' ? 'Marquer cette journée comme non réalisée' : 'Marquer cette journée comme réalisée'}
+                                    onClick={isDistributionDisabled ? undefined : onToggleDistribution}
+                                    disabled={isDistributionDisabled}
+                                    title={
+                                        !hasEquipe
+                                            ? 'Veuillez assigner une équipe avant de modifier les distributions'
+                                            : tache.statut === 'TERMINEE'
+                                                ? 'Les distributions ne peuvent pas être modifiées pour une tâche terminée'
+                                                : distributionStatus === 'REALISEE'
+                                                    ? 'Marquer cette journée comme non réalisée'
+                                                    : 'Marquer cette journée comme réalisée'
+                                    }
                                     className={`
                                 mt-1 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300
                                 ${isCompleted
                                             ? 'bg-emerald-600 border-emerald-600 text-white animate-check'
                                             : 'bg-white border-gray-400 hover:border-emerald-500 hover:bg-emerald-50'
                                         }
-                                ${isReadOnly ? 'cursor-not-allowed opacity-60' : ''}
+                                ${isDistributionDisabled ? 'cursor-not-allowed opacity-60' : ''}
                             `}
                                 >
                                     {isCompleted && <CheckCircle2 className="w-4 h-4" />}
@@ -259,6 +299,11 @@ const TaskDetailPopover: FC<PopoverProps> = ({ tache, eventStart, eventEnd, dist
                             <div className="flex-1">
                                 <h3 className={`text-lg font-medium leading-snug ${isCompleted ? 'line-through text-gray-500' : 'text-gray-900'}`}>
                                     {tache.type_tache_detail.nom_tache}
+                                    {tache.reference && (
+                                        <span className="ml-2 text-xs font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded align-middle">
+                                            {tache.reference}
+                                        </span>
+                                    )}
                                 </h3>
                                 <div className="mt-2 flex flex-col gap-1 text-sm text-gray-600">
                                     <div className="flex items-center gap-2">
@@ -275,7 +320,7 @@ const TaskDetailPopover: FC<PopoverProps> = ({ tache, eventStart, eventEnd, dist
                                             }
                                         </span>
                                     </div>
-                                    {(tache.equipes_detail?.length > 0 || tache.equipe_detail) && (
+                                    {(tache.equipes_detail?.length > 0 || tache.equipe_detail) ? (
                                         <div className="flex items-center gap-2">
                                             <Users className="w-4 h-4 text-gray-400" />
                                             <span>
@@ -283,6 +328,11 @@ const TaskDetailPopover: FC<PopoverProps> = ({ tache, eventStart, eventEnd, dist
                                                     ? tache.equipes_detail.map(e => (e as any).nom_equipe || e.nomEquipe).join(', ')
                                                     : (tache.equipe_detail as any)?.nom_equipe || tache.equipe_detail?.nomEquipe}
                                             </span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2 text-orange-600 bg-orange-50 px-3 py-2 rounded-lg">
+                                            <AlertTriangle className="w-4 h-4" />
+                                            <span className="text-sm font-medium">Assigner une équipe à cette tâche</span>
                                         </div>
                                     )}
                                 </div>
@@ -1108,7 +1158,6 @@ const Planning: FC = () => {
                 date_fin_planifiee: data.date_fin_planifiee,
                 priorite: data.priorite,
                 commentaires: data.commentaires,
-                parametres_recurrence: data.parametres_recurrence,
                 objets: data.objets,
                 charge_estimee_heures: data.charge_estimee_heures,
                 distributions_charge_data: data.distributions_charge_data
@@ -1528,6 +1577,48 @@ const Planning: FC = () => {
                 </div>
             </div>
 
+            {/* ✅ NOUVEAU: Légende visuelle */}
+            {viewMode === 'calendar' && (
+                <div className="px-6 py-2 bg-gray-50 border-b border-gray-200">
+                    <div className="flex items-center gap-6 text-xs">
+                        <span className="font-medium text-gray-600">Légende:</span>
+
+                        {/* Distribution de charge */}
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded border-l-4 border-blue-500 bg-gradient-to-r from-blue-50 to-transparent">
+                                <Clock className="w-3 h-3 text-blue-600" />
+                                <span className="text-gray-700">Distribution</span>
+                            </div>
+                        </div>
+
+                        {/* Tâche simple */}
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded border-l-4 border-gray-400 bg-gradient-to-r from-gray-50 to-transparent">
+                                <CalendarIcon className="w-3 h-3 text-gray-500" />
+                                <span className="text-gray-700">Tâche simple</span>
+                            </div>
+                        </div>
+
+                        {/* Tâche avec distributions multiples */}
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded border-l-4 border-gray-400 bg-gradient-to-r from-gray-50 to-transparent">
+                                <CalendarIcon className="w-3 h-3 text-gray-500" />
+                                <span className="text-gray-700">Tâche</span>
+                                <span className="text-[9px] px-1.5 py-0.5 bg-blue-500 text-white rounded-full font-semibold">3j</span>
+                            </div>
+                        </div>
+
+                        {/* Distribution réalisée */}
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded border-l-4 border-green-500 bg-green-50">
+                                <CheckCircle2 className="w-3 h-3 text-green-600" />
+                                <span className="text-gray-700">Réalisée</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Content */}
             <div className="flex-1 overflow-hidden relative">
                 {viewMode === 'calendar' ? (
@@ -1659,7 +1750,12 @@ const Planning: FC = () => {
                                                                 distributionId: distribution?.id
                                                             });
                                                         }}
-                                                        className={`bg-white p-4 rounded-xl border shadow-sm hover:shadow-md hover:border-emerald-200 transition-all cursor-pointer group flex flex-col sm:flex-row gap-4 items-start sm:items-center ${distribution?.status === 'REALISEE' ? 'border-green-500 border-2 bg-green-50' : 'border-gray-200'}`}
+                                                        className={`bg-white p-4 rounded-xl border-l-4 border shadow-sm hover:shadow-md hover:border-emerald-200 transition-all cursor-pointer group flex flex-col sm:flex-row gap-4 items-start sm:items-center ${distribution?.status === 'REALISEE'
+                                                            ? 'border-l-green-500 border-2 bg-green-50'
+                                                            : distribution
+                                                                ? 'border-l-blue-500 border-gray-200 bg-gradient-to-r from-blue-50/30 to-transparent'
+                                                                : 'border-l-gray-400 border-gray-200'
+                                                            }`}
                                                     >
                                                         {/* Time Column */}
                                                         <div className="min-w-[80px] text-sm text-gray-500 font-medium flex flex-col items-start">
@@ -1671,9 +1767,21 @@ const Planning: FC = () => {
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-2 mb-1">
                                                                 <div className={`w-2 h-2 rounded-full ${STATUT_TACHE_COLORS[tache.statut].bg.replace('bg-', 'bg-').replace('100', '500')}`} />
+                                                                {/* ✅ NOUVEAU: Icône distinctive */}
+                                                                {distribution ? (
+                                                                    <Clock className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                                                ) : (
+                                                                    <CalendarIcon className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                                                                )}
                                                                 <h3 className={`font-semibold transition-colors truncate ${tache.statut === 'TERMINEE' ? 'line-through text-gray-500' : 'text-gray-900 group-hover:text-emerald-600'}`}>
                                                                     {tache.type_tache_detail.nom_tache}
                                                                 </h3>
+                                                                {/* ✅ NOUVEAU: Badge de comptage */}
+                                                                {tache.distributions_charge && tache.distributions_charge.length > 1 && !distribution && (
+                                                                    <span className="shrink-0 text-[9px] px-1.5 py-0.5 bg-blue-500 text-white rounded-full font-semibold">
+                                                                        {tache.distributions_charge.length}j
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                             <div className="text-sm text-gray-500 flex items-center gap-3">
                                                                 {hasEquipe ? (

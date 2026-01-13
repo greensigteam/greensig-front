@@ -31,7 +31,7 @@ import { TypeTache, TacheCreate } from '../types/planning';
 import { EquipeList, Utilisateur } from '../types/users';
 import { SatisfactionForm } from '../components/SatisfactionForm';
 import TaskFormModal from '../components/planning/TaskFormModal';
-import { formatLocalDate, localInputToUTC } from '../utils/dateHelpers';
+import { formatLocalDate } from '../utils/dateHelpers';
 import { format } from 'date-fns';
 import LoadingScreen from '../components/LoadingScreen';
 import ConfirmModal from '../components/ConfirmModal';
@@ -268,8 +268,8 @@ const ReclamationDetailPage: React.FC = () => {
             const payload: TacheCreate = {
                 ...data,
                 reclamation: reclamation.id,
-                date_debut_planifiee: localInputToUTC(data.date_debut_planifiee) || data.date_debut_planifiee,
-                date_fin_planifiee: localInputToUTC(data.date_fin_planifiee) || data.date_fin_planifiee,
+                date_debut_planifiee: data.date_debut_planifiee,
+                date_fin_planifiee: data.date_fin_planifiee,
             };
 
             await planningService.createTache(payload);

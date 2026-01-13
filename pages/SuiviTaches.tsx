@@ -480,7 +480,7 @@ const SuiviTaches: React.FC = () => {
 
             if (filters.clientId !== null) {
                 // Filter by structure_client (organization)
-                // Check direct structure_client on task first
+                // Check direct structure_client on task
                 const tacheStructureId = t.structure_client_detail?.id;
                 if (tacheStructureId === filters.clientId) {
                     // Direct match - continue to other filters
@@ -496,7 +496,7 @@ const SuiviTaches: React.FC = () => {
             }
 
             if (filters.siteId !== null) {
-                const hasSite = t.objets_detail?.some(obj => obj.site === filters.siteId);
+                const hasSite = t.objets_detail?.some(obj => Number(obj.site) === filters.siteId);
                 if (!hasSite) return false;
             }
 
@@ -558,7 +558,11 @@ const SuiviTaches: React.FC = () => {
                             <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                             <select
                                 value={filters.clientId ?? ''}
-                                onChange={e => setFilters({ ...filters, clientId: e.target.value ? Number(e.target.value) : null })}
+                                onChange={e => setFilters({
+                                    ...filters,
+                                    clientId: e.target.value ? Number(e.target.value) : null,
+                                    siteId: null // Reset site when org changes
+                                })}
                                 className="appearance-none pl-9 pr-8 py-2 border-2 border-slate-200 rounded-lg text-sm font-medium text-slate-700 bg-white hover:border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]"
                                 disabled={loadingFilters}
                             >
@@ -679,9 +683,16 @@ const SuiviTaches: React.FC = () => {
                                             }`}
                                     >
                                         <div className="flex justify-between items-start mb-2">
-                                            <h3 className="font-semibold text-slate-800">
-                                                {tache.type_tache_detail?.nom_tache || 'Tâche sans nom'}
-                                            </h3>
+                                            <div className="flex flex-col gap-0.5">
+                                                <h3 className="font-semibold text-slate-800">
+                                                    {tache.type_tache_detail?.nom_tache || 'Tâche sans nom'}
+                                                </h3>
+                                                {tache.reference && (
+                                                    <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded w-fit">
+                                                        {tache.reference}
+                                                    </span>
+                                                )}
+                                            </div>
                                             {tache.statut && (
                                                 <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUT_TACHE_COLORS[tache.statut]?.bg} ${STATUT_TACHE_COLORS[tache.statut]?.text}`}>
                                                     {STATUT_TACHE_LABELS[tache.statut]}
@@ -728,15 +739,25 @@ const SuiviTaches: React.FC = () => {
                                     <h2 className="text-lg font-bold text-slate-800 truncate">
                                         {selectedTache.type_tache_detail?.nom_tache}
                                     </h2>
+
                                     <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                        <span className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-600">
-                                            #{selectedTache.id}
+                                        <span
+                                            className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-600"
+                                            title={`Identifiant unique de la tâche`}
+                                        >
+                                            {selectedTache.reference || `#${selectedTache.id}`}
                                         </span>
-                                        <span className={`text-xs px-2 py-0.5 rounded font-medium ${STATUT_TACHE_COLORS[selectedTache.statut]?.bg} ${STATUT_TACHE_COLORS[selectedTache.statut]?.text}`}>
+                                        <span
+                                            className={`text-xs px-2 py-0.5 rounded font-medium ${STATUT_TACHE_COLORS[selectedTache.statut]?.bg} ${STATUT_TACHE_COLORS[selectedTache.statut]?.text}`}
+                                            title={`Statut: ${STATUT_TACHE_LABELS[selectedTache.statut]}`}
+                                        >
                                             {selectedTache.statut}
                                         </span>
                                         {selectedTache.statut === 'TERMINEE' && (
-                                            <span className={`text-xs px-2 py-0.5 rounded font-medium flex items-center gap-1 ${ETAT_VALIDATION_COLORS[selectedTache.etat_validation]?.bg} ${ETAT_VALIDATION_COLORS[selectedTache.etat_validation]?.text}`}>
+                                            <span
+                                                className={`text-xs px-2 py-0.5 rounded font-medium flex items-center gap-1 ${ETAT_VALIDATION_COLORS[selectedTache.etat_validation]?.bg} ${ETAT_VALIDATION_COLORS[selectedTache.etat_validation]?.text}`}
+                                                title={`Validation: ${ETAT_VALIDATION_LABELS[selectedTache.etat_validation]}${selectedTache.date_validation ? ` - ${new Date(selectedTache.date_validation).toLocaleDateString('fr-FR')}` : ''}`}
+                                            >
                                                 <ShieldCheck className="w-3 h-3" />
                                                 {ETAT_VALIDATION_LABELS[selectedTache.etat_validation]}
                                             </span>
@@ -759,30 +780,52 @@ const SuiviTaches: React.FC = () => {
                                                 Modifier
                                             </button>
                                         )}
-                                        {(selectedTache.statut === 'PLANIFIEE' || selectedTache.statut === 'NON_DEBUTEE') && (
-                                            <button
-                                                onClick={() => openConfirmModal('start')}
-                                                disabled={changingStatut}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm disabled:opacity-50"
-                                            >
-                                                {changingStatut ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                                                Démarrer
-                                            </button>
-                                        )}
-                                        {selectedTache.statut === 'EN_COURS' && (
-                                            <button
-                                                onClick={() => openConfirmModal('complete')}
-                                                disabled={changingStatut}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-50"
-                                            >
-                                                {changingStatut ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                                                Terminer
-                                            </button>
-                                        )}
+                                        {(selectedTache.statut === 'PLANIFIEE' || selectedTache.statut === 'NON_DEBUTEE') && (() => {
+                                            const hasEquipe = (selectedTache.equipes_detail && selectedTache.equipes_detail.length > 0) || selectedTache.equipe_detail;
+                                            const nbEquipes = selectedTache.equipes_detail?.length || (selectedTache.equipe_detail ? 1 : 0);
+                                            const nbObjets = selectedTache.objets_detail?.length || 0;
+                                            const nbDistributions = selectedTache.distributions_charge?.length || 0;
+
+                                            const tooltipMessage = !hasEquipe
+                                                ? '❌ Veuillez assigner une équipe avant de démarrer la tâche'
+                                                : `▶ Démarrer la tâche\n${nbEquipes} équipe${nbEquipes > 1 ? 's' : ''} assignée${nbEquipes > 1 ? 's' : ''}${nbObjets > 0 ? ` • ${nbObjets} objet${nbObjets > 1 ? 's' : ''}` : ''}${nbDistributions > 0 ? ` • ${nbDistributions} distribution${nbDistributions > 1 ? 's' : ''}` : ''}`;
+
+                                            return (
+                                                <button
+                                                    onClick={() => openConfirmModal('start')}
+                                                    disabled={changingStatut || !hasEquipe}
+                                                    title={tooltipMessage}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    {changingStatut ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                                                    Démarrer
+                                                </button>
+                                            );
+                                        })()}
+                                        {selectedTache.statut === 'EN_COURS' && (() => {
+                                            const distributionsRealisees = selectedTache.distributions_charge?.filter(d => d.status === 'REALISEE').length || 0;
+                                            const totalDistributions = selectedTache.distributions_charge?.length || 0;
+                                            const tooltipMessage = totalDistributions > 0
+                                                ? `Terminer la tâche (${distributionsRealisees}/${totalDistributions} distribution${totalDistributions > 1 ? 's' : ''} réalisée${totalDistributions > 1 ? 's' : ''})`
+                                                : 'Terminer la tâche';
+
+                                            return (
+                                                <button
+                                                    onClick={() => openConfirmModal('complete')}
+                                                    disabled={changingStatut}
+                                                    title={tooltipMessage}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-50"
+                                                >
+                                                    {changingStatut ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                                                    Terminer
+                                                </button>
+                                            );
+                                        })()}
                                         {isAdmin && selectedTache.statut === 'TERMINEE' && selectedTache.etat_validation === 'EN_ATTENTE' && (
                                             <>
                                                 <button
                                                     onClick={() => openValidationModal('VALIDEE')}
+                                                    title="Valider la tâche terminée (Administrateur)"
                                                     className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm"
                                                 >
                                                     <ThumbsUp className="w-4 h-4" />
@@ -790,6 +833,7 @@ const SuiviTaches: React.FC = () => {
                                                 </button>
                                                 <button
                                                     onClick={() => openValidationModal('REJETEE')}
+                                                    title="Rejeter la tâche terminée (Administrateur)"
                                                     className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
                                                 >
                                                     <ThumbsDown className="w-4 h-4" />
@@ -978,6 +1022,8 @@ const SuiviTaches: React.FC = () => {
                                                         const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
                                                         const isRealisee = dist.status === 'REALISEE';
+                                                        const isTaskTerminee = selectedTache.statut === 'TERMINEE';
+                                                        const hasEquipe = (selectedTache.equipes_detail && selectedTache.equipes_detail.length > 0) || selectedTache.equipe_detail;
 
                                                         return (
                                                             <div
@@ -986,24 +1032,39 @@ const SuiviTaches: React.FC = () => {
                                                                     p-3 rounded-lg border text-sm transition-all
                                                                     ${isRealisee ? 'bg-green-50 border-green-500 border-2' :
                                                                         isSunday
-                                                                        ? 'bg-red-50 border-red-200'
-                                                                        : isWeekend
-                                                                        ? 'bg-blue-50 border-blue-200'
-                                                                        : 'bg-white border-slate-200'
+                                                                            ? 'bg-red-50 border-red-200'
+                                                                            : isWeekend
+                                                                                ? 'bg-blue-50 border-blue-200'
+                                                                                : 'bg-white border-slate-200'
                                                                     }
                                                                 `}
                                                             >
                                                                 <div className="flex items-start justify-between gap-3">
                                                                     {/* Checkbox pour toggle le statut */}
                                                                     <button
-                                                                        onClick={() => handleToggleDistribution(dist.id, dist.status)}
-                                                                        title={isRealisee ? 'Marquer comme non réalisée' : 'Marquer comme réalisée'}
+                                                                        onClick={(isTaskTerminee || !hasEquipe) ? undefined : () => handleToggleDistribution(dist.id, dist.status)}
+                                                                        disabled={isTaskTerminee || !hasEquipe}
+                                                                        title={(() => {
+                                                                            if (!hasEquipe) {
+                                                                                return '❌ Veuillez assigner une équipe avant de modifier les distributions';
+                                                                            }
+                                                                            if (isTaskTerminee) {
+                                                                                return '🔒 Les distributions ne peuvent pas être modifiées pour une tâche terminée';
+                                                                            }
+                                                                            if (isRealisee) {
+                                                                                const heures = dist.heures_planifiees?.toFixed(2) || '0';
+                                                                                return `✓ Distribution réalisée (${heures}h) - Cliquer pour marquer comme non réalisée`;
+                                                                            }
+                                                                            const heures = dist.heures_planifiees?.toFixed(2) || '0';
+                                                                            return `○ Distribution non réalisée (${heures}h planifiées) - Cliquer pour marquer comme réalisée`;
+                                                                        })()}
                                                                         className={`
                                                                             mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0
                                                                             ${isRealisee
                                                                                 ? 'bg-emerald-600 border-emerald-600 text-white'
                                                                                 : 'bg-white border-gray-400 hover:border-emerald-500 hover:bg-emerald-50'
                                                                             }
+                                                                            ${(isTaskTerminee || !hasEquipe) ? 'cursor-not-allowed opacity-50' : ''}
                                                                         `}
                                                                     >
                                                                         {isRealisee && <CheckCircle className="w-3 h-3" />}
@@ -1050,7 +1111,7 @@ const SuiviTaches: React.FC = () => {
                                                     <span className="text-slate-600 font-medium">Total planifié</span>
                                                     <span className="text-emerald-600 font-bold">
                                                         {selectedTache.charge_totale_distributions?.toFixed(2) ||
-                                                         selectedTache.distributions_charge.reduce((sum, d) => sum + (d.heures_planifiees || 0), 0).toFixed(2)}h
+                                                            selectedTache.distributions_charge.reduce((sum, d) => sum + (d.heures_planifiees || 0), 0).toFixed(2)}h
                                                     </span>
                                                 </div>
                                             </div>
@@ -1351,109 +1412,119 @@ const SuiviTaches: React.FC = () => {
             </div>
 
             {/* Modals */}
-            {confirmModal?.isOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-                        <div className={`p-6 text-center ${confirmModal.type === 'start' ? 'bg-emerald-50' : confirmModal.type === 'complete' ? 'bg-blue-50' : 'bg-red-50'}`}>
-                            <div className={`w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-4 ${confirmModal.type === 'start' ? 'bg-emerald-100' : confirmModal.type === 'complete' ? 'bg-blue-100' : 'bg-red-100'}`}>
-                                {confirmModal.icon === 'play' && <Play className="w-7 h-7 text-emerald-600" />}
-                                {confirmModal.icon === 'check' && <CheckCircle className="w-7 h-7 text-blue-600" />}
-                                {confirmModal.icon === 'x' && <XCircle className="w-7 h-7 text-red-600" />}
+            {
+                confirmModal?.isOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                            <div className={`p-6 text-center ${confirmModal.type === 'start' ? 'bg-emerald-50' : confirmModal.type === 'complete' ? 'bg-blue-50' : 'bg-red-50'}`}>
+                                <div className={`w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-4 ${confirmModal.type === 'start' ? 'bg-emerald-100' : confirmModal.type === 'complete' ? 'bg-blue-100' : 'bg-red-100'}`}>
+                                    {confirmModal.icon === 'play' && <Play className="w-7 h-7 text-emerald-600" />}
+                                    {confirmModal.icon === 'check' && <CheckCircle className="w-7 h-7 text-blue-600" />}
+                                    {confirmModal.icon === 'x' && <XCircle className="w-7 h-7 text-red-600" />}
+                                </div>
+                                <h3 className="text-lg font-bold text-slate-800">{confirmModal.title}</h3>
                             </div>
-                            <h3 className="text-lg font-bold text-slate-800">{confirmModal.title}</h3>
-                        </div>
-                        <div className="p-6">
-                            <p className="text-slate-600 text-center mb-6">{confirmModal.message}</p>
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setConfirmModal(null)}
-                                    className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200"
-                                >
-                                    Annuler
-                                </button>
-                                <button
-                                    onClick={executeConfirmedAction}
-                                    className={`flex-1 px-4 py-2.5 rounded-xl font-medium text-white ${confirmModal.type === 'start' ? 'bg-emerald-600 hover:bg-emerald-700' : confirmModal.type === 'complete' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'}`}
-                                >
-                                    Confirmer
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {deletingPhotoId && (
-                <ConfirmDeleteModal
-                    title="Supprimer cette photo ?"
-                    message="Cette action est irréversible."
-                    onConfirm={() => handleDeletePhoto(deletingPhotoId)}
-                    onCancel={() => setDeletingPhotoId(null)}
-                />
-            )}
-
-            {deletingConsommationId && (
-                <ConfirmDeleteModal
-                    title="Supprimer cette consommation ?"
-                    message="Cette action est irréversible."
-                    onConfirm={() => handleDeleteConsommation(deletingConsommationId)}
-                    onCancel={() => setDeletingConsommationId(null)}
-                />
-            )}
-
-            {validationModal?.isOpen && selectedTache && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-                        <div className={`p-6 text-center ${validationModal.type === 'VALIDEE' ? 'bg-emerald-50' : 'bg-red-50'}`}>
-                            <div className={`w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-4 ${validationModal.type === 'VALIDEE' ? 'bg-emerald-100' : 'bg-red-100'}`}>
-                                {validationModal.type === 'VALIDEE' ? <ThumbsUp className="w-7 h-7 text-emerald-600" /> : <ThumbsDown className="w-7 h-7 text-red-600" />}
-                            </div>
-                            <h3 className="text-lg font-bold text-slate-800">
-                                {validationModal.type === 'VALIDEE' ? 'Valider la tâche' : 'Rejeter la tâche'}
-                            </h3>
-                        </div>
-                        <div className="p-6">
-                            <textarea
-                                value={validationComment}
-                                onChange={(e) => setValidationComment(e.target.value)}
-                                placeholder={validationModal.type === 'VALIDEE' ? 'Commentaire optionnel...' : 'Raison du rejet...'}
-                                className="w-full p-3 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 resize-none mb-4"
-                                rows={3}
-                                required={validationModal.type === 'REJETEE'}
-                            />
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => { setValidationModal(null); setValidationComment(''); }}
-                                    disabled={validating}
-                                    className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 disabled:opacity-50"
-                                >
-                                    Annuler
-                                </button>
-                                <button
-                                    onClick={handleValidation}
-                                    disabled={validating || (validationModal.type === 'REJETEE' && !validationComment.trim())}
-                                    className={`flex-1 px-4 py-2.5 rounded-xl font-medium text-white disabled:opacity-50 flex items-center justify-center gap-2 ${validationModal.type === 'VALIDEE' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}
-                                >
-                                    {validating && <Loader2 className="w-4 h-4 animate-spin" />}
-                                    {validationModal.type === 'VALIDEE' ? 'Valider' : 'Rejeter'}
-                                </button>
+                            <div className="p-6">
+                                <p className="text-slate-600 text-center mb-6">{confirmModal.message}</p>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setConfirmModal(null)}
+                                        className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200"
+                                    >
+                                        Annuler
+                                    </button>
+                                    <button
+                                        onClick={executeConfirmedAction}
+                                        className={`flex-1 px-4 py-2.5 rounded-xl font-medium text-white ${confirmModal.type === 'start' ? 'bg-emerald-600 hover:bg-emerald-700' : confirmModal.type === 'complete' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'}`}
+                                    >
+                                        Confirmer
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
-            {showEditModal && selectedTache && (
-                <TaskFormModal
-                    onClose={() => setShowEditModal(false)}
-                    onSubmit={handleTaskUpdate}
-                    typesTaches={typesTaches}
-                    equipes={equipes}
-                    tache={selectedTache}
-                    isSubmitting={updatingTask}
-                />
-            )}
-        </div>
+            {
+                deletingPhotoId && (
+                    <ConfirmDeleteModal
+                        title="Supprimer cette photo ?"
+                        message="Cette action est irréversible."
+                        onConfirm={() => handleDeletePhoto(deletingPhotoId)}
+                        onCancel={() => setDeletingPhotoId(null)}
+                    />
+                )
+            }
+
+            {
+                deletingConsommationId && (
+                    <ConfirmDeleteModal
+                        title="Supprimer cette consommation ?"
+                        message="Cette action est irréversible."
+                        onConfirm={() => handleDeleteConsommation(deletingConsommationId)}
+                        onCancel={() => setDeletingConsommationId(null)}
+                    />
+                )
+            }
+
+            {
+                validationModal?.isOpen && selectedTache && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                            <div className={`p-6 text-center ${validationModal.type === 'VALIDEE' ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                                <div className={`w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-4 ${validationModal.type === 'VALIDEE' ? 'bg-emerald-100' : 'bg-red-100'}`}>
+                                    {validationModal.type === 'VALIDEE' ? <ThumbsUp className="w-7 h-7 text-emerald-600" /> : <ThumbsDown className="w-7 h-7 text-red-600" />}
+                                </div>
+                                <h3 className="text-lg font-bold text-slate-800">
+                                    {validationModal.type === 'VALIDEE' ? 'Valider la tâche' : 'Rejeter la tâche'}
+                                </h3>
+                            </div>
+                            <div className="p-6">
+                                <textarea
+                                    value={validationComment}
+                                    onChange={(e) => setValidationComment(e.target.value)}
+                                    placeholder={validationModal.type === 'VALIDEE' ? 'Commentaire optionnel...' : 'Raison du rejet...'}
+                                    className="w-full p-3 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 resize-none mb-4"
+                                    rows={3}
+                                    required={validationModal.type === 'REJETEE'}
+                                />
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => { setValidationModal(null); setValidationComment(''); }}
+                                        disabled={validating}
+                                        className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 disabled:opacity-50"
+                                    >
+                                        Annuler
+                                    </button>
+                                    <button
+                                        onClick={handleValidation}
+                                        disabled={validating || (validationModal.type === 'REJETEE' && !validationComment.trim())}
+                                        className={`flex-1 px-4 py-2.5 rounded-xl font-medium text-white disabled:opacity-50 flex items-center justify-center gap-2 ${validationModal.type === 'VALIDEE' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}
+                                    >
+                                        {validating && <Loader2 className="w-4 h-4 animate-spin" />}
+                                        {validationModal.type === 'VALIDEE' ? 'Valider' : 'Rejeter'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {
+                showEditModal && selectedTache && (
+                    <TaskFormModal
+                        onClose={() => setShowEditModal(false)}
+                        onSubmit={handleTaskUpdate}
+                        typesTaches={typesTaches}
+                        equipes={equipes}
+                        tache={selectedTache}
+                        isSubmitting={updatingTask}
+                    />
+                )
+            }
+        </div >
     );
 };
 

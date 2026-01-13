@@ -259,9 +259,6 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
     // ✅ PHASE 1: États pour planification intelligente
     const [ratios, setRatios] = useState<RatioProductivite[]>([]);
     const [loadingRatios, setLoadingRatios] = useState(false);
-    const [calculerChargeAuto, setCalculerChargeAuto] = useState(true); // Default: ON
-    const [repartirMultiJours, setRepartirMultiJours] = useState(true); // Default: ON
-    const [autoRecurrenceActivated, setAutoRecurrenceActivated] = useState(false); // Track if recurrence was auto-activated
 
     // Loading states
     const [loadingObjects, setLoadingObjects] = useState(false);
@@ -460,72 +457,7 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
         };
     }, [selectedType, selectedObjects, ratios]);
 
-    // ✅ PHASE 2.2: Auto-activate recurrence when charge > 10h (intelligent calculation)
-    useEffect(() => {
-        // Skip if recurrence already active, or no charge preview
-        if (recurrence || !chargePreview?.totalHeures) return;
 
-        // Skip if user disabled auto-calculation or multi-day splitting
-        if (!calculerChargeAuto || !repartirMultiJours) return;
-
-        // Skip if charge is reasonable for one day (≤ 10h)
-        if (chargePreview.totalHeures <= 10) return;
-
-        // Skip if no team selected (need team to calculate work hours)
-        const equipeId = selectedEquipes.length > 0 ? selectedEquipes[0] : null;
-        if (!equipeId) {
-            console.log('⚠️ No team selected, skipping intelligent recurrence calculation');
-            return;
-        }
-
-        // Call API to calculate recommended occurrences based on real work hours
-        const dateDebut = format(initialDate, 'yyyy-MM-dd');
-
-        console.log(`🔄 Calculating intelligent recurrence: ${chargePreview.totalHeures}h for team ${equipeId}`);
-
-        planningService.calculateRecurrenceRecommendee({
-            equipe_id: equipeId,
-            charge_totale_heures: chargePreview.totalHeures,
-            date_debut: dateDebut,
-            frequence: 'daily'
-        })
-            .then(response => {
-                const days = response.nombre_occurrences;
-                const endDate = new Date(initialDate);
-                endDate.setDate(endDate.getDate() + (days - 1));
-
-                console.log(`✅ Intelligent recurrence calculated: ${days} days (avg ${response.heures_par_jour_moyen}h/day)`);
-
-                // Auto-activate DAILY recurrence
-                setRecurrence({
-                    frequence: 'daily',
-                    interval: 1,
-                    nombre_occurrences: days,
-                    date_fin: format(endDate, 'yyyy-MM-dd')
-                });
-
-                // Mark that recurrence was auto-activated
-                setAutoRecurrenceActivated(true);
-            })
-            .catch(err => {
-                console.error('❌ Error calculating intelligent recurrence, falling back to 10h/day:', err);
-
-                // Fallback to hardcoded 10h/day if API fails
-                const days = Math.ceil(chargePreview.totalHeures / 10);
-                const endDate = new Date(initialDate);
-                endDate.setDate(endDate.getDate() + (days - 1));
-
-                setRecurrence({
-                    frequence: 'daily',
-                    interval: 1,
-                    nombre_occurrences: days,
-                    date_fin: format(endDate, 'yyyy-MM-dd')
-                });
-
-                setAutoRecurrenceActivated(true);
-            });
-
-    }, [chargePreview?.totalHeures, recurrence, initialDate, selectedEquipes, calculerChargeAuto, repartirMultiJours]);
 
     const handleSelectType = (type: TypeTache) => {
         setSelectedType(type);
@@ -601,11 +533,10 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                 date_fin_planifiee: dateFin,     // Format YYYY-MM-DD
                 priorite,
                 commentaires,
-                parametres_recurrence: null, // Pas de récurrence en mode distributions
                 objets: selectedObjects.map(o => o.id),
                 id_client: null,
                 reclamation: null,
-                charge_estimee_heures: calculerChargeAuto && chargePreview?.totalHeures ? chargePreview.totalHeures : null,
+                charge_estimee_heures: chargePreview?.totalHeures || null,
                 distributions_charge_data: sortedDistributions
             };
         } else {
@@ -625,11 +556,10 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                 date_fin_planifiee: format(initialDate, 'yyyy-MM-dd'),   // Format YYYY-MM-DD
                 priorite,
                 commentaires,
-                parametres_recurrence: recurrence,
                 objets: selectedObjects.map(o => o.id),
                 id_client: null,
                 reclamation: null,
-                charge_estimee_heures: calculerChargeAuto && chargePreview?.totalHeures ? chargePreview.totalHeures : null,
+                charge_estimee_heures: chargePreview?.totalHeures || null,
                 // En mode simple, on peut créer une distribution pour ce jour
                 distributions_charge_data: [{
                     date: format(initialDate, 'yyyy-MM-dd'),
@@ -1027,22 +957,20 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                                             <button
                                                 type="button"
                                                 onClick={() => setModeDistribution('simple')}
-                                                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                                                    modeDistribution === 'simple'
-                                                        ? 'bg-emerald-600 text-white'
-                                                        : 'text-gray-600 hover:text-emerald-600'
-                                                }`}
+                                                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${modeDistribution === 'simple'
+                                                    ? 'bg-emerald-600 text-white'
+                                                    : 'text-gray-600 hover:text-emerald-600'
+                                                    }`}
                                             >
                                                 Un jour
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => setModeDistribution('multi-jours')}
-                                                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                                                    modeDistribution === 'multi-jours'
-                                                        ? 'bg-emerald-600 text-white'
-                                                        : 'text-gray-600 hover:text-emerald-600'
-                                                }`}
+                                                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${modeDistribution === 'multi-jours'
+                                                    ? 'bg-emerald-600 text-white'
+                                                    : 'text-gray-600 hover:text-emerald-600'
+                                                    }`}
                                             >
                                                 Multi-jours
                                             </button>
@@ -1057,7 +985,7 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                                                     <PremiumInput
                                                         type="text"
                                                         value={format(initialDate, 'dd/MM/yyyy', { locale: fr })}
-                                                        onChange={() => {}} // Read-only
+                                                        onChange={() => { }} // Read-only
                                                         label="Date"
                                                         icon={<Calendar className="w-4 h-4" />}
                                                         variant="outlined"
@@ -1154,11 +1082,10 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                                                                 setSelectedEquipes(prev => [...prev, equipe.id]);
                                                             }
                                                         }}
-                                                        className={`w-full p-3 border-2 rounded-lg transition-all text-left flex items-center justify-between ${
-                                                            isSelected
-                                                                ? 'border-emerald-500 bg-emerald-50'
-                                                                : 'border-gray-200 bg-white hover:border-gray-300'
-                                                        }`}
+                                                        className={`w-full p-3 border-2 rounded-lg transition-all text-left flex items-center justify-between ${isSelected
+                                                            ? 'border-emerald-500 bg-emerald-50'
+                                                            : 'border-gray-200 bg-white hover:border-gray-300'
+                                                            }`}
                                                     >
                                                         <div className="flex items-center gap-3 flex-1 min-w-0">
                                                             <Users className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-emerald-600' : 'text-gray-400'}`} />
@@ -1190,11 +1117,10 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                                                 key={p}
                                                 type="button"
                                                 onClick={() => setPriorite(p as PrioriteTache)}
-                                                className={`flex-1 py-2 px-3 rounded-lg border-2 transition-all ${
-                                                    priorite === p
-                                                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700 font-medium'
-                                                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                                                }`}
+                                                className={`flex-1 py-2 px-3 rounded-lg border-2 transition-all ${priorite === p
+                                                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700 font-medium'
+                                                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                                                    }`}
                                             >
                                                 P{p}
                                             </button>
@@ -1286,66 +1212,7 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                                             )}
                                         </div>
 
-                                        {/* Options de planification intelligente */}
-                                        {chargePreview && (
-                                            <div className="space-y-3">
-                                                <label className="block text-sm font-medium text-gray-700">
-                                                    Options de planification
-                                                </label>
 
-                                                {/* Calculer charge automatiquement */}
-                                                <label className="flex items-start gap-3 cursor-pointer group p-3 border border-gray-200 rounded-lg hover:border-emerald-300 transition-colors">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={calculerChargeAuto}
-                                                        onChange={(e) => setCalculerChargeAuto(e.target.checked)}
-                                                        className="mt-1 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                                                    />
-                                                    <div className="flex-1">
-                                                        <div className="text-sm font-medium text-gray-800 group-hover:text-emerald-700 transition-colors">
-                                                            ✅ Calculer la charge automatiquement
-                                                        </div>
-                                                        <p className="text-xs text-gray-500 mt-0.5">
-                                                            La charge est calculée en fonction des superficies et ratios de productivité
-                                                            {chargePreview.totalHeures > 0 && (
-                                                                <span className="font-semibold text-emerald-700"> ({chargePreview.totalHeures}h estimées)</span>
-                                                            )}
-                                                        </p>
-                                                    </div>
-                                                </label>
-
-                                                {/* Répartir sur plusieurs jours */}
-                                                <label className="flex items-start gap-3 cursor-pointer group p-3 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={repartirMultiJours}
-                                                        onChange={(e) => {
-                                                            const isChecked = e.target.checked;
-                                                            setRepartirMultiJours(isChecked);
-
-                                                            // Si décoché et récurrence active, la désactiver
-                                                            if (!isChecked && recurrence) {
-                                                                setRecurrence(null);
-                                                                setAutoRecurrenceActivated(false);
-                                                                console.log('🚫 Répartition multi-jours désactivée - récurrence supprimée');
-                                                            }
-                                                        }}
-                                                        className="mt-1 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                                                    />
-                                                    <div className="flex-1">
-                                                        <div className="text-sm font-medium text-gray-800 group-hover:text-blue-700 transition-colors">
-                                                            📅 Répartir sur plusieurs jours
-                                                        </div>
-                                                        <p className="text-xs text-gray-500 mt-0.5">
-                                                            Si la charge dépasse 10h, utilisez la récurrence ci-dessous pour diviser sur plusieurs jours
-                                                            {chargePreview.totalHeures > 10 && (
-                                                                <span className="font-semibold text-blue-700"> (recommandé: ~{Math.ceil(chargePreview.totalHeures / 8)} jours)</span>
-                                                            )}
-                                                        </p>
-                                                    </div>
-                                                </label>
-                                            </div>
-                                        )}
                                     </div>
                                 )}
 
