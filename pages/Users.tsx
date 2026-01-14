@@ -16,7 +16,8 @@ import {
 } from '../components/users/CreateUserModals';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import { AdminDetailModal, ClientDetailModal, UserDetailModalSelector } from '../components/users/UserDetailModals';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Users as UsersIcon,
   UserCheck,
@@ -63,8 +64,137 @@ import {
 } from '../services/usersApi';
 
 // ============================================================================
-// MODAL - Editer un utilisateur
+// DROPDOWN COMPONENT (PORTAL)
 // ============================================================================
+
+const UserActionDropdown = ({
+  user,
+  onView,
+  onEdit,
+  onDelete
+}: {
+  user: Utilisateur,
+  onView: () => void,
+  onEdit: () => void,
+  onDelete: () => void
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (isOpen && dropdownRef.current) {
+      const rect = dropdownRef.current.getBoundingClientRect();
+      const windowHeight = window.innerHeight;
+      const spaceBelow = windowHeight - rect.bottom;
+      const openUpwards = spaceBelow < 200;
+
+      if (openUpwards) {
+        setDropdownStyle({
+          position: 'fixed',
+          bottom: windowHeight - rect.top + 5,
+          right: window.innerWidth - rect.right,
+          zIndex: 9999
+        });
+      } else {
+        setDropdownStyle({
+          position: 'fixed',
+          top: rect.bottom + 5,
+          right: window.innerWidth - rect.right,
+          zIndex: 9999
+        });
+      }
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(target) &&
+        menuRef.current &&
+        !menuRef.current.contains(target)
+      ) {
+        setIsOpen(false);
+      }
+    };
+
+    const handleScroll = () => {
+      if (isOpen) setIsOpen(false);
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleScroll);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, [isOpen]);
+
+  const menu = (
+    <div
+      ref={menuRef}
+      style={dropdownStyle}
+      className="w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 animate-in fade-in zoom-in-95 duration-100"
+    >
+      <button
+        className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+        onClick={(e) => {
+          e.stopPropagation();
+          onView();
+          setIsOpen(false);
+        }}
+      >
+        <Eye className="w-4 h-4 text-gray-500" />
+        Voir les détails
+      </button>
+      <button
+        className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+        onClick={(e) => {
+          e.stopPropagation();
+          onEdit();
+          setIsOpen(false);
+        }}
+      >
+        <Edit2 className="w-4 h-4 text-blue-500" />
+        Modifier
+      </button>
+      <div className="border-t border-gray-100 my-1"></div>
+      <button
+        className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete();
+          setIsOpen(false);
+        }}
+      >
+        <UserX className="w-4 h-4" />
+        Désactiver
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+        title="Actions"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
+      >
+        <MoreVertical className="w-4 h-4" />
+      </button>
+      {isOpen && createPortal(menu, document.body)}
+    </div>
+  );
+};
 
 interface EditUserModalProps {
   user: Utilisateur;
@@ -524,7 +654,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, onClose, o
                             <div className="flex items-center justify-between text-xs">
                               <span className="text-gray-600">Force du mot de passe :</span>
                               <span className={`font-medium ${passwordStrength.label === 'Fort' ? 'text-green-600' :
-                                  passwordStrength.label === 'Moyen' ? 'text-yellow-600' : 'text-red-600'
+                                passwordStrength.label === 'Moyen' ? 'text-yellow-600' : 'text-red-600'
                                 }`}>
                                 {passwordStrength.label}
                               </span>
@@ -732,7 +862,6 @@ const Users: React.FC<UsersProps> = ({ triggerCreate }) => {
   const [selectedAdminUser, setSelectedAdminUser] = useState<Utilisateur | null>(null);
   const [editingUser, setEditingUser] = useState<Utilisateur | null>(null);
   const [deleteUserId, setDeleteUserId] = useState<number | null>(null);
-  const [openActionMenu, setOpenActionMenu] = useState<number | null>(null);
 
   // Handler pour la sélection du type d'utilisateur
   const handleUserTypeSelect = (type: NomRole) => {
@@ -965,8 +1094,8 @@ const Users: React.FC<UsersProps> = ({ triggerCreate }) => {
             <button
               onClick={() => setRoleFilter(null)}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${!roleFilter
-                  ? 'bg-white text-slate-800 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-800'
+                ? 'bg-white text-slate-800 shadow-sm'
+                : 'text-slate-600 hover:text-slate-800'
                 }`}
             >
               Tous
@@ -974,8 +1103,8 @@ const Users: React.FC<UsersProps> = ({ triggerCreate }) => {
             <button
               onClick={() => setRoleFilter('ADMIN')}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${roleFilter === 'ADMIN'
-                  ? 'bg-white text-purple-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-800'
+                ? 'bg-white text-purple-700 shadow-sm'
+                : 'text-slate-600 hover:text-slate-800'
                 }`}
             >
               <Shield className="w-3.5 h-3.5" />
@@ -984,8 +1113,8 @@ const Users: React.FC<UsersProps> = ({ triggerCreate }) => {
             <button
               onClick={() => setRoleFilter('SUPERVISEUR')}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${roleFilter === 'SUPERVISEUR'
-                  ? 'bg-white text-blue-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-800'
+                ? 'bg-white text-blue-700 shadow-sm'
+                : 'text-slate-600 hover:text-slate-800'
                 }`}
             >
               <Award className="w-3.5 h-3.5" />
@@ -994,8 +1123,8 @@ const Users: React.FC<UsersProps> = ({ triggerCreate }) => {
             <button
               onClick={() => setRoleFilter('CLIENT')}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${roleFilter === 'CLIENT'
-                  ? 'bg-white text-green-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-800'
+                ? 'bg-white text-green-700 shadow-sm'
+                : 'text-slate-600 hover:text-slate-800'
                 }`}
             >
               <Building2 className="w-3.5 h-3.5" />
@@ -1019,67 +1148,13 @@ const Users: React.FC<UsersProps> = ({ triggerCreate }) => {
             {
               key: 'actions',
               label: 'Actions',
-              render: (user) => (
-                <div className="relative">
-                  <button
-                    className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
-                    title="Actions"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOpenActionMenu(openActionMenu === user.id ? null : user.id);
-                    }}
-                  >
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
-
-                  {openActionMenu === user.id && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-10"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenActionMenu(null);
-                        }}
-                      />
-                      <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
-                        <button
-                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRowClick(user);
-                            setOpenActionMenu(null);
-                          }}
-                        >
-                          <Eye className="w-4 h-4 text-gray-500" />
-                          Voir les détails
-                        </button>
-                        <button
-                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingUser(user);
-                            setOpenActionMenu(null);
-                          }}
-                        >
-                          <Edit2 className="w-4 h-4 text-blue-500" />
-                          Modifier
-                        </button>
-                        <hr className="my-1 border-gray-100" />
-                        <button
-                          className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteUserId(Number(user.id));
-                            setOpenActionMenu(null);
-                          }}
-                        >
-                          <UserX className="w-4 h-4" />
-                          Désactiver
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
+              render: (user: Utilisateur) => (
+                <UserActionDropdown
+                  user={user}
+                  onView={() => handleRowClick(user)}
+                  onEdit={() => setEditingUser(user)}
+                  onDelete={() => setDeleteUserId(Number(user.id))}
+                />
               ),
               sortable: false
             }

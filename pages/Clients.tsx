@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import {
     Users, RefreshCw, Edit2, Trash2, MoreVertical, Plus, Building2,
@@ -29,73 +30,114 @@ const ActionDropdown = ({
     isActive: boolean
 }) => {
     const [isOpen, setIsOpen] = useState(false);
-    const [openUpwards, setOpenUpwards] = useState(false);
+    const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (isOpen && dropdownRef.current) {
             const rect = dropdownRef.current.getBoundingClientRect();
             const windowHeight = window.innerHeight;
             const spaceBelow = windowHeight - rect.bottom;
-            // Si moins de 200px en dessous, on ouvre vers le haut
-            setOpenUpwards(spaceBelow < 200);
+            const openUpwards = spaceBelow < 200;
+
+            if (openUpwards) {
+                setDropdownStyle({
+                    position: 'fixed',
+                    bottom: windowHeight - rect.top + 5,
+                    right: window.innerWidth - rect.right,
+                    zIndex: 9999
+                });
+            } else {
+                setDropdownStyle({
+                    position: 'fixed',
+                    top: rect.bottom + 5,
+                    right: window.innerWidth - rect.right,
+                    zIndex: 9999
+                });
+            }
         }
     }, [isOpen]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+            const target = event.target as Node;
+            if (
+                dropdownRef.current &&
+                !dropdownRef.current.contains(target) &&
+                menuRef.current &&
+                !menuRef.current.contains(target)
+            ) {
                 setIsOpen(false);
             }
         };
+
+        const handleScroll = () => {
+            if (isOpen) setIsOpen(false); // Close on scroll to avoid detached menu
+        };
+
         document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+        window.addEventListener('scroll', handleScroll, true);
+        window.addEventListener('resize', handleScroll);
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            window.removeEventListener('scroll', handleScroll, true);
+            window.removeEventListener('resize', handleScroll);
+        };
+    }, [isOpen]);
+
+    const menu = (
+        <div
+            ref={menuRef}
+            style={dropdownStyle}
+            className="w-48 bg-white rounded-lg shadow-lg border border-gray-100 py-1 animate-in fade-in zoom-in-95 duration-100"
+        >
+            <button
+                onClick={(e) => { e.stopPropagation(); onEdit(); setIsOpen(false); }}
+                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            >
+                <Edit2 className="w-4 h-4" />
+                Modifier
+            </button>
+            <button
+                onClick={(e) => { e.stopPropagation(); onToggleActive(); setIsOpen(false); }}
+                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            >
+                {isActive ? (
+                    <>
+                        <AlertCircle className="w-4 h-4 text-orange-500" />
+                        Desactiver
+                    </>
+                ) : (
+                    <>
+                        <CheckCircle className="w-4 h-4 text-emerald-500" />
+                        Activer
+                    </>
+                )}
+            </button>
+            <div className="border-t border-gray-100 my-1"></div>
+            <button
+                onClick={(e) => { e.stopPropagation(); onDelete(); setIsOpen(false); }}
+                className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+            >
+                <Trash2 className="w-4 h-4" />
+                Supprimer
+            </button>
+        </div>
+    );
 
     return (
         <div className="relative" ref={dropdownRef}>
             <button
                 onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
                 className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+                title="Options"
             >
                 <MoreVertical className="w-5 h-5" />
             </button>
 
-            {isOpen && (
-                <div className={`absolute right-0 ${openUpwards ? 'bottom-full mb-2' : 'top-full mt-2'} w-48 bg-white rounded-lg shadow-lg border border-gray-100 z-50 py-1 animate-in ${openUpwards ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2'} fade-in zoom-in-95 duration-100`}>
-                    <button
-                        onClick={(e) => { e.stopPropagation(); onEdit(); setIsOpen(false); }}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                    >
-                        <Edit2 className="w-4 h-4" />
-                        Modifier
-                    </button>
-                    <button
-                        onClick={(e) => { e.stopPropagation(); onToggleActive(); setIsOpen(false); }}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                    >
-                        {isActive ? (
-                            <>
-                                <AlertCircle className="w-4 h-4 text-orange-500" />
-                                Desactiver
-                            </>
-                        ) : (
-                            <>
-                                <CheckCircle className="w-4 h-4 text-emerald-500" />
-                                Activer
-                            </>
-                        )}
-                    </button>
-                    <div className="border-t border-gray-100 my-1"></div>
-                    <button
-                        onClick={(e) => { e.stopPropagation(); onDelete(); setIsOpen(false); }}
-                        className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                        Supprimer
-                    </button>
-                </div>
-            )}
+            {isOpen && createPortal(menu, document.body)}
         </div>
     );
 };
@@ -661,15 +703,15 @@ export default function Clients() {
                                                 )}
                                             </td>
                                             <td className="px-6 py-4 text-center">
-                                                <div className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-sm font-medium">
-                                                    <Users className="w-4 h-4" />
-                                                    {structure.utilisateursCount}
+                                                <div className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
+                                                    <Users className="w-3.5 h-3.5" />
+                                                    {structure.utilisateursCount || 0}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-center">
-                                                <div className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-full text-sm font-medium">
-                                                    <MapPin className="w-4 h-4" />
-                                                    {structure.sitesCount}
+                                                <div className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium">
+                                                    <MapPin className="w-3.5 h-3.5" />
+                                                    {structure.sitesCount || 0}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-center">

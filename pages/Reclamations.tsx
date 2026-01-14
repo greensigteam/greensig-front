@@ -23,7 +23,7 @@ import { EquipeList, Utilisateur } from '../types/users';
 import { PhotoUpload } from '../components/shared/PhotoUpload';
 import TaskFormModal from '../components/planning/TaskFormModal';
 import { utcToLocalInput } from '../utils/dateHelpers';
-import { format } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import LoadingScreen from '../components/LoadingScreen';
 import { PremiumInput, PremiumSelect, PremiumTextarea } from '../components/modals/PremiumFormComponents';
 import { RECLAMATION_STATUS_LABELS } from '../constants';
@@ -106,7 +106,7 @@ const Reclamations: React.FC = () => {
     // Helpers rôles
     const isAdmin = !!currentUser?.roles?.includes('ADMIN');
     const isClient = !!currentUser?.roles?.includes('CLIENT');
-    const isChefEquipe = !!currentUser?.roles?.includes('SUPERVISEUR');
+    const isSupervisor = !!currentUser?.roles?.includes('SUPERVISEUR');
 
     // UI State
     const [activeTab, setActiveTab] = useState<'reclamations' | 'taches' | 'stats'>('reclamations');
@@ -173,6 +173,34 @@ const Reclamations: React.FC = () => {
     const [filterDateDebut, setFilterDateDebut] = useState<string>('');
     const [filterDateFin, setFilterDateFin] = useState<string>('');
     const [showFilters, setShowFilters] = useState(false);
+    const [filterPeriod, setFilterPeriod] = useState<string>('custom');
+
+    const handlePeriodChange = (value: string) => {
+        setFilterPeriod(value);
+        const today = new Date();
+
+        switch (value) {
+            case 'last_7':
+                setFilterDateDebut(format(subDays(today, 7), 'yyyy-MM-dd'));
+                setFilterDateFin(format(today, 'yyyy-MM-dd'));
+                break;
+            case 'last_30':
+                setFilterDateDebut(format(subDays(today, 30), 'yyyy-MM-dd'));
+                setFilterDateFin(format(today, 'yyyy-MM-dd'));
+                break;
+            case 'this_month':
+                setFilterDateDebut(format(startOfMonth(today), 'yyyy-MM-dd'));
+                setFilterDateFin(format(endOfMonth(today), 'yyyy-MM-dd'));
+                break;
+            case 'all':
+                setFilterDateDebut('');
+                setFilterDateFin('');
+                break;
+            default:
+                // custom: do nothing to dates
+                break;
+        }
+    };
 
     // Set search placeholder and cleanup on unmount
     useEffect(() => {
@@ -295,6 +323,7 @@ const Reclamations: React.FC = () => {
     }, [location.state, navigate]);
 
     const loadReclamations = async () => {
+        setLoading(true);
         try {
             const params: any = {};
             if (filterStatut) params.statut = filterStatut;
@@ -306,6 +335,8 @@ const Reclamations: React.FC = () => {
             setReclamations(recsData);
         } catch (error) {
             console.error("Erreur chargement réclamations", error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -683,7 +714,7 @@ const Reclamations: React.FC = () => {
             {/* Filters Panel */}
             {showFilters && activeTab === 'reclamations' && (
                 <div className="mb-6 pb-4 border-b border-slate-200 bg-slate-50 p-4 rounded-lg">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className={`grid grid-cols-1 ${filterPeriod === 'custom' ? 'md:grid-cols-5' : 'md:grid-cols-3'} gap-4`}>
                         {/* Filtre Statut */}
                         <CustomSelect
                             value={filterStatut}
@@ -712,33 +743,57 @@ const Reclamations: React.FC = () => {
                             icon={<MapPin className="w-4 h-4" />}
                         />
 
-                        {/* Filtre Date Début */}
-                        <div className="relative">
-                            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                                <Calendar className="w-4 h-4 text-slate-500" />
-                            </div>
-                            <input
-                                type="date"
-                                value={filterDateDebut}
-                                onChange={(e) => setFilterDateDebut(e.target.value)}
-                                placeholder="Date début"
-                                className="w-full pl-10 pr-3 py-2.5 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm hover:border-slate-400"
-                            />
-                        </div>
+                        {/* Filtre Période */}
+                        <CustomSelect
+                            value={filterPeriod}
+                            onChange={(val) => handlePeriodChange(val)}
+                            options={[
+                                { value: 'all', label: 'Tout l\'historique' },
+                                { value: 'last_7', label: '7 derniers jours' },
+                                { value: 'last_30', label: '30 derniers jours' },
+                                { value: 'this_month', label: 'Ce mois-ci' },
+                                { value: 'custom', label: 'Période personnalisée' }
+                            ]}
+                            icon={<Clock className="w-4 h-4" />}
+                        />
 
-                        {/* Filtre Date Fin */}
-                        <div className="relative">
-                            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                                <Calendar className="w-4 h-4 text-slate-500" />
-                            </div>
-                            <input
-                                type="date"
-                                value={filterDateFin}
-                                onChange={(e) => setFilterDateFin(e.target.value)}
-                                placeholder="Date fin"
-                                className="w-full pl-10 pr-3 py-2.5 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm hover:border-slate-400"
-                            />
-                        </div>
+                        {filterPeriod === 'custom' && (
+                            <>
+                                {/* Filtre Date Début */}
+                                <div className="relative">
+                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                        <Calendar className="w-4 h-4 text-slate-500" />
+                                    </div>
+                                    <input
+                                        type="date"
+                                        value={filterDateDebut}
+                                        onChange={(e) => {
+                                            setFilterDateDebut(e.target.value);
+                                            setFilterPeriod('custom');
+                                        }}
+                                        placeholder="Date création (début)"
+                                        className="w-full pl-10 pr-3 py-2.5 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm hover:border-slate-400"
+                                    />
+                                </div>
+
+                                {/* Filtre Date Fin */}
+                                <div className="relative">
+                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                        <Calendar className="w-4 h-4 text-slate-500" />
+                                    </div>
+                                    <input
+                                        type="date"
+                                        value={filterDateFin}
+                                        onChange={(e) => {
+                                            setFilterDateFin(e.target.value);
+                                            setFilterPeriod('custom');
+                                        }}
+                                        placeholder="Date création (fin)"
+                                        className="w-full pl-10 pr-3 py-2.5 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm hover:border-slate-400"
+                                    />
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     {/* Reset Button */}
@@ -778,139 +833,156 @@ const Reclamations: React.FC = () => {
                         </div>
                     ) : (
                         <>
-                            <table className="w-full">
-                                <thead className="bg-slate-50 border-b border-slate-100 rounded-t-xl">
-                                    <tr>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider first:rounded-tl-xl">Numéro</th>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Urgence</th>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Site / Zone</th>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Créé par</th>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Statut</th>
-                                        <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider rounded-tr-xl">
-                                            <Settings className="w-4 h-4 ml-auto text-slate-400" />
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {paginatedReclamations.map(rec => (
-                                        <tr
-                                            key={rec.id}
-                                            onClick={() => handleDetails(rec.id)}
-                                            className="hover:bg-slate-50 transition-colors group cursor-pointer"
-                                        >
-                                            <td className="px-6 py-4">
-                                                <span className="text-sm font-medium text-slate-800">{rec.numero_reclamation}</span>
-                                            </td>
-                                            <td className="px-6 py-4 text-sm text-slate-600">{rec.type_reclamation_nom}</td>
-                                            <td className="px-6 py-4">
-                                                <span
-                                                    className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
-                                                    style={{
-                                                        backgroundColor: (rec.urgence_couleur || '#ccc') + '20',
-                                                        color: rec.urgence_couleur || '#666'
-                                                    }}
-                                                >
-                                                    {rec.urgence_niveau}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-medium text-slate-800">{rec.site_nom}</span>
-                                                    {rec.zone_nom && <span className="text-xs text-slate-400">{rec.zone_nom}</span>}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-sm text-slate-600">
-                                                {rec.createur_nom || <span className="text-slate-400 italic">Anonyme</span>}
-                                            </td>
-                                            <td className="px-6 py-4 text-sm text-slate-600">
-                                                {new Date(rec.date_creation).toLocaleDateString('fr-FR')}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`
+                            <div className="overflow-x-auto min-h-[400px]">
+                                <table className="w-full">
+                                    <thead className="bg-slate-50 border-b border-slate-100 rounded-t-xl">
+                                        <tr>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider first:rounded-tl-xl">Numéro</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Urgence</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Site / Zone</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Créé par</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Statut</th>
+                                            <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider rounded-tr-xl w-24">
+                                                Actions
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {paginatedReclamations.map(rec => (
+                                            <tr
+                                                key={rec.id}
+                                                onClick={() => handleDetails(rec.id)}
+                                                className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                                            >
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className="text-sm font-medium text-slate-800">{rec.numero_reclamation}</span>
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">{rec.type_reclamation_nom}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span
+                                                        className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
+                                                        style={{
+                                                            backgroundColor: (rec.urgence_couleur || '#ccc') + '20',
+                                                            color: rec.urgence_couleur || '#666'
+                                                        }}
+                                                    >
+                                                        {rec.urgence_niveau}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex flex-col min-w-[150px]">
+                                                        <span className="text-sm font-medium text-slate-800">{rec.site_nom}</span>
+                                                        {rec.zone_nom && <span className="text-xs text-slate-400">{rec.zone_nom}</span>}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
+                                                    {rec.createur_nom || <span className="text-slate-400 italic">Anonyme</span>}
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
+                                                    {new Date(rec.date_creation).toLocaleDateString('fr-FR')}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className={`
                                                     inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium
                                                     ${rec.statut === 'NOUVELLE' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
-                                                        rec.statut === 'RESOLUE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                                                            rec.statut === 'EN_COURS' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                                                                rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'bg-orange-50 text-orange-700 border border-orange-100' :
-                                                                    rec.statut === 'CLOTUREE' ? 'bg-slate-100 text-slate-600 border border-slate-200' :
-                                                                        'bg-slate-100 text-slate-600 border border-slate-200'}
+                                                            rec.statut === 'RESOLUE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                                                                rec.statut === 'EN_COURS' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                                                                    rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'bg-orange-50 text-orange-700 border border-orange-100' :
+                                                                        rec.statut === 'CLOTUREE' ? 'bg-slate-100 text-slate-600 border border-slate-200' :
+                                                                            'bg-slate-100 text-slate-600 border border-slate-200'}
                                                 `}>
-                                                    <div className={`w-1.5 h-1.5 rounded-full ${rec.statut === 'NOUVELLE' ? 'bg-blue-500' :
-                                                        rec.statut === 'RESOLUE' ? 'bg-emerald-500' :
-                                                            rec.statut === 'EN_COURS' ? 'bg-amber-500' :
-                                                                rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'bg-orange-500' :
-                                                                    'bg-slate-400'
-                                                        }`} />
-                                                    {rec.statut_display || rec.statut}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex justify-end" data-row-menu>
-                                                    <div className="relative">
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setRowMenuOpen(rowMenuOpen === rec.id ? null : rec.id);
-                                                            }}
-                                                            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                                                        >
-                                                            <MoreVertical className="w-4 h-4" />
-                                                        </button>
-
-                                                        {rowMenuOpen === rec.id && (
-                                                            <div className="absolute right-0 mt-1 w-44 bg-white rounded-xl shadow-lg border border-slate-200 py-1 z-[60] animate-in fade-in slide-in-from-top-2 duration-150">
-                                                                {!isClient && !isChefEquipe && rec.statut !== 'CLOTUREE' && (
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleOpenTaskModal(rec);
-                                                                            setRowMenuOpen(null);
-                                                                        }}
-                                                                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                                                                    >
-                                                                        <ClipboardList className="w-4 h-4 text-purple-500" />
-                                                                        Créer une tâche
-                                                                    </button>
-                                                                )}
-
-                                                                {!isClient && (isAdmin || (rec.createur === currentUser?.id)) && (
-                                                                    <>
-                                                                        <div className="my-1 border-t border-slate-100" />
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                handleEdit(rec.id);
-                                                                                setRowMenuOpen(null);
-                                                                            }}
-                                                                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                                                                        >
-                                                                            <Edit2 className="w-4 h-4 text-emerald-500" />
-                                                                            Modifier
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                handleDelete(rec.id);
-                                                                                setRowMenuOpen(null);
-                                                                            }}
-                                                                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                                                                        >
-                                                                            <Trash2 className="w-4 h-4" />
-                                                                            Supprimer
-                                                                        </button>
-                                                                    </>
-                                                                )}
-                                                            </div>
+                                                        <div className={`w-1.5 h-1.5 rounded-full ${rec.statut === 'NOUVELLE' ? 'bg-blue-500' :
+                                                            rec.statut === 'RESOLUE' ? 'bg-emerald-500' :
+                                                                rec.statut === 'EN_COURS' ? 'bg-amber-500' :
+                                                                    rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'bg-orange-500' :
+                                                                        'bg-slate-400'
+                                                            }`} />
+                                                        {rec.statut_display || rec.statut}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex justify-end items-center gap-2" data-row-menu>
+                                                        {isSupervisor && rec.statut === 'NOUVELLE' && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleOpenTaskModal(rec);
+                                                                }}
+                                                                className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-all duration-200 group/btn"
+                                                                title="Planifier une tâche"
+                                                            >
+                                                                <ClipboardList className="w-5 h-5 transition-transform group-hover/btn:scale-110" />
+                                                            </button>
                                                         )}
+
+                                                        <div className="relative">
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setRowMenuOpen(rowMenuOpen === rec.id ? null : rec.id);
+                                                                }}
+                                                                className={`p-2 rounded-lg transition-all duration-200 ${rowMenuOpen === rec.id
+                                                                    ? 'bg-slate-100 text-slate-800'
+                                                                    : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                                                            >
+                                                                <MoreVertical className="w-5 h-5" />
+                                                            </button>
+
+                                                            {rowMenuOpen === rec.id && (
+                                                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-[60] animate-in fade-in slide-in-from-top-2 duration-150 ring-1 ring-black/5">
+                                                                    {!isClient && rec.statut !== 'CLOTUREE' && (
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleOpenTaskModal(rec);
+                                                                                setRowMenuOpen(null);
+                                                                            }}
+                                                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                                                                        >
+                                                                            <ClipboardList className="w-4 h-4 text-purple-500" />
+                                                                            Créer une tâche
+                                                                        </button>
+                                                                    )}
+
+                                                                    {!isClient && (isAdmin || (rec.createur === currentUser?.id)) && (
+                                                                        <>
+                                                                            <div className="my-1 border-t border-slate-100" />
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    handleEdit(rec.id);
+                                                                                    setRowMenuOpen(null);
+                                                                                }}
+                                                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                                                                            >
+                                                                                <Edit2 className="w-4 h-4 text-emerald-500" />
+                                                                                Modifier
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    handleDelete(rec.id);
+                                                                                    setRowMenuOpen(null);
+                                                                                }}
+                                                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors font-medium"
+                                                                            >
+                                                                                <Trash2 className="w-4 h-4" />
+                                                                                Supprimer
+                                                                            </button>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
 
                             {/* Pagination Reclamations */}
                             <div className="sticky bottom-0 bg-white border-t border-slate-200 px-6 py-3">
@@ -973,86 +1045,88 @@ const Reclamations: React.FC = () => {
                         </div>
                     ) : (
                         <>
-                            <table className="w-full">
-                                <thead className="bg-slate-50 border-b border-slate-100">
-                                    <tr>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Type Tâche</th>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Réclamation</th>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Equipe</th>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Dates</th>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Priorité</th>
-                                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Statut</th>
-                                        <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                                            <Settings className="w-4 h-4 ml-auto text-slate-400" />
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {paginatedTaches.map(t => {
-                                        const statutColors = STATUT_TACHE_COLORS[t.statut] || { bg: 'bg-slate-100', text: 'text-slate-800' };
-                                        return (
-                                            <tr key={t.id} className="hover:bg-slate-50 transition-colors group">
-                                                <td className="px-6 py-4">
-                                                    <span className="text-sm font-medium text-slate-800">{t.type_tache_detail.nom_tache}</span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    {t.reclamation_numero ? (
-                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-100">
-                                                            <AlertCircle className="w-3 h-3" />
-                                                            {t.reclamation_numero}
+                            <div className="overflow-x-auto min-h-[400px]">
+                                <table className="w-full">
+                                    <thead className="bg-slate-50 border-b border-slate-100">
+                                        <tr>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Type Tâche</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Réclamation</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Equipe</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Dates</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Priorité</th>
+                                            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Statut</th>
+                                            <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                                <Settings className="w-4 h-4 ml-auto text-slate-400" />
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {paginatedTaches.map(t => {
+                                            const statutColors = STATUT_TACHE_COLORS[t.statut] || { bg: 'bg-slate-100', text: 'text-slate-800' };
+                                            return (
+                                                <tr key={t.id} className="hover:bg-slate-50 transition-colors group">
+                                                    <td className="px-6 py-4">
+                                                        <span className="text-sm font-medium text-slate-800">{t.type_tache_detail.nom_tache}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        {t.reclamation_numero ? (
+                                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-100">
+                                                                <AlertCircle className="w-3 h-3" />
+                                                                {t.reclamation_numero}
+                                                            </span>
+                                                        ) : <span className="text-slate-400">-</span>}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm text-slate-600">
+                                                        {t.equipes_detail && t.equipes_detail.length > 0
+                                                            ? t.equipes_detail.map(eq => (eq as any).nomEquipe || (eq as any).nom_equipe).join(', ')
+                                                            : (t.equipe_detail as any)?.nomEquipe || (t.equipe_detail as any)?.nom_equipe || '-'}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-sm text-slate-600">
+                                                                {new Date(t.date_debut_planifiee).toLocaleDateString('fr-FR')}
+                                                            </span>
+                                                            <span className="text-xs text-slate-400">
+                                                                → {new Date(t.date_fin_planifiee).toLocaleDateString('fr-FR')}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${t.priorite >= 4 ? 'bg-red-50 text-red-700 border border-red-100' :
+                                                            t.priorite === 3 ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                                                                'bg-slate-100 text-slate-600 border border-slate-200'
+                                                            }`}>
+                                                            {PRIORITE_LABELS[t.priorite]}
                                                         </span>
-                                                    ) : <span className="text-slate-400">-</span>}
-                                                </td>
-                                                <td className="px-6 py-4 text-sm text-slate-600">
-                                                    {t.equipes_detail && t.equipes_detail.length > 0
-                                                        ? t.equipes_detail.map(eq => eq.nomEquipe).join(', ')
-                                                        : (t.equipe_detail as any)?.nomEquipe || (t.equipe_detail as any)?.nom_equipe || '-'}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-sm text-slate-600">
-                                                            {new Date(t.date_debut_planifiee).toLocaleDateString('fr-FR')}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statutColors.bg} ${statutColors.text}`}>
+                                                            <div className={`w-1.5 h-1.5 rounded-full ${t.statut === 'PLANIFIEE' ? 'bg-blue-500' :
+                                                                t.statut === 'EN_COURS' ? 'bg-amber-500' :
+                                                                    t.statut === 'TERMINEE' ? 'bg-emerald-500' :
+                                                                        t.statut === 'ANNULEE' ? 'bg-red-500' :
+                                                                            'bg-slate-400'
+                                                                }`} />
+                                                            {t.statut.toLowerCase().replace('_', ' ')}
                                                         </span>
-                                                        <span className="text-xs text-slate-400">
-                                                            → {new Date(t.date_fin_planifiee).toLocaleDateString('fr-FR')}
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${t.priorite >= 4 ? 'bg-red-50 text-red-700 border border-red-100' :
-                                                        t.priorite === 3 ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                                                            'bg-slate-100 text-slate-600 border border-slate-200'
-                                                        }`}>
-                                                        {PRIORITE_LABELS[t.priorite]}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statutColors.bg} ${statutColors.text}`}>
-                                                        <div className={`w-1.5 h-1.5 rounded-full ${t.statut === 'PLANIFIEE' ? 'bg-blue-500' :
-                                                            t.statut === 'EN_COURS' ? 'bg-amber-500' :
-                                                                t.statut === 'TERMINEE' ? 'bg-emerald-500' :
-                                                                    t.statut === 'ANNULEE' ? 'bg-red-500' :
-                                                                        'bg-slate-400'
-                                                            }`} />
-                                                        {t.statut.toLowerCase().replace('_', ' ')}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex justify-end">
-                                                        <button
-                                                            onClick={() => navigate(`/planning?date=${t.date_debut_planifiee?.split('T')[0] || ''}`)}
-                                                            className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                                                            title="Voir dans l'agenda"
-                                                        >
-                                                            <Calendar className="w-4 h-4" />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )
-                                    })}
-                                </tbody>
-                            </table>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex justify-end">
+                                                            <button
+                                                                onClick={() => navigate(`/planning?date=${t.date_debut_planifiee?.split('T')[0] || ''}`)}
+                                                                className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                                                                title="Voir dans l'agenda"
+                                                            >
+                                                                <Calendar className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
 
                             {/* Pagination Taches */}
                             <div className="sticky bottom-0 bg-white border-t border-slate-200 px-6 py-3">
@@ -1173,8 +1247,7 @@ const Reclamations: React.FC = () => {
                             </div>
 
                             {/* Charts Grid */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                {/* Répartition par Statut (Pie Chart) */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                                 <div className="bg-white rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow overflow-hidden">
                                     <div className="p-6 border-b border-slate-100">
                                         <h3 className="font-bold text-lg text-slate-800">Répartition par Statut</h3>
@@ -1273,152 +1346,156 @@ const Reclamations: React.FC = () => {
             )}
 
             {/* Modal Création Tâche (Intervention) - Utilise le même formulaire que Planning */}
-            {isTaskModalOpen && (
-                <TaskFormModal
-                    initialValues={taskInitialValues}
-                    equipes={equipes}
-                    typesTaches={typesTaches}
-                    siteFilter={taskSiteFilter}
-                    onClose={handleCloseTaskModal}
-                    onSubmit={handleTaskSubmit}
-                />
-            )}
+            {
+                isTaskModalOpen && (
+                    <TaskFormModal
+                        initialValues={taskInitialValues}
+                        equipes={equipes}
+                        typesTaches={typesTaches}
+                        siteFilter={taskSiteFilter}
+                        onClose={handleCloseTaskModal}
+                        onSubmit={handleTaskSubmit}
+                    />
+                )
+            }
 
             {/* Modal Création / Edition Réclamation */}
-            {isCreateModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-                        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
-                            <h2 className="text-lg font-bold text-slate-800">
-                                {editingId ? 'Modifier la Réclamation' : 'Nouvelle Réclamation'}
-                            </h2>
-                            <button onClick={closeCreateModal} className="text-slate-400 hover:text-red-500 transition-colors">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
+            {
+                isCreateModalOpen && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+                            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+                                <h2 className="text-lg font-bold text-slate-800">
+                                    {editingId ? 'Modifier la Réclamation' : 'Nouvelle Réclamation'}
+                                </h2>
+                                <button onClick={closeCreateModal} className="text-slate-400 hover:text-red-500 transition-colors">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
 
-                        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-                            <div className="p-6 space-y-4 overflow-y-auto flex-1">
-                                {/* Pre-selected site indicator */}
-                                {preSelectedSiteName && (
-                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2">
-                                        <MapPin className="w-4 h-4 text-blue-600" />
-                                        <span className="text-sm text-blue-800">
-                                            Site: <strong>{preSelectedSiteName}</strong>
-                                        </span>
-                                    </div>
-                                )}
-                                <PremiumSelect
-                                    value={formData.type_reclamation?.toString() || ''}
-                                    onChange={(value) => setFormData({ ...formData, type_reclamation: Number(value) })}
-                                    options={types.map(t => ({
-                                        value: t.id.toString(),
-                                        label: t.nom_reclamation
-                                    }))}
-                                    label="Type de réclamation"
-                                    placeholder="Sélectionner un type..."
-                                    icon={<FileText className="w-4 h-4" />}
-                                    required
-                                    variant="outlined"
-                                    size="md"
-                                />
-
-                                <PremiumSelect
-                                    value={formData.urgence?.toString() || ''}
-                                    onChange={(value) => setFormData({ ...formData, urgence: Number(value) })}
-                                    options={urgences.map(u => ({
-                                        value: u.id.toString(),
-                                        label: u.niveau_urgence
-                                    }))}
-                                    label="Urgence"
-                                    placeholder="Sélectionner un niveau d'urgence..."
-                                    icon={<AlertOctagon className="w-4 h-4" />}
-                                    required
-                                    variant="outlined"
-                                    size="md"
-                                />
-
-                                <PremiumTextarea
-                                    value={formData.description || ''}
-                                    onChange={(value) => setFormData({ ...formData, description: value })}
-                                    label="Description"
-                                    placeholder="Décrivez le problème rencontré..."
-                                    rows={4}
-                                    required
-                                    variant="outlined"
-                                    size="md"
-                                />
-
-                                <PremiumInput
-                                    type="date"
-                                    value={formData.date_constatation || ''}
-                                    onChange={(value) => {
-                                        setFormData({
-                                            ...formData,
-                                            date_constatation: value || undefined
-                                        });
-                                    }}
-                                    label="Date de constatation"
-                                    icon={<Calendar className="w-4 h-4" />}
-                                    hint="Date où le problème a été constaté"
-                                    required
-                                    variant="outlined"
-                                    size="md"
-                                />
-
-                                {/* Section Photos Existantes (Edition) */}
-                                {existingPhotos.length > 0 && (
-                                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                                        <label className="block text-xs font-semibold text-slate-500 uppercase mb-2">
-                                            Photos existantes
-                                        </label>
-                                        <div className="flex gap-2 overflow-x-auto">
-                                            {existingPhotos.map((p, i) => (
-                                                <div key={p.id || i} className="relative group shrink-0">
-                                                    <img
-                                                        src={p.url_fichier}
-                                                        alt={p.legende || 'Photo'}
-                                                        className="h-20 w-20 object-cover rounded-md border border-slate-200"
-                                                    />
-                                                </div>
-                                            ))}
+                            <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+                                <div className="p-6 space-y-4 overflow-y-auto flex-1">
+                                    {/* Pre-selected site indicator */}
+                                    {preSelectedSiteName && (
+                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2">
+                                            <MapPin className="w-4 h-4 text-blue-600" />
+                                            <span className="text-sm text-blue-800">
+                                                Site: <strong>{preSelectedSiteName}</strong>
+                                            </span>
                                         </div>
-                                    </div>
-                                )}
-
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2 pb-2">
-                                        <Camera className="w-4 h-4 text-slate-600" />
-                                        <label className="text-sm font-semibold text-slate-800">
-                                            {editingId ? 'Ajouter des photos' : 'Photos'} <span className="text-xs text-slate-500 font-normal">(optionnel)</span>
-                                        </label>
-                                    </div>
-                                    <PhotoUpload
-                                        photos={photos}
-                                        onChange={setPhotos}
+                                    )}
+                                    <PremiumSelect
+                                        value={formData.type_reclamation?.toString() || ''}
+                                        onChange={(value) => setFormData({ ...formData, type_reclamation: Number(value) })}
+                                        options={types.map(t => ({
+                                            value: t.id.toString(),
+                                            label: t.nom_reclamation
+                                        }))}
+                                        label="Type de réclamation"
+                                        placeholder="Sélectionner un type..."
+                                        icon={<FileText className="w-4 h-4" />}
+                                        required
+                                        variant="outlined"
+                                        size="md"
                                     />
-                                </div>
-                            </div>
 
-                            <div className="p-4 border-t border-slate-100 shrink-0 bg-slate-50 flex gap-3">
-                                <button
-                                    type="button"
-                                    onClick={closeCreateModal}
-                                    className="flex-1 px-4 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium transition-colors"
-                                >
-                                    Annuler
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium shadow-sm hover:shadow-md transition-all"
-                                >
-                                    {editingId ? 'Enregistrer' : 'Créer'}
-                                </button>
-                            </div>
-                        </form>
+                                    <PremiumSelect
+                                        value={formData.urgence?.toString() || ''}
+                                        onChange={(value) => setFormData({ ...formData, urgence: Number(value) })}
+                                        options={urgences.map(u => ({
+                                            value: u.id.toString(),
+                                            label: u.niveau_urgence
+                                        }))}
+                                        label="Urgence"
+                                        placeholder="Sélectionner un niveau d'urgence..."
+                                        icon={<AlertOctagon className="w-4 h-4" />}
+                                        required
+                                        variant="outlined"
+                                        size="md"
+                                    />
+
+                                    <PremiumTextarea
+                                        value={formData.description || ''}
+                                        onChange={(value) => setFormData({ ...formData, description: value })}
+                                        label="Description"
+                                        placeholder="Décrivez le problème rencontré..."
+                                        rows={4}
+                                        required
+                                        variant="outlined"
+                                        size="md"
+                                    />
+
+                                    <PremiumInput
+                                        type="date"
+                                        value={formData.date_constatation || ''}
+                                        onChange={(value) => {
+                                            setFormData({
+                                                ...formData,
+                                                date_constatation: value || undefined
+                                            });
+                                        }}
+                                        label="Date de constatation"
+                                        icon={<Calendar className="w-4 h-4" />}
+                                        hint="Date où le problème a été constaté"
+                                        required
+                                        variant="outlined"
+                                        size="md"
+                                    />
+
+                                    {/* Section Photos Existantes (Edition) */}
+                                    {existingPhotos.length > 0 && (
+                                        <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                                            <label className="block text-xs font-semibold text-slate-500 uppercase mb-2">
+                                                Photos existantes
+                                            </label>
+                                            <div className="flex gap-2 overflow-x-auto">
+                                                {existingPhotos.map((p, i) => (
+                                                    <div key={p.id || i} className="relative group shrink-0">
+                                                        <img
+                                                            src={p.url_fichier}
+                                                            alt={p.legende || 'Photo'}
+                                                            className="h-20 w-20 object-cover rounded-md border border-slate-200"
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2 pb-2">
+                                            <Camera className="w-4 h-4 text-slate-600" />
+                                            <label className="text-sm font-semibold text-slate-800">
+                                                {editingId ? 'Ajouter des photos' : 'Photos'} <span className="text-xs text-slate-500 font-normal">(optionnel)</span>
+                                            </label>
+                                        </div>
+                                        <PhotoUpload
+                                            photos={photos}
+                                            onChange={setPhotos}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="p-4 border-t border-slate-100 shrink-0 bg-slate-50 flex gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={closeCreateModal}
+                                        className="flex-1 px-4 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium transition-colors"
+                                    >
+                                        Annuler
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium shadow-sm hover:shadow-md transition-all"
+                                    >
+                                        {editingId ? 'Enregistrer' : 'Créer'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
 
 
@@ -1437,14 +1514,16 @@ const Reclamations: React.FC = () => {
             />
 
             {/* Delete Confirmation Modal */}
-            {deletingReclamationId && (
-                <ConfirmDeleteModal
-                    title="Supprimer la réclamation ?"
-                    message="Cette action est irréversible."
-                    onConfirm={confirmDeleteReclamation}
-                    onCancel={() => setDeletingReclamationId(null)}
-                />
-            )}
+            {
+                deletingReclamationId && (
+                    <ConfirmDeleteModal
+                        title="Supprimer la réclamation ?"
+                        message="Cette action est irréversible."
+                        onConfirm={confirmDeleteReclamation}
+                        onCancel={() => setDeletingReclamationId(null)}
+                    />
+                )
+            }
 
         </div >
     );

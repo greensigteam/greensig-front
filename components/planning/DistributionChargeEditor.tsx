@@ -62,6 +62,13 @@ export function DistributionChargeEditor({
     return Math.round((diffMinutes / 60) * 100) / 100; // Arrondi à 2 décimales
   };
 
+  // ✅ Créer un Map pour accès rapide aux distributions originales par date
+  const distributionsMap = useMemo(() => {
+    const map = new Map<string, DistributionChargeData>();
+    distributions?.forEach(dist => map.set(dist.date, dist));
+    return map;
+  }, [distributions]);
+
   // Générer les lignes UNIQUEMENT pour les jours avec distributions
   const dayRows = useMemo(() => {
     // Si aucune distribution, retourner un tableau vide (affichera un message)
@@ -113,8 +120,10 @@ export function DistributionChargeEditor({
   // Handler pour changement de commentaire
   const handleCommentaireChange = (dateString: string, value: string) => {
     const newDistributions: DistributionChargeData[] = dayRows.map(row => {
+      const originalDist = distributionsMap.get(row.dateString);
       const c = row.dateString === dateString ? value : row.commentaire;
       return {
+        ...originalDist, // ✅ Préserver id, status, reference
         date: row.dateString,
         heure_debut: row.heure_debut,
         heure_fin: row.heure_fin,
@@ -128,9 +137,11 @@ export function DistributionChargeEditor({
   // Handler pour changement heure_debut
   const handleHeureDebutChange = (dateString: string, value: string) => {
     const newDistributions: DistributionChargeData[] = dayRows.map(row => {
+      const originalDist = distributionsMap.get(row.dateString);
       const nouveauDebut = row.dateString === dateString ? value : row.heure_debut;
 
       return {
+        ...originalDist, // ✅ Préserver id, status, reference
         date: row.dateString,
         heure_debut: nouveauDebut,
         heure_fin: row.heure_fin,
@@ -144,9 +155,11 @@ export function DistributionChargeEditor({
   // Handler pour changement heure_fin
   const handleHeureFinChange = (dateString: string, value: string) => {
     const newDistributions: DistributionChargeData[] = dayRows.map(row => {
+      const originalDist = distributionsMap.get(row.dateString);
       const nouvelleFin = row.dateString === dateString ? value : row.heure_fin;
 
       return {
+        ...originalDist, // ✅ Préserver id, status, reference
         date: row.dateString,
         heure_debut: row.heure_debut,
         heure_fin: nouvelleFin,
@@ -163,12 +176,18 @@ export function DistributionChargeEditor({
 
   // Handler pour la sélection des jours depuis le modal
   const handleDaysSelected = (selectedDays: any[]) => {
-    const newDistributions: DistributionChargeData[] = selectedDays.map(day => ({
-      date: day.date,
-      heure_debut: day.heure_debut,
-      heure_fin: day.heure_fin,
-      commentaire: day.commentaire || ''
-    }));
+    const newDistributions: DistributionChargeData[] = selectedDays.map(day => {
+      // ✅ Préserver les données existantes si la distribution existe déjà
+      const existingDist = distributionsMap.get(day.date);
+
+      return {
+        ...existingDist, // Préserver id, status, reference si existant
+        date: day.date,
+        heure_debut: day.heure_debut,
+        heure_fin: day.heure_fin,
+        commentaire: day.commentaire || existingDist?.commentaire || ''
+      };
+    });
 
     onChange(newDistributions);
     setShowSelectDaysModal(false);

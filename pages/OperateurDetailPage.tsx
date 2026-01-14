@@ -41,11 +41,10 @@ const TabButton: React.FC<{
 }> = ({ active, onClick, icon, label, badge }) => (
     <button
         onClick={onClick}
-        className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
-            active
+        className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${active
                 ? 'border-emerald-500 text-emerald-600 bg-gradient-to-r from-emerald-50/50'
                 : 'border-transparent text-gray-500 hover:text-emerald-600 hover:border-gray-300'
-        }`}
+            }`}
     >
         {icon}
         <span className="font-medium">{label}</span>
@@ -184,11 +183,10 @@ const OngletGeneral: React.FC<{ operateur: OperateurDetail }> = ({ operateur }) 
                         </div>
                         <div className="flex items-center justify-between pb-3 border-b border-blue-200">
                             <span className="text-sm text-gray-600">Disponibilité</span>
-                            <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full ${
-                                operateur.estDisponible
+                            <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full ${operateur.estDisponible
                                     ? 'bg-green-100 text-green-800'
                                     : 'bg-red-100 text-red-800'
-                            }`}>
+                                }`}>
                                 {operateur.estDisponible ? (
                                     <UserCheck className="w-3 h-3" />
                                 ) : (
@@ -418,11 +416,10 @@ const OngletAbsences: React.FC<{
                             <button
                                 onClick={() => goToPage(currentPage - 1)}
                                 disabled={currentPage === 1}
-                                className={`px-3 py-1 text-sm rounded-lg border transition-colors ${
-                                    currentPage === 1
+                                className={`px-3 py-1 text-sm rounded-lg border transition-colors ${currentPage === 1
                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                         : 'bg-white text-gray-700 hover:bg-gray-50'
-                                }`}
+                                    }`}
                             >
                                 <ChevronLeft className="w-4 h-4" />
                             </button>
@@ -432,11 +429,10 @@ const OngletAbsences: React.FC<{
                                     <button
                                         key={page}
                                         onClick={() => goToPage(page)}
-                                        className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                                            currentPage === page
+                                        className={`px-3 py-1 text-sm rounded-lg transition-colors ${currentPage === page
                                                 ? 'bg-emerald-600 text-white font-medium'
                                                 : 'bg-white text-gray-700 hover:bg-gray-50 border'
-                                        }`}
+                                            }`}
                                     >
                                         {page}
                                     </button>
@@ -446,11 +442,10 @@ const OngletAbsences: React.FC<{
                             <button
                                 onClick={() => goToPage(currentPage + 1)}
                                 disabled={currentPage === totalPages}
-                                className={`px-3 py-1 text-sm rounded-lg border transition-colors ${
-                                    currentPage === totalPages
+                                className={`px-3 py-1 text-sm rounded-lg border transition-colors ${currentPage === totalPages
                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                         : 'bg-white text-gray-700 hover:bg-gray-50'
-                                }`}
+                                    }`}
                             >
                                 <ChevronRight className="w-4 h-4" />
                             </button>
@@ -590,11 +585,10 @@ const OngletInterventions: React.FC<{
                             <button
                                 onClick={() => goToPage(currentPage - 1)}
                                 disabled={currentPage === 1}
-                                className={`px-3 py-1 text-sm rounded-lg border transition-colors ${
-                                    currentPage === 1
+                                className={`px-3 py-1 text-sm rounded-lg border transition-colors ${currentPage === 1
                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                         : 'bg-white text-gray-700 hover:bg-gray-50'
-                                }`}
+                                    }`}
                             >
                                 <ChevronLeft className="w-4 h-4" />
                             </button>
@@ -604,11 +598,10 @@ const OngletInterventions: React.FC<{
                                     <button
                                         key={page}
                                         onClick={() => goToPage(page)}
-                                        className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                                            currentPage === page
+                                        className={`px-3 py-1 text-sm rounded-lg transition-colors ${currentPage === page
                                                 ? 'bg-emerald-600 text-white font-medium'
                                                 : 'bg-white text-gray-700 hover:bg-gray-50 border'
-                                        }`}
+                                            }`}
                                     >
                                         {page}
                                     </button>
@@ -618,11 +611,10 @@ const OngletInterventions: React.FC<{
                             <button
                                 onClick={() => goToPage(currentPage + 1)}
                                 disabled={currentPage === totalPages}
-                                className={`px-3 py-1 text-sm rounded-lg border transition-colors ${
-                                    currentPage === totalPages
+                                className={`px-3 py-1 text-sm rounded-lg border transition-colors ${currentPage === totalPages
                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                         : 'bg-white text-gray-700 hover:bg-gray-50'
-                                }`}
+                                    }`}
                             >
                                 <ChevronRight className="w-4 h-4" />
                             </button>

@@ -104,12 +104,16 @@ export interface RatioProductiviteCreate {
 
 export interface ObjetSimple {
     id: number;
-    site: number;           // Site FK (ID)
+    site?: number;           // Legacy: Site FK (ID) - kept for backward compatibility
+    site_id?: number;        // New: Site FK (ID) from ObjetMinimalSerializer
     site_nom: string;       // Site name
     sous_site: number | null;  // SousSite FK (ID)
     sous_site_nom?: string;    // SousSite name (if available)
     nom_type?: string;         // Object type name (optional, from get_nom_type)
     display?: string;          // Display string (optional)
+    superficie_calculee?: number; // ✅ NEW: Surfacic Data
+    etat?: string;            // ✅ NEW: State
+    famille?: string;         // ✅ NEW: Family
 }
 
 export interface ParticipationTache {
@@ -155,12 +159,14 @@ export interface DistributionCharge {
 }
 
 export interface DistributionChargeData {
+    id?: number; // ✅ CRITIQUE: Pour les updates, permet au backend d'identifier les distributions existantes
     date: string; // YYYY-MM-DD
     heures_planifiees?: number;  // Calculé automatiquement côté backend depuis heure_debut et heure_fin
     heure_debut?: string;  // "HH:MM" ou "HH:MM:SS"
     heure_fin?: string;     // "HH:MM" ou "HH:MM:SS"
     commentaire?: string;
     status?: StatusDistribution;  // ✅ NOUVEAU: Statut optionnel (défaut: NON_REALISEE)
+    reference?: string; // ✅ NOUVEAU: Référence persistante (pour tracking)
 }
 
 // ============================================================================

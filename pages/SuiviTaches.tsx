@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
     Calendar, MapPin, Building2, Users, ChevronDown,
-    ChevronRight, Camera, Package, AlertCircle, Plus, Trash2,
+    ChevronRight, ChevronLeft, ChevronsLeft, ChevronsRight, Camera, Package, AlertCircle, Plus, Trash2,
     Loader2, FileImage, Play, CheckCircle, XCircle, ThumbsUp, ThumbsDown, ShieldCheck,
     RefreshCw, Eye, Filter, X, Clock, Pencil
 } from 'lucide-react';
@@ -37,6 +37,10 @@ const SuiviTaches: React.FC = () => {
     const [loadingTasks, setLoadingTasks] = useState(true);
     const [taches, setTaches] = useState<Tache[]>([]);
     const [selectedTache, setSelectedTache] = useState<Tache | null>(null);
+
+    // State Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(20);
 
     // State Filtres
     const [filters, setFilters] = useState<PlanningFilters>(EMPTY_PLANNING_FILTERS);
@@ -109,6 +113,11 @@ const SuiviTaches: React.FC = () => {
         };
     }, [setPlaceholder, setSearchQuery]);
 
+    // Reset pagination when filters or search change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, filters]);
+
 
     // Chargement initial
     useEffect(() => {
@@ -126,8 +135,8 @@ const SuiviTaches: React.FC = () => {
                 fetchEquipes(),
                 fetchAllSites()
             ]);
-            setStructures(structuresRes.results || []);
-            setEquipes(equipesRes.results || []);
+            setStructures(Array.isArray(structuresRes) ? structuresRes : (structuresRes.results || []));
+            setEquipes(Array.isArray(equipesRes) ? equipesRes : (equipesRes.results || []));
             setSites(sitesArray.filter(s => s.actif));
         } catch (error) {
             console.error("Erreur chargement données filtres", error);
@@ -157,8 +166,9 @@ const SuiviTaches: React.FC = () => {
     const loadTaches = async () => {
         setLoadingTasks(true);
         try {
-            const response = await planningService.getTaches({ page: 1 });
-            setTaches(response.results);
+            const response = await planningService.getTaches();
+            const tachesData = Array.isArray(response) ? response : (response.results || []);
+            setTaches(tachesData);
         } catch (error) {
             console.error("Erreur chargement tâches", error);
         } finally {
@@ -486,7 +496,7 @@ const SuiviTaches: React.FC = () => {
                     // Direct match - continue to other filters
                 } else {
                     // Fallback: check if any object's site belongs to this structure
-                    const siteIds = t.objets_detail?.map(obj => obj.site) || [];
+                    const siteIds = t.objets_detail?.map(obj => obj.site_id || Number(obj.site)) || [];
                     const matchingSites = sites.filter(s =>
                         s.structure_client === filters.clientId &&
                         siteIds.includes(Number(s.id))
@@ -496,7 +506,7 @@ const SuiviTaches: React.FC = () => {
             }
 
             if (filters.siteId !== null) {
-                const hasSite = t.objets_detail?.some(obj => Number(obj.site) === filters.siteId);
+                const hasSite = t.objets_detail?.some(obj => (obj.site_id || Number(obj.site)) === filters.siteId);
                 if (!hasSite) return false;
             }
 
@@ -512,6 +522,13 @@ const SuiviTaches: React.FC = () => {
             return true;
         });
     }, [taches, searchQuery, filters]);
+
+    // Pagination Logic
+    const totalPages = Math.ceil(filteredTaches.length / itemsPerPage);
+    const paginatedTaches = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filteredTaches.slice(startIndex, startIndex + itemsPerPage);
+    }, [filteredTaches, currentPage, itemsPerPage]);
 
     const activeFiltersCount = useMemo(() => {
         let count = 0;
@@ -673,7 +690,7 @@ const SuiviTaches: React.FC = () => {
                             </div>
                         ) : (
                             <div className="grid gap-3">
-                                {filteredTaches.map(tache => (
+                                {paginatedTaches.map(tache => (
                                     <div
                                         key={tache.id}
                                         onClick={() => setSelectedTache(tache)}
@@ -721,6 +738,48 @@ const SuiviTaches: React.FC = () => {
                             </div>
                         )}
                     </div>
+
+                    {/* Pagination Controls */}
+                    {filteredTaches.length > 0 && (
+                        <div className="sticky bottom-0 bg-white border-t border-slate-200 px-6 py-3">
+                            <div className="flex items-center justify-between">
+                                <div className="text-sm text-slate-600">
+                                    Affichage {(currentPage - 1) * itemsPerPage + 1} à {Math.min(currentPage * itemsPerPage, filteredTaches.length)} sur {filteredTaches.length}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setCurrentPage(1)}
+                                        disabled={currentPage === 1}
+                                        className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <ChevronsLeft className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                        disabled={currentPage === 1}
+                                        className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <ChevronLeft className="w-4 h-4" />
+                                    </button>
+                                    <span className="px-3 py-1 text-sm text-slate-600">Page {currentPage} sur {totalPages || 1}</span>
+                                    <button
+                                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                        disabled={currentPage === totalPages || totalPages === 0}
+                                        className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentPage(totalPages)}
+                                        disabled={currentPage === totalPages || totalPages === 0}
+                                        className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <ChevronsRight className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Right Panel: Task Detail */}

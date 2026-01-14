@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Calendar, X, CheckSquare, Clock, Settings2, AlertTriangle } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Calendar, X, CheckSquare, Clock, Settings2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { DayPicker, Matcher } from 'react-day-picker';
 import { fr } from 'date-fns/locale/fr';
 import { isSunday, isSaturday, format } from 'date-fns';
@@ -77,9 +77,26 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
 
   const [selectedDays, setSelectedDays] = useState<DaySelection[]>(allDays);
 
-  // ❌ SUPPRIMÉ: Ne plus appliquer automatiquement les horaires par défaut à tous les jours
-  // Les horaires par défaut s'appliquent uniquement lors de la sélection initiale ou de nouveaux jours
-  // Les jours déjà sélectionnés conservent leurs heures actuelles
+  // ✅ Synchroniser selectedDays avec allDays quand il change (ex: initialSelection change)
+  useEffect(() => {
+    setSelectedDays(allDays);
+  }, [allDays]);
+
+  // ✅ Fonction pour appliquer les horaires par défaut à tous les jours sélectionnés
+  const appliquerHorairesParDefaut = () => {
+    setSelectedDays(prev =>
+      prev.map(day =>
+        day.selected
+          ? { ...day, heure_debut: defaultHeureDebut, heure_fin: defaultHeureFin }
+          : day
+      )
+    );
+  };
+
+  // ❌ SUPPRIMÉ: Application automatique des horaires par défaut
+  // Les horaires par défaut s'appliquent UNIQUEMENT :
+  // 1. Aux nouveaux jours lors de la sélection initiale (via handleSelect)
+  // 2. Manuellement via le bouton "Appliquer à la sélection"
 
   const selectedDates = useMemo(() => {
     return selectedDays
@@ -283,6 +300,17 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
               <span className="text-emerald-700 font-bold ml-2">
                 ({calculerHeures(defaultHeureDebut, defaultHeureFin).toFixed(2)}h)
               </span>
+              {stats.count > 0 && (
+                <button
+                  type="button"
+                  onClick={appliquerHorairesParDefaut}
+                  className="ml-2 px-3 py-1 text-xs font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all shadow-sm flex items-center gap-1.5"
+                  title="Appliquer ces horaires à tous les jours sélectionnés"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  Appliquer à la sélection
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -372,7 +400,8 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
                 border: 2px solid #fcd34d;
               }
 
-              .rdp-day-sunday {
+              .rdp-day-sunday,
+              .rdp-day_disabled {
                 background-color: #fee2e2 !important;
                 color: #dc2626 !important;
                 cursor: not-allowed !important;
@@ -380,8 +409,9 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
               }
 
               .rdp-day-outside {
-                background-color: #f9fafb !important;
-                color: #d1d5db !important;
+                opacity: 0.3;
+                background-color: transparent !important;
+                pointer-events: none;
               }
 
               /* ✅ NOUVEAU: Style pour les dates protégées (réalisées) */
@@ -453,10 +483,12 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
                   today: 'rdp-today',
                 }}
                 disabled={(date) =>
-                  isSunday(date) // ✅ MODIFIÉ: Seulement les dimanches sont désactivés
+                  isSunday(date) || date < dateDebut || date > dateFin // ✅ MODIFIÉ: Dimanches + Hors période sont désactivés
                 }
+                fromDate={dateDebut}
+                toDate={dateFin}
                 defaultMonth={dateDebut}
-                showOutsideDays
+                showOutsideDays={false} // ✅ MODIFIÉ: Cacher les jours complètement hors mois si voulu, ou garder true avec style disabled
               />
 
               {/* Légende */}

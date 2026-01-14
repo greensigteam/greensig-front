@@ -599,6 +599,7 @@ export interface InventoryResponse {
       famille?: string
       site_nom: string
       sous_site_nom?: string
+      etat?: string; // ✅ NEW: State
       [key: string]: any   // Propriétés spécifiques au type
     }
   }>

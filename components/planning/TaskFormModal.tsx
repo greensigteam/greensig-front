@@ -42,6 +42,8 @@ export interface InventoryObjectOption {
     site: string;
     soussite?: string;
     superficie?: number;
+    etat?: string;
+    famille?: string;
 }
 
 interface TaskFormModalProps {
@@ -122,10 +124,13 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
     // ✅ NOUVEAU: Distributions de charge pour tâches multi-jours
     const [distributionsCharge, setDistributionsCharge] = useState<DistributionChargeData[]>(
         tache?.distributions_charge?.map(d => ({
+            id: d.id, // ✅ CRITIQUE: Préserver l'ID pour les updates
             date: d.date,
             heure_debut: d.heure_debut ?? undefined, // normalize null -> undefined
             heure_fin: d.heure_fin ?? undefined,     // normalize null -> undefined
-            commentaire: d.commentaire
+            commentaire: d.commentaire,
+            status: d.status, // ✅ NOUVEAU: Préserver le statut
+            reference: d.reference // ✅ NOUVEAU: Préserver la référence
         })) || []
     );
 
@@ -205,17 +210,22 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
 
         if (formData.date_debut_planifiee) {
             const start = new Date(formData.date_debut_planifiee);
-            const now = new Date();
 
-            // Check if start date is in the past (only for new tasks or significantly modified dates)
-            // Using a small buffer of 5 minutes to avoid annoying warnings for "just now"
-            if (start.getTime() < now.getTime() - 5 * 60 * 1000) {
+            // Warning 1 : Date de début dans le passé
+            // Comparaison basée uniquement sur les dates (année, mois, jour) sans prendre en compte l'heure
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const startDate = new Date(start);
+            startDate.setHours(0, 0, 0, 0);
+
+            if (startDate.getTime() < today.getTime()) {
                 warnings.push("La date de début est dans le passé.");
             }
 
             if (formData.date_fin_planifiee) {
                 const end = new Date(formData.date_fin_planifiee);
-                if (end.getTime() <= start.getTime()) {
+                if (end.getDate() < start.getDate()) {
                     warnings.push("La date de fin doit être postérieure à la date de début.");
                 }
             }
@@ -385,7 +395,9 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                             nom: item.properties.nom || item.properties.famille || `${item.properties.object_type} #${objectId}`,
                             site: item.properties.site_nom,
                             soussite: item.properties.sous_site_nom,
-                            superficie: item.properties.superficie_calculee // ✅ Extraire la superficie
+                            superficie: item.properties.superficie_calculee, // ✅ Extraire la superficie
+                            etat: item.properties.etat, // ✅ Extraire l'état
+                            famille: item.properties.famille // ✅ Extraire la famille
                         };
                     });
 
@@ -412,7 +424,9 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                             nom: item.properties.nom || item.properties.famille || `${item.properties.object_type} #${objectId}`,
                             site: item.properties.site_nom,
                             soussite: item.properties.sous_site_nom,
-                            superficie: item.properties.superficie_calculee // ✅ Extraire la superficie
+                            superficie: item.properties.superficie_calculee, // ✅ Extraire la superficie
+                            etat: item.properties.etat, // ✅ Extraire l'état
+                            famille: item.properties.famille // ✅ Extraire la famille
                         };
                     });
 
@@ -491,7 +505,9 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                 nom: o.display || `Objet #${o.id}`, // Now available from backend
                 site: o.site_nom || '',
                 soussite: o.sous_site_nom,
-                superficie: o.superficie_calculee // ✅ Extraire la superficie
+                superficie: o.superficie_calculee, // ✅ Extraire la superficie
+                etat: o.etat, // ✅ Extraire l'état
+                famille: o.famille // ✅ Extraire la famille
             })) || [];
 
             setSelectedObjects(newSelectedObjects);

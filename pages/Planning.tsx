@@ -11,27 +11,31 @@ import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 
 import {
     Users, Clock, X, Trash2, Edit, Timer, AlertTriangle, Download, Calendar as CalendarIcon, List,
-    ChevronLeft, ChevronRight, CheckCircle2, MoreVertical, CornerUpLeft, ChevronDown
+    ChevronLeft, ChevronRight, CheckCircle2, MoreVertical, CornerUpLeft, ChevronDown,
+    Calendar, Filter
 } from 'lucide-react';
+import { useSearch } from '../contexts/SearchContext';
 import { planningService } from '../services/planningService';
-import { fetchEquipes, fetchClients } from '../services/usersApi';
-import { fetchCurrentUser } from '../services/api';
+import { fetchEquipes, fetchStructures } from '../services/usersApi';
+import { fetchCurrentUser, fetchAllSites, SiteFrontend } from '../services/api';
 import {
     Tache, TacheCreate, TacheUpdate, TypeTache,
     STATUT_TACHE_LABELS, STATUT_TACHE_COLORS,
     PRIORITE_LABELS,
     STATUS_DISTRIBUTION_LABELS, STATUS_DISTRIBUTION_COLORS,
-    type StatusDistribution
+    type StatusDistribution,
+    PlanningFilters, EMPTY_PLANNING_FILTERS
 } from '../types/planning';
-import { EquipeList, Client } from '../types/users';
+import { EquipeList, StructureClient } from '../types/users';
 import { usePermissions } from '../hooks/usePermissions';
-import type { User, Role } from '../types';
+import type { User, Role, SearchSuggestion } from '../types';
 import TaskFormModal, { InventoryObjectOption } from '../components/planning/TaskFormModal';
 import QuickTaskCreator from '../components/planning/QuickTaskCreator';
 import { StatusBadge } from '../components/StatusBadge';
 import LoadingScreen from '../components/LoadingScreen';
-import { fetchSites, fetchInventory } from '../services/api';
+import { fetchInventory } from '../services/api';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
+import PlanningFiltersComponent from '../components/planning/PlanningFilters';
 import {
     FloatingPortal,
     type ReferenceType,
@@ -123,7 +127,7 @@ const TaskEvent = memo(function TaskEvent({ event }: { event: CalendarEvent, tit
         <div
             className={`
                 task-event-root group flex items-start gap-2 p-1.5 rounded-lg transition-all duration-200
-                border-l-4 relative
+                border-l-4 relative h-full
                 ${isCompleted ? 'opacity-60' : 'hover:bg-gray-50'}
                 ${isDistributionRealisee ? 'bg-green-50 border-green-500 shadow-sm' : ''}
                 ${isDistribution && !isDistributionRealisee
@@ -161,10 +165,10 @@ const TaskEvent = memo(function TaskEvent({ event }: { event: CalendarEvent, tit
 
                     <span
                         className={`
-                            text-xs font-medium truncate
-                            ${isCompleted ? 'line-through text-gray-500' : 'text-gray-700'}
-                            ${isUrgent && !isCompleted ? 'text-red-700 font-semibold' : ''}
-                        `}
+                                text-xs font-medium truncate
+                                ${isCompleted ? 'line-through text-gray-500' : 'text-gray-700'}
+                                ${isUrgent && !isCompleted ? 'text-red-700 font-semibold' : ''}
+                            `}
                     >
                         {tache.type_tache_detail.nom_tache}
                     </span>
@@ -241,7 +245,7 @@ const TaskDetailPopover: FC<PopoverProps> = ({ tache, eventStart, eventEnd, dist
                 className="fixed inset-0 z-[1000] flex items-center justify-center p-4 pointer-events-none"
             >
                 <div
-                    className="w-[420px] max-w-full bg-white rounded-xl shadow-2xl border border-gray-100 animate-popover flex flex-col overflow-hidden pointer-events-auto"
+                    className="w-[550px] max-w-full min-h-[400px] bg-white rounded-xl shadow-2xl border border-gray-100 animate-popover flex flex-col overflow-hidden pointer-events-auto"
                     onClick={(e) => e.stopPropagation()}
                 >
                     {/* Header Actions */}
@@ -267,9 +271,9 @@ const TaskDetailPopover: FC<PopoverProps> = ({ tache, eventStart, eventEnd, dist
                     </div>
 
                     {/* Hero Content */}
-                    <div className="px-6 py-5">
-                        <div className="flex items-start gap-4">
-                            {/* Big Checkbox - disabled for CLIENT (readOnly), TERMINEE tasks, or tasks without team */}
+                    <div className="p-8">
+                        <div className="flex items-start gap-5">
+                            {/* Big Checkbox */}
                             {onToggleDistribution && (
                                 <button
                                     onClick={isDistributionDisabled ? undefined : onToggleDistribution}
@@ -284,7 +288,7 @@ const TaskDetailPopover: FC<PopoverProps> = ({ tache, eventStart, eventEnd, dist
                                                     : 'Marquer cette journée comme réalisée'
                                     }
                                     className={`
-                                mt-1 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300
+                                mt-1.5 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0
                                 ${isCompleted
                                             ? 'bg-emerald-600 border-emerald-600 text-white animate-check'
                                             : 'bg-white border-gray-400 hover:border-emerald-500 hover:bg-emerald-50'
@@ -292,37 +296,71 @@ const TaskDetailPopover: FC<PopoverProps> = ({ tache, eventStart, eventEnd, dist
                                 ${isDistributionDisabled ? 'cursor-not-allowed opacity-60' : ''}
                             `}
                                 >
-                                    {isCompleted && <CheckCircle2 className="w-4 h-4" />}
+                                    {isCompleted && <CheckCircle2 className="w-5 h-5" />}
                                 </button>
                             )}
 
                             <div className="flex-1">
-                                <h3 className={`text-lg font-medium leading-snug ${isCompleted ? 'line-through text-gray-500' : 'text-gray-900'}`}>
-                                    {tache.type_tache_detail.nom_tache}
+                                {/* Type Label & Reference */}
+                                <div className="flex items-center gap-3 mb-2">
+                                    <span className={`text-[11px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-full ${distributionId ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                                        {distributionId ? 'Distribution de la tâche' : 'Tâche'}
+                                    </span>
                                     {tache.reference && (
-                                        <span className="ml-2 text-xs font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded align-middle">
+                                        <span className="text-sm font-mono text-slate-500">
                                             {tache.reference}
                                         </span>
                                     )}
+                                </div>
+
+                                <h3 className={`text-xl font-semibold leading-relaxed ${isCompleted ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+                                    {tache.type_tache_detail.nom_tache}
                                 </h3>
-                                <div className="mt-2 flex flex-col gap-1 text-sm text-gray-600">
-                                    <div className="flex items-center gap-2">
-                                        <Clock className="w-4 h-4 text-gray-400" />
-                                        <span>
-                                            {eventStart
-                                                ? format(eventStart, 'EEEE d MMMM', { locale: fr })
-                                                : format(new Date(tache.date_debut_planifiee), 'EEEE d MMMM', { locale: fr })
-                                            }
-                                            <span className="mx-1">•</span>
-                                            {eventStart && eventEnd
-                                                ? `${format(eventStart, 'HH:mm')} - ${format(eventEnd, 'HH:mm')}`
-                                                : `${format(new Date(tache.date_debut_planifiee), 'HH:mm')} - ${format(new Date(tache.date_fin_planifiee), 'HH:mm')}`
-                                            }
-                                        </span>
+                                <div className="mt-4 flex flex-col gap-3 text-base text-gray-600">
+                                    {/* Date Header: Distribution (Specific) vs Task (Period) */}
+                                    <div className="flex items-center gap-3">
+                                        <Clock className="w-5 h-5 text-gray-400" />
+                                        {distributionId ? (
+                                            /* Distribution : Date & Heure spécifique */
+                                            <span>
+                                                {eventStart && format(eventStart, 'EEEE d MMMM', { locale: fr })}
+                                                <span className="mx-2 text-gray-300">|</span>
+                                                {eventStart && eventEnd && `${format(eventStart, 'HH:mm')} - ${format(eventEnd, 'HH:mm')}`}
+                                            </span>
+                                        ) : (
+                                            /* Tâche : Période planifiée globale */
+                                            <span className="text-sm font-medium text-slate-700">
+                                                Période planifiée : {format(new Date(tache.date_debut_planifiee), 'd MMM', { locale: fr })}
+                                                <span className="mx-2 text-slate-400">→</span>
+                                                {format(new Date(tache.date_fin_planifiee), 'd MMM yyyy', { locale: fr })}
+                                            </span>
+                                        )}
                                     </div>
+
+                                    {/* Liste des jours d'intervention (Uniquement si distributions existantes) */}
+                                    {(!distributionId && tache.distributions_charge && tache.distributions_charge.length > 0) && (
+                                        <div className="flex items-start gap-3 bg-slate-50 px-3 py-2.5 rounded-lg border border-slate-100/50">
+                                            <Calendar className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                                            <div className="flex flex-col gap-2 flex-1">
+                                                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wide">
+                                                    Jours d'intervention ({tache.distributions_charge.length})
+                                                </span>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {tache.distributions_charge
+                                                        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                                                        .map(d => (
+                                                            <span key={d.id} className="inline-flex items-center px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-medium text-slate-700 shadow-sm">
+                                                                {format(new Date(d.date), 'd MMM', { locale: fr })}
+                                                            </span>
+                                                        ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {(tache.equipes_detail?.length > 0 || tache.equipe_detail) ? (
-                                        <div className="flex items-center gap-2">
-                                            <Users className="w-4 h-4 text-gray-400" />
+                                        <div className="flex items-center gap-3">
+                                            <Users className="w-5 h-5 text-gray-400" />
                                             <span>
                                                 {tache.equipes_detail?.length > 0
                                                     ? tache.equipes_detail.map(e => (e as any).nom_equipe || e.nomEquipe).join(', ')
@@ -330,9 +368,9 @@ const TaskDetailPopover: FC<PopoverProps> = ({ tache, eventStart, eventEnd, dist
                                             </span>
                                         </div>
                                     ) : (
-                                        <div className="flex items-center gap-2 text-orange-600 bg-orange-50 px-3 py-2 rounded-lg">
-                                            <AlertTriangle className="w-4 h-4" />
-                                            <span className="text-sm font-medium">Assigner une équipe à cette tâche</span>
+                                        <div className="flex items-center gap-3 text-orange-600 bg-orange-50 px-4 py-3 rounded-xl mt-2">
+                                            <AlertTriangle className="w-5 h-5" />
+                                            <span className="font-medium">Assigner une équipe à cette tâche</span>
                                         </div>
                                     )}
                                 </div>
@@ -342,7 +380,7 @@ const TaskDetailPopover: FC<PopoverProps> = ({ tache, eventStart, eventEnd, dist
 
                     {/* Body / Context */}
                     {(tache.commentaires || tache.priorite) && (
-                        <div className="px-6 pb-6 pt-0 space-y-4">
+                        <div className="px-8 pb-8 pt-0 space-y-5">
                             {tache.commentaires && (
                                 <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg leading-relaxed">
                                     {tache.commentaires}
@@ -379,9 +417,8 @@ const Planning: FC = () => {
     const [taches, setTaches] = useState<Tache[]>([]);
     const [equipes, setEquipes] = useState<EquipeList[]>([]);
     const [typesTaches, setTypesTaches] = useState<TypeTache[]>([]);
-    const [sites, setSites] = useState<Array<{ id: number; name: string }>>([]);
-
-    const [_clients, setClients] = useState<Client[]>([]);
+    const [sites, setSites] = useState<SiteFrontend[]>([]);
+    const [structures, setStructures] = useState<StructureClient[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -420,8 +457,133 @@ const Planning: FC = () => {
     const [initialTaskValues, setInitialTaskValues] = useState<Partial<TacheCreate> | undefined>(undefined);
     const [preSelectedObjects, setPreSelectedObjects] = useState<InventoryObjectOption[] | undefined>(undefined);
 
-    // Toutes les tâches (pas de filtrage dans Planning, les filtres sont dans SuiviTaches)
-    const filteredTaches = taches;
+    // Search & Filters state
+    const { searchQuery, setPlaceholder, setSearchSuggestions, setSelectedSuggestion } = useSearch();
+    const [filters, setFilters] = useState<PlanningFilters>(() => {
+        const saved = localStorage.getItem('planning_filters');
+        return saved ? JSON.parse(saved) : EMPTY_PLANNING_FILTERS;
+    });
+    const [showFilters, setShowFilters] = useState(false);
+
+    // Compte filtres actifs pour le badge
+    const activeFiltersCount = useMemo(() => {
+        let count = 0;
+        if (filters.clientId !== null) count++;
+        if (filters.siteId !== null) count++;
+        if (filters.equipeId !== null) count++;
+        if (filters.statuts.length > 0) count++;
+        return count;
+    }, [filters]);
+
+    // Persistent filters
+    useEffect(() => {
+        localStorage.setItem('planning_filters', JSON.stringify(filters));
+    }, [filters]);
+
+    // Update global search placeholder
+    useEffect(() => {
+        setPlaceholder('Rechercher par nom, référence, équipe ou site...');
+    }, [setPlaceholder]);
+
+    // Filtered tasks logic
+    const filteredTaches = useMemo(() => {
+        const active = taches.filter((t: Tache) => {
+            const task = t as any;
+            // 1. Search filter
+            if (searchQuery.trim()) {
+                const q = searchQuery.toLowerCase();
+                const matchesName = task.type_tache_detail.nom_tache.toLowerCase().includes(q);
+                const matchesRef = task.reference?.toLowerCase().includes(q);
+                const site_nom = task.site_nom || task.client_detail?.structure?.nom || task.client_detail?.nomStructure;
+                const matchesSite = site_nom?.toLowerCase().includes(q);
+
+                const matchesEquipes = task.equipes_detail?.some((e: any) =>
+                    (e.nom_equipe || e.nomEquipe || '').toLowerCase().includes(q)
+                ) || task.equipe_detail?.nom_equipe?.toLowerCase().includes(q) ||
+                    task.equipe_detail?.nomEquipe?.toLowerCase().includes(q);
+
+                if (!matchesName && !matchesRef && !matchesSite && !matchesEquipes) return false;
+            }
+
+            // 2. Faceted filters
+            const id_client = task.structure_client_detail?.id || task.id_structure_client;
+            if (filters.clientId && String(id_client) !== String(filters.clientId)) return false;
+
+            if (filters.siteId) {
+                // Like SuiviTaches, check if any object belongs to the selected site
+                const hasSite = task.objets_detail?.some((obj: any) =>
+                    (obj.site_id || Number(obj.site)) === Number(filters.siteId)
+                );
+                if (!hasSite) return false;
+            }
+
+            if (filters.equipeId) {
+                const id_equipe = task.id_equipe;
+                const inEquipes = task.equipes_detail?.some((e: any) => String(e.id) === String(filters.equipeId));
+                if (!inEquipes && (!id_equipe || String(id_equipe) !== String(filters.equipeId))) return false;
+            }
+
+            if (filters.statuts.length > 0 && !filters.statuts.includes(task.statut)) return false;
+
+            return true;
+        });
+
+        return active;
+    }, [taches, searchQuery, filters]);
+
+    // Auto-completion logic
+    useEffect(() => {
+        if (!searchQuery.trim() || searchQuery.length < 2) {
+            setSearchSuggestions([]);
+            return;
+        }
+
+        const q = searchQuery.toLowerCase();
+        const suggestions: SearchSuggestion[] = [];
+
+        // Find unique task types & names matching
+        const matchingTaches = taches.filter(t =>
+            t.type_tache_detail.nom_tache.toLowerCase().includes(q) ||
+            t.reference?.toLowerCase().includes(q)
+        ).slice(0, 5);
+
+        matchingTaches.forEach(t => {
+            suggestions.push({
+                id: `task-${t.id}`,
+                name: t.type_tache_detail.nom_tache,
+                type: 'Tâche',
+                subtitle: t.reference || undefined
+            });
+        });
+
+        // Find matching sites
+        const matchingSites = sites.filter(s => s.name.toLowerCase().includes(q)).slice(0, 3);
+        matchingSites.forEach(s => {
+            suggestions.push({
+                id: `site-${s.id}`,
+                name: s.name,
+                type: 'Site'
+            });
+        });
+
+        // Find matching teams
+        const matchingEquipes = equipes.filter(e => e.nomEquipe.toLowerCase().includes(q)).slice(0, 3);
+        matchingEquipes.forEach(e => {
+            suggestions.push({
+                id: `team-${e.id}`,
+                name: e.nomEquipe,
+                type: 'Équipe'
+            });
+        });
+
+        setSearchSuggestions(suggestions);
+    }, [searchQuery, taches, sites, equipes, setSearchSuggestions]);
+
+    // Handle suggestion selection
+    useEffect(() => {
+        // Here we could handle jump to date or site if needed
+        // For now, selecting a suggestion just sets the searchQuery (handled by SearchContext)
+    }, [setSelectedSuggestion]);
 
     // ... (Data Loading & Navigation Effects - unchanged)
     useEffect(() => { loadStableData(); loadTaches(); }, []);
@@ -430,24 +592,18 @@ const Planning: FC = () => {
     const loadStableData = async () => {
         try {
             setLoading(true);
-            const [equipesData, typesData, userData, clientsData] = await Promise.all([
+            const [equipesData, typesData, userData, structuresRes] = await Promise.all([
                 fetchEquipes().then(data => data.results || data),
                 planningService.getTypesTaches(),
                 fetchCurrentUser(),
-                fetchClients() // NOUVEAU: Fetch clients for filters
+                fetchStructures()
             ]);
+
             setEquipes(Array.isArray(equipesData) ? equipesData : []);
             setTypesTaches(typesData);
 
-            // NOUVEAU: Extraire clients
-            const clientsArray = clientsData.results || [];
-            console.log('📊 [CLIENTS] Clients chargés:', clientsArray);
-            console.log('  → Nombre de clients:', clientsArray.length);
-            console.log('  → Premiers clients:', clientsArray.slice(0, 3).map(c => ({
-                utilisateur: c.utilisateur,
-                nom: c.structure?.nom || c.nomStructure
-            })));
-            setClients(clientsArray);
+            const structuresArray = Array.isArray(structuresRes) ? structuresRes : (structuresRes.results || []);
+            setStructures(structuresArray);
 
             // Convert userData to User type and store it
             const user: User = {
@@ -464,65 +620,13 @@ const Planning: FC = () => {
             setIsReadOnly(roles.includes('CLIENT'));
             setIsClientView(roles.includes('CLIENT'));
 
-            // Load sites separately (non-blocking)
-            fetchSites()
-                .then(sitesData => {
-                    console.log('Sites data received:', sitesData);
-                    console.log('Sites data type:', typeof sitesData);
-                    console.log('Sites data.results type:', typeof sitesData?.results);
-
-                    // Extract array from various possible formats
-                    let results: any[] = [];
-                    if (Array.isArray(sitesData)) {
-                        console.log('✓ sitesData is array, length:', sitesData.length);
-                        results = sitesData;
-                    } else if (sitesData.results) {
-                        console.log('sitesData.results exists');
-
-                        // Check if results is a FeatureCollection (has type and features properties)
-                        if (typeof sitesData.results === 'object' &&
-                            !Array.isArray(sitesData.results) &&
-                            'features' in sitesData.results &&
-                            Array.isArray(sitesData.results.features)) {
-                            console.log('✓ sitesData.results.features is array (GeoJSON), length:', sitesData.results.features.length);
-                            results = sitesData.results.features;
-                        }
-                        // Check if results is an array
-                        else if (Array.isArray(sitesData.results)) {
-                            console.log('✓ sitesData.results is array, length:', sitesData.results.length);
-                            results = sitesData.results;
-                        }
-                        // Unexpected format
-                        else {
-                            console.log('⚠️ sitesData.results is object, keys:', Object.keys(sitesData.results));
-                            console.log('This should not happen - unexpected format');
-                            results = [];
-                        }
-                    } else if ('features' in sitesData && Array.isArray(sitesData.features)) {
-                        console.log('✓ sitesData.features is array (GeoJSON at root), length:', sitesData.features.length);
-                        results = sitesData.features;
-                    }
-
-                    console.log('Results before mapping:', results);
-                    console.log('Results length:', results.length);
-
-                    const sitesArray = results
-                        .filter((s: any) => s != null) // Filter out null/undefined
-                        .map((s: any) => {
-                            // Handle both GeoJSON format and plain format
-                            const id = s.properties?.id || s.id;
-                            const name = s.properties?.nom_site || s.nom_site || `Site #${id}`;
-                            console.log('Processing site:', { raw: s, extracted: { id, name } });
-                            return { id, name };
-                        })
-                        .filter((s: any) => s.id != null); // Filter out items without valid id
-
-                    console.log('Sites processed:', sitesArray);
-                    console.log('Final sites count:', sitesArray.length);
-                    setSites(sitesArray);
+            // Load all sites properly (exhaustive) - matching SuiviTaches behavior
+            fetchAllSites()
+                .then(sitesArray => {
+                    setSites(sitesArray.filter(s => s.actif));
                 })
                 .catch(err => {
-                    console.warn('Sites non disponibles:', err);
+                    console.error("Erreur chargement sites:", err);
                     setSites([]);
                 });
         } catch (err) {
@@ -835,7 +939,7 @@ const Planning: FC = () => {
                         pdf.setTextColor(taskColor.text.r, taskColor.text.g, taskColor.text.b);
 
                         const taskTime = format(new Date(task.date_debut_planifiee), 'HH:mm');
-                        const taskText = `${taskTime} ${task.type_tache_detail.nom_tache}`;
+                        const taskText = `${taskTime} ${task.reference ? '[' + task.reference + '] ' : ''}${task.type_tache_detail.nom_tache}`;
 
                         // Tronquer si nécessaire
                         const maxTextWidth = taskWidth - 2;
@@ -955,7 +1059,7 @@ const Planning: FC = () => {
                             pdf.setFont('helvetica', 'bold');
                             pdf.setTextColor(taskColor.text.r, taskColor.text.g, taskColor.text.b);
 
-                            const taskText = task.type_tache_detail.nom_tache;
+                            const taskText = (task.reference ? `[${task.reference}] ` : '') + task.type_tache_detail.nom_tache;
                             const maxTextWidth = width - 3;
                             let displayText = taskText;
                             if (pdf.getTextWidth(taskText) > maxTextWidth) {
@@ -1043,7 +1147,7 @@ const Planning: FC = () => {
 
                     // Nom de la tâche (tronquer si nécessaire)
                     pdf.setFont('helvetica', 'bold');
-                    let taskName = task.type_tache_detail.nom_tache;
+                    let taskName = (task.reference ? `[${task.reference}] ` : '') + task.type_tache_detail.nom_tache;
                     const maxTaskWidth = colWidths.task - 4;
                     if (pdf.getTextWidth(taskName) > maxTaskWidth) {
                         while (pdf.getTextWidth(taskName + '…') > maxTaskWidth && taskName.length > 0) {
@@ -1220,7 +1324,9 @@ const Planning: FC = () => {
                 nom: item.properties.nom || item.properties.famille || `${item.properties.object_type} #${item.id}`,
                 site: item.properties.site_nom,
                 soussite: item.properties.sous_site_nom,
-                superficie: item.properties.superficie_calculee // ✅ FIX: Ajouter superficie pour calcul de charge
+                superficie: item.properties.superficie_calculee, // ✅ FIX: Ajouter superficie pour calcul de charge
+                etat: item.properties.etat, // ✅ FIX: Ajouter état pour filtrage
+                famille: item.properties.famille // ✅ FIX: Ajouter famille
             }));
         } catch (err) {
             console.error('Erreur chargement objets:', err);
@@ -1386,21 +1492,30 @@ const Planning: FC = () => {
     }, [currentDate, currentView]);
 
     const events: CalendarEvent[] = useMemo(() => {
+        // ✅ STRATÉGIE UNIFIÉE POUR LES EMPLACEMENTS, MAIS CONTENU ADAPTÉ À LA VUE
+        // - Tous les événements sont positionnés sur les jours de distribution (jamais de bloc continu)
+        // - EN VUE MOIS : On masque les IDs de distribution pour que le popover affiche la "Tâche globale"
+        // - AUTRES VUES : On garde les IDs pour afficher/gérer la "Distribution spécifique"
+
         return filteredTaches.flatMap(t => {
-            // Si la tâche a des distributions de charge, créer un événement par jour
+            // CAS 1: Tâche avec distributions de charge
             if (t.distributions_charge && t.distributions_charge.length > 0) {
                 return t.distributions_charge.map(dist => {
-                    // Construire les dates avec les heures depuis les distributions
-                    const dateStr = dist.date; // YYYY-MM-DD
+                    // Construction déterministe des dates (éviter string parsing et TZ offsets)
+                    const [year, month, day] = dist.date.split('-').map(Number) as [number, number, number];
+
                     let startTime = dist.heure_debut || '08:00:00';
                     let endTime = dist.heure_fin || '17:00:00';
 
-                    // Normaliser le format de l'heure (gérer HH:MM et HH:MM:SS)
-                    if (startTime.split(':').length === 2) startTime += ':00';
-                    if (endTime.split(':').length === 2) endTime += ':00';
+                    const [sh, sm] = startTime.split(':').map(Number) as [number, number];
+                    const [eh, em] = endTime.split(':').map(Number) as [number, number];
 
-                    const start = new Date(`${dateStr}T${startTime}`);
-                    const end = new Date(`${dateStr}T${endTime}`);
+                    // Note: Month est 0-indexed dans Date constructor
+                    const start = new Date(year, month - 1, day, sh, sm, 0);
+                    const end = new Date(year, month - 1, day, eh, em, 0);
+
+                    // ✅ LOGIQUE VUE MOIS: Masquer l'identité "Distribution" pour forcer le mode "Tâche"
+                    const isMonthView = currentView === 'month';
 
                     return {
                         id: t.id,
@@ -1408,21 +1523,23 @@ const Planning: FC = () => {
                         start,
                         end,
                         resource: t,
-                        distributionStatus: dist.status,  // ✅ Statut de la distribution
-                        distributionId: dist.id  // ✅ ID de la distribution
+                        distributionStatus: isMonthView ? undefined : dist.status,
+                        distributionId: isMonthView ? undefined : dist.id
                     };
                 });
             }
 
-            // Fallback: utiliser les dates planifiées (pour les tâches sans distributions)
+            // CAS 2: Tâche sans distributions (héritage ou simple)
+            // On crée un événement unique basé sur les dates de la tâche
             const startDate = new Date(t.date_debut_planifiee);
             const endDate = new Date(t.date_fin_planifiee);
 
-            // Si pas d'heures, utiliser des heures par défaut
+            // Si pas d'heures définies dans les dates (souvent minuit pour les dates sans heure), mettre des défauts
             if (startDate.getHours() === 0 && startDate.getMinutes() === 0) {
                 startDate.setHours(8, 0, 0);
             }
             if (endDate.getHours() === 0 && endDate.getMinutes() === 0) {
+                // Si même jour, fin à 17h, sinon conserver la date (l'affichage sur plusieurs jours sera géré par le calendrier)
                 endDate.setHours(17, 0, 0);
             }
 
@@ -1432,9 +1549,10 @@ const Planning: FC = () => {
                 start: startDate,
                 end: endDate,
                 resource: t
+                // Pas de distributionId/distributionStatus
             }];
         });
-    }, [filteredTaches]);
+    }, [filteredTaches, currentView]);
 
     // Group tasks by date for List View
     const tasksByDate = useMemo(() => {
@@ -1532,27 +1650,72 @@ const Planning: FC = () => {
             <style>{customCalendarStyles}</style>
 
             {/* Toolbar */}
-            <div className="flex flex-col md:flex-row justify-between items-center px-6 py-3 border-b border-gray-200 gap-4 bg-white z-10">
-                {/* LEFT: Navigation calendrier */}
-                <div className="flex items-center gap-6 w-full md:w-auto">
+            <div className="flex flex-col md:flex-row justify-between items-center px-6 py-3 border-b border-gray-200 gap-4 bg-white z-20">
+                {/* LEFT: Navigation calendrier + Filtres */}
+                <div className="flex items-center gap-4 w-full md:w-auto overflow-x-auto scrollbar-hide">
                     {viewMode === 'calendar' && (
                         <>
-                            <button onClick={() => onNavigate('TODAY')} className="px-5 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-full hover:bg-gray-50 transition-colors shadow-sm">Aujourd'hui</button>
-                            <div className="flex items-center gap-2">
+                            <button onClick={() => onNavigate('TODAY')} className="px-5 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-full hover:bg-gray-50 transition-colors shadow-sm shrink-0">Aujourd'hui</button>
+                            <div className="flex items-center gap-1 shrink-0">
                                 <button onClick={() => onNavigate('PREV')} className="p-2 hover:bg-gray-100 rounded-full text-gray-600 transition-colors"><ChevronLeft className="w-5 h-5" /></button>
                                 <button onClick={() => onNavigate('NEXT')} className="p-2 hover:bg-gray-100 rounded-full text-gray-600 transition-colors"><ChevronRight className="w-5 h-5" /></button>
                             </div>
-                            <span className="text-xl font-normal text-gray-800 capitalize min-w-[180px]">{dateLabel}</span>
+                            <span className="text-xl font-normal text-gray-800 capitalize min-w-[150px] shrink-0">{dateLabel}</span>
                         </>
                     )}
-                    {viewMode === 'list' && <h2 className="text-xl font-normal text-gray-800">Agenda des tâches</h2>}
+                    {viewMode === 'list' && <h2 className="text-xl font-normal text-gray-800 shrink-0">Agenda des tâches</h2>}
+
                 </div>
 
-                {/* CENTER: Spacer */}
+                {/* Spacer flexible pour pousser le reste à droite */}
                 <div className="flex-1" />
 
                 {/* RIGHT: View controls */}
                 <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+                    {/* Toggle Filtres (Superposé en dessous) */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowFilters(!showFilters)}
+                            className={`relative p-2.5 rounded-xl transition-all duration-200 shrink-0 ${showFilters || activeFiltersCount > 0
+                                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200 ring-2 ring-emerald-500/20'
+                                : 'bg-white text-slate-700 border-2 border-slate-200 hover:border-slate-300 shadow-sm'
+                                }`}
+                            title="Filtres"
+                        >
+                            <Filter className="w-4 h-4" />
+                            {activeFiltersCount > 0 && (
+                                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold shadow-md border-2 border-white">
+                                    {activeFiltersCount}
+                                </span>
+                            )}
+                        </button>
+
+                        {showFilters && (
+                            <div className="absolute top-full right-0 mt-3 z-[100] animate-in fade-in slide-in-from-top-2 duration-300">
+                                <div className="bg-white p-4 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-100 min-w-[700px]">
+                                    <div className="flex justify-between items-center mb-3 px-1">
+                                        <h3 className="text-sm font-semibold text-slate-800">Filtres avancés sur les Tâches</h3>
+                                        <button
+                                            onClick={() => setShowFilters(false)}
+                                            className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                    <PlanningFiltersComponent
+                                        filters={filters}
+                                        onFiltersChange={setFilters}
+                                        structures={structures}
+                                        sites={sites}
+                                        equipes={equipes}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="h-8 w-px bg-gray-200 hidden md:block shrink-0 mx-1" />
+
                     {viewMode === 'calendar' && <ViewSelector />}
 
                     <div className="flex bg-gray-100 p-1 rounded-full">
@@ -1765,6 +1928,11 @@ const Planning: FC = () => {
                                                                     <CalendarIcon className="w-3.5 h-3.5 text-gray-500 shrink-0" />
                                                                 )}
                                                                 <h3 className={`font-semibold transition-colors truncate ${tache.statut === 'TERMINEE' ? 'line-through text-gray-500' : 'text-gray-900 group-hover:text-emerald-600'}`}>
+                                                                    {tache.reference && (
+                                                                        <span className="text-xs font-mono text-gray-400 mr-2 opacity-70">
+                                                                            {tache.reference}
+                                                                        </span>
+                                                                    )}
                                                                     {tache.type_tache_detail.nom_tache}
                                                                 </h3>
                                                                 {/* ✅ NOUVEAU: Badge de comptage */}
@@ -1889,7 +2057,7 @@ const Planning: FC = () => {
                     onSubmit={handleCreateTache}
                     typesTaches={typesTaches}
                     equipes={equipes}
-                    sites={sites}
+                    sites={sites.map(s => ({ id: Number(s.id), name: s.name }))}
                     initialDate={quickCreatorDate}
                     initialStartTime={quickCreatorStartTime}
                     initialEndTime={quickCreatorEndTime}

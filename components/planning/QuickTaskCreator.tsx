@@ -3,12 +3,11 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
     X, Search, ChevronRight, ChevronLeft, MapPin, TreePine, Users,
-    CheckCircle2, Calendar, Clock, Sparkles, AlertCircle, Filter, RefreshCw
+    CheckCircle2, Calendar, Clock, Sparkles, AlertCircle, Filter
 } from 'lucide-react';
 import { TypeTache, TacheCreate, PrioriteTache, DistributionChargeData } from '../../types/planning';
 import { EquipeList } from '../../types/users';
 import { InventoryObjectOption } from './TaskFormModal';
-import { RecurrenceSelector, type RecurrenceParams } from './RecurrenceSelector';
 import { DistributionChargeEditor } from './DistributionChargeEditor';
 import { DataTable, Column } from '../DataTable';
 import { StatusBadge } from '../StatusBadge';
@@ -250,7 +249,6 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
     const [selectedEquipes, setSelectedEquipes] = useState<number[]>([]);
     const [commentaires, setCommentaires] = useState('');
     const [priorite, setPriorite] = useState<PrioriteTache>(3);
-    const [recurrence, setRecurrence] = useState<RecurrenceParams | null>(null);
     const [distributionsCharge, setDistributionsCharge] = useState<DistributionChargeData[]>([]);
 
     // Mode de planification: 'simple' ou 'multi-jours'
@@ -1211,67 +1209,6 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                                                 </div>
                                             )}
                                         </div>
-
-
-                                    </div>
-                                )}
-
-                                {/* ✅ Auto-Recurrence Banner */}
-                                {autoRecurrenceActivated && recurrence && (
-                                    <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-300 rounded-xl p-4 shadow-sm">
-                                        <div className="flex items-start gap-3">
-                                            <div className="bg-blue-500 rounded-full p-2 flex-shrink-0">
-                                                <RefreshCw className="w-5 h-5 text-white" />
-                                            </div>
-                                            <div className="flex-1">
-                                                <h4 className="text-sm font-bold text-blue-900 mb-1">
-                                                    🔄 Récurrence activée automatiquement
-                                                </h4>
-                                                <p className="text-sm text-blue-700 mb-2">
-                                                    {chargePreview?.totalHeures ? (
-                                                        <>
-                                                            Charge totale : <strong>{chargePreview.totalHeures}h</strong> répartie sur <strong>{recurrence.nombre_occurrences} jours</strong>
-                                                            {' '}(≈ <strong>{(chargePreview.totalHeures / recurrence.nombre_occurrences).toFixed(1)}h/jour</strong>)
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            La tâche s'étend sur plusieurs jours. Elle sera créée <strong>{recurrence.nombre_occurrences} fois</strong>
-                                                        </>
-                                                    )}
-                                                    {' '}(du {format(initialDate, 'dd/MM/yyyy', { locale: fr })} au {recurrence.date_fin ? format(new Date(recurrence.date_fin), 'dd/MM/yyyy', { locale: fr }) : '—'}).
-                                                </p>
-                                                <p className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded inline-block mb-2">
-                                                    💡 La charge sera automatiquement répartie sur chaque jour
-                                                </p>
-                                                <div className="flex gap-2 mt-2">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setRecurrence(null);
-                                                            setAutoRecurrenceActivated(false);
-                                                        }}
-                                                        className="text-xs bg-white hover:bg-blue-50 text-blue-700 border border-blue-300 px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1"
-                                                    >
-                                                        <X className="w-3 h-3" />
-                                                        Désactiver la récurrence
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Récurrence (uniquement en mode simple) */}
-                                {modeDistribution === 'simple' && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Récurrence
-                                        </label>
-                                        <RecurrenceSelector
-                                            value={recurrence}
-                                            onChange={setRecurrence}
-                                            startDate={initialDate.toISOString()}
-                                        />
                                     </div>
                                 )}
                             </div>

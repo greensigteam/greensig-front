@@ -6,9 +6,9 @@ interface ClientPortalProps {
 }
 
 // Client Portal - Claims/Réclamations
-const ClientPortal: React.FC<ClientPortalProps> = ({ user }) => {
+const ClientPortal: React.FC<ClientPortalProps> = ({ user: _user }) => {
     return (
-        <div className="flex flex-col h-full bg-gray-50">
+        <div className="flex flex-col min-h-[calc(100vh-4rem)] bg-gray-50">
             <div className="flex-1 p-4 sm:p-6 max-w-7xl mx-auto w-full flex flex-col">
                 <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
                     <div className="flex-1 flex items-center justify-center p-8">

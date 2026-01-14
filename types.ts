@@ -157,6 +157,7 @@ export interface SearchSuggestion {
   id: string;
   name: string;
   type: string;
+  subtitle?: string;
   coordinates?: Coordinates;
 }
 

@@ -1,18 +1,18 @@
 import { FC, useMemo, useState } from 'react';
-import { X, Filter } from 'lucide-react';
+import { X, Building2, MapPin, Users, Clock, ChevronDown } from 'lucide-react';
 import {
     useFloating, offset, flip, shift, autoUpdate,
     FloatingPortal, useDismiss, useInteractions
 } from '@floating-ui/react';
 import { PlanningFilters, STATUT_TACHE_LABELS, StatutTache } from '../../types/planning';
-import { Client, EquipeList } from '../../types/users';
-import { MODAL_DESIGN_TOKENS } from '../modals/designTokens';
+import { StructureClient, EquipeList } from '../../types/users';
+import { SiteFrontend } from '../../services/api';
 
 interface PlanningFiltersProps {
     filters: PlanningFilters;
     onFiltersChange: (filters: PlanningFilters) => void;
-    clients: Client[];
-    sites: Array<{ id: number; name: string }>;
+    structures: StructureClient[];
+    sites: SiteFrontend[];
     equipes: EquipeList[];
     disabled?: boolean;
 }
@@ -20,7 +20,7 @@ interface PlanningFiltersProps {
 const PlanningFiltersComponent: FC<PlanningFiltersProps> = ({
     filters,
     onFiltersChange,
-    clients,
+    structures,
     sites,
     equipes,
     disabled = false
@@ -87,70 +87,85 @@ const PlanningFiltersComponent: FC<PlanningFiltersProps> = ({
         });
     };
 
-    return (
-        <div className="flex items-center gap-2 flex-wrap">
-            {/* Client Dropdown */}
-            <select
-                value={filters.clientId ?? ''}
-                onChange={(e) => handleClientChange(e.target.value ? Number(e.target.value) : null)}
-                disabled={disabled || clients.length === 0}
-                className={`${MODAL_DESIGN_TOKENS.inputs.select} min-w-[140px] sm:min-w-[180px] ${disabled || clients.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-                <option value="">Tous les clients</option>
-                {clients.map(c => (
-                    <option key={c.utilisateur} value={c.utilisateur}>
-                        {c.structure?.nom || c.nomStructure}
-                    </option>
-                ))}
-            </select>
+    const filteredSites = useMemo(() => {
+        if (!filters.clientId) return sites;
+        // Si un client est sélectionné, on filtre les sites correspondants
+        // Note: SiteFrontend.structure_client semble être l'ID numérique
+        return sites.filter(s => s.structure_client === filters.clientId);
+    }, [sites, filters.clientId]);
 
-            {/* Site Dropdown (conditionnel - apparaît seulement si client sélectionné) */}
-            {filters.clientId !== null && (
+    return (
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide py-1">
+            {/* Client (Structure) */}
+            <div className="relative shrink-0">
+                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <select
+                    value={filters.clientId ?? ''}
+                    onChange={(e) => handleClientChange(e.target.value ? Number(e.target.value) : null)}
+                    disabled={disabled}
+                    className="appearance-none pl-9 pr-8 py-2 border-2 border-slate-200 rounded-lg text-sm font-medium text-slate-700 bg-white hover:border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[150px]"
+                >
+                    <option value="">Organisation</option>
+                    {structures.map(s => (
+                        <option key={s.id} value={s.id}>
+                            {s.nom}
+                        </option>
+                    ))}
+                </select>
+                <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* Site */}
+            <div className="relative shrink-0">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                 <select
                     value={filters.siteId ?? ''}
                     onChange={(e) => handleSiteChange(e.target.value ? Number(e.target.value) : null)}
-                    disabled={disabled || sites.length === 0}
-                    className={`${MODAL_DESIGN_TOKENS.inputs.select} min-w-[140px] sm:min-w-[180px] ${disabled || sites.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={disabled}
+                    className="appearance-none pl-9 pr-8 py-2 border-2 border-slate-200 rounded-lg text-sm font-medium text-slate-700 bg-white hover:border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[130px]"
                 >
-                    <option value="">Tous les sites</option>
-                    {sites.map(s => (
+                    <option value="">Site</option>
+                    {filteredSites.map(s => (
                         <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                 </select>
-            )}
+                <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            </div>
 
-            {/* Équipe Dropdown */}
-            <select
-                value={filters.equipeId ?? ''}
-                onChange={(e) => handleEquipeChange(e.target.value ? Number(e.target.value) : null)}
-                disabled={disabled || equipes.length === 0}
-                className={`${MODAL_DESIGN_TOKENS.inputs.select} min-w-[140px] sm:min-w-[180px] ${disabled || equipes.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-                <option value="">Toutes les équipes</option>
-                {equipes.map(eq => (
-                    <option key={eq.id} value={eq.id}>{eq.nomEquipe}</option>
-                ))}
-            </select>
+            {/* Équipe */}
+            <div className="relative shrink-0">
+                <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <select
+                    value={filters.equipeId ?? ''}
+                    onChange={(e) => handleEquipeChange(e.target.value ? Number(e.target.value) : null)}
+                    disabled={disabled}
+                    className="appearance-none pl-9 pr-8 py-2 border-2 border-slate-200 rounded-lg text-sm font-medium text-slate-700 bg-white hover:border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[130px]"
+                >
+                    <option value="">Équipe</option>
+                    {equipes.map(eq => (
+                        <option key={eq.id} value={eq.id}>{eq.nomEquipe}</option>
+                    ))}
+                </select>
+                <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            </div>
 
-            {/* Statut Multi-Select (Floating UI Popover) */}
-            <div>
+            {/* Statut (on garde le popover multi-select car plus puissant, mais on le style comme SuiviTaches) */}
+            <div className="shrink-0">
                 <button
                     ref={refs.setReference}
                     {...getReferenceProps()}
-                    type="button"
                     disabled={disabled}
                     onClick={() => setIsStatutOpen(!isStatutOpen)}
                     className={`
-                        flex items-center gap-2 px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg
-                        hover:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500
-                        transition-all outline-none
-                        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                        relative flex items-center gap-2 pl-9 pr-4 py-2 border-2 rounded-lg text-sm font-medium transition-all shadow-sm min-w-[120px]
+                        ${isStatutOpen || filters.statuts.length > 0
+                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                            : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'}
                     `}
                 >
-                    <Filter className="w-4 h-4 text-gray-500" />
-                    <span className="font-medium text-gray-700">
-                        Statut {filters.statuts.length > 0 && `(${filters.statuts.length})`}
-                    </span>
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                    Statut {filters.statuts.length > 0 && `(${filters.statuts.length})`}
+                    <ChevronDown className="ml-auto w-4 h-4 text-slate-400" />
                 </button>
 
                 {isStatutOpen && (
@@ -159,25 +174,26 @@ const PlanningFiltersComponent: FC<PlanningFiltersProps> = ({
                             ref={refs.setFloating}
                             style={floatingStyles}
                             {...getFloatingProps()}
-                            className="z-[1000] w-64 bg-white rounded-lg shadow-xl border border-gray-200 p-3 space-y-2"
+                            className="z-[1000] w-64 bg-white rounded-xl shadow-2xl border border-slate-200 p-3 space-y-1 animate-in fade-in zoom-in-95 duration-200"
                         >
+                            <div className="px-2 py-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider">Filtrer par statut</div>
                             {statutsOptions.map(statut => {
                                 const isSelected = filters.statuts.includes(statut);
                                 return (
                                     <label
                                         key={statut}
                                         className={`
-                                            flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors
-                                            ${isSelected ? 'bg-emerald-50 border border-emerald-200' : 'hover:bg-gray-50'}
+                                            flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors
+                                            ${isSelected ? 'bg-emerald-50 text-emerald-700' : 'hover:bg-slate-50 text-slate-700'}
                                         `}
                                     >
                                         <input
                                             type="checkbox"
                                             checked={isSelected}
                                             onChange={() => handleStatutToggle(statut)}
-                                            className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                                            className="w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500"
                                         />
-                                        <span className="text-sm font-medium text-gray-700">
+                                        <span className="text-sm font-semibold">
                                             {STATUT_TACHE_LABELS[statut]}
                                         </span>
                                     </label>
@@ -191,21 +207,12 @@ const PlanningFiltersComponent: FC<PlanningFiltersProps> = ({
             {/* Reset Button */}
             {hasActiveFilters && (
                 <button
-                    type="button"
                     onClick={handleReset}
-                    disabled={disabled}
-                    className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
+                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all border border-transparent hover:border-red-100"
                     title="Réinitialiser les filtres"
                 >
                     <X className="w-4 h-4" />
                 </button>
-            )}
-
-            {/* Active Filters Badge */}
-            {activeCount > 0 && (
-                <span className={MODAL_DESIGN_TOKENS.badges.emerald}>
-                    {activeCount} filtre{activeCount > 1 ? 's' : ''}
-                </span>
             )}
         </div>
     );
