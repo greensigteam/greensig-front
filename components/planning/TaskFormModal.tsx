@@ -316,23 +316,21 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
     }, []);
 
     // ✅ NOUVEAU: Auto-update task dates when distributions change
-    // If distributions extend beyond the current date range, expand the range
+    // If distributions extend beyond the current date range, or are smaller, adjust the range
     useEffect(() => {
-        if (distributionsCharge.length > 0 && formData.date_debut_planifiee && formData.date_fin_planifiee) {
+        if (distributionsCharge.length > 0) {
             const dates = distributionsCharge.map(d => d.date).filter(Boolean).sort();
             if (dates.length === 0) return;
 
             const minDate = dates[0]!;
             const maxDate = dates[dates.length - 1]!;
 
-            // Update form dates if distributions extend beyond current range
-            const needsUpdate = minDate < formData.date_debut_planifiee || maxDate > formData.date_fin_planifiee;
-
-            if (needsUpdate) {
+            // Update form dates to match exactly the distribution range (shrink or expand)
+            if (formData.date_debut_planifiee !== minDate || formData.date_fin_planifiee !== maxDate) {
                 setFormData(prev => ({
                     ...prev,
-                    date_debut_planifiee: minDate < prev.date_debut_planifiee ? minDate : prev.date_debut_planifiee,
-                    date_fin_planifiee: maxDate > prev.date_fin_planifiee ? maxDate : prev.date_fin_planifiee
+                    date_debut_planifiee: minDate,
+                    date_fin_planifiee: maxDate
                 }));
             }
         }
@@ -538,6 +536,17 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
             return;
         }
 
+        // ✅ Validation: Pour les tâches multi-jours, vérifier qu'au moins un jour est sélectionné
+        const isMultiDay = formData.date_debut_planifiee !== formData.date_fin_planifiee;
+        console.log('🔍 DEBUG - isMultiDay:', isMultiDay);
+        console.log('🔍 DEBUG - distributionsCharge:', distributionsCharge);
+        console.log('🔍 DEBUG - distributionsCharge.length:', distributionsCharge.length);
+
+        if (isMultiDay && distributionsCharge.length === 0) {
+            setValidationError('Pour une tâche multi-jours, veuillez sélectionner les jours de travail (via "Horaires de la journée" ou l\'éditeur de distribution).');
+            return;
+        }
+
         // ❌ SUPPRIMÉ: Validation multi-jours qui forçait la récurrence
         // Les tâches multi-jours sont maintenant gérées nativement via distributions_charge
 
@@ -546,6 +555,10 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
 
         // ✅ Si c'est une tâche d'un seul jour et pas de distributions multi-jours, créer une distribution avec les heures
         if (formData.date_debut_planifiee === formData.date_fin_planifiee && distributionsCharge.length === 0) {
+            if (startTime >= endTime) {
+                setValidationError("L'heure de fin doit être postérieure à l'heure de début.");
+                return;
+            }
             distributionsToSend = [{
                 date: formData.date_debut_planifiee,
                 heure_debut: startTime,
@@ -553,6 +566,9 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                 commentaire: ''
             }];
         }
+
+        console.log('🔍 DEBUG - distributionsToSend:', distributionsToSend);
+        console.log('🔍 DEBUG - distributionsToSend.length:', distributionsToSend.length);
 
         const payload = {
             ...formData,
@@ -563,6 +579,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         };
 
         console.log('📤 Submitting task data:', payload);
+        console.log('📤 Submitting distributions_charge_data:', payload.distributions_charge_data);
         onSubmit(payload);
     };
 
@@ -750,8 +767,8 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                                 />
                             </div>
                             {(() => {
-                                const [startHour, startMin] = startTime.split(':').map(Number);
-                                const [endHour, endMin] = endTime.split(':').map(Number);
+                                const [startHour = 0, startMin = 0] = startTime.split(':').map(Number);
+                                const [endHour = 0, endMin = 0] = endTime.split(':').map(Number);
                                 const startMinutes = startHour * 60 + startMin;
                                 const endMinutes = endHour * 60 + endMin;
                                 const duration = (endMinutes - startMinutes) / 60;
@@ -803,7 +820,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                 })()}
 
                 <PremiumSelect
-                    value={formData.priorite.toString()}
+                    value={(formData.priorite || 3).toString()}
                     onChange={(value) => setFormData({ ...formData, priorite: Number(value) as PrioriteTache })}
                     options={Object.entries(PRIORITE_LABELS).map(([value, label]) => ({
                         value: value,
