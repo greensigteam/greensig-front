@@ -264,6 +264,10 @@ const ReclamationDetailPage: React.FC = () => {
     const handleTaskSubmit = async (data: TacheCreate) => {
         if (!reclamation) return;
 
+        console.log('🟢 [ReclamationDetail] handleTaskSubmit APPELÉE');
+        console.log('🔵 [ReclamationDetail] Données reçues:', data);
+        console.log('🔵 [ReclamationDetail] recurrence_config:', data.recurrence_config);
+
         try {
             const payload: TacheCreate = {
                 ...data,
@@ -272,19 +276,73 @@ const ReclamationDetailPage: React.FC = () => {
                 date_fin_planifiee: data.date_fin_planifiee,
             };
 
-            await planningService.createTache(payload);
+            // Créer la tâche de base
+            const createdTask = await planningService.createTache(payload);
+            console.log('✅ [ReclamationDetail] Tâche de base créée:', createdTask);
+
+            // ✅ Gérer la récurrence si activée
+            const recurrenceConfig = data.recurrence_config;
+            console.log('🔵 [ReclamationDetail] Configuration de récurrence:', recurrenceConfig);
+
+            if (recurrenceConfig && recurrenceConfig.enabled && createdTask.id) {
+                console.log('🔄 [ReclamationDetail] Récurrence activée, mode:', recurrenceConfig.mode);
+
+                try {
+                    let recurrenceResult;
+
+                    if (recurrenceConfig.mode === 'frequency') {
+                        console.log('📅 [ReclamationDetail] Appel API dupliquer-recurrence avec fréquence:', recurrenceConfig.frequency);
+                        recurrenceResult = await planningService.dupliquerTacheRecurrence(createdTask.id, {
+                            frequence: recurrenceConfig.frequency!,
+                            nombre_occurrences: recurrenceConfig.nombre_occurrences,
+                            date_fin_recurrence: recurrenceConfig.date_fin_recurrence,
+                            conserver_equipes: recurrenceConfig.conserver_equipes,
+                            conserver_objets: recurrenceConfig.conserver_objets
+                        });
+                    } else if (recurrenceConfig.mode === 'custom') {
+                        console.log('⚙️ [ReclamationDetail] Appel API dupliquer avec décalage:', recurrenceConfig.decalage_jours);
+                        recurrenceResult = await planningService.dupliquerTache(createdTask.id, {
+                            decalage_jours: recurrenceConfig.decalage_jours!,
+                            nombre_occurrences: recurrenceConfig.nombre_occurrences,
+                            date_fin_recurrence: recurrenceConfig.date_fin_recurrence,
+                            conserver_equipes: recurrenceConfig.conserver_equipes,
+                            conserver_objets: recurrenceConfig.conserver_objets
+                        });
+                    } else if (recurrenceConfig.mode === 'dates') {
+                        console.log('📆 [ReclamationDetail] Appel API dupliquer-dates avec:', recurrenceConfig.dates_cibles);
+                        recurrenceResult = await planningService.dupliquerTacheDates(createdTask.id, {
+                            dates_cibles: recurrenceConfig.dates_cibles!,
+                            conserver_equipes: recurrenceConfig.conserver_equipes,
+                            conserver_objets: recurrenceConfig.conserver_objets
+                        });
+                    }
+
+                    console.log('✅ [ReclamationDetail] Résultat de la récurrence:', recurrenceResult);
+
+                    // Notification avec nombre de tâches créées
+                    if (recurrenceResult) {
+                        const totalCreated = 1 + recurrenceResult.nombre_taches_creees;
+                        showToast(`${totalCreated} tâche${totalCreated > 1 ? 's' : ''} créée${totalCreated > 1 ? 's' : ''} avec succès pour la réclamation ${reclamation.numero_reclamation} (1 tâche de base + ${recurrenceResult.nombre_taches_creees} occurrence${recurrenceResult.nombre_taches_creees > 1 ? 's' : ''}).`, 'success');
+                    } else {
+                        showToast(`Une tâche a été créée pour la réclamation ${reclamation.numero_reclamation}.`, 'success');
+                    }
+                } catch (recurrenceError: any) {
+                    console.error('❌ [ReclamationDetail] Erreur lors de la création des occurrences:', recurrenceError);
+                    showToast(`Tâche de base créée, mais erreur lors de la génération des occurrences: ${recurrenceError.message || recurrenceError}`, 'error');
+                }
+            } else {
+                console.log('ℹ️ [ReclamationDetail] Pas de récurrence activée');
+                showToast(`Une tâche a été créée pour la réclamation ${reclamation.numero_reclamation}.`, 'success');
+            }
 
             setIsTaskModalOpen(false);
             setTaskInitialValues({});
             setTaskSiteFilter(undefined);
 
-            // Notification toast
-            showToast(`Une tâche a été créée pour la réclamation ${reclamation.numero_reclamation}.`, 'success');
-
             // Recharger les données
             loadData();
-        } catch (error) {
-            console.error("Erreur création tâche", error);
+        } catch (error: any) {
+            console.error("❌ [ReclamationDetail] Erreur création tâche", error);
             setModalConfig({
                 isOpen: true,
                 title: 'Erreur',

@@ -479,8 +479,8 @@ const SuiviTaches: React.FC = () => {
     const filteredTaches = useMemo(() => {
         return taches.filter(t => {
             const teamNames = t.equipes_detail?.length > 0
-                ? t.equipes_detail.map((e: any) => e.nom_equipe || e.nomEquipe).join(' ')
-                : (t.equipe_detail as any)?.nom_equipe || t.equipe_detail?.nomEquipe || '';
+                ? t.equipes_detail.map((e: any) => e.nomEquipe).join(' ')
+                : t.equipe_detail?.nomEquipe || '';
 
             const matchesSearch = !searchQuery ||
                 t.type_tache_detail?.nom_tache.toLowerCase().includes(searchQuery.toLowerCase()) ||

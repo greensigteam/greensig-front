@@ -418,14 +418,75 @@ export const MapPage: React.FC<MapPageProps> = ({
   };
 
   const handleTaskSubmit = async (data: TacheCreate) => {
+    console.log('🟢 [MapPage] handleTaskSubmit APPELÉE');
+    console.log('🔵 [MapPage] Données reçues:', data);
+    console.log('🔵 [MapPage] recurrence_config:', data.recurrence_config);
+
     try {
-      await planningService.createTache(data);
-      showToast("Tâche créée avec succès", "success");
+      // Créer la tâche de base
+      const createdTask = await planningService.createTache(data);
+      console.log('✅ [MapPage] Tâche de base créée:', createdTask);
+
+      // ✅ Gérer la récurrence si activée
+      const recurrenceConfig = data.recurrence_config;
+      console.log('🔵 [MapPage] Configuration de récurrence:', recurrenceConfig);
+
+      if (recurrenceConfig && recurrenceConfig.enabled && createdTask.id) {
+        console.log('🔄 [MapPage] Récurrence activée, mode:', recurrenceConfig.mode);
+
+        try {
+          let recurrenceResult;
+
+          if (recurrenceConfig.mode === 'frequency') {
+            console.log('📅 [MapPage] Appel API dupliquer-recurrence avec fréquence:', recurrenceConfig.frequency);
+            recurrenceResult = await planningService.dupliquerTacheRecurrence(createdTask.id, {
+              frequence: recurrenceConfig.frequency!,
+              nombre_occurrences: recurrenceConfig.nombre_occurrences,
+              date_fin_recurrence: recurrenceConfig.date_fin_recurrence,
+              conserver_equipes: recurrenceConfig.conserver_equipes,
+              conserver_objets: recurrenceConfig.conserver_objets
+            });
+          } else if (recurrenceConfig.mode === 'custom') {
+            console.log('⚙️ [MapPage] Appel API dupliquer avec décalage:', recurrenceConfig.decalage_jours);
+            recurrenceResult = await planningService.dupliquerTache(createdTask.id, {
+              decalage_jours: recurrenceConfig.decalage_jours!,
+              nombre_occurrences: recurrenceConfig.nombre_occurrences,
+              date_fin_recurrence: recurrenceConfig.date_fin_recurrence,
+              conserver_equipes: recurrenceConfig.conserver_equipes,
+              conserver_objets: recurrenceConfig.conserver_objets
+            });
+          } else if (recurrenceConfig.mode === 'dates') {
+            console.log('📆 [MapPage] Appel API dupliquer-dates avec:', recurrenceConfig.dates_cibles);
+            recurrenceResult = await planningService.dupliquerTacheDates(createdTask.id, {
+              dates_cibles: recurrenceConfig.dates_cibles!,
+              conserver_equipes: recurrenceConfig.conserver_equipes,
+              conserver_objets: recurrenceConfig.conserver_objets
+            });
+          }
+
+          console.log('✅ [MapPage] Résultat de la récurrence:', recurrenceResult);
+
+          // Message de succès avec nombre de tâches créées
+          if (recurrenceResult) {
+            const totalCreated = 1 + recurrenceResult.nombre_taches_creees;
+            showToast(`✅ ${totalCreated} tâche${totalCreated > 1 ? 's' : ''} créée${totalCreated > 1 ? 's' : ''} avec succès (1 tâche de base + ${recurrenceResult.nombre_taches_creees} occurrence${recurrenceResult.nombre_taches_creees > 1 ? 's' : ''})`, "success");
+          } else {
+            showToast("Tâche créée avec succès", "success");
+          }
+        } catch (recurrenceError: any) {
+          console.error('❌ [MapPage] Erreur lors de la création des occurrences:', recurrenceError);
+          showToast(`Tâche de base créée, mais erreur lors de la génération des occurrences: ${recurrenceError.message || recurrenceError}`, "error");
+        }
+      } else {
+        console.log('ℹ️ [MapPage] Pas de récurrence activée');
+        showToast("Tâche créée avec succès", "success");
+      }
+
       setIsTaskModalOpen(false);
       // Navigate to planning page after successful creation
       navigate('/planning');
     } catch (err: any) {
-      console.error("Error creating task", err);
+      console.error("❌ [MapPage] Error creating task", err);
       showToast(err.message || "Erreur lors de la création de la tâche", "error");
     }
   };

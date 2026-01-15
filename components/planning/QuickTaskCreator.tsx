@@ -13,6 +13,7 @@ import { DataTable, Column } from '../DataTable';
 import { StatusBadge } from '../StatusBadge';
 import { PremiumInput } from '../modals/PremiumFormComponents';
 import { planningService } from '../../services/planningService';
+import { RecurrenceSelector, type RecurrenceConfig } from './RecurrenceSelector';
 
 // ✅ PHASE 1: Interface pour les ratios de productivité
 interface RatioProductivite {
@@ -257,6 +258,14 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
     // ✅ PHASE 1: États pour planification intelligente
     const [ratios, setRatios] = useState<RatioProductivite[]>([]);
     const [loadingRatios, setLoadingRatios] = useState(false);
+
+    // État pour la récurrence
+    const [recurrenceConfig, setRecurrenceConfig] = useState<RecurrenceConfig>({
+        enabled: false,
+        mode: 'frequency',
+        conserver_equipes: true,
+        conserver_objets: true
+    });
 
     // Loading states
     const [loadingObjects, setLoadingObjects] = useState(false);
@@ -568,7 +577,15 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
             };
         }
 
-        onSubmit(taskData);
+        // Ajouter la configuration de récurrence si activée
+        const taskDataWithRecurrence: any = {
+            ...taskData,
+            ...(recurrenceConfig.enabled && {
+                recurrence_config: recurrenceConfig
+            })
+        };
+
+        onSubmit(taskDataWithRecurrence);
         onClose();
     };
 
@@ -1211,6 +1228,16 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                                         </div>
                                     </div>
                                 )}
+
+                                {/* Récurrence */}
+                                <div className="mt-6">
+                                    <RecurrenceSelector
+                                        dateDebut={modeDistribution === 'simple' ? format(initialDate, 'yyyy-MM-dd') : (distributionsCharge.length > 0 ? [...distributionsCharge].sort((a, b) => a.date.localeCompare(b.date))[0].date : format(initialDate, 'yyyy-MM-dd'))}
+                                        dateFin={modeDistribution === 'simple' ? format(initialDate, 'yyyy-MM-dd') : (distributionsCharge.length > 0 ? [...distributionsCharge].sort((a, b) => a.date.localeCompare(b.date))[distributionsCharge.length - 1].date : format(initialDate, 'yyyy-MM-dd'))}
+                                        value={recurrenceConfig}
+                                        onChange={setRecurrenceConfig}
+                                    />
+                                </div>
                             </div>
                         )}
                     </div>

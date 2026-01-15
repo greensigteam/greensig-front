@@ -249,6 +249,19 @@ export interface TacheCreate {
 
     // ✅ NOUVEAU: Distributions de charge (tâches multi-jours)
     distributions_charge_data?: DistributionChargeData[];
+
+    // ✅ NOUVEAU: Configuration de récurrence (géré côté frontend après création)
+    recurrence_config?: {
+        enabled: boolean;
+        mode: 'frequency' | 'custom' | 'dates';
+        frequency?: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+        decalage_jours?: number;
+        dates_cibles?: string[];
+        nombre_occurrences?: number;
+        date_fin_recurrence?: string;
+        conserver_equipes: boolean;
+        conserver_objets: boolean;
+    };
 }
 
 export interface TacheUpdate {

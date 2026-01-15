@@ -412,5 +412,112 @@ export const planningService = {
         }
 
         return response.json();
+    },
+
+    // ============================================================================
+    // RÉCURRENCE - Duplication de tâches avec leurs distributions
+    // ============================================================================
+
+    /**
+     * Duplique une tâche avec un décalage personnalisé en jours.
+     *
+     * @param tacheId - ID de la tâche à dupliquer
+     * @param params - Paramètres de duplication
+     * @returns Nouvelles tâches créées
+     */
+    async dupliquerTache(tacheId: number, params: {
+        decalage_jours: number;
+        nombre_occurrences?: number;
+        date_fin_recurrence?: string;
+        conserver_equipes?: boolean;
+        conserver_objets?: boolean;
+    }): Promise<any> {
+        console.log(`🔵 [planningService] dupliquerTache - tacheId: ${tacheId}, params:`, params);
+
+        const response = await apiFetch(`${BASE_URL}/taches/${tacheId}/dupliquer/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        });
+
+        console.log(`🔵 [planningService] dupliquerTache - response.ok: ${response.ok}, status: ${response.status}`);
+
+        if (!response.ok) {
+            const error = await response.json();
+            console.error('❌ [planningService] dupliquerTache - erreur:', error);
+            throw new Error(error.error || error.detail || 'Erreur lors de la duplication de la tâche');
+        }
+
+        const result = await response.json();
+        console.log('✅ [planningService] dupliquerTache - résultat:', result);
+        return result;
+    },
+
+    /**
+     * Duplique une tâche selon une fréquence prédéfinie.
+     *
+     * @param tacheId - ID de la tâche à dupliquer
+     * @param params - Paramètres de récurrence
+     * @returns Nouvelles tâches créées
+     */
+    async dupliquerTacheRecurrence(tacheId: number, params: {
+        frequence: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+        nombre_occurrences?: number;
+        date_fin_recurrence?: string;
+        conserver_equipes?: boolean;
+        conserver_objets?: boolean;
+    }): Promise<any> {
+        console.log(`🔵 [planningService] dupliquerTacheRecurrence - tacheId: ${tacheId}, params:`, params);
+
+        const response = await apiFetch(`${BASE_URL}/taches/${tacheId}/dupliquer-recurrence/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        });
+
+        console.log(`🔵 [planningService] dupliquerTacheRecurrence - response.ok: ${response.ok}, status: ${response.status}`);
+
+        if (!response.ok) {
+            const error = await response.json();
+            console.error('❌ [planningService] dupliquerTacheRecurrence - erreur:', error);
+            throw new Error(error.error || error.detail || 'Erreur lors de la duplication récurrente');
+        }
+
+        const result = await response.json();
+        console.log('✅ [planningService] dupliquerTacheRecurrence - résultat:', result);
+        return result;
+    },
+
+    /**
+     * Duplique une tâche à des dates spécifiques.
+     *
+     * @param tacheId - ID de la tâche à dupliquer
+     * @param params - Paramètres de duplication avec dates
+     * @returns Nouvelles tâches créées
+     */
+    async dupliquerTacheDates(tacheId: number, params: {
+        dates_cibles: string[];
+        conserver_equipes?: boolean;
+        conserver_objets?: boolean;
+    }): Promise<any> {
+        console.log(`🔵 [planningService] dupliquerTacheDates - tacheId: ${tacheId}, params:`, params);
+
+        const response = await apiFetch(`${BASE_URL}/taches/${tacheId}/dupliquer-dates/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        });
+
+        console.log(`🔵 [planningService] dupliquerTacheDates - response.ok: ${response.ok}, status: ${response.status}`);
+
+        if (!response.ok) {
+            const error = await response.json();
+            console.error('❌ [planningService] dupliquerTacheDates - erreur:', error);
+            throw new Error(error.error || error.detail || 'Erreur lors de la duplication aux dates spécifiées');
+        }
+
+        const result = await response.json();
+        console.log('✅ [planningService] dupliquerTacheDates - résultat:', result);
+        return result;
     }
 };

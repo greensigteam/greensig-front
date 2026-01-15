@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import {
     Users, RefreshCw, Edit2, Trash2, MoreVertical, Plus, Building2,
-    Mail, Phone, MapPin, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+    Mail, Phone, MapPin, Map as MapIcon, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
     AlertCircle, CheckCircle, Loader2, Upload, Link as LinkIcon
 } from 'lucide-react';
 import { fetchStructures, updateStructure, deleteStructure, createStructure } from '../services/usersApi';
@@ -710,7 +710,7 @@ export default function Clients() {
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <div className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium">
-                                                    <MapPin className="w-3.5 h-3.5" />
+                                                    <MapIcon className="w-3.5 h-3.5" />
                                                     {structure.sitesCount || 0}
                                                 </div>
                                             </td>

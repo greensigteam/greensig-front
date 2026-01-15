@@ -1,416 +1,507 @@
-import { useState, useEffect, useRef, type FC } from 'react';
-import { addDays, addWeeks, addMonths, format } from 'date-fns';
-import { Repeat, ChevronDown, X, Hash, Calendar } from 'lucide-react';
-import { FrequenceRecurrence } from '../../types/planning';
+import { useState, useEffect, useMemo, type FC } from 'react';
+import { format, addDays, addMonths } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import {
+    RefreshCw, Calendar, Clock, AlertTriangle, CheckCircle2, X, Plus, Info
+} from 'lucide-react';
 import { PremiumInput, PremiumSelect } from '../modals/PremiumFormComponents';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-export interface RecurrenceParams {
-    frequence: FrequenceRecurrence;
-    interval: number;
-    jours?: string[]; // Pour weekly: ['MO', 'TU', ...]
+export interface RecurrenceConfig {
+    enabled: boolean;
+    mode: 'frequency' | 'custom' | 'dates';
+    // Mode fréquence
+    frequency?: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+    // Mode custom
+    decalage_jours?: number;
+    // Mode dates
+    dates_cibles?: string[];
+    // Paramètres communs
     nombre_occurrences?: number;
-    date_fin?: string;
+    date_fin_recurrence?: string;
+    conserver_equipes: boolean;
+    conserver_objets: boolean;
 }
 
 interface RecurrenceSelectorProps {
-    value: RecurrenceParams | null;
-    onChange: (value: RecurrenceParams | null) => void;
-    startDate: string; // ISO datetime
+    dateDebut: string; // Format YYYY-MM-DD
+    dateFin: string;   // Format YYYY-MM-DD
+    onChange: (config: RecurrenceConfig) => void;
+    value?: RecurrenceConfig;
+    disabled?: boolean; // Désactive le composant (mode édition)
 }
 
-// ============================================================================
-// PRESETS (Google Calendar style)
-// ============================================================================
-
-const RECURRENCE_PRESETS = [
-    { id: null, label: 'Ne se répète pas' },
-    { id: 'daily', label: 'Quotidien' },
-    { id: 'weekdays', label: 'Tous les jours ouvrables (lun-ven)' },
-    { id: 'weekly', label: 'Hebdomadaire' },
-    { id: 'monthly', label: 'Mensuel' },
-    { id: 'custom', label: 'Personnalisé...' },
-] as const;
-
-const DAYS_OF_WEEK = [
-    { id: 'MO', label: 'Lun', fullLabel: 'Lundi' },
-    { id: 'TU', label: 'Mar', fullLabel: 'Mardi' },
-    { id: 'WE', label: 'Mer', fullLabel: 'Mercredi' },
-    { id: 'TH', label: 'Jeu', fullLabel: 'Jeudi' },
-    { id: 'FR', label: 'Ven', fullLabel: 'Vendredi' },
-    { id: 'SA', label: 'Sam', fullLabel: 'Samedi' },
-    { id: 'SU', label: 'Dim', fullLabel: 'Dimanche' },
-];
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-function getRecurrenceSummary(params: RecurrenceParams | null, startDate: string): string {
-    if (!params) return 'Ne se répète pas';
-
-    const { frequence, interval, jours, nombre_occurrences, date_fin } = params;
-
-    // Build frequency text
-    let freqText = '';
-    if (frequence === 'daily') {
-        freqText = interval === 1 ? 'tous les jours' : `tous les ${interval} jours`;
-    } else if (frequence === 'weekly') {
-        if (interval === 1) {
-            if (jours && jours.length > 0) {
-                const dayLabels = jours.map(d => DAYS_OF_WEEK.find(day => day.id === d)?.label).join(', ');
-                freqText = `toutes les semaines le ${dayLabels}`;
-            } else {
-                freqText = 'toutes les semaines';
-            }
-        } else {
-            freqText = `toutes les ${interval} semaines`;
-        }
-    } else if (frequence === 'monthly') {
-        freqText = interval === 1 ? 'tous les mois' : `tous les ${interval} mois`;
-    }
-
-    // Build end text
-    let endText = '';
-    if (nombre_occurrences) {
-        endText = `, ${nombre_occurrences} fois`;
-    } else if (date_fin) {
-        const endDateObj = new Date(date_fin);
-        endText = `, jusqu'au ${endDateObj.toLocaleDateString('fr-FR')}`;
-    }
-
-    return `Se répète ${freqText}${endText}`;
-}
-
-function applyPreset(presetId: string | null, startDate: string): RecurrenceParams | null {
-    if (!presetId) return null;
-
-    const start = new Date(startDate);
-    const dayOfWeek = start.getDay(); // 0 = Sunday, 1 = Monday, ...
-    const dayCode = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][dayOfWeek];
-
-    switch (presetId) {
-        case 'daily':
-            return {
-                frequence: 'daily',
-                interval: 1,
-                nombre_occurrences: 7,
-            };
-        case 'weekdays':
-            return {
-                frequence: 'weekly',
-                interval: 1,
-                jours: ['MO', 'TU', 'WE', 'TH', 'FR'],
-                nombre_occurrences: 5,
-            };
-        case 'weekly':
-            return {
-                frequence: 'weekly',
-                interval: 1,
-                jours: [dayCode],
-                nombre_occurrences: 4,
-            };
-        case 'monthly':
-            return {
-                frequence: 'monthly',
-                interval: 1,
-                nombre_occurrences: 3,
-            };
-        default:
-            return null;
-    }
-}
+// Mapping fréquence -> décalage en jours
+const FREQUENCE_MAPPING = {
+    'DAILY': { label: 'Quotidien (tous les jours)', decalage: 1 },
+    'WEEKLY': { label: 'Hebdomadaire (toutes les semaines)', decalage: 7 },
+    'MONTHLY': { label: 'Mensuel (tous les mois)', decalage: 30 },
+    'YEARLY': { label: 'Annuel (tous les ans)', decalage: 365 }
+};
 
 // ============================================================================
 // COMPONENT
 // ============================================================================
 
 export const RecurrenceSelector: FC<RecurrenceSelectorProps> = ({
-    value,
+    dateDebut,
+    dateFin,
     onChange,
-    startDate,
+    value,
+    disabled = false
 }) => {
-    const [showDropdown, setShowDropdown] = useState(false);
-    const [showCustomModal, setShowCustomModal] = useState(false);
-    const [customParams, setCustomParams] = useState<RecurrenceParams>(
-        value || {
-            frequence: 'weekly',
-            interval: 1,
-            jours: [],
-            nombre_occurrences: 4,
-        }
+    const [enabled, setEnabled] = useState(value?.enabled ?? false);
+    const [mode, setMode] = useState<'frequency' | 'custom' | 'dates'>(value?.mode ?? 'frequency');
+    const [frequency, setFrequency] = useState<'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY'>(
+        value?.frequency ?? 'WEEKLY'
+    );
+    const [decalageJours, setDecalageJours] = useState<number>(value?.decalage_jours ?? 7);
+    const [datesCibles, setDatesCibles] = useState<string[]>(value?.dates_cibles ?? []);
+    const [newDate, setNewDate] = useState('');
+
+    // Choix : nombre d'occurrences OU date de fin
+    const [limitMode, setLimitMode] = useState<'occurrences' | 'date' | 'none'>(
+        value?.nombre_occurrences ? 'occurrences' :
+        value?.date_fin_recurrence ? 'date' :
+        'none'
+    );
+    const [nombreOccurrences, setNombreOccurrences] = useState<number>(value?.nombre_occurrences ?? 10);
+    const [dateFinRecurrence, setDateFinRecurrence] = useState<string>(
+        value?.date_fin_recurrence ?? format(addMonths(new Date(), 6), 'yyyy-MM-dd')
     );
 
-    const dropdownRef = useRef<HTMLDivElement>(null);
+    const [conserverEquipes, setConserverEquipes] = useState(value?.conserver_equipes ?? true);
+    const [conserverObjets, setConserverObjets] = useState(value?.conserver_objets ?? true);
 
-    // Handle click outside to close dropdown
+    // Calculer la durée de la tâche en jours
+    const dureeTache = useMemo(() => {
+        const debut = new Date(dateDebut);
+        const fin = new Date(dateFin);
+        const diffTime = Math.abs(fin.getTime() - debut.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 pour inclure les deux jours
+        return diffDays;
+    }, [dateDebut, dateFin]);
+
+    // Obtenir le décalage selon le mode
+    const decalageEffectif = useMemo(() => {
+        if (mode === 'custom') return decalageJours;
+        if (mode === 'frequency') return FREQUENCE_MAPPING[frequency].decalage;
+        return 0;
+    }, [mode, frequency, decalageJours]);
+
+    // Vérifier la compatibilité
+    const compatibilite = useMemo(() => {
+        if (mode === 'dates') return { valide: true, message: null };
+
+        if (decalageEffectif < dureeTache) {
+            return {
+                valide: false,
+                message: `Le décalage (${decalageEffectif} jour${decalageEffectif > 1 ? 's' : ''}) doit être supérieur ou égal à la durée de la tâche (${dureeTache} jour${dureeTache > 1 ? 's' : ''}) pour éviter le chevauchement des occurrences.`
+            };
+        }
+
+        return { valide: true, message: null };
+    }, [decalageEffectif, dureeTache, mode]);
+
+    // Calculer l'aperçu des occurrences
+    const apercuOccurrences = useMemo(() => {
+        if (!enabled || mode === 'dates') return null;
+
+        const debut = new Date(dateDebut);
+        const occurrences: string[] = [];
+        let occurrence = 1;
+        const maxOccurrences = limitMode === 'occurrences' ? nombreOccurrences : 100;
+        const dateLimite = limitMode === 'date' ? new Date(dateFinRecurrence) : addMonths(new Date(), 12);
+
+        while (occurrence <= maxOccurrences && occurrences.length < 5) { // Montrer max 5 exemples
+            const nouvelleDate = addDays(debut, decalageEffectif * occurrence);
+
+            if (nouvelleDate > dateLimite) break;
+
+            occurrences.push(format(nouvelleDate, 'dd/MM/yyyy', { locale: fr }));
+            occurrence++;
+        }
+
+        return occurrences;
+    }, [enabled, mode, dateDebut, decalageEffectif, limitMode, nombreOccurrences, dateFinRecurrence]);
+
+    // Mettre à jour le parent à chaque changement
     useEffect(() => {
-        if (!showDropdown) return;
+        if (!enabled) {
+            onChange({
+                enabled: false,
+                mode,
+                conserver_equipes: conserverEquipes,
+                conserver_objets: conserverObjets
+            });
+            return;
+        }
 
-        const handleClickOutside = (event: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-                setShowDropdown(false);
-            }
+        const config: RecurrenceConfig = {
+            enabled: true,
+            mode,
+            conserver_equipes: conserverEquipes,
+            conserver_objets: conserverObjets
         };
 
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [showDropdown]);
-
-    const summary = getRecurrenceSummary(value, startDate);
-
-    const handlePresetClick = (presetId: string | null) => {
-        if (presetId === 'custom') {
-            setShowCustomModal(true);
-        } else {
-            const preset = applyPreset(presetId, startDate);
-            onChange(preset);
+        if (mode === 'frequency') {
+            config.frequency = frequency;
+        } else if (mode === 'custom') {
+            config.decalage_jours = decalageJours;
+        } else if (mode === 'dates') {
+            config.dates_cibles = datesCibles;
         }
-        setShowDropdown(false);
-    };
 
-    const handleCustomSave = () => {
-        onChange(customParams);
-        setShowCustomModal(false);
-    };
+        if (limitMode === 'occurrences') {
+            config.nombre_occurrences = nombreOccurrences;
+        } else if (limitMode === 'date') {
+            config.date_fin_recurrence = dateFinRecurrence;
+        }
+
+        onChange(config);
+    }, [enabled, mode, frequency, decalageJours, datesCibles, limitMode, nombreOccurrences, dateFinRecurrence, conserverEquipes, conserverObjets]);
+
+    if (!enabled) {
+        return (
+            <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 ${disabled ? 'bg-gray-200' : 'bg-emerald-100'} rounded-lg flex items-center justify-center`}>
+                            <RefreshCw className={`w-5 h-5 ${disabled ? 'text-gray-400' : 'text-emerald-600'}`} />
+                        </div>
+                        <div>
+                            <h4 className={`font-semibold ${disabled ? 'text-gray-500' : 'text-gray-900'}`}>Récurrence</h4>
+                            <p className="text-sm text-gray-500">
+                                {disabled ? 'Non disponible en mode modification' : 'Créer plusieurs tâches automatiquement'}
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setEnabled(true)}
+                        disabled={disabled}
+                        className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
+                            disabled
+                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                        }`}
+                    >
+                        Activer
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div ref={dropdownRef} className="relative">
-            {/* Trigger Button */}
-            <button
-                type="button"
-                onClick={() => setShowDropdown(!showDropdown)}
-                className={`w-full flex items-center justify-between px-4 py-3 bg-white border-2 rounded-lg focus:outline-none transition-all text-left shadow-sm ${
-                    showDropdown
-                        ? 'border-emerald-500 ring-4 ring-emerald-500/20'
-                        : 'border-slate-200 hover:border-slate-300'
-                }`}
-            >
+        <div className="border-2 border-emerald-200 rounded-xl p-5 bg-gradient-to-br from-emerald-50 to-teal-50">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                    <Repeat className={`w-4 h-4 transition-colors ${showDropdown ? 'text-emerald-600' : 'text-slate-400'}`} />
-                    <span className={`text-sm font-medium ${value ? 'text-slate-900' : 'text-slate-500'}`}>{summary}</span>
+                    <div className="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center">
+                        <RefreshCw className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                        <h4 className="font-semibold text-gray-900">Récurrence activée</h4>
+                        <p className="text-xs text-gray-600">Plusieurs tâches seront créées automatiquement</p>
+                    </div>
                 </div>
-                <ChevronDown className={`w-4 h-4 transition-all ${showDropdown ? 'rotate-180 text-emerald-600' : 'text-slate-400'}`} />
-            </button>
+                <button
+                    type="button"
+                    onClick={() => setEnabled(false)}
+                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Désactiver la récurrence"
+                >
+                    <X className="w-5 h-5" />
+                </button>
+            </div>
 
-            {/* Dropdown Menu */}
-            {showDropdown && (
-                <div className="absolute z-[150] mt-2 w-full bg-white border border-slate-200 rounded-xl shadow-2xl py-1.5 max-h-64 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
-                    {RECURRENCE_PRESETS.map((preset) => (
+            <div className="space-y-4">
+                {/* Mode de récurrence */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Mode de récurrence
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
                         <button
-                            key={preset.id || 'none'}
                             type="button"
-                            onClick={() => handlePresetClick(preset.id)}
-                            className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
+                            onClick={() => setMode('frequency')}
+                            className={`p-3 rounded-lg border-2 transition-all text-sm font-medium ${
+                                mode === 'frequency'
+                                    ? 'border-emerald-500 bg-white text-emerald-700 shadow-sm'
+                                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                            }`}
                         >
-                            {preset.label}
+                            <Clock className="w-4 h-4 mx-auto mb-1" />
+                            Fréquence
                         </button>
-                    ))}
+                        <button
+                            type="button"
+                            onClick={() => setMode('custom')}
+                            className={`p-3 rounded-lg border-2 transition-all text-sm font-medium ${
+                                mode === 'custom'
+                                    ? 'border-emerald-500 bg-white text-emerald-700 shadow-sm'
+                                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                            }`}
+                        >
+                            <RefreshCw className="w-4 h-4 mx-auto mb-1" />
+                            Personnalisé
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setMode('dates')}
+                            className={`p-3 rounded-lg border-2 transition-all text-sm font-medium ${
+                                mode === 'dates'
+                                    ? 'border-emerald-500 bg-white text-emerald-700 shadow-sm'
+                                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                            }`}
+                        >
+                            <Calendar className="w-4 h-4 mx-auto mb-1" />
+                            Dates
+                        </button>
+                    </div>
                 </div>
-            )}
 
-            {/* Custom Modal */}
-            {showCustomModal && (
-                <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md">
-                        {/* Header */}
-                        <div className="flex items-center justify-between p-6 border-b border-slate-200">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
-                                    <Repeat className="w-5 h-5 text-emerald-600" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-bold text-slate-900">Récurrence personnalisée</h3>
-                                    <p className="text-xs text-slate-500">Configurez la périodicité de la tâche</p>
-                                </div>
+                {/* Configuration selon le mode */}
+                <div className="bg-white rounded-lg p-4 border border-emerald-100">
+                    {mode === 'frequency' && (
+                        <PremiumSelect
+                            value={frequency}
+                            onChange={(val) => setFrequency(val as typeof frequency)}
+                            options={Object.entries(FREQUENCE_MAPPING).map(([key, data]) => ({
+                                value: key,
+                                label: data.label
+                            }))}
+                            label="Fréquence"
+                            icon={<Clock className="w-4 h-4" />}
+                            variant="outlined"
+                            size="md"
+                        />
+                    )}
+
+                    {mode === 'custom' && (
+                        <PremiumInput
+                            type="number"
+                            value={decalageJours.toString()}
+                            onChange={(val) => setDecalageJours(parseInt(val) || 1)}
+                            label="Décalage en jours"
+                            icon={<RefreshCw className="w-4 h-4" />}
+                            variant="outlined"
+                            size="md"
+                            hint={`La tâche sera répétée tous les ${decalageJours} jour${decalageJours > 1 ? 's' : ''}`}
+                        />
+                    )}
+
+                    {mode === 'dates' && (
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                                <PremiumInput
+                                    type="date"
+                                    value={newDate}
+                                    onChange={setNewDate}
+                                    label="Ajouter une date"
+                                    icon={<Calendar className="w-4 h-4" />}
+                                    variant="outlined"
+                                    size="md"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (newDate && !datesCibles.includes(newDate)) {
+                                            setDatesCibles([...datesCibles, newDate].sort());
+                                            setNewDate('');
+                                        }
+                                    }}
+                                    disabled={!newDate || datesCibles.includes(newDate)}
+                                    className="mt-7 p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <Plus className="w-5 h-5" />
+                                </button>
                             </div>
-                            <button
-                                onClick={() => setShowCustomModal(false)}
-                                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
 
-                        {/* Body */}
-                        <div className="p-6 space-y-6">
-                            {/* Interval + Frequency */}
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-800 mb-3">Se répète tous les</label>
-                                <div className="grid grid-cols-[100px_1fr] gap-3">
-                                    <PremiumInput
-                                        type="number"
-                                        value={customParams.interval}
-                                        onChange={(value) => setCustomParams({ ...customParams, interval: Number(value) || 1 })}
-                                        min={1}
-                                        icon={<Hash className="w-4 h-4" />}
-                                        variant="outlined"
-                                        size="md"
-                                    />
-                                    <PremiumSelect
-                                        value={customParams.frequence}
-                                        onChange={(value) => setCustomParams({ ...customParams, frequence: value as FrequenceRecurrence })}
-                                        options={[
-                                            { value: 'daily', label: 'Jours' },
-                                            { value: 'weekly', label: 'Semaines' },
-                                            { value: 'monthly', label: 'Mois' }
-                                        ]}
-                                        variant="outlined"
-                                        size="md"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Days of Week (for weekly) */}
-                            {customParams.frequence === 'weekly' && (
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-800 mb-3">Se répète le</label>
+                            {datesCibles.length > 0 && (
+                                <div className="space-y-1">
+                                    <p className="text-xs font-medium text-gray-600">
+                                        Dates sélectionnées ({datesCibles.length})
+                                    </p>
                                     <div className="flex flex-wrap gap-2">
-                                        {DAYS_OF_WEEK.map((day) => {
-                                            const isSelected = customParams.jours?.includes(day.id);
-                                            return (
+                                        {datesCibles.map(date => (
+                                            <span
+                                                key={date}
+                                                className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 text-xs px-2 py-1 rounded-full"
+                                            >
+                                                {format(new Date(date), 'dd/MM/yyyy')}
                                                 <button
-                                                    key={day.id}
                                                     type="button"
-                                                    onClick={() => {
-                                                        const currentDays = customParams.jours || [];
-                                                        const newDays = isSelected
-                                                            ? currentDays.filter(d => d !== day.id)
-                                                            : [...currentDays, day.id];
-                                                        setCustomParams({ ...customParams, jours: newDays });
-                                                    }}
-                                                    className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                                                        isSelected
-                                                            ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20'
-                                                            : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
-                                                    }`}
+                                                    onClick={() => setDatesCibles(datesCibles.filter(d => d !== date))}
+                                                    className="hover:text-red-600"
                                                 >
-                                                    {day.label}
+                                                    <X className="w-3 h-3" />
                                                 </button>
-                                            );
-                                        })}
+                                            </span>
+                                        ))}
                                     </div>
                                 </div>
                             )}
+                        </div>
+                    )}
+                </div>
 
-                            {/* End condition */}
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-800 mb-3">Se termine</label>
-                                <div className="space-y-3">
-                                    {/* Option: Après X occurrences */}
-                                    <div
-                                        onClick={() => !customParams.nombre_occurrences && setCustomParams({ ...customParams, nombre_occurrences: 5, date_fin: undefined })}
-                                        className={`p-3 rounded-lg border-2 transition-all cursor-pointer ${
-                                            !!customParams.nombre_occurrences
-                                                ? 'border-emerald-500 bg-emerald-50/50'
-                                                : 'border-slate-200 bg-white hover:border-slate-300'
-                                        }`}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                                                !!customParams.nombre_occurrences
-                                                    ? 'border-emerald-600'
-                                                    : 'border-slate-300'
-                                            }`}>
-                                                {!!customParams.nombre_occurrences && (
-                                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
-                                                )}
-                                            </div>
-                                            <span className="text-sm font-medium text-slate-700">Après</span>
-                                            <div className="flex-1" onClick={(e) => e.stopPropagation()}>
-                                                <PremiumInput
-                                                    type="number"
-                                                    min={1}
-                                                    disabled={!customParams.nombre_occurrences}
-                                                    value={customParams.nombre_occurrences || ''}
-                                                    onChange={(value) => setCustomParams({ ...customParams, nombre_occurrences: Number(value) || undefined })}
-                                                    icon={<Hash className="w-4 h-4" />}
-                                                    variant="outlined"
-                                                    size="md"
-                                                />
-                                            </div>
-                                            <span className="text-sm text-slate-500 whitespace-nowrap">occurrence(s)</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Option: Jusqu'à une date */}
-                                    <div
-                                        onClick={() => {
-                                            if (!customParams.date_fin) {
-                                                const defaultEndDate = format(addDays(new Date(startDate), 7), 'yyyy-MM-dd');
-                                                setCustomParams({ ...customParams, date_fin: defaultEndDate, nombre_occurrences: undefined });
-                                            }
-                                        }}
-                                        className={`p-3 rounded-lg border-2 transition-all cursor-pointer ${
-                                            !!customParams.date_fin
-                                                ? 'border-emerald-500 bg-emerald-50/50'
-                                                : 'border-slate-200 bg-white hover:border-slate-300'
-                                        }`}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                                                !!customParams.date_fin
-                                                    ? 'border-emerald-600'
-                                                    : 'border-slate-300'
-                                            }`}>
-                                                {!!customParams.date_fin && (
-                                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
-                                                )}
-                                            </div>
-                                            <span className="text-sm font-medium text-slate-700">Le</span>
-                                            <div className="flex-1" onClick={(e) => e.stopPropagation()}>
-                                                <PremiumInput
-                                                    type="date"
-                                                    disabled={!customParams.date_fin}
-                                                    value={customParams.date_fin?.slice(0, 10) || ''}
-                                                    onChange={(value) => setCustomParams({ ...customParams, date_fin: value })}
-                                                    icon={<Calendar className="w-4 h-4" />}
-                                                    variant="outlined"
-                                                    size="md"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                {/* Limite (nombre d'occurrences ou date de fin) - Seulement pour frequency et custom */}
+                {mode !== 'dates' && (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Générer jusqu'à
+                        </label>
+                        <div className="space-y-3">
+                            {/* Choix du mode */}
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setLimitMode('occurrences')}
+                                    className={`flex-1 p-2 rounded-lg border-2 transition-all text-sm font-medium ${
+                                        limitMode === 'occurrences'
+                                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                                    }`}
+                                >
+                                    Nombre fixe
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setLimitMode('date')}
+                                    className={`flex-1 p-2 rounded-lg border-2 transition-all text-sm font-medium ${
+                                        limitMode === 'date'
+                                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                                    }`}
+                                >
+                                    Date limite
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setLimitMode('none')}
+                                    className={`flex-1 p-2 rounded-lg border-2 transition-all text-sm font-medium ${
+                                        limitMode === 'none'
+                                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                                    }`}
+                                >
+                                    Fin d'année
+                                </button>
                             </div>
 
-                            {/* Summary Preview */}
-                            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-2 border-emerald-200 rounded-xl p-4 shadow-sm">
-                                <div className="flex items-start gap-3">
-                                    <Repeat className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-                                    <div>
-                                        <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">Aperçu</p>
-                                        <p className="text-sm text-emerald-900 font-medium leading-relaxed">
-                                            {getRecurrenceSummary(customParams, startDate)}
+                            {/* Configuration selon le mode */}
+                            <div className="bg-white rounded-lg p-3 border border-emerald-100">
+                                {limitMode === 'occurrences' && (
+                                    <PremiumInput
+                                        type="number"
+                                        value={nombreOccurrences.toString()}
+                                        onChange={(val) => setNombreOccurrences(parseInt(val) || 1)}
+                                        label="Nombre d'occurrences"
+                                        icon={<RefreshCw className="w-4 h-4" />}
+                                        variant="outlined"
+                                        size="sm"
+                                        hint="Nombre de tâches à créer (max: 100)"
+                                    />
+                                )}
+
+                                {limitMode === 'date' && (
+                                    <PremiumInput
+                                        type="date"
+                                        value={dateFinRecurrence}
+                                        onChange={setDateFinRecurrence}
+                                        label="Date de fin de récurrence"
+                                        icon={<Calendar className="w-4 h-4" />}
+                                        variant="outlined"
+                                        size="sm"
+                                        hint="Générer des tâches jusqu'à cette date"
+                                    />
+                                )}
+
+                                {limitMode === 'none' && (
+                                    <div className="flex items-start gap-2 text-sm text-blue-700 bg-blue-50 p-3 rounded-lg">
+                                        <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                                        <p>
+                                            Les tâches seront générées jusqu'au <strong>31 décembre {new Date().getFullYear()}</strong> (par défaut).
                                         </p>
                                     </div>
-                                </div>
+                                )}
                             </div>
                         </div>
+                    </div>
+                )}
 
-                        {/* Footer */}
-                        <div className="flex gap-3 p-6 border-t border-slate-200 bg-slate-50">
-                            <button
-                                type="button"
-                                onClick={() => setShowCustomModal(false)}
-                                className="flex-1 px-4 py-2.5 text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors font-medium"
-                            >
-                                Annuler
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleCustomSave}
-                                className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium shadow-sm"
-                            >
-                                Appliquer
-                            </button>
+                {/* Validation */}
+                {!compatibilite.valide && (
+                    <div className="flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                        <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                        <div>
+                            <p className="font-medium mb-1">Incompatibilité détectée</p>
+                            <p>{compatibilite.message}</p>
                         </div>
                     </div>
+                )}
+
+                {/* Aperçu des occurrences */}
+                {compatibilite.valide && apercuOccurrences && apercuOccurrences.length > 0 && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                            <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                            <p className="text-sm font-medium text-blue-900">
+                                Aperçu des prochaines occurrences
+                            </p>
+                        </div>
+                        <div className="space-y-1">
+                            {apercuOccurrences.map((date, idx) => (
+                                <div key={idx} className="text-xs text-blue-700 flex items-center gap-2">
+                                    <span className="w-4 text-right font-medium">#{idx + 1}</span>
+                                    <Calendar className="w-3 h-3" />
+                                    <span>{date}</span>
+                                </div>
+                            ))}
+                            {limitMode === 'none' && (
+                                <p className="text-xs text-blue-600 italic mt-2">
+                                    ... et toutes les occurrences jusqu'au 31/12/{new Date().getFullYear()}
+                                </p>
+                            )}
+                            {limitMode === 'date' && (
+                                <p className="text-xs text-blue-600 italic mt-2">
+                                    ... et toutes les occurrences jusqu'au {format(new Date(dateFinRecurrence), 'dd/MM/yyyy')}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Options */}
+                <div className="border-t border-emerald-200 pt-4 space-y-2">
+                    <p className="text-sm font-medium text-gray-700 mb-2">Options</p>
+
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={conserverEquipes}
+                            onChange={(e) => setConserverEquipes(e.target.checked)}
+                            className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                        />
+                        <span className="text-sm text-gray-700">Conserver les équipes assignées</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={conserverObjets}
+                            onChange={(e) => setConserverObjets(e.target.checked)}
+                            className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                        />
+                        <span className="text-sm text-gray-700">Conserver les objets liés</span>
+                    </label>
                 </div>
-            )}
+            </div>
         </div>
     );
 };

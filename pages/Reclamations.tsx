@@ -173,7 +173,7 @@ const Reclamations: React.FC = () => {
     const [filterDateDebut, setFilterDateDebut] = useState<string>('');
     const [filterDateFin, setFilterDateFin] = useState<string>('');
     const [showFilters, setShowFilters] = useState(false);
-    const [filterPeriod, setFilterPeriod] = useState<string>('custom');
+    const [filterPeriod, setFilterPeriod] = useState<string>('all');
 
     const handlePeriodChange = (value: string) => {
         setFilterPeriod(value);
@@ -531,6 +531,10 @@ const Reclamations: React.FC = () => {
     };
 
     const handleTaskSubmit = async (data: TacheCreate) => {
+        console.log('🟢 [Reclamations] handleTaskSubmit APPELÉE');
+        console.log('🔵 [Reclamations] Données reçues:', data);
+        console.log('🔵 [Reclamations] recurrence_config:', data.recurrence_config);
+
         try {
             // Ajouter la réclamation aux données
             const payload: TacheCreate = {
@@ -540,26 +544,99 @@ const Reclamations: React.FC = () => {
                 date_fin_planifiee: data.date_fin_planifiee,
             };
 
-            await planningService.createTache(payload);
+            // Créer la tâche de base
+            const createdTask = await planningService.createTache(payload);
+            console.log('✅ [Reclamations] Tâche de base créée:', createdTask);
+
+            // ✅ Gérer la récurrence si activée
+            const recurrenceConfig = data.recurrence_config;
+            console.log('🔵 [Reclamations] Configuration de récurrence:', recurrenceConfig);
+
+            if (recurrenceConfig && recurrenceConfig.enabled && createdTask.id) {
+                console.log('🔄 [Reclamations] Récurrence activée, mode:', recurrenceConfig.mode);
+
+                try {
+                    let recurrenceResult;
+
+                    if (recurrenceConfig.mode === 'frequency') {
+                        console.log('📅 [Reclamations] Appel API dupliquer-recurrence avec fréquence:', recurrenceConfig.frequency);
+                        recurrenceResult = await planningService.dupliquerTacheRecurrence(createdTask.id, {
+                            frequence: recurrenceConfig.frequency!,
+                            nombre_occurrences: recurrenceConfig.nombre_occurrences,
+                            date_fin_recurrence: recurrenceConfig.date_fin_recurrence,
+                            conserver_equipes: recurrenceConfig.conserver_equipes,
+                            conserver_objets: recurrenceConfig.conserver_objets
+                        });
+                    } else if (recurrenceConfig.mode === 'custom') {
+                        console.log('⚙️ [Reclamations] Appel API dupliquer avec décalage:', recurrenceConfig.decalage_jours);
+                        recurrenceResult = await planningService.dupliquerTache(createdTask.id, {
+                            decalage_jours: recurrenceConfig.decalage_jours!,
+                            nombre_occurrences: recurrenceConfig.nombre_occurrences,
+                            date_fin_recurrence: recurrenceConfig.date_fin_recurrence,
+                            conserver_equipes: recurrenceConfig.conserver_equipes,
+                            conserver_objets: recurrenceConfig.conserver_objets
+                        });
+                    } else if (recurrenceConfig.mode === 'dates') {
+                        console.log('📆 [Reclamations] Appel API dupliquer-dates avec:', recurrenceConfig.dates_cibles);
+                        recurrenceResult = await planningService.dupliquerTacheDates(createdTask.id, {
+                            dates_cibles: recurrenceConfig.dates_cibles!,
+                            conserver_equipes: recurrenceConfig.conserver_equipes,
+                            conserver_objets: recurrenceConfig.conserver_objets
+                        });
+                    }
+
+                    console.log('✅ [Reclamations] Résultat de la récurrence:', recurrenceResult);
+
+                    // Message de succès avec nombre de tâches créées
+                    if (recurrenceResult) {
+                        const totalCreated = 1 + recurrenceResult.nombre_taches_creees;
+                        setModalConfig({
+                            isOpen: true,
+                            title: 'Succès',
+                            message: `${totalCreated} tâche${totalCreated > 1 ? 's' : ''} créée${totalCreated > 1 ? 's' : ''} avec succès pour la réclamation ${reclamationTargetForTask?.numero_reclamation} (1 tâche de base + ${recurrenceResult.nombre_taches_creees} occurrence${recurrenceResult.nombre_taches_creees > 1 ? 's' : ''}).`,
+                            variant: 'success',
+                            onConfirm: () => setModalConfig(p => ({ ...p, isOpen: false }))
+                        });
+                    } else {
+                        setModalConfig({
+                            isOpen: true,
+                            title: 'Succès',
+                            message: `Une tâche a été créée pour la réclamation ${reclamationTargetForTask?.numero_reclamation}.`,
+                            variant: 'success',
+                            onConfirm: () => setModalConfig(p => ({ ...p, isOpen: false }))
+                        });
+                    }
+                } catch (recurrenceError: any) {
+                    console.error('❌ [Reclamations] Erreur lors de la création des occurrences:', recurrenceError);
+                    setModalConfig({
+                        isOpen: true,
+                        title: 'Avertissement',
+                        message: `Tâche de base créée, mais erreur lors de la génération des occurrences: ${recurrenceError.message || recurrenceError}`,
+                        variant: 'warning',
+                        onConfirm: () => setModalConfig(p => ({ ...p, isOpen: false }))
+                    });
+                }
+            } else {
+                console.log('ℹ️ [Reclamations] Pas de récurrence activée');
+                setModalConfig({
+                    isOpen: true,
+                    title: 'Succès',
+                    message: `Une tâche a été créée pour la réclamation ${reclamationTargetForTask?.numero_reclamation}.`,
+                    variant: 'success',
+                    onConfirm: () => setModalConfig(p => ({ ...p, isOpen: false }))
+                });
+            }
 
             setIsTaskModalOpen(false);
             setTaskInitialValues({});
             setTaskSiteFilter(undefined);
             setReclamationTargetForTask(null);
 
-            setModalConfig({
-                isOpen: true,
-                title: 'Succès',
-                message: `Une tâche a été créée pour la réclamation ${reclamationTargetForTask?.numero_reclamation}.`,
-                variant: 'success',
-                onConfirm: () => setModalConfig(p => ({ ...p, isOpen: false }))
-            });
-
             // Recharger les tâches liées
             loadData();
 
-        } catch (error) {
-            console.error("Erreur création tâche", error);
+        } catch (error: any) {
+            console.error("❌ [Reclamations] Erreur création tâche", error);
             setModalConfig({ isOpen: true, title: 'Erreur', message: "Échec de la création de la tâche.", variant: 'danger' });
         }
     };

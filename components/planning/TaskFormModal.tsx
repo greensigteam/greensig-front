@@ -28,6 +28,7 @@ import { EquipeList } from '../../types/users';
 import FormModal from '../FormModal';
 import { PremiumInput, PremiumSelect, PremiumTextarea, PremiumSearchableSelect, PremiumMultiSelect } from '../modals/PremiumFormComponents';
 import { DistributionChargeEditor } from './DistributionChargeEditor';
+import { RecurrenceSelector, type RecurrenceConfig } from './RecurrenceSelector';
 
 
 // ============================================================================
@@ -62,6 +63,7 @@ interface TaskFormModalProps {
 }
 
 const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, typesTaches, preSelectedObjects, siteFilter, isSubmitting = false, onClose, onSubmit, onResetCharge }) => {
+
     // Initialize equipes from M2M or legacy single equipe
     const initialEquipesIds = (): number[] => {
         if (tache?.equipes_detail && tache.equipes_detail.length > 0) {
@@ -109,14 +111,14 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         // Si la tâche existe et a une distribution, utiliser ses heures
         if (tache?.distributions_charge && tache.distributions_charge.length > 0) {
             const firstDist = tache.distributions_charge[0];
-            return firstDist.heure_debut ? firstDist.heure_debut.substring(0, 5) : '08:00';
+            return firstDist?.heure_debut ? firstDist.heure_debut.substring(0, 5) : '08:00';
         }
         return '08:00';
     });
     const [endTime, setEndTime] = useState<string>(() => {
         if (tache?.distributions_charge && tache.distributions_charge.length > 0) {
             const firstDist = tache.distributions_charge[0];
-            return firstDist.heure_fin ? firstDist.heure_fin.substring(0, 5) : '17:00';
+            return firstDist?.heure_fin ? firstDist.heure_fin.substring(0, 5) : '17:00';
         }
         return '17:00';
     });
@@ -137,6 +139,14 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
     // State for ratios and charge preview
     const [ratios, setRatios] = useState<RatioProductivite[]>([]);
     const [loadingRatios, setLoadingRatios] = useState(false);
+
+    // State for recurrence (only for creation mode)
+    const [recurrenceConfig, setRecurrenceConfig] = useState<RecurrenceConfig>({
+        enabled: false,
+        mode: 'frequency',
+        conserver_equipes: true,
+        conserver_objets: true
+    });
 
     // State for object selector
     const [selectedObjects, setSelectedObjects] = useState<InventoryObjectOption[]>(
@@ -569,17 +579,28 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
 
         console.log('🔍 DEBUG - distributionsToSend:', distributionsToSend);
         console.log('🔍 DEBUG - distributionsToSend.length:', distributionsToSend.length);
+        console.log('🔍 DEBUG - tache (mode édition si défini):', tache);
+        console.log('🔍 DEBUG - Mode:', tache ? 'ÉDITION' : 'CRÉATION');
+        console.log('🔍 DEBUG - recurrenceConfig:', recurrenceConfig);
+        console.log('🔍 DEBUG - recurrenceConfig.enabled:', recurrenceConfig.enabled);
 
-        const payload = {
+        const payload: any = {
             ...formData,
             // ✅ Distributions de charge (multi-jours ou jour unique avec heures)
             ...(distributionsToSend.length > 0 && {
                 distributions_charge_data: distributionsToSend
+            }),
+            // ✅ Configuration de récurrence (seulement pour création et si activée)
+            ...((recurrenceConfig.enabled) && {
+                recurrence_config: recurrenceConfig
             })
         };
 
         console.log('📤 Submitting task data:', payload);
         console.log('📤 Submitting distributions_charge_data:', payload.distributions_charge_data);
+        if (payload.recurrence_config) {
+            console.log('📤 Submitting recurrence_config:', payload.recurrence_config);
+        }
         onSubmit(payload);
     };
 
@@ -833,7 +854,7 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                 />
 
                 <PremiumTextarea
-                    value={formData.commentaires}
+                    value={formData.commentaires || ''}
                     onChange={(value) => setFormData({ ...formData, commentaires: value })}
                     label="Commentaires"
                     placeholder="Détails de la tâche..."
@@ -1140,9 +1161,37 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                     </div>
                 )}
 
-                {/* ❌ SUPPRIMÉ: Checkboxes "Calculer charge auto" et "Répartir multi-jours" */}
-                {/* ❌ SUPPRIMÉ: Banner auto-récurrence */}
-                {/* La planification multi-jours est maintenant gérée via l'éditeur de distribution */}
+                {/* ============================================================================ */}
+                {/* RÉCURRENCE                                                                  */}
+                {/* ============================================================================ */}
+                <div className="mt-6">
+                    {(() => {
+                        // Calculer les dates de début et fin basées sur les distributions réelles
+                        let dateDebutRecurrence: string;
+                        let dateFinRecurrence: string;
+
+                        if (distributionsCharge.length > 0) {
+                            // Trier les distributions une seule fois
+                            const distributionsSorted = [...distributionsCharge].sort((a, b) => a.date.localeCompare(b.date));
+                            dateDebutRecurrence = distributionsSorted[0].date;
+                            dateFinRecurrence = distributionsSorted[distributionsSorted.length - 1].date;
+                        } else {
+                            // Fallback : utiliser les dates du formulaire
+                            dateDebutRecurrence = formData.date_debut_planifiee;
+                            dateFinRecurrence = formData.date_fin_planifiee;
+                        }
+
+                        return (
+                            <RecurrenceSelector
+                                dateDebut={dateDebutRecurrence}
+                                dateFin={dateFinRecurrence}
+                                value={recurrenceConfig}
+                                onChange={setRecurrenceConfig}
+                                disabled={!!tache}
+                            />
+                        );
+                    })()}
+                </div>
 
             </div>
         </FormModal>

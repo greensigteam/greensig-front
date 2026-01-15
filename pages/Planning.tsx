@@ -23,7 +23,7 @@ import {
     STATUT_TACHE_LABELS, STATUT_TACHE_COLORS,
     PRIORITE_LABELS,
     STATUS_DISTRIBUTION_LABELS, STATUS_DISTRIBUTION_COLORS,
-    type StatusDistribution,
+    type StatusDistribution, type DistributionCharge,
     PlanningFilters, EMPTY_PLANNING_FILTERS
 } from '../types/planning';
 import { EquipeList, StructureClient } from '../types/users';
@@ -498,9 +498,8 @@ const Planning: FC = () => {
                 const matchesSite = site_nom?.toLowerCase().includes(q);
 
                 const matchesEquipes = task.equipes_detail?.some((e: any) =>
-                    (e.nom_equipe || e.nomEquipe || '').toLowerCase().includes(q)
-                ) || task.equipe_detail?.nom_equipe?.toLowerCase().includes(q) ||
-                    task.equipe_detail?.nomEquipe?.toLowerCase().includes(q);
+                    (e.nomEquipe || '').toLowerCase().includes(q)
+                ) || task.equipe_detail?.nomEquipe?.toLowerCase().includes(q);
 
                 if (!matchesName && !matchesRef && !matchesSite && !matchesEquipes) return false;
             }
@@ -776,27 +775,40 @@ const Planning: FC = () => {
                     return taskDate >= startDate && taskDate < endDate;
                 });
             } else if (currentView === 'week') {
-                // For week view, include tasks from the displayed week
+                // For week view, include tasks that have distributions in the displayed week
                 const weekStart = new Date(currentDate);
                 weekStart.setDate(weekStart.getDate() - (weekStart.getDay() === 0 ? 6 : weekStart.getDay() - 1));
 
                 const weekEnd = new Date(weekStart);
                 weekEnd.setDate(weekEnd.getDate() + 7);
 
+                const weekStartStr = format(weekStart, 'yyyy-MM-dd');
+                const weekEndStr = format(weekEnd, 'yyyy-MM-dd');
+
                 tasksToRender = filteredTaches.filter(t => {
+                    // Check if task has any distributions in the week range
+                    if (t.distributions_charge && t.distributions_charge.length > 0) {
+                        return t.distributions_charge.some(d => d.date >= weekStartStr && d.date < weekEndStr);
+                    }
+                    // Fallback: check task date for tasks without distributions
                     const taskDate = new Date(t.date_debut_planifiee);
                     return taskDate >= weekStart && taskDate < weekEnd;
                 });
             } else if (currentView === 'day') {
-                // For day view, include tasks from the current day
-                const dayStart = new Date(currentDate);
-                dayStart.setHours(0, 0, 0, 0);
-
-                const dayEnd = new Date(currentDate);
-                dayEnd.setHours(23, 59, 59, 999);
+                // For day view, include tasks that have distributions on the current day
+                const dateKey = format(currentDate, 'yyyy-MM-dd');
 
                 tasksToRender = filteredTaches.filter(t => {
+                    // Include tasks that have a distribution for this specific day
+                    if (t.distributions_charge && t.distributions_charge.length > 0) {
+                        return t.distributions_charge.some(d => d.date === dateKey);
+                    }
+                    // Fallback: check if task falls on this day (for tasks without distributions)
                     const taskDate = new Date(t.date_debut_planifiee);
+                    const dayStart = new Date(currentDate);
+                    dayStart.setHours(0, 0, 0, 0);
+                    const dayEnd = new Date(currentDate);
+                    dayEnd.setHours(23, 59, 59, 999);
                     return taskDate >= dayStart && taskDate <= dayEnd;
                 });
             } else if (currentView === 'agenda') {
@@ -838,77 +850,20 @@ const Planning: FC = () => {
 
             // Dessiner le calendrier selon la vue
             if (currentView === 'month') {
-                const startY = 32;
-                const cellWidth = (pageWidth - 20) / 7;
-                const cellHeight = 26;
-                const headerHeight = 8;
-
-                // En-têtes des jours avec style amélioré
-                const dayNames = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'];
-                pdf.setFillColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
-                pdf.rect(10, startY, pageWidth - 20, headerHeight, 'F');
-
-                pdf.setFontSize(9);
-                pdf.setTextColor(255, 255, 255);
-                pdf.setFont('helvetica', 'bold');
-                dayNames.forEach((day, i) => {
-                    const x = 10 + (i * cellWidth) + (cellWidth / 2);
-                    pdf.text(day, x, startY + 5.5, { align: 'center' });
-                });
-
-                // Calculer les jours du mois
+                // Pré-calculer les tâches par jour pour déterminer la hauteur des cellules
                 const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
                 const startDate = new Date(firstDay);
                 startDate.setDate(startDate.getDate() - (startDate.getDay() === 0 ? 6 : startDate.getDay() - 1));
 
-                // Dessiner la grille et les tâches
+                // Créer une map des tâches par jour
+                const tasksByDay = new Map<string, Tache[]>();
+                let maxTasksInDay = 0;
+
                 for (let i = 0; i < 42; i++) {
                     const date = new Date(startDate);
                     date.setDate(date.getDate() + i);
+                    const dateKey = format(date, 'yyyy-MM-dd');
 
-                    const currentRow = Math.floor(i / 7);
-                    const currentCol = i % 7;
-
-                    const x = 10 + (currentCol * cellWidth);
-                    const y = startY + headerHeight + (currentRow * cellHeight);
-
-                    const isCurrentMonth = date.getMonth() === currentDate.getMonth();
-                    const isToday = date.toDateString() === today.toDateString();
-
-                    // Fond de la cellule
-                    if (isToday) {
-                        pdf.setFillColor(colors.emeraldLight.r, colors.emeraldLight.g, colors.emeraldLight.b);
-                        pdf.rect(x, y, cellWidth, cellHeight, 'F');
-                    } else if (!isCurrentMonth) {
-                        pdf.setFillColor(250, 250, 252);
-                        pdf.rect(x, y, cellWidth, cellHeight, 'F');
-                    } else {
-                        pdf.setFillColor(255, 255, 255);
-                        pdf.rect(x, y, cellWidth, cellHeight, 'F');
-                    }
-
-                    // Bordure
-                    pdf.setDrawColor(220, 220, 220);
-                    pdf.setLineWidth(0.2);
-                    pdf.rect(x, y, cellWidth, cellHeight);
-
-                    // Numéro du jour
-                    if (isToday) {
-                        // Cercle vert pour aujourd'hui
-                        pdf.setFillColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
-                        pdf.circle(x + 5, y + 4, 3, 'F');
-                        pdf.setFontSize(8);
-                        pdf.setFont('helvetica', 'bold');
-                        pdf.setTextColor(255, 255, 255);
-                        pdf.text(date.getDate().toString(), x + 5, y + 5, { align: 'center' });
-                    } else {
-                        pdf.setFontSize(10);
-                        pdf.setFont('helvetica', 'bold');
-                        pdf.setTextColor(isCurrentMonth ? 50 : 180);
-                        pdf.text(date.getDate().toString(), x + 2.5, y + 5);
-                    }
-
-                    // Tâches du jour
                     const dayTasks = tasksToRender.filter(t => {
                         const taskDate = new Date(t.date_debut_planifiee);
                         return taskDate.getDate() === date.getDate() &&
@@ -916,53 +871,337 @@ const Planning: FC = () => {
                             taskDate.getFullYear() === date.getFullYear();
                     }).sort((a, b) => new Date(a.date_debut_planifiee).getTime() - new Date(b.date_debut_planifiee).getTime());
 
-                    let taskY = y + 8;
-                    const maxTasksPerCell = 3;
-                    const taskHeight = 4.2;
+                    tasksByDay.set(dateKey, dayTasks);
+                    maxTasksInDay = Math.max(maxTasksInDay, dayTasks.length);
+                }
 
-                    dayTasks.slice(0, maxTasksPerCell).forEach((task) => {
-                        const taskX = x + 0.8;
-                        const taskWidth = cellWidth - 1.6;
-                        const taskColor = getTaskColor(task);
+                // Calculer la hauteur des cellules dynamiquement
+                const taskHeight = 4.2;
+                const taskSpacing = 0.6;
+                const minCellHeight = 26;
+                const dayNumberHeight = 8;
 
-                        // Fond de la tâche avec couleur selon statut
-                        pdf.setFillColor(taskColor.bg.r, taskColor.bg.g, taskColor.bg.b);
-                        pdf.roundedRect(taskX, taskY, taskWidth, taskHeight, 0.8, 0.8, 'F');
+                // Hauteur nécessaire pour afficher toutes les tâches
+                const requiredCellHeight = Math.max(
+                    minCellHeight,
+                    dayNumberHeight + (maxTasksInDay * (taskHeight + taskSpacing)) + 2
+                );
 
-                        // Bordure gauche colorée (indicateur de statut)
-                        pdf.setFillColor(taskColor.border.r, taskColor.border.g, taskColor.border.b);
-                        pdf.rect(taskX, taskY + 0.3, 0.6, taskHeight - 0.6, 'F');
+                // Si la hauteur dépasse la page, on la limite et on créera plusieurs pages par semaine
+                const maxCellHeightPerPage = 35; // Hauteur maximale pour garder une bonne lisibilité
+                const cellHeight = Math.min(requiredCellHeight, maxCellHeightPerPage);
 
-                        // Texte de la tâche
-                        pdf.setFontSize(6.5);
-                        pdf.setFont('helvetica', task.statut === 'TERMINEE' ? 'normal' : 'bold');
-                        pdf.setTextColor(taskColor.text.r, taskColor.text.g, taskColor.text.b);
+                const startY = 32;
+                const cellWidth = (pageWidth - 20) / 7;
+                const headerHeight = 8;
 
-                        const taskTime = format(new Date(task.date_debut_planifiee), 'HH:mm');
-                        const taskText = `${taskTime} ${task.reference ? '[' + task.reference + '] ' : ''}${task.type_tache_detail.nom_tache}`;
+                // Fonction pour dessiner l'en-tête
+                const drawHeader = (yPosition: number) => {
+                    const dayNames = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'];
+                    pdf.setFillColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
+                    pdf.rect(10, yPosition, pageWidth - 20, headerHeight, 'F');
 
-                        // Tronquer si nécessaire
-                        const maxTextWidth = taskWidth - 2;
-                        let displayText = taskText;
-                        if (pdf.getTextWidth(taskText) > maxTextWidth) {
-                            let truncated = taskText;
-                            while (pdf.getTextWidth(truncated + '…') > maxTextWidth && truncated.length > 0) {
-                                truncated = truncated.slice(0, -1);
-                            }
-                            displayText = truncated + '…';
+                    pdf.setFontSize(9);
+                    pdf.setTextColor(255, 255, 255);
+                    pdf.setFont('helvetica', 'bold');
+                    dayNames.forEach((day, i) => {
+                        const x = 10 + (i * cellWidth) + (cellWidth / 2);
+                        pdf.text(day, x, yPosition + 5.5, { align: 'center' });
+                    });
+                };
+
+                // Dessiner l'en-tête initial
+                drawHeader(startY);
+
+                // Dessiner la grille par semaine (pour permettre la pagination)
+                let currentPageY = startY + headerHeight;
+                const maxYPerPage = pageHeight - 20; // Laisser de l'espace pour la légende
+
+                for (let week = 0; week < 6; week++) {
+                    const weekStartIndex = week * 7;
+
+                    // Vérifier si on a besoin d'une nouvelle page
+                    if (currentPageY + cellHeight > maxYPerPage) {
+                        pdf.addPage();
+                        currentPageY = 20;
+                        drawHeader(currentPageY);
+                        currentPageY += headerHeight;
+                    }
+
+                    // Dessiner les 7 jours de la semaine
+                    for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
+                        const i = weekStartIndex + dayOfWeek;
+                        const date = new Date(startDate);
+                        date.setDate(date.getDate() + i);
+                        const dateKey = format(date, 'yyyy-MM-dd');
+
+                        const currentCol = dayOfWeek;
+                        const x = 10 + (currentCol * cellWidth);
+                        const y = currentPageY;
+
+                        const isCurrentMonth = date.getMonth() === currentDate.getMonth();
+                        const isToday = date.toDateString() === today.toDateString();
+
+                        // Fond de la cellule
+                        if (isToday) {
+                            pdf.setFillColor(colors.emeraldLight.r, colors.emeraldLight.g, colors.emeraldLight.b);
+                            pdf.rect(x, y, cellWidth, cellHeight, 'F');
+                        } else if (!isCurrentMonth) {
+                            pdf.setFillColor(250, 250, 252);
+                            pdf.rect(x, y, cellWidth, cellHeight, 'F');
+                        } else {
+                            pdf.setFillColor(255, 255, 255);
+                            pdf.rect(x, y, cellWidth, cellHeight, 'F');
                         }
 
-                        pdf.text(displayText, taskX + 1.2, taskY + 2.9);
-                        taskY += taskHeight + 0.6;
-                    });
+                        // Bordure
+                        pdf.setDrawColor(220, 220, 220);
+                        pdf.setLineWidth(0.2);
+                        pdf.rect(x, y, cellWidth, cellHeight);
 
-                    // Indicateur "+X autres"
-                    if (dayTasks.length > maxTasksPerCell) {
-                        pdf.setFontSize(6);
-                        pdf.setFont('helvetica', 'bold');
-                        pdf.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
-                        pdf.text(`+${dayTasks.length - maxTasksPerCell} autre${dayTasks.length - maxTasksPerCell > 1 ? 's' : ''}`, x + 2, taskY + 2);
+                        // Numéro du jour
+                        if (isToday) {
+                            // Cercle vert pour aujourd'hui
+                            pdf.setFillColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
+                            pdf.circle(x + 5, y + 4, 3, 'F');
+                            pdf.setFontSize(8);
+                            pdf.setFont('helvetica', 'bold');
+                            pdf.setTextColor(255, 255, 255);
+                            pdf.text(date.getDate().toString(), x + 5, y + 5, { align: 'center' });
+                        } else {
+                            pdf.setFontSize(10);
+                            pdf.setFont('helvetica', 'bold');
+                            pdf.setTextColor(isCurrentMonth ? 50 : 180);
+                            pdf.text(date.getDate().toString(), x + 2.5, y + 5);
+                        }
+
+                        // Tâches du jour (toutes, sans limite)
+                        const dayTasks = tasksByDay.get(dateKey) || [];
+                        let taskY = y + dayNumberHeight;
+                        const maxTasksVisible = Math.floor((cellHeight - dayNumberHeight - 2) / (taskHeight + taskSpacing));
+
+                        dayTasks.slice(0, maxTasksVisible).forEach((task) => {
+                            const taskX = x + 0.8;
+                            const taskWidth = cellWidth - 1.6;
+                            const taskColor = getTaskColor(task);
+
+                            // Fond de la tâche avec couleur selon statut
+                            pdf.setFillColor(taskColor.bg.r, taskColor.bg.g, taskColor.bg.b);
+                            pdf.roundedRect(taskX, taskY, taskWidth, taskHeight, 0.8, 0.8, 'F');
+
+                            // Bordure gauche colorée (indicateur de statut)
+                            pdf.setFillColor(taskColor.border.r, taskColor.border.g, taskColor.border.b);
+                            pdf.rect(taskX, taskY + 0.3, 0.6, taskHeight - 0.6, 'F');
+
+                            // Texte de la tâche
+                            pdf.setFontSize(6.5);
+                            pdf.setFont('helvetica', task.statut === 'TERMINEE' ? 'normal' : 'bold');
+                            pdf.setTextColor(taskColor.text.r, taskColor.text.g, taskColor.text.b);
+
+                            const taskTime = format(new Date(task.date_debut_planifiee), 'HH:mm');
+                            const taskText = `${taskTime} ${task.reference ? '[' + task.reference + '] ' : ''}${task.type_tache_detail.nom_tache}`;
+
+                            // Tronquer si nécessaire
+                            const maxTextWidth = taskWidth - 2;
+                            let displayText = taskText;
+                            if (pdf.getTextWidth(taskText) > maxTextWidth) {
+                                let truncated = taskText;
+                                while (pdf.getTextWidth(truncated + '…') > maxTextWidth && truncated.length > 0) {
+                                    truncated = truncated.slice(0, -1);
+                                }
+                                displayText = truncated + '…';
+                            }
+
+                            pdf.text(displayText, taskX + 1.2, taskY + 2.9);
+                            taskY += taskHeight + taskSpacing;
+                        });
+
+                        // Indicateur "+X autres" si toutes les tâches ne rentrent pas
+                        if (dayTasks.length > maxTasksVisible) {
+                            pdf.setFontSize(6);
+                            pdf.setFont('helvetica', 'bold');
+                            pdf.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
+                            const remaining = dayTasks.length - maxTasksVisible;
+                            pdf.text(`+${remaining} autre${remaining > 1 ? 's' : ''}`, x + 2, y + cellHeight - 2);
+                        }
                     }
+
+                    currentPageY += cellHeight;
+                }
+
+                // Ajouter des pages détaillées pour les jours avec trop de tâches
+                const daysWithOverflow: Array<{ date: Date; tasks: Tache[] }> = [];
+                const maxTasksVisible = Math.floor((cellHeight - dayNumberHeight - 2) / (taskHeight + taskSpacing));
+
+                // Identifier les jours qui ont plus de tâches que ce qui peut être affiché
+                tasksByDay.forEach((tasks, dateKey) => {
+                    if (tasks.length > maxTasksVisible) {
+                        const [year, month, day] = dateKey.split('-').map(Number);
+                        daysWithOverflow.push({
+                            date: new Date(year, month - 1, day),
+                            tasks: tasks
+                        });
+                    }
+                });
+
+                // Si des jours ont des tâches débordantes, créer des pages détaillées
+                if (daysWithOverflow.length > 0) {
+                    // Ajouter une nouvelle page pour les détails
+                    pdf.addPage();
+
+                    // Titre de la section
+                    pdf.setFontSize(14);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.setTextColor(colors.grayDark.r, colors.grayDark.g, colors.grayDark.b);
+                    pdf.text('Détail complet des journées chargées', pageWidth / 2, 20, { align: 'center' });
+
+                    let detailY = 30;
+                    const rowHeight = 7;
+                    const maxYDetail = pageHeight - 20;
+
+                    daysWithOverflow.forEach((dayData) => {
+                        // Vérifier si on a besoin d'une nouvelle page
+                        const estimatedHeight = 15 + (dayData.tasks.length * rowHeight);
+                        if (detailY + estimatedHeight > maxYDetail) {
+                            pdf.addPage();
+                            detailY = 20;
+                        }
+
+                        // En-tête du jour
+                        pdf.setFillColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
+                        pdf.rect(10, detailY, pageWidth - 20, 8, 'F');
+
+                        pdf.setFontSize(10);
+                        pdf.setFont('helvetica', 'bold');
+                        pdf.setTextColor(255, 255, 255);
+                        const dayLabel = format(dayData.date, 'EEEE d MMMM yyyy', { locale: fr });
+                        pdf.text(dayLabel, 15, detailY + 5.5);
+                        pdf.text(`${dayData.tasks.length} tâche${dayData.tasks.length > 1 ? 's' : ''}`, pageWidth - 15, detailY + 5.5, { align: 'right' });
+
+                        detailY += 10;
+
+                        // Liste des tâches (format étendu sur 2 lignes)
+                        dayData.tasks.forEach((task, index) => {
+                            const taskColor = getTaskColor(task);
+                            const taskRowHeight = 12; // Hauteur augmentée pour 2 lignes
+
+                            // Vérifier si on a besoin d'une nouvelle page
+                            if (detailY + taskRowHeight > maxYDetail) {
+                                pdf.addPage();
+                                detailY = 20;
+                            }
+
+                            // Fond alterné
+                            if (index % 2 === 0) {
+                                pdf.setFillColor(250, 250, 252);
+                                pdf.rect(10, detailY, pageWidth - 20, taskRowHeight, 'F');
+                            }
+
+                            // Bordure gauche colorée
+                            pdf.setFillColor(taskColor.border.r, taskColor.border.g, taskColor.border.b);
+                            pdf.rect(10, detailY, 2, taskRowHeight, 'F');
+
+                            // === LIGNE 1 : Heure, Nom, Statut ===
+
+                            // Heure
+                            pdf.setFontSize(8);
+                            pdf.setFont('helvetica', 'bold');
+                            pdf.setTextColor(colors.grayDark.r, colors.grayDark.g, colors.grayDark.b);
+                            const taskStartTime = format(new Date(task.date_debut_planifiee), 'HH:mm');
+                            const taskEndTime = format(new Date(task.date_fin_planifiee), 'HH:mm');
+                            const timeRange = `${taskStartTime}-${taskEndTime}`;
+                            pdf.text(timeRange, 15, detailY + 4);
+
+                            // Nom de la tâche
+                            pdf.setFont('helvetica', 'bold');
+                            let taskName = (task.reference ? `[${task.reference}] ` : '') + task.type_tache_detail.nom_tache;
+                            const maxTaskNameWidth = 140;
+                            if (pdf.getTextWidth(taskName) > maxTaskNameWidth) {
+                                while (pdf.getTextWidth(taskName + '…') > maxTaskNameWidth && taskName.length > 0) {
+                                    taskName = taskName.slice(0, -1);
+                                }
+                                taskName += '…';
+                            }
+                            pdf.text(taskName, 38, detailY + 4);
+
+                            // Badge statut
+                            const statusLabels: Record<string, string> = {
+                                'PLANIFIEE': 'Planifiée',
+                                'NON_DEBUTEE': 'Non débutée',
+                                'EN_COURS': 'En cours',
+                                'TERMINEE': 'Terminée',
+                                'ANNULEE': 'Annulée'
+                            };
+                            const statusText = statusLabels[task.statut] || task.statut;
+
+                            pdf.setFillColor(taskColor.bg.r, taskColor.bg.g, taskColor.bg.b);
+                            pdf.roundedRect(pageWidth - 40, detailY + 1, 30, 4, 0.8, 0.8, 'F');
+
+                            pdf.setFontSize(6.5);
+                            pdf.setFont('helvetica', 'bold');
+                            pdf.setTextColor(taskColor.text.r, taskColor.text.g, taskColor.text.b);
+                            pdf.text(statusText, pageWidth - 25, detailY + 3.8, { align: 'center' });
+
+                            // === LIGNE 2 : Client, Site, Équipe ===
+
+                            pdf.setFontSize(7);
+                            pdf.setFont('helvetica', 'normal');
+                            pdf.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
+
+                            // Client
+                            let clientName = task.structure_client_detail?.nom
+                                || task.client_detail?.structure?.nom
+                                || task.client_detail?.nomStructure
+                                || 'N/A';
+                            const maxClientWidth = 55;
+                            if (pdf.getTextWidth(clientName) > maxClientWidth) {
+                                while (pdf.getTextWidth(clientName + '…') > maxClientWidth && clientName.length > 0) {
+                                    clientName = clientName.slice(0, -1);
+                                }
+                                clientName += '…';
+                            }
+                            pdf.text(`📍 ${clientName}`, 15, detailY + 9);
+
+                            // Site
+                            let siteName = task.site_detail?.nom || task.site_detail?.nom_site || 'Non spécifié';
+                            const maxSiteWidth = 60;
+                            if (pdf.getTextWidth(siteName) > maxSiteWidth) {
+                                while (pdf.getTextWidth(siteName + '…') > maxSiteWidth && siteName.length > 0) {
+                                    siteName = siteName.slice(0, -1);
+                                }
+                                siteName += '…';
+                            }
+                            pdf.text(`🗺️  ${siteName}`, 80, detailY + 9);
+
+                            // Équipe
+                            let equipeName = '';
+                            if (task.equipes_detail && task.equipes_detail.length > 0) {
+                                equipeName = task.equipes_detail.map(e => e.nomEquipe).join(', ');
+                            } else if (task.equipe_detail) {
+                                equipeName = task.equipe_detail.nomEquipe || '';
+                            }
+                            if (!equipeName) equipeName = 'Non assignée';
+
+                            const maxEquipeWidth = 70;
+                            if (pdf.getTextWidth(equipeName) > maxEquipeWidth) {
+                                while (pdf.getTextWidth(equipeName + '…') > maxEquipeWidth && equipeName.length > 0) {
+                                    equipeName = equipeName.slice(0, -1);
+                                }
+                                equipeName += '…';
+                            }
+                            pdf.text(`👥 ${equipeName}`, 155, detailY + 9);
+
+                            // Priorité (icône visuelle si haute)
+                            if (task.priorite >= 4) {
+                                pdf.setFillColor(colors.red.r, colors.red.g, colors.red.b);
+                                pdf.circle(pageWidth - 5, detailY + 7, 1.5, 'F');
+                            }
+
+                            detailY += taskRowHeight + 1;
+                        });
+
+                        detailY += 5; // Espace entre les jours
+                    });
                 }
             } else if (currentView === 'week') {
                 // Vue semaine
@@ -1025,39 +1264,87 @@ const Planning: FC = () => {
                     pdf.line(x, gridStartY, x, gridStartY + (endHour - startHour) * hourHeight);
                 }
 
-                // Dessiner les tâches de la semaine
+                // Dessiner les distributions de la semaine
                 for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
                     const dayDate = new Date(weekStart);
                     dayDate.setDate(dayDate.getDate() + dayIndex);
+                    const dateKey = format(dayDate, 'yyyy-MM-dd');
 
-                    const dayTasks = tasksToRender.filter(t => {
-                        const taskDate = new Date(t.date_debut_planifiee);
-                        return taskDate.toDateString() === dayDate.toDateString();
+                    // Préparer les distributions pour ce jour
+                    const dayDistributions: Array<{
+                        task: Tache;
+                        distribution?: DistributionCharge;
+                        startHour: number;
+                        endHour: number;
+                        color: any;
+                    }> = [];
+
+                    tasksToRender.forEach(task => {
+                        // Chercher une distribution pour ce jour
+                        const distribution = task.distributions_charge?.find(d => d.date === dateKey);
+
+                        if (distribution) {
+                            // Tâche avec distribution
+                            const heureDebut = distribution.heure_debut || '08:00';
+                            const heureFin = distribution.heure_fin || '17:00';
+
+                            const [startH = 0, startM = 0] = heureDebut.split(':').map(Number);
+                            const [endH = 0, endM = 0] = heureFin.split(':').map(Number);
+
+                            const startHourCalc = startH + startM / 60;
+                            const endHourCalc = endH + endM / 60;
+
+                            // Couleur selon le statut de distribution
+                            const color = distribution.status === 'REALISEE'
+                                ? { bg: colors.greenLight, text: colors.greenDark, border: colors.green }
+                                : { bg: colors.blueLight, text: colors.blueDark, border: colors.blue };
+
+                            dayDistributions.push({
+                                task,
+                                distribution,
+                                startHour: startHourCalc,
+                                endHour: endHourCalc,
+                                color
+                            });
+                        } else {
+                            // Tâche sans distribution (fallback)
+                            const taskDate = new Date(task.date_debut_planifiee);
+                            if (taskDate.toDateString() === dayDate.toDateString()) {
+                                const taskStart = new Date(task.date_debut_planifiee);
+                                const taskEnd = new Date(task.date_fin_planifiee);
+                                const startHourCalc = taskStart.getHours() + taskStart.getMinutes() / 60;
+                                const endHourCalc = taskEnd.getHours() + taskEnd.getMinutes() / 60;
+
+                                dayDistributions.push({
+                                    task,
+                                    startHour: startHourCalc,
+                                    endHour: endHourCalc,
+                                    color: getTaskColor(task)
+                                });
+                            }
+                        }
                     });
 
-                    dayTasks.forEach((task) => {
-                        const taskStart = new Date(task.date_debut_planifiee);
-                        const taskEnd = new Date(task.date_fin_planifiee);
-                        const startHourTask = taskStart.getHours() + taskStart.getMinutes() / 60;
-                        const endHourTask = taskEnd.getHours() + taskEnd.getMinutes() / 60;
-
+                    // Dessiner les distributions
+                    dayDistributions.forEach(({ task, distribution, startHour: startHourTask, endHour: endHourTask, color }) => {
                         if (startHourTask >= startHour && startHourTask < endHour) {
                             const x = 10 + timeColWidth + (dayIndex * cellWidth) + 1;
                             const y = gridStartY + (startHourTask - startHour) * hourHeight;
                             const height = Math.min((endHourTask - startHourTask) * hourHeight, (endHour - startHourTask) * hourHeight);
                             const width = cellWidth - 2;
 
-                            const taskColor = getTaskColor(task);
-
-                            pdf.setFillColor(taskColor.bg.r, taskColor.bg.g, taskColor.bg.b);
+                            // Fond de la carte
+                            pdf.setFillColor(color.bg.r, color.bg.g, color.bg.b);
                             pdf.roundedRect(x, y, width, Math.max(height, 6), 1, 1, 'F');
 
-                            pdf.setFillColor(taskColor.border.r, taskColor.border.g, taskColor.border.b);
+                            // Bordure gauche colorée
+                            pdf.setFillColor(color.border.r, color.border.g, color.border.b);
                             pdf.rect(x, y + 0.5, 1, Math.max(height, 6) - 1, 'F');
 
+                            // Texte de la tâche
                             pdf.setFontSize(6);
                             pdf.setFont('helvetica', 'bold');
-                            pdf.setTextColor(taskColor.text.r, taskColor.text.g, taskColor.text.b);
+                            pdf.setTextColor(color.text.r, color.text.g, color.text.b);
 
                             const taskText = (task.reference ? `[${task.reference}] ` : '') + task.type_tache_detail.nom_tache;
                             const maxTextWidth = width - 3;
@@ -1070,6 +1357,15 @@ const Planning: FC = () => {
                                 displayText = truncated + '…';
                             }
                             pdf.text(displayText, x + 2, y + 4);
+
+                            // Ajouter un indicateur visuel pour les distributions réalisées
+                            if (distribution?.status === 'REALISEE' && height > 8) {
+                                pdf.setFillColor(colors.green.r, colors.green.g, colors.green.b);
+                                pdf.circle(x + width - 3, y + 3, 1.5, 'F');
+                                pdf.setTextColor(255, 255, 255);
+                                pdf.setFontSize(5);
+                                pdf.text('✓', x + width - 3.5, y + 4);
+                            }
                         }
                     });
                 }
@@ -1077,53 +1373,230 @@ const Planning: FC = () => {
                 // Vue liste (agenda/day) - Affichage en tableau
                 const startY = 35;
                 const rowHeight = 8;
+                const isDayView = currentView === 'day';
+
+                // Colonnes identiques pour vue jour et vue agenda (avec plus de détails)
                 const colWidths = {
-                    date: 35,
-                    time: 20,
-                    task: 90,
-                    client: 50,
-                    status: 30
+                    time: 22,
+                    task: 65,
+                    client: 40,
+                    site: 45,
+                    equipe: 40,
+                    status: 28
                 };
 
-                // En-tête du tableau
-                pdf.setFillColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
-                pdf.rect(10, startY, pageWidth - 20, rowHeight, 'F');
+                // Fonction pour dessiner l'en-tête du tableau
+                const drawTableHeader = (yPos: number) => {
+                    pdf.setFillColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
+                    pdf.rect(10, yPos, pageWidth - 20, rowHeight, 'F');
 
-                pdf.setFontSize(8);
-                pdf.setTextColor(255, 255, 255);
-                pdf.setFont('helvetica', 'bold');
+                    pdf.setFontSize(7.5);
+                    pdf.setTextColor(255, 255, 255);
+                    pdf.setFont('helvetica', 'bold');
 
-                let xPos = 12;
-                pdf.text('Date', xPos, startY + 5.5);
-                xPos += colWidths.date;
-                pdf.text('Heure', xPos, startY + 5.5);
-                xPos += colWidths.time;
-                pdf.text('Tâche', xPos, startY + 5.5);
-                xPos += colWidths.task;
-                pdf.text('Client', xPos, startY + 5.5);
-                xPos += colWidths.client;
-                pdf.text('Statut', xPos, startY + 5.5);
+                    let xPos = 12;
+                    pdf.text('Horaire', xPos, yPos + 5.5);
+                    xPos += colWidths.time;
+                    pdf.text('Tâche', xPos, yPos + 5.5);
+                    xPos += colWidths.task;
+                    pdf.text('Client', xPos, yPos + 5.5);
+                    xPos += colWidths.client;
+                    pdf.text('Site', xPos, yPos + 5.5);
+                    xPos += colWidths.site;
+                    pdf.text('Équipe', xPos, yPos + 5.5);
+                    xPos += colWidths.equipe;
+                    pdf.text('Statut', xPos, yPos + 5.5);
+                };
 
-                // Trier les tâches par date
-                const sortedTasks = [...tasksToRender].sort((a, b) =>
-                    new Date(a.date_debut_planifiee).getTime() - new Date(b.date_debut_planifiee).getTime()
-                );
+                // Dessiner l'en-tête initial
+                drawTableHeader(startY);
+
+                // Préparer les données à afficher
+                let dataRows: Array<{
+                    task: Tache;
+                    date: Date;
+                    timeRange: string;
+                    distributionStatus?: StatusDistribution;
+                    equipes?: string;
+                }> = [];
+
+                if (isDayView) {
+                    // Vue jour : afficher les distributions de charge
+                    const dateKey = format(currentDate, 'yyyy-MM-dd');
+
+                    tasksToRender.forEach(task => {
+                        const distribution = task.distributions_charge?.find(d => d.date === dateKey);
+
+                        if (distribution) {
+                            // Tâche avec distribution pour ce jour
+                            const heureDebut = distribution.heure_debut || '08:00';
+                            const heureFin = distribution.heure_fin || '17:00';
+                            const timeRange = `${heureDebut.substring(0, 5)} - ${heureFin.substring(0, 5)}`;
+
+                            // Récupérer les équipes
+                            let equipes = '';
+                            if (task.equipes_detail && task.equipes_detail.length > 0) {
+                                equipes = task.equipes_detail.map(e => e.nomEquipe).join(', ');
+                            } else if (task.equipe_detail) {
+                                equipes = task.equipe_detail.nomEquipe || '';
+                            }
+
+                            dataRows.push({
+                                task,
+                                date: new Date(`${dateKey}T${heureDebut}`),
+                                timeRange,
+                                distributionStatus: distribution.status,
+                                equipes
+                            });
+                        } else {
+                            // Tâche sans distribution (fallback)
+                            const taskDate = new Date(task.date_debut_planifiee);
+                            const timeRange = format(taskDate, 'HH:mm') + ' - ' + format(new Date(task.date_fin_planifiee), 'HH:mm');
+
+                            let equipes = '';
+                            if (task.equipes_detail && task.equipes_detail.length > 0) {
+                                equipes = task.equipes_detail.map(e => e.nomEquipe).join(', ');
+                            } else if (task.equipe_detail) {
+                                equipes = task.equipe_detail.nomEquipe || '';
+                            }
+
+                            dataRows.push({
+                                task,
+                                date: taskDate,
+                                timeRange,
+                                equipes
+                            });
+                        }
+                    });
+                } else {
+                    // Vue agenda : afficher toutes les distributions organisées par jour
+                    tasksToRender.forEach(task => {
+                        // Si la tâche a des distributions, afficher chaque distribution
+                        if (task.distributions_charge && task.distributions_charge.length > 0) {
+                            task.distributions_charge.forEach(distribution => {
+                                const heureDebut = distribution.heure_debut || '08:00';
+                                const heureFin = distribution.heure_fin || '17:00';
+                                const timeRange = `${heureDebut.substring(0, 5)} - ${heureFin.substring(0, 5)}`;
+
+                                // Récupérer les équipes
+                                let equipes = '';
+                                if (task.equipes_detail && task.equipes_detail.length > 0) {
+                                    equipes = task.equipes_detail.map(e => e.nomEquipe).join(', ');
+                                } else if (task.equipe_detail) {
+                                    equipes = task.equipe_detail.nomEquipe || '';
+                                }
+
+                                dataRows.push({
+                                    task,
+                                    date: new Date(`${distribution.date}T${heureDebut}`),
+                                    timeRange,
+                                    distributionStatus: distribution.status,
+                                    equipes
+                                });
+                            });
+                        } else {
+                            // Tâche sans distribution (fallback)
+                            const taskDate = new Date(task.date_debut_planifiee);
+                            const timeRange = format(taskDate, 'HH:mm') + ' - ' + format(new Date(task.date_fin_planifiee), 'HH:mm');
+
+                            let equipes = '';
+                            if (task.equipes_detail && task.equipes_detail.length > 0) {
+                                equipes = task.equipes_detail.map(e => e.nomEquipe).join(', ');
+                            } else if (task.equipe_detail) {
+                                equipes = task.equipe_detail.nomEquipe || '';
+                            }
+
+                            dataRows.push({
+                                task,
+                                date: taskDate,
+                                timeRange,
+                                equipes
+                            });
+                        }
+                    });
+                }
+
+                // Trier par date/heure
+                dataRows.sort((a, b) => a.date.getTime() - b.date.getTime());
 
                 let currentY = startY + rowHeight;
                 const maxY = pageHeight - 20; // Laisser de l'espace pour la légende
+                let lastDateStr = '';
+                let rowIndex = 0;
 
-                sortedTasks.forEach((task, index) => {
-                    // Vérifier si on a besoin d'une nouvelle page
+                dataRows.forEach((row) => {
+                    const task = row.task;
+                    const currentDateStr = format(row.date, 'yyyy-MM-dd');
+
+                    // Ajouter un séparateur de jour pour la vue agenda
+                    if (!isDayView && currentDateStr !== lastDateStr) {
+                        // Vérifier si on a besoin d'une nouvelle page pour le séparateur + première ligne
+                        if (currentY + 10 + rowHeight > maxY) {
+                            pdf.addPage();
+                            currentY = 20;
+                            drawTableHeader(currentY);
+                            currentY += rowHeight;
+                        }
+
+                        // Séparateur de jour
+                        if (lastDateStr !== '') {
+                            currentY += 2; // Petit espace avant le nouveau jour
+                        }
+
+                        pdf.setFillColor(colors.grayLight.r, colors.grayLight.g, colors.grayLight.b);
+                        pdf.rect(10, currentY, pageWidth - 20, 7, 'F');
+
+                        pdf.setFontSize(9);
+                        pdf.setFont('helvetica', 'bold');
+                        pdf.setTextColor(colors.grayDark.r, colors.grayDark.g, colors.grayDark.b);
+                        const dayLabel = format(row.date, 'EEEE d MMMM yyyy', { locale: fr });
+                        pdf.text(dayLabel, 15, currentY + 4.5);
+
+                        // Compter les distributions pour ce jour
+                        const dayCount = dataRows.filter(r => format(r.date, 'yyyy-MM-dd') === currentDateStr).length;
+                        pdf.setFontSize(8);
+                        pdf.setFont('helvetica', 'normal');
+                        pdf.text(`${dayCount} distribution${dayCount > 1 ? 's' : ''}`, pageWidth - 15, currentY + 4.5, { align: 'right' });
+
+                        currentY += 8;
+                        lastDateStr = currentDateStr;
+                        rowIndex = 0;
+                    }
+
+                    // Vérifier si on a besoin d'une nouvelle page pour cette ligne
                     if (currentY + rowHeight > maxY) {
                         pdf.addPage();
                         currentY = 20;
+                        drawTableHeader(currentY);
+                        currentY += rowHeight;
+                        rowIndex = 0;
                     }
 
-                    const taskColor = getTaskColor(task);
-                    const taskDate = new Date(task.date_debut_planifiee);
+                    // Déterminer la couleur selon le statut (distribution ou tâche)
+                    let taskColor;
+                    let statusText: string;
+
+                    if (row.distributionStatus) {
+                        // Couleur basée sur le statut de distribution
+                        taskColor = row.distributionStatus === 'REALISEE'
+                            ? { bg: colors.greenLight, text: colors.greenDark, border: colors.green }
+                            : { bg: colors.blueLight, text: colors.blueDark, border: colors.blue };
+                        statusText = STATUS_DISTRIBUTION_LABELS[row.distributionStatus];
+                    } else {
+                        // Couleur basée sur le statut de la tâche
+                        taskColor = getTaskColor(task);
+                        const statusLabels: Record<string, string> = {
+                            'PLANIFIEE': 'Planifiée',
+                            'NON_DEBUTEE': 'Non débutée',
+                            'EN_COURS': 'En cours',
+                            'TERMINEE': 'Terminée',
+                            'ANNULEE': 'Annulée'
+                        };
+                        statusText = statusLabels[task.statut] || task.statut;
+                    }
 
                     // Fond alterné pour lisibilité
-                    if (index % 2 === 0) {
+                    if (rowIndex % 2 === 0) {
                         pdf.setFillColor(250, 250, 252);
                         pdf.rect(10, currentY, pageWidth - 20, rowHeight, 'F');
                     }
@@ -1132,23 +1605,20 @@ const Planning: FC = () => {
                     pdf.setFillColor(taskColor.border.r, taskColor.border.g, taskColor.border.b);
                     pdf.rect(10, currentY, 2, rowHeight, 'F');
 
-                    pdf.setFontSize(7);
+                    pdf.setFontSize(6.5);
                     pdf.setFont('helvetica', 'normal');
                     pdf.setTextColor(colors.grayDark.r, colors.grayDark.g, colors.grayDark.b);
 
-                    xPos = 14;
-                    // Date
-                    pdf.text(format(taskDate, 'dd/MM/yyyy', { locale: fr }), xPos, currentY + 5.5);
-                    xPos += colWidths.date;
+                    let xPos = 12;
 
-                    // Heure
-                    pdf.text(format(taskDate, 'HH:mm'), xPos, currentY + 5.5);
+                    // Horaire
+                    pdf.text(row.timeRange, xPos, currentY + 5.5);
                     xPos += colWidths.time;
 
                     // Nom de la tâche (tronquer si nécessaire)
                     pdf.setFont('helvetica', 'bold');
                     let taskName = (task.reference ? `[${task.reference}] ` : '') + task.type_tache_detail.nom_tache;
-                    const maxTaskWidth = colWidths.task - 4;
+                    const maxTaskWidth = colWidths.task - 2;
                     if (pdf.getTextWidth(taskName) > maxTaskWidth) {
                         while (pdf.getTextWidth(taskName + '…') > maxTaskWidth && taskName.length > 0) {
                             taskName = taskName.slice(0, -1);
@@ -1160,8 +1630,11 @@ const Planning: FC = () => {
 
                     // Client (tronquer si nécessaire)
                     pdf.setFont('helvetica', 'normal');
-                    let clientName = task.client_detail?.structure?.nom || task.client_detail?.nomStructure || 'N/A';
-                    const maxClientWidth = colWidths.client - 4;
+                    let clientName = task.structure_client_detail?.nom
+                        || task.client_detail?.structure?.nom
+                        || task.client_detail?.nomStructure
+                        || 'N/A';
+                    const maxClientWidth = colWidths.client - 2;
                     if (pdf.getTextWidth(clientName) > maxClientWidth) {
                         while (pdf.getTextWidth(clientName + '…') > maxClientWidth && clientName.length > 0) {
                             clientName = clientName.slice(0, -1);
@@ -1171,16 +1644,33 @@ const Planning: FC = () => {
                     pdf.text(clientName, xPos, currentY + 5.5);
                     xPos += colWidths.client;
 
-                    // Statut (badge coloré)
-                    const statusLabels: Record<string, string> = {
-                        'PLANIFIEE': 'Planifiée',
-                        'NON_DEBUTEE': 'Non débutée',
-                        'EN_COURS': 'En cours',
-                        'TERMINEE': 'Terminée',
-                        'ANNULEE': 'Annulée'
-                    };
-                    const statusText = statusLabels[task.statut] || task.statut;
+                    // Site (tronquer si nécessaire)
+                    pdf.setFont('helvetica', 'normal');
+                    let siteName = task.site_detail?.nom || task.site_detail?.nom_site || 'Non spécifié';
+                    const maxSiteWidth = colWidths.site - 2;
+                    if (pdf.getTextWidth(siteName) > maxSiteWidth) {
+                        while (pdf.getTextWidth(siteName + '…') > maxSiteWidth && siteName.length > 0) {
+                            siteName = siteName.slice(0, -1);
+                        }
+                        siteName += '…';
+                    }
+                    pdf.text(siteName, xPos, currentY + 5.5);
+                    xPos += colWidths.site;
 
+                    // Équipe (tronquer si nécessaire)
+                    pdf.setFont('helvetica', 'normal');
+                    let equipeName = row.equipes || 'Non assignée';
+                    const maxEquipeWidth = colWidths.equipe - 2;
+                    if (pdf.getTextWidth(equipeName) > maxEquipeWidth) {
+                        while (pdf.getTextWidth(equipeName + '…') > maxEquipeWidth && equipeName.length > 0) {
+                            equipeName = equipeName.slice(0, -1);
+                        }
+                        equipeName += '…';
+                    }
+                    pdf.text(equipeName, xPos, currentY + 5.5);
+                    xPos += colWidths.equipe;
+
+                    // Statut (badge coloré)
                     pdf.setFillColor(taskColor.bg.r, taskColor.bg.g, taskColor.bg.b);
                     pdf.roundedRect(xPos, currentY + 1.5, colWidths.status - 2, 5, 1, 1, 'F');
 
@@ -1190,14 +1680,18 @@ const Planning: FC = () => {
                     pdf.text(statusText, xPos + (colWidths.status - 2) / 2, currentY + 5, { align: 'center' });
 
                     currentY += rowHeight;
+                    rowIndex++;
                 });
 
-                // Message si aucune tâche
-                if (sortedTasks.length === 0) {
+                // Message si aucune donnée
+                if (dataRows.length === 0) {
                     pdf.setFontSize(10);
                     pdf.setFont('helvetica', 'italic');
                     pdf.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
-                    pdf.text('Aucune tâche pour cette période', pageWidth / 2, startY + 40, { align: 'center' });
+                    const emptyMessage = isDayView
+                        ? 'Aucune distribution de travail pour ce jour'
+                        : 'Aucune tâche pour cette période';
+                    pdf.text(emptyMessage, pageWidth / 2, startY + 40, { align: 'center' });
                 }
             }
 
@@ -1209,7 +1703,11 @@ const Planning: FC = () => {
             pdf.setTextColor(colors.grayDark.r, colors.grayDark.g, colors.grayDark.b);
             pdf.text('Statuts:', 10, legendY);
 
-            const legendItems = [
+            // Légende adaptée selon la vue
+            const legendItems = (currentView === 'day' || currentView === 'week') ? [
+                { label: 'Non Réalisée', color: colors.blue },
+                { label: 'Réalisée', color: colors.green },
+            ] : [
                 { label: 'Planifiée', color: colors.blue },
                 { label: 'Non débutée', color: colors.gray },
                 { label: 'En cours', color: colors.orange },
@@ -1227,14 +1725,16 @@ const Planning: FC = () => {
                 legendX += pdf.getTextWidth(item.label) + 10;
             });
 
-            // Légende priorité urgente
-            pdf.setFont('helvetica', 'bold');
-            pdf.text('|  Priorité:', legendX + 2, legendY);
-            legendX += pdf.getTextWidth('|  Priorité:') + 4;
-            pdf.setFillColor(colors.red.r, colors.red.g, colors.red.b);
-            pdf.roundedRect(legendX, legendY - 2.5, 3, 3, 0.5, 0.5, 'F');
-            pdf.setFont('helvetica', 'normal');
-            pdf.text('Haute/Urgent', legendX + 4.5, legendY);
+            // Légende priorité urgente (seulement pour vues non-jour et non-semaine)
+            if (currentView !== 'day' && currentView !== 'week') {
+                pdf.setFont('helvetica', 'bold');
+                pdf.text('|  Priorité:', legendX + 2, legendY);
+                legendX += pdf.getTextWidth('|  Priorité:') + 4;
+                pdf.setFillColor(colors.red.r, colors.red.g, colors.red.b);
+                pdf.roundedRect(legendX, legendY - 2.5, 3, 3, 0.5, 0.5, 'F');
+                pdf.setFont('helvetica', 'normal');
+                pdf.text('Haute/Urgent', legendX + 4.5, legendY);
+            }
 
             // Pied de page (sur la même ligne que la légende, à droite)
             pdf.setFontSize(6);
@@ -1275,12 +1775,80 @@ const Planning: FC = () => {
     };
 
     const handleCreateTache = async (data: TacheCreate) => {
+        console.log('🟢 [Planning] handleCreateTache APPELÉE');
+        console.log('🔵 [Planning] Données reçues:', data);
+        console.log('🔵 [Planning] recurrence_config:', data.recurrence_config);
+
         try {
+            console.log('🔵 [Planning] Création de la tâche avec data:', data);
+
             // ✅ Ne pas utiliser localInputToUTC car les dates sont maintenant au format YYYY-MM-DD (DateField)
-            await planningService.createTache(data);
+            const createdTask = await planningService.createTache(data);
+            console.log('✅ [Planning] Tâche de base créée:', createdTask);
+
+            // ✅ Gérer la récurrence si activée
+            const recurrenceConfig = data.recurrence_config;
+            console.log('🔵 [Planning] Configuration de récurrence:', recurrenceConfig);
+
+            if (recurrenceConfig && recurrenceConfig.enabled && createdTask.id) {
+                console.log('🔄 [Planning] Récurrence activée, mode:', recurrenceConfig.mode);
+
+                try {
+                    let recurrenceResult;
+
+                    if (recurrenceConfig.mode === 'frequency') {
+                        console.log('📅 [Planning] Appel API dupliquer-recurrence avec fréquence:', recurrenceConfig.frequency);
+                        // Mode fréquence prédéfinie
+                        recurrenceResult = await planningService.dupliquerTacheRecurrence(createdTask.id, {
+                            frequence: recurrenceConfig.frequency!,
+                            nombre_occurrences: recurrenceConfig.nombre_occurrences,
+                            date_fin_recurrence: recurrenceConfig.date_fin_recurrence,
+                            conserver_equipes: recurrenceConfig.conserver_equipes,
+                            conserver_objets: recurrenceConfig.conserver_objets
+                        });
+                    } else if (recurrenceConfig.mode === 'custom') {
+                        console.log('⚙️ [Planning] Appel API dupliquer avec décalage:', recurrenceConfig.decalage_jours);
+                        // Mode décalage personnalisé
+                        recurrenceResult = await planningService.dupliquerTache(createdTask.id, {
+                            decalage_jours: recurrenceConfig.decalage_jours!,
+                            nombre_occurrences: recurrenceConfig.nombre_occurrences,
+                            date_fin_recurrence: recurrenceConfig.date_fin_recurrence,
+                            conserver_equipes: recurrenceConfig.conserver_equipes,
+                            conserver_objets: recurrenceConfig.conserver_objets
+                        });
+                    } else if (recurrenceConfig.mode === 'dates') {
+                        console.log('📆 [Planning] Appel API dupliquer-dates avec:', recurrenceConfig.dates_cibles);
+                        // Mode dates spécifiques
+                        recurrenceResult = await planningService.dupliquerTacheDates(createdTask.id, {
+                            dates_cibles: recurrenceConfig.dates_cibles!,
+                            conserver_equipes: recurrenceConfig.conserver_equipes,
+                            conserver_objets: recurrenceConfig.conserver_objets
+                        });
+                    }
+
+                    console.log('✅ [Planning] Résultat de la récurrence:', recurrenceResult);
+
+                    // Afficher un message de succès avec le nombre de tâches créées
+                    if (recurrenceResult) {
+                        const totalCreated = 1 + recurrenceResult.nombre_taches_creees;
+                        alert(`✅ ${totalCreated} tâche${totalCreated > 1 ? 's' : ''} créée${totalCreated > 1 ? 's' : ''} avec succès\n(1 tâche de base + ${recurrenceResult.nombre_taches_creees} occurrence${recurrenceResult.nombre_taches_creees > 1 ? 's' : ''})`);
+                    }
+                } catch (recurrenceError: any) {
+                    console.error('❌ [Planning] Erreur lors de la création des occurrences:', recurrenceError);
+                    console.error('❌ [Planning] Message d\'erreur:', recurrenceError.message);
+                    console.error('❌ [Planning] Stack:', recurrenceError.stack);
+                    alert(`⚠️ Tâche de base créée, mais erreur lors de la génération des occurrences:\n${recurrenceError.message || recurrenceError}`);
+                }
+            } else {
+                console.log('ℹ️ [Planning] Pas de récurrence activée');
+            }
+
             await loadTaches();
             setShowCreateForm(false);
-        } catch (err) { alert('Erreur création'); }
+        } catch (err: any) {
+            console.error('❌ [Planning] Erreur lors de la création:', err);
+            alert(`Erreur création: ${err.message || err}`);
+        }
     };
 
     const handleDeleteTache = (id: number) => {
@@ -1502,13 +2070,13 @@ const Planning: FC = () => {
             if (t.distributions_charge && t.distributions_charge.length > 0) {
                 return t.distributions_charge.map(dist => {
                     // Construction déterministe des dates (éviter string parsing et TZ offsets)
-                    const [year, month, day] = dist.date.split('-').map(Number) as [number, number, number];
+                    const [year = 0, month = 0, day = 0] = dist.date.split('-').map(Number);
 
                     let startTime = dist.heure_debut || '08:00:00';
                     let endTime = dist.heure_fin || '17:00:00';
 
-                    const [sh, sm] = startTime.split(':').map(Number) as [number, number];
-                    const [eh, em] = endTime.split(':').map(Number) as [number, number];
+                    const [sh = 0, sm = 0] = startTime.split(':').map(Number);
+                    const [eh = 0, em = 0] = endTime.split(':').map(Number);
 
                     // Note: Month est 0-indexed dans Date constructor
                     const start = new Date(year, month - 1, day, sh, sm, 0);
@@ -2026,18 +2594,22 @@ const Planning: FC = () => {
             )}
 
             {/* Create/Edit Modal - Only ADMIN and SUPERVISEUR can create/edit tasks */}
-            {showCreateForm && permissions.canCreateTask && (
-                <TaskFormModal
-                    tache={tacheToEdit || undefined}
-                    initialValues={initialTaskValues}
-                    preSelectedObjects={preSelectedObjects}
-                    equipes={equipes}
-                    typesTaches={typesTaches}
-                    onClose={() => { setShowCreateForm(false); setTacheToEdit(null); setInitialTaskValues(undefined); setPreSelectedObjects(undefined); }}
-                    onSubmit={tacheToEdit ? handleUpdateTache : handleCreateTache}
-                    onResetCharge={handleResetCharge}
-                />
-            )}
+            {showCreateForm && permissions.canCreateTask && (() => {
+                console.log('🟡 [Planning] Rendu TaskFormModal - tacheToEdit:', tacheToEdit);
+                console.log('🟡 [Planning] onSubmit sera:', tacheToEdit ? 'handleUpdateTache' : 'handleCreateTache');
+                return (
+                    <TaskFormModal
+                        tache={tacheToEdit || undefined}
+                        initialValues={initialTaskValues}
+                        preSelectedObjects={preSelectedObjects}
+                        equipes={equipes}
+                        typesTaches={typesTaches}
+                        onClose={() => { setShowCreateForm(false); setTacheToEdit(null); setInitialTaskValues(undefined); setPreSelectedObjects(undefined); }}
+                        onSubmit={tacheToEdit ? handleUpdateTache : handleCreateTache}
+                        onResetCharge={handleResetCharge}
+                    />
+                );
+            })()}
 
             {/* Delete Confirmation Modal */}
             {tacheToDelete && (
