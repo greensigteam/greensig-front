@@ -158,6 +158,7 @@ const ReclamationDetailPage: React.FC = () => {
 
     // Task modal
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+    const [isSubmittingTask, setIsSubmittingTask] = useState(false);
     const [taskInitialValues, setTaskInitialValues] = useState<Partial<TacheCreate>>({});
     const [taskSiteFilter, setTaskSiteFilter] = useState<{ id: number; name: string } | undefined>(undefined);
 
@@ -268,6 +269,7 @@ const ReclamationDetailPage: React.FC = () => {
         console.log('🔵 [ReclamationDetail] Données reçues:', data);
         console.log('🔵 [ReclamationDetail] recurrence_config:', data.recurrence_config);
 
+        setIsSubmittingTask(true);
         try {
             const payload: TacheCreate = {
                 ...data,
@@ -349,6 +351,8 @@ const ReclamationDetailPage: React.FC = () => {
                 message: "Échec de la création de la tâche.",
                 variant: 'danger'
             });
+        } finally {
+            setIsSubmittingTask(false);
         }
     };
 
@@ -992,6 +996,7 @@ const ReclamationDetailPage: React.FC = () => {
                     equipes={equipes}
                     typesTaches={typesTaches}
                     siteFilter={taskSiteFilter}
+                    isSubmitting={isSubmittingTask}
                     onClose={handleCloseTaskModal}
                     onSubmit={handleTaskSubmit}
                 />

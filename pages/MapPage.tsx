@@ -236,6 +236,7 @@ export const MapPage: React.FC<MapPageProps> = ({
 
   // Task Creation State
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [isSubmittingTask, setIsSubmittingTask] = useState(false);
   const [taskModalInitialValues, setTaskModalInitialValues] = useState<Partial<TacheCreate>>({});
   const [taskPreSelectedObjects, setTaskPreSelectedObjects] = useState<InventoryObjectOption[]>([]);
   const [taskSiteFilter, setTaskSiteFilter] = useState<{ id: number; name: string } | undefined>(undefined);
@@ -422,6 +423,7 @@ export const MapPage: React.FC<MapPageProps> = ({
     console.log('🔵 [MapPage] Données reçues:', data);
     console.log('🔵 [MapPage] recurrence_config:', data.recurrence_config);
 
+    setIsSubmittingTask(true);
     try {
       // Créer la tâche de base
       const createdTask = await planningService.createTache(data);
@@ -488,6 +490,8 @@ export const MapPage: React.FC<MapPageProps> = ({
     } catch (err: any) {
       console.error("❌ [MapPage] Error creating task", err);
       showToast(err.message || "Erreur lors de la création de la tâche", "error");
+    } finally {
+      setIsSubmittingTask(false);
     }
   };
 
@@ -1209,6 +1213,7 @@ export const MapPage: React.FC<MapPageProps> = ({
           siteFilter={taskSiteFilter}
           typesTaches={typesTaches}
           equipes={equipes}
+          isSubmitting={isSubmittingTask}
           onClose={() => setIsTaskModalOpen(false)}
           onSubmit={handleTaskSubmit}
         />

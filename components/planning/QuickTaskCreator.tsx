@@ -528,10 +528,14 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
         let taskData: TacheCreate;
 
         if (modeDistribution === 'multi-jours' && distributionsCharge.length > 0) {
-            // Mode multi-jours: utiliser les distributions
+            // Mode multi-jours: utiliser la plage de dates passée au DistributionChargeEditor
+            // Les distributions peuvent être partielles (ex: tâche du 1er au 31, distributions seulement sur 5, 10, 15, 20)
             const sortedDistributions = [...distributionsCharge].sort((a, b) => a.date.localeCompare(b.date));
-            const dateDebut = sortedDistributions[0].date;
-            const dateFin = sortedDistributions[sortedDistributions.length - 1].date;
+
+            // ✅ CORRIGÉ: Utiliser la plage de dates de l'éditeur, pas les distributions
+            // La plage correspond à ce qui est passé au DistributionChargeEditor (initialDate + 30 jours)
+            const dateDebut = format(initialDate, 'yyyy-MM-dd');
+            const dateFin = format(new Date(initialDate.getTime() + 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
 
             taskData = {
                 id_type_tache: selectedType.id,
@@ -1232,8 +1236,8 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                                 {/* Récurrence */}
                                 <div className="mt-6">
                                     <RecurrenceSelector
-                                        dateDebut={modeDistribution === 'simple' ? format(initialDate, 'yyyy-MM-dd') : (distributionsCharge.length > 0 ? [...distributionsCharge].sort((a, b) => a.date.localeCompare(b.date))[0].date : format(initialDate, 'yyyy-MM-dd'))}
-                                        dateFin={modeDistribution === 'simple' ? format(initialDate, 'yyyy-MM-dd') : (distributionsCharge.length > 0 ? [...distributionsCharge].sort((a, b) => a.date.localeCompare(b.date))[distributionsCharge.length - 1].date : format(initialDate, 'yyyy-MM-dd'))}
+                                        dateDebut={format(initialDate, 'yyyy-MM-dd')}
+                                        dateFin={modeDistribution === 'simple' ? format(initialDate, 'yyyy-MM-dd') : format(new Date(initialDate.getTime() + 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd')}
                                         value={recurrenceConfig}
                                         onChange={setRecurrenceConfig}
                                     />

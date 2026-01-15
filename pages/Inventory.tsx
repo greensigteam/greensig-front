@@ -210,6 +210,7 @@ const Inventory: React.FC<InventoryProps> = ({ user }) => {
   // Task modal state
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [modalEquipes, setModalEquipes] = useState<EquipeList[]>([]);
   const [modalTypesTaches, setModalTypesTaches] = useState<TypeTache[]>([]);
 
@@ -600,6 +601,7 @@ const Inventory: React.FC<InventoryProps> = ({ user }) => {
     console.log('🔵 [Inventory] Données reçues:', data);
     console.log('🔵 [Inventory] recurrence_config:', data.recurrence_config);
 
+    setIsSubmitting(true);
     try {
       // Créer la tâche de base
       const createdTask = await planningService.createTache(data);
@@ -670,6 +672,8 @@ const Inventory: React.FC<InventoryProps> = ({ user }) => {
     } catch (error: any) {
       console.error('❌ [Inventory] Erreur création tâche:', error);
       showToast('Erreur lors de la création de la tâche', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1389,6 +1393,7 @@ const Inventory: React.FC<InventoryProps> = ({ user }) => {
           equipes={modalEquipes}
           typesTaches={modalTypesTaches}
           preSelectedObjects={preSelectedObjects}
+          isSubmitting={isSubmitting}
           onClose={() => setShowTaskModal(false)}
           onSubmit={handleTaskSubmit}
         />

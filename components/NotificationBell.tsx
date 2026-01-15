@@ -6,9 +6,19 @@
  * Utilise le theme GreenSIG (emerald).
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, Check, CheckCheck, X, Circle } from 'lucide-react';
+import {
+  useFloating,
+  offset,
+  flip,
+  shift,
+  autoUpdate,
+  FloatingPortal,
+  useDismiss,
+  useInteractions
+} from '@floating-ui/react';
 import { useNotificationContext, Notification } from '../contexts/NotificationContext';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -24,8 +34,6 @@ interface NotificationBellProps {
 export default function NotificationBell({ className = '' }: NotificationBellProps) {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
 
   const {
     notifications,
@@ -35,22 +43,17 @@ export default function NotificationBell({ className = '' }: NotificationBellPro
     markAllAsRead,
   } = useNotificationContext();
 
-  // Fermer le popover en cliquant ailleurs
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        popoverRef.current &&
-        !popoverRef.current.contains(event.target as Node) &&
-        buttonRef.current &&
-        !buttonRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    }
+  // Floating UI pour popover
+  const { refs, floatingStyles, context } = useFloating({
+    open: isOpen,
+    onOpenChange: setIsOpen,
+    placement: 'bottom-end',
+    middleware: [offset(8), flip(), shift({ padding: 10 })],
+    whileElementsMounted: autoUpdate
+  });
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const dismiss = useDismiss(context, { outsidePress: true, escapeKey: true });
+  const { getReferenceProps, getFloatingProps } = useInteractions([dismiss]);
 
   // Handler de clic sur notification
   const handleNotificationClick = async (notification: Notification) => {
@@ -100,7 +103,8 @@ export default function NotificationBell({ className = '' }: NotificationBellPro
     <div className="relative">
       {/* Bouton cloche */}
       <button
-        ref={buttonRef}
+        ref={refs.setReference}
+        {...getReferenceProps()}
         onClick={() => setIsOpen(!isOpen)}
         className={`relative p-2 md:p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-all duration-200 group ${className}`}
         title={isConnected ? 'Notifications' : 'Notifications (hors ligne)'}
@@ -125,116 +129,122 @@ export default function NotificationBell({ className = '' }: NotificationBellPro
 
       {/* Popover notifications */}
       {isOpen && (
-        <div
-          ref={popoverRef}
-          className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden"
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200">
-            <h3 className="font-semibold text-slate-800">Notifications</h3>
-            <div className="flex items-center gap-2">
-              {unreadCount > 0 && (
+        <FloatingPortal>
+          <div
+            ref={refs.setFloating}
+            style={{
+              ...floatingStyles,
+              zIndex: 9999, // Très haut pour être devant le header et tout le reste
+            }}
+            {...getFloatingProps()}
+            className="w-80 sm:w-96 bg-white rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200">
+              <h3 className="font-semibold text-slate-800">Notifications</h3>
+              <div className="flex items-center gap-2">
+                {unreadCount > 0 && (
+                  <button
+                    onClick={markAllAsRead}
+                    className="text-xs text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                  >
+                    <CheckCheck className="w-3.5 h-3.5" />
+                    Tout marquer lu
+                  </button>
+                )}
                 <button
-                  onClick={markAllAsRead}
-                  className="text-xs text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                  onClick={() => setIsOpen(false)}
+                  className="text-slate-400 hover:text-slate-600"
                 >
-                  <CheckCheck className="w-3.5 h-3.5" />
-                  Tout marquer lu
+                  <X className="w-4 h-4" />
                 </button>
+              </div>
+            </div>
+
+            {/* Liste des notifications */}
+            <div className="max-h-[450px] overflow-y-auto custom-scrollbar">
+              {notifications.length === 0 ? (
+                <div className="px-4 py-8 text-center text-slate-500">
+                  <Bell className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                  <p className="text-sm">Aucune notification</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {notifications.map((notification) => (
+                    <div
+                      key={notification.id}
+                      onClick={() => handleNotificationClick(notification)}
+                      className={`px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors ${!notification.lu ? 'bg-emerald-50/50' : ''
+                        }`}
+                    >
+                      <div className="flex gap-3">
+                        {/* Icone type */}
+                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${getPriorityColor(notification.priorite)}`}>
+                          {getTypeIcon(notification.type)}
+                        </div>
+
+                        {/* Contenu */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className={`text-sm font-medium truncate ${!notification.lu ? 'text-slate-900' : 'text-slate-600'}`}>
+                              {notification.titre}
+                            </p>
+                            {!notification.lu && (
+                              <Circle className="w-2 h-2 fill-emerald-500 text-emerald-500 flex-shrink-0 mt-1.5" />
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">
+                            {notification.message}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] text-slate-400">
+                              {formatDistanceToNow(new Date(notification.created_at), {
+                                addSuffix: true,
+                                locale: fr,
+                              })}
+                            </span>
+                            {notification.acteur && (
+                              <span className="text-[10px] text-slate-400">
+                                par {notification.acteur.nom}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Action marquer lu */}
+                        {!notification.lu && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markAsRead(notification.id);
+                            }}
+                            className="flex-shrink-0 p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded"
+                            title="Marquer comme lu"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
+            </div>
+
+            {/* Footer - toujours visible */}
+            <div className="px-4 py-3 bg-slate-50 border-t border-slate-200">
               <button
-                onClick={() => setIsOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
+                onClick={() => {
+                  navigate('/notifications');
+                  setIsOpen(false);
+                }}
+                className="text-xs text-emerald-600 hover:text-emerald-700 font-bold w-full text-center uppercase tracking-wider"
               >
-                <X className="w-4 h-4" />
+                Voir toutes les notifications
               </button>
             </div>
           </div>
-
-          {/* Liste des notifications */}
-          <div className="max-h-96 overflow-y-auto">
-            {notifications.length === 0 ? (
-              <div className="px-4 py-8 text-center text-slate-500">
-                <Bell className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                <p className="text-sm">Aucune notification</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {notifications.map((notification) => (
-                  <div
-                    key={notification.id}
-                    onClick={() => handleNotificationClick(notification)}
-                    className={`px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors ${
-                      !notification.lu ? 'bg-emerald-50/50' : ''
-                    }`}
-                  >
-                    <div className="flex gap-3">
-                      {/* Icone type */}
-                      <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${getPriorityColor(notification.priorite)}`}>
-                        {getTypeIcon(notification.type)}
-                      </div>
-
-                      {/* Contenu */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className={`text-sm font-medium truncate ${!notification.lu ? 'text-slate-900' : 'text-slate-600'}`}>
-                            {notification.titre}
-                          </p>
-                          {!notification.lu && (
-                            <Circle className="w-2 h-2 fill-emerald-500 text-emerald-500 flex-shrink-0 mt-1.5" />
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">
-                          {notification.message}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[10px] text-slate-400">
-                            {formatDistanceToNow(new Date(notification.created_at), {
-                              addSuffix: true,
-                              locale: fr,
-                            })}
-                          </span>
-                          {notification.acteur && (
-                            <span className="text-[10px] text-slate-400">
-                              par {notification.acteur.nom}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Action marquer lu */}
-                      {!notification.lu && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            markAsRead(notification.id);
-                          }}
-                          className="flex-shrink-0 p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded"
-                          title="Marquer comme lu"
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Footer - toujours visible */}
-          <div className="px-4 py-2 bg-slate-50 border-t border-slate-200">
-            <button
-              onClick={() => {
-                navigate('/notifications');
-                setIsOpen(false);
-              }}
-              className="text-xs text-emerald-600 hover:text-emerald-700 font-medium w-full text-center"
-            >
-              Voir toutes les notifications
-            </button>
-          </div>
-        </div>
+        </FloatingPortal>
       )}
     </div>
   );

@@ -75,6 +75,48 @@ const customCalendarStyles = `
     .rbc-today { background-color: transparent !important; }
     .rbc-now .rbc-button-link { background-color: #10b981; color: white; border-radius: 50%; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; margin-top: -4px; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3); }
 
+    /* Vue Mois - Ajustements pour forcer l'affichage de 1-2 tâches max */
+    .rbc-month-view .rbc-row-content {
+        overflow: hidden;
+    }
+    
+    .rbc-month-row {
+        min-height: 100px !important; /* Donne assez d'espace pour voir la date + 1 tâche + le lien */
+    }
+
+    .rbc-event {
+        margin-bottom: 2px !important;
+    }
+
+    /* Le bouton "Show More" par défaut de RBC */
+    .rbc-show-more {
+        background-color: #ecfdf5 !important;
+        color: #059669 !important;
+        font-weight: 600 !important;
+        font-size: 11px !important;
+        padding: 2px 8px !important;
+        border-radius: 6px !important;
+        margin-top: 2px !important;
+        text-decoration: none !important;
+        display: inline-block !important;
+        width: auto !important;
+    }
+    
+    .rbc-show-more:hover {
+        background-color: #d1fae5 !important;
+    }
+
+    /* Popup d'affichage des tâches supplémentaires */
+    .rbc-overlay {
+        background: white !important;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.15) !important;
+        border-radius: 12px !important;
+        border: 1px solid #e5e7eb !important;
+        padding: 12px !important;
+        z-index: 1000 !important;
+        min-width: 250px !important;
+    }
+
     /* Événements Transparents (Le composant TaskEvent gère le visuel) */
     .rbc-event { background-color: transparent !important; padding: 0 !important; border-radius: 0 !important; outline: none !important; box-shadow: none !important; overflow: visible !important; }
     .rbc-event:focus { outline: none !important; }
@@ -196,6 +238,34 @@ const TaskEvent = memo(function TaskEvent({ event }: { event: CalendarEvent, tit
                 )}
             </div>
         </div>
+    );
+});
+
+// ============================================================================
+// COMPOSANT "MORE" POUR VUE MOIS (Affiche "+X tâche(s)")
+// ============================================================================
+
+interface MonthMoreLinkProps {
+    count: number;
+    onClick: () => void;
+}
+
+const MonthMoreLink: React.FC<MonthMoreLinkProps> = memo(({ count, onClick }) => {
+    return (
+        <button
+            type="button"
+            onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onClick();
+            }}
+            className="w-full text-left px-2 py-1.5 mt-1 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded transition-all flex items-center gap-1.5 border border-transparent hover:border-emerald-200"
+        >
+            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold">
+                +{count}
+            </span>
+            <span>tâche{count > 1 ? 's' : ''}</span>
+        </button>
     );
 });
 
@@ -2346,13 +2416,31 @@ const Planning: FC = () => {
                 {viewMode === 'calendar' ? (
                     <div className={`h-full p-4 transition-opacity duration-300 ${slideDirection === 'right' ? 'animate-slide-right' : slideDirection === 'left' ? 'animate-slide-left' : ''}`} ref={calendarRef} key={currentDate.toString() + currentView}>
                         <DnDCalendar
-                            components={{ event: TaskEvent }}
+                            components={{
+                                event: TaskEvent,
+                            }}
                             localizer={localizer}
                             events={events}
+                            popup={true}
                             startAccessor="start"
                             endAccessor="end"
+                            // Limite le nombre de lignes visibles dans chaque cellule de mois
+                            length={1}
                             style={{ height: '100%' }}
-                            messages={{ next: "Suivant", previous: "Précédent", today: "Aujourd'hui", month: "Mois", week: "Semaine", day: "Jour", agenda: "Agenda", date: "Date", time: "Heure", event: "Événement", noEventsInRange: "Aucune tâche." }}
+                            messages={{
+                                next: "Suivant",
+                                previous: "Précédent",
+                                today: "Aujourd'hui",
+                                month: "Mois",
+                                week: "Semaine",
+                                day: "Jour",
+                                agenda: "Agenda",
+                                date: "Date",
+                                time: "Heure",
+                                event: "Événement",
+                                noEventsInRange: "Aucune tâche.",
+                                showMore: (count: number) => `+${count} tâche${count > 1 ? 's' : ''}`
+                            }}
                             culture='fr'
                             min={new Date(2024, 0, 1, 7, 0, 0)}
                             max={new Date(2024, 0, 1, 19, 0, 0)}

@@ -325,26 +325,10 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
             .finally(() => setLoadingRatios(false));
     }, []);
 
-    // ✅ NOUVEAU: Auto-update task dates when distributions change
-    // If distributions extend beyond the current date range, or are smaller, adjust the range
-    useEffect(() => {
-        if (distributionsCharge.length > 0) {
-            const dates = distributionsCharge.map(d => d.date).filter(Boolean).sort();
-            if (dates.length === 0) return;
-
-            const minDate = dates[0]!;
-            const maxDate = dates[dates.length - 1]!;
-
-            // Update form dates to match exactly the distribution range (shrink or expand)
-            if (formData.date_debut_planifiee !== minDate || formData.date_fin_planifiee !== maxDate) {
-                setFormData(prev => ({
-                    ...prev,
-                    date_debut_planifiee: minDate,
-                    date_fin_planifiee: maxDate
-                }));
-            }
-        }
-    }, [distributionsCharge, formData.date_debut_planifiee, formData.date_fin_planifiee]);
+    // ✅ SUPPRIMÉ: Auto-update task dates when distributions change
+    // Les dates de début et fin de la tâche sont INDÉPENDANTES des distributions
+    // Exemple: Une tâche peut être planifiée du 1er au 31 janvier avec des distributions
+    // seulement sur certains jours (5, 10, 15, 20 janvier)
 
     // Filter task types based on selected objects
     useEffect(() => {
@@ -1165,32 +1149,13 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
                 {/* RÉCURRENCE                                                                  */}
                 {/* ============================================================================ */}
                 <div className="mt-6">
-                    {(() => {
-                        // Calculer les dates de début et fin basées sur les distributions réelles
-                        let dateDebutRecurrence: string;
-                        let dateFinRecurrence: string;
-
-                        if (distributionsCharge.length > 0) {
-                            // Trier les distributions une seule fois
-                            const distributionsSorted = [...distributionsCharge].sort((a, b) => a.date.localeCompare(b.date));
-                            dateDebutRecurrence = distributionsSorted[0].date;
-                            dateFinRecurrence = distributionsSorted[distributionsSorted.length - 1].date;
-                        } else {
-                            // Fallback : utiliser les dates du formulaire
-                            dateDebutRecurrence = formData.date_debut_planifiee;
-                            dateFinRecurrence = formData.date_fin_planifiee;
-                        }
-
-                        return (
-                            <RecurrenceSelector
-                                dateDebut={dateDebutRecurrence}
-                                dateFin={dateFinRecurrence}
-                                value={recurrenceConfig}
-                                onChange={setRecurrenceConfig}
-                                disabled={!!tache}
-                            />
-                        );
-                    })()}
+                    <RecurrenceSelector
+                        dateDebut={formData.date_debut_planifiee}
+                        dateFin={formData.date_fin_planifiee}
+                        value={recurrenceConfig}
+                        onChange={setRecurrenceConfig}
+                        disabled={!!tache}
+                    />
                 </div>
 
             </div>

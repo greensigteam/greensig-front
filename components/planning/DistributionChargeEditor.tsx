@@ -14,8 +14,6 @@ interface DistributionChargeEditorProps {
 interface DayRow {
   date: Date;
   dateString: string; // YYYY-MM-DD
-  isWeekend: boolean;
-  isSunday: boolean;
   dayName: string;
   heures: number;
   heure_debut: string;  // "HH:MM"
@@ -34,7 +32,6 @@ const JOUR_NAMES = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
  * Features:
  * - Liste tous les jours entre dateDebut et dateFin
  * - Permet de saisir les heures par jour
- * - Marque les weekends (samedi travaillé, dimanche repos)
  * - Affiche le total des heures
  * - Validation (heures >= 0)
  */
@@ -79,9 +76,7 @@ export function DistributionChargeEditor({
     // Créer une ligne pour chaque distribution existante
     const rows: DayRow[] = distributions.map(dist => {
       const date = new Date(dist.date + 'T00:00:00');
-      const dayOfWeek = date.getDay(); // 0 = dimanche, 6 = samedi
-      const isSunday = dayOfWeek === 0;
-      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      const dayOfWeek = date.getDay();
 
       // Heures par défaut si non définies
       const heure_debut = dist.heure_debut ?? '08:00';
@@ -96,8 +91,6 @@ export function DistributionChargeEditor({
       return {
         date,
         dateString: dist.date,
-        isWeekend,
-        isSunday,
         dayName: JOUR_NAMES[dayOfWeek] ?? '',
         heures,
         heure_debut,
@@ -234,8 +227,6 @@ export function DistributionChargeEditor({
           <p className="opacity-80">
             Répartissez manuellement les heures de travail sur chaque jour.
             Les jours à 0h ne seront pas enregistrés.
-            <span className="font-bold text-amber-700"> Samedi</span> est optionnel,
-            <span className="font-bold text-red-600"> Dimanche</span> est repos.
           </p>
         </div>
       </div>
@@ -306,11 +297,7 @@ export function DistributionChargeEditor({
                   className={
                     row.isRealized
                       ? 'bg-emerald-50/70 border-l-4 border-emerald-500' // ✅ Réalisée = verrouillée
-                      : row.isSunday
-                        ? 'bg-red-50/50' // Dimanche = repos
-                        : row.isWeekend
-                          ? 'bg-amber-50/50' // Samedi = optionnel
-                          : 'hover:bg-slate-50 transition-colors'
+                      : 'hover:bg-slate-50 transition-colors'
                   }
                 >
                   <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-slate-700">
@@ -321,15 +308,7 @@ export function DistributionChargeEditor({
                     })}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm">
-                    <span
-                      className={
-                        row.isSunday
-                          ? 'text-red-600 font-bold'
-                          : row.isWeekend
-                            ? 'text-amber-700 font-bold'
-                            : 'text-slate-600 font-medium'
-                      }
-                    >
+                    <span className="text-slate-600 font-medium">
                       {row.dayName}
                     </span>
                     {row.isRealized && (
@@ -338,23 +317,11 @@ export function DistributionChargeEditor({
                         Réalisée
                       </span>
                     )}
-                    {row.isSunday && (
-                      <span className="ml-1.5 text-[10px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded uppercase tracking-wider">Repos</span>
-                    )}
-                    {row.isWeekend && !row.isSunday && !row.isRealized && (
-                      <span className="ml-1.5 text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded uppercase tracking-wider">Samedi</span>
-                    )}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-center">
                     <div className="flex justify-center">
-                      <div className={`
-                        px-3 py-1 rounded-lg text-sm font-bold shadow-sm border
-                        ${row.isSunday
-                          ? 'bg-slate-100 text-slate-400 border-slate-200'
-                          : 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                        }
-                      `}>
-                        {row.isSunday ? '0' : row.heures.toFixed(1)}h
+                      <div className="px-3 py-1 rounded-lg text-sm font-bold shadow-sm border bg-emerald-50 text-emerald-700 border-emerald-100">
+                        {row.heures.toFixed(1)}h
                       </div>
                     </div>
                   </td>
@@ -363,10 +330,10 @@ export function DistributionChargeEditor({
                       type="time"
                       value={row.heure_debut}
                       onChange={(e) => handleHeureDebutChange(row.dateString, e.target.value)}
-                      disabled={readonly || row.isSunday || row.isRealized}
+                      disabled={readonly || row.isRealized}
                       className={`
                         w-24 px-3 py-1.5 text-sm border rounded-xl transition-all
-                        ${row.isSunday || row.isRealized
+                        ${row.isRealized
                           ? 'bg-slate-100 cursor-not-allowed text-slate-400 border-slate-200'
                           : 'border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
                         }
@@ -379,10 +346,10 @@ export function DistributionChargeEditor({
                       type="time"
                       value={row.heure_fin}
                       onChange={(e) => handleHeureFinChange(row.dateString, e.target.value)}
-                      disabled={readonly || row.isSunday || row.isRealized}
+                      disabled={readonly || row.isRealized}
                       className={`
                         w-24 px-3 py-1.5 text-sm border rounded-xl transition-all
-                        ${row.isSunday || row.isRealized
+                        ${row.isRealized
                           ? 'bg-slate-100 cursor-not-allowed text-slate-400 border-slate-200'
                           : 'border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
                         }
@@ -395,11 +362,11 @@ export function DistributionChargeEditor({
                       type="text"
                       value={row.commentaire}
                       onChange={(e) => handleCommentaireChange(row.dateString, e.target.value)}
-                      disabled={readonly || row.isSunday || row.isRealized}
-                      placeholder={row.isSunday || row.isRealized ? '' : 'Détails...'}
+                      disabled={readonly || row.isRealized}
+                      placeholder={row.isRealized ? '' : 'Détails...'}
                       className={`
                         w-full px-3 py-1.5 text-sm border rounded-xl transition-all
-                        ${row.isSunday || row.isRealized
+                        ${row.isRealized
                           ? 'bg-slate-100 cursor-not-allowed text-slate-400 border-slate-200'
                           : 'border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
                         }

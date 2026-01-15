@@ -2,15 +2,13 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Calendar, X, CheckSquare, Clock, Settings2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { DayPicker, Matcher } from 'react-day-picker';
 import { fr } from 'date-fns/locale/fr';
-import { isSunday, isSaturday, format } from 'date-fns';
+import { format } from 'date-fns';
 import 'react-day-picker/style.css';
 
 interface DaySelection {
   date: string; // YYYY-MM-DD
   dayName: string;
   dayOfWeek: number;
-  isWeekend: boolean;
-  isSunday: boolean;
   selected: boolean;
   heure_debut: string;
   heure_fin: string;
@@ -56,15 +54,11 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
     while (currentDate <= endDate) {
       const dateString = format(currentDate, 'yyyy-MM-dd');
       const dayOfWeek = currentDate.getDay();
-      const isDimanche = dayOfWeek === 0;
-      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
       days.push({
         date: dateString,
         dayName: JOUR_NAMES[dayOfWeek] ?? '',
         dayOfWeek,
-        isWeekend,
-        isSunday: isDimanche,
         selected: initialSelection.includes(dateString),
         heure_debut: defaultHeureDebut ?? '',
         heure_fin: defaultHeureFin ?? ''
@@ -150,7 +144,7 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
   const handleSelectJoursOuvres = () => {
     setSelectedDays(prev =>
       prev.map(day => {
-        const shouldBeSelected = !day.isSunday;
+        const shouldBeSelected = true; // Sélectionner tous les jours (y compris weekends)
         const wasSelected = day.selected;
 
         // Si le jour vient d'être sélectionné, appliquer les horaires par défaut
@@ -175,7 +169,7 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
   const handleSelectAll = () => {
     setSelectedDays(prev =>
       prev.map(day => {
-        const shouldBeSelected = !day.isSunday;
+        const shouldBeSelected = true; // Sélectionner tous les jours (y compris weekends)
         const wasSelected = day.selected;
 
         // Si le jour vient d'être sélectionné, appliquer les horaires par défaut
@@ -225,16 +219,11 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
   };
 
   const modifiers: Record<string, Matcher> = {
-    sunday: (date: Date) => isSunday(date),
-    saturday: (date: Date) => isSaturday(date),
-    // ✅ MODIFIÉ: Ne plus marquer les dates hors période comme "outside"
-    // Les dates sont maintenant disponibles pour sélection flexible
+    // ✅ MODIFIÉ: Suppression des contraintes weekend (sunday/saturday)
     protected: (date: Date) => protectedDates.includes(format(date, 'yyyy-MM-dd'))
   };
 
   const modifiersClassNames = {
-    sunday: 'rdp-day-sunday',
-    saturday: 'rdp-day-saturday',
     protected: 'rdp-day-protected'
   };
 
@@ -356,15 +345,15 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
                 max-width: 650px;
               }
 
-              .rdp-selected:not(.rdp-day-sunday),
-              .rdp-day-selected:not(.rdp-day-sunday) {
+              .rdp-selected,
+              .rdp-day-selected {
                 background-color: #059669 !important;
                 color: white !important;
                 font-weight: 600;
               }
 
-              .rdp-selected:not(.rdp-day-sunday):hover,
-              .rdp-day-selected:not(.rdp-day-sunday):hover {
+              .rdp-selected:hover,
+              .rdp-day-selected:hover {
                 background-color: #047857 !important;
               }
 
@@ -394,19 +383,7 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
                 font-weight: 700 !important;
               }
 
-              .rdp-day-saturday:not(.rdp-day-selected):not(.rdp-day-outside) {
-                background-color: #fef3c7;
-                color: #92400e;
-                border: 2px solid #fcd34d;
-              }
-
-              .rdp-day-sunday,
-              .rdp-day_disabled {
-                background-color: #fee2e2 !important;
-                color: #dc2626 !important;
-                cursor: not-allowed !important;
-                opacity: 0.5;
-              }
+              /* Styles weekend supprimés - pas de contraintes sur les weekends */
 
               .rdp-day-outside {
                 opacity: 0.3;
@@ -432,11 +409,11 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
                 font-size: 10px;
               }
 
-              .rdp-day:not(.rdp-day-sunday):not(.rdp-day-outside) {
+              .rdp-day:not(.rdp-day-outside) {
                 cursor: pointer;
               }
 
-              .rdp-day:not(.rdp-day-selected):not(.rdp-day-sunday):not(.rdp-day-outside):not(.rdp-day-saturday):hover {
+              .rdp-day:not(.rdp-day-selected):not(.rdp-day-outside):hover {
                 background-color: #ecfdf5;
                 border: 2px solid #10b981;
                 color: #065f46;
@@ -482,13 +459,23 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
                   selected: 'rdp-selected rdp-day-selected',
                   today: 'rdp-today',
                 }}
-                disabled={(date) =>
-                  isSunday(date) || date < dateDebut || date > dateFin // ✅ MODIFIÉ: Dimanches + Hors période sont désactivés
-                }
+                disabled={(date) => {
+                  // ✅ Normaliser les dates à minuit pour comparaison correcte
+                  const normalizedDate = new Date(date);
+                  normalizedDate.setHours(0, 0, 0, 0);
+
+                  const normalizedDebut = new Date(dateDebut);
+                  normalizedDebut.setHours(0, 0, 0, 0);
+
+                  const normalizedFin = new Date(dateFin);
+                  normalizedFin.setHours(0, 0, 0, 0);
+
+                  return normalizedDate < normalizedDebut || normalizedDate > normalizedFin;
+                }}
                 fromDate={dateDebut}
                 toDate={dateFin}
                 defaultMonth={dateDebut}
-                showOutsideDays={false} // ✅ MODIFIÉ: Cacher les jours complètement hors mois si voulu, ou garder true avec style disabled
+                showOutsideDays={false}
               />
 
               {/* Légende */}
@@ -505,14 +492,6 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
                     <span className="font-semibold text-slate-700">Réalisée (protégée)</span>
                   </div>
                 )}
-                <div className="flex items-center gap-2.5">
-                  <div className="w-4 h-4 bg-amber-50 border-2 border-amber-300 rounded-md"></div>
-                  <span className="font-semibold text-slate-700">Samedi (Optionnel)</span>
-                </div>
-                <div className="flex items-center gap-2.5">
-                  <div className="w-4 h-4 bg-red-100 border border-red-200 rounded-md"></div>
-                  <span className="font-semibold text-slate-700">Dimanche (Repos)</span>
-                </div>
                 <div className="flex items-center gap-2.5">
                   <div className="w-4 h-4 border-2 border-slate-300 rounded-md bg-white"></div>
                   <span className="font-semibold text-slate-700">Disponible</span>
@@ -553,11 +532,6 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
                             month: 'long'
                           })}
                         </div>
-                        {day.isWeekend && !day.isSunday && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 mt-1 uppercase tracking-wider">
-                            Samedi
-                          </span>
-                        )}
                       </div>
                       <button
                         type="button"
