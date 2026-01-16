@@ -15,6 +15,7 @@ import {
     Calendar, Filter
 } from 'lucide-react';
 import { useSearch } from '../contexts/SearchContext';
+import { useToast } from '../contexts/ToastContext';
 import { planningService } from '../services/planningService';
 import { fetchEquipes, fetchStructures } from '../services/usersApi';
 import { fetchCurrentUser, fetchAllSites, SiteFrontend } from '../services/api';
@@ -36,6 +37,7 @@ import LoadingScreen from '../components/LoadingScreen';
 import { fetchInventory } from '../services/api';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import PlanningFiltersComponent from '../components/planning/PlanningFilters';
+import { DistributionEditForm } from '../components/planning/DistributionEditForm';
 import {
     FloatingPortal,
     type ReferenceType,
@@ -283,10 +285,12 @@ interface PopoverProps {
     onEdit: () => void;
     onDelete: () => void;
     onToggleDistribution?: () => void;  // ✅ Nouveau: toggle du statut de distribution
+    onUpdate?: () => void;  // ✅ Nouveau: callback après modification de distribution
     isReadOnly?: boolean;
 }
 
-const TaskDetailPopover: FC<PopoverProps> = ({ tache, eventStart, eventEnd, distributionStatus, distributionId, onClose, onEdit, onDelete, onToggleDistribution, isReadOnly }) => {
+const TaskDetailPopover: FC<PopoverProps> = ({ tache, eventStart, eventEnd, distributionStatus, distributionId, onClose, onEdit, onDelete, onToggleDistribution, onUpdate, isReadOnly }) => {
+    const [isEditingDist, setIsEditingDist] = useState(false);
     // Si on a une distribution, on utilise son statut, sinon on utilise le statut de la tâche
     const isCompleted = distributionStatus ? distributionStatus === 'REALISEE' : tache.statut === 'TERMINEE';
     // Vérifier si la tâche a au moins une équipe
@@ -294,10 +298,12 @@ const TaskDetailPopover: FC<PopoverProps> = ({ tache, eventStart, eventEnd, dist
     // Désactiver le toggle si la tâche est terminée ou si pas d'équipe
     const isDistributionDisabled = isReadOnly || tache.statut === 'TERMINEE' || !hasEquipe;
 
-    // Handle escape key and click outside
+    // Handle escape key to close popup
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
+            if (e.key === 'Escape') {
+                onClose();
+            }
         };
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
@@ -315,7 +321,7 @@ const TaskDetailPopover: FC<PopoverProps> = ({ tache, eventStart, eventEnd, dist
                 className="fixed inset-0 z-[1000] flex items-center justify-center p-4 pointer-events-none"
             >
                 <div
-                    className="w-[550px] max-w-full min-h-[400px] bg-white rounded-xl shadow-2xl border border-gray-100 animate-popover flex flex-col overflow-hidden pointer-events-auto"
+                    className="w-[550px] max-w-full min-h-[400px] bg-white rounded-xl shadow-2xl border border-gray-100 animate-popover flex flex-col overflow-hidden pointer-events-auto relative"
                     onClick={(e) => e.stopPropagation()}
                 >
                     {/* Header Actions */}
@@ -326,7 +332,17 @@ const TaskDetailPopover: FC<PopoverProps> = ({ tache, eventStart, eventEnd, dist
                         <div className="flex items-center gap-1">
                             {!isReadOnly && (
                                 <>
-                                    <button onClick={onEdit} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors" title="Modifier">
+                                    <button
+                                        onClick={() => {
+                                            if (distributionId) {
+                                                setIsEditingDist(!isEditingDist);
+                                            } else {
+                                                onEdit();
+                                            }
+                                        }}
+                                        className={`p-2 rounded-full transition-colors ${isEditingDist ? 'bg-emerald-100 text-emerald-700' : 'text-gray-500 hover:bg-gray-100'}`}
+                                        title="Modifier"
+                                    >
                                         <Edit className="w-4 h-4" />
                                     </button>
                                     <button onClick={onDelete} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors" title="Supprimer">
@@ -388,27 +404,37 @@ const TaskDetailPopover: FC<PopoverProps> = ({ tache, eventStart, eventEnd, dist
                                 </h3>
                                 <div className="mt-4 flex flex-col gap-3 text-base text-gray-600">
                                     {/* Date Header: Distribution (Specific) vs Task (Period) */}
-                                    <div className="flex items-center gap-3">
-                                        <Clock className="w-5 h-5 text-gray-400" />
-                                        {distributionId ? (
-                                            /* Distribution : Date & Heure spécifique */
-                                            <span>
-                                                {eventStart && format(eventStart, 'EEEE d MMMM', { locale: fr })}
-                                                <span className="mx-2 text-gray-300">|</span>
-                                                {eventStart && eventEnd && `${format(eventStart, 'HH:mm')} - ${format(eventEnd, 'HH:mm')}`}
-                                            </span>
-                                        ) : (
-                                            /* Tâche : Période planifiée globale */
+                                    {distributionId && eventStart && eventEnd ? (
+                                        /* Distribution : Affichage et édition avec le composant dédié */
+                                        <DistributionEditForm
+                                            distributionId={distributionId}
+                                            tacheId={tache.id}
+                                            eventStart={eventStart}
+                                            eventEnd={eventEnd}
+                                            commentaire={tache.distributions_charge?.find(d => d.id === distributionId)?.commentaire}
+                                            tacheDateDebut={tache.date_debut_planifiee}
+                                            tacheDateFin={tache.date_fin_planifiee}
+                                            isReadOnly={isReadOnly}
+                                            isCompleted={isCompleted}
+                                            isExternalEditing={isEditingDist}
+                                            onIsEditingChange={setIsEditingDist}
+                                            onSuccess={onUpdate}
+                                            onClose={onClose}
+                                        />
+                                    ) : !distributionId ? (
+                                        /* Tâche : Période planifiée globale */
+                                        <div className="flex items-center gap-3">
+                                            <Clock className="w-5 h-5 text-gray-400" />
                                             <span className="text-sm font-medium text-slate-700">
                                                 Période planifiée : {format(new Date(tache.date_debut_planifiee), 'd MMM', { locale: fr })}
                                                 <span className="mx-2 text-slate-400">→</span>
                                                 {format(new Date(tache.date_fin_planifiee), 'd MMM yyyy', { locale: fr })}
                                             </span>
-                                        )}
-                                    </div>
+                                        </div>
+                                    ) : null}
 
                                     {/* Liste des jours d'intervention (Uniquement si distributions existantes) */}
-                                    {(!distributionId && tache.distributions_charge && tache.distributions_charge.length > 0) && (
+                                    {(tache.distributions_charge && tache.distributions_charge.length > 0) && (
                                         <div className="flex items-start gap-3 bg-slate-50 px-3 py-2.5 rounded-lg border border-slate-100/50">
                                             <Calendar className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                                             <div className="flex flex-col gap-2 flex-1">
@@ -505,6 +531,7 @@ const Planning: FC = () => {
 
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [tacheToDelete, setTacheToDelete] = useState<number | null>(null);
+    const [distributionToDelete, setDistributionToDelete] = useState<number | null>(null); // ✅ État pour la suppression de distribution
     const [tacheToEdit, setTacheToEdit] = useState<Tache | null>(null);
 
     // Quick Task Creator State
@@ -935,10 +962,11 @@ const Planning: FC = () => {
                     const dateKey = format(date, 'yyyy-MM-dd');
 
                     const dayTasks = tasksToRender.filter(t => {
+                        if (t.distributions_charge && t.distributions_charge.length > 0) {
+                            return t.distributions_charge.some(d => d.date === dateKey);
+                        }
                         const taskDate = new Date(t.date_debut_planifiee);
-                        return taskDate.getDate() === date.getDate() &&
-                            taskDate.getMonth() === date.getMonth() &&
-                            taskDate.getFullYear() === date.getFullYear();
+                        return format(taskDate, 'yyyy-MM-dd') === dateKey;
                     }).sort((a, b) => new Date(a.date_debut_planifiee).getTime() - new Date(b.date_debut_planifiee).getTime());
 
                     tasksByDay.set(dateKey, dayTasks);
@@ -1068,7 +1096,10 @@ const Planning: FC = () => {
                             pdf.setFont('helvetica', task.statut === 'TERMINEE' ? 'normal' : 'bold');
                             pdf.setTextColor(taskColor.text.r, taskColor.text.g, taskColor.text.b);
 
-                            const taskTime = format(new Date(task.date_debut_planifiee), 'HH:mm');
+                            const distribution = task.distributions_charge?.find(d => d.date === dateKey);
+                            const taskTime = distribution?.heure_debut
+                                ? distribution.heure_debut.substring(0, 5)
+                                : format(new Date(task.date_debut_planifiee), 'HH:mm');
                             const taskText = `${taskTime} ${task.reference ? '[' + task.reference + '] ' : ''}${task.type_tache_detail.nom_tache}`;
 
                             // Tronquer si nécessaire
@@ -1177,8 +1208,14 @@ const Planning: FC = () => {
                             pdf.setFontSize(8);
                             pdf.setFont('helvetica', 'bold');
                             pdf.setTextColor(colors.grayDark.r, colors.grayDark.g, colors.grayDark.b);
-                            const taskStartTime = format(new Date(task.date_debut_planifiee), 'HH:mm');
-                            const taskEndTime = format(new Date(task.date_fin_planifiee), 'HH:mm');
+                            const dateKey = format(dayData.date, 'yyyy-MM-dd');
+                            const distribution = task.distributions_charge?.find(d => d.date === dateKey);
+                            const taskStartTime = distribution?.heure_debut
+                                ? distribution.heure_debut.substring(0, 5)
+                                : format(new Date(task.date_debut_planifiee), 'HH:mm');
+                            const taskEndTime = distribution?.heure_fin
+                                ? distribution.heure_fin.substring(0, 5)
+                                : format(new Date(task.date_fin_planifiee), 'HH:mm');
                             const timeRange = `${taskStartTime}-${taskEndTime}`;
                             pdf.text(timeRange, 15, detailY + 4);
 
@@ -1274,169 +1311,356 @@ const Planning: FC = () => {
                     });
                 }
             } else if (currentView === 'week') {
-                // Vue semaine
+                // 📅 Vue semaine - BLOCS LARGES (comme le mois mais plus grands)
                 const startY = 32;
-                const timeColWidth = 15;
-                const cellWidth = (pageWidth - 20 - timeColWidth) / 7;
-                const headerHeight = 10;
-                const hourHeight = 12;
-                const startHour = 7;
-                const endHour = 19;
+                const cellWidth = (pageWidth - 20) / 7;
+                const headerHeight = 12;
+                const blockHeight = 20; // 📏 Blocs plus grands pour afficher nom complet
+                const blockSpacing = 2.5;
+                const maxBlocksPerDay = 10; // Nombre max de blocs visibles par colonne
 
                 // En-têtes des jours avec dates
                 const weekStart = startOfWeek(currentDate, { locale: fr, weekStartsOn: 1 });
                 const dayNames = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'];
 
+                // Fond d'en-tête
                 pdf.setFillColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
-                pdf.rect(10 + timeColWidth, startY, pageWidth - 20 - timeColWidth, headerHeight, 'F');
+                pdf.rect(10, startY, pageWidth - 20, headerHeight, 'F');
 
-                pdf.setFontSize(8);
+                pdf.setFontSize(9);
                 pdf.setTextColor(255, 255, 255);
                 pdf.setFont('helvetica', 'bold');
 
+                // Dessiner les en-têtes des jours
                 for (let i = 0; i < 7; i++) {
                     const dayDate = new Date(weekStart);
                     dayDate.setDate(dayDate.getDate() + i);
-                    const x = 10 + timeColWidth + (i * cellWidth) + (cellWidth / 2);
+                    const x = 10 + (i * cellWidth) + (cellWidth / 2);
                     const isToday = dayDate.toDateString() === today.toDateString();
 
                     if (isToday) {
                         pdf.setFillColor(255, 255, 255);
-                        pdf.circle(x, startY + 5, 4, 'F');
+                        pdf.circle(x, startY + 6, 5, 'F');
                         pdf.setTextColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
                     } else {
                         pdf.setTextColor(255, 255, 255);
                     }
-                    pdf.text(`${dayNames[i]} ${dayDate.getDate()}`, x, startY + 6, { align: 'center' });
+                    pdf.text(`${dayNames[i]} ${dayDate.getDate()}`, x, startY + 7.5, { align: 'center' });
                 }
 
-                // Grille horaire
-                const gridStartY = startY + headerHeight;
-                for (let hour = startHour; hour <= endHour; hour++) {
-                    const y = gridStartY + (hour - startHour) * hourHeight;
-
-                    // Ligne de l'heure
-                    pdf.setDrawColor(230, 230, 230);
-                    pdf.setLineWidth(0.1);
-                    pdf.line(10, y, pageWidth - 10, y);
-
-                    // Label de l'heure
-                    pdf.setFontSize(7);
-                    pdf.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
-                    pdf.setFont('helvetica', 'normal');
-                    pdf.text(`${hour.toString().padStart(2, '0')}:00`, 12, y + 3);
+                // Bordures verticales entre les jours
+                pdf.setDrawColor(220, 220, 220);
+                pdf.setLineWidth(0.2);
+                for (let i = 1; i < 7; i++) {
+                    const x = 10 + (i * cellWidth);
+                    pdf.line(x, startY + headerHeight, x, pageHeight - 10);
                 }
 
-                // Bordures des colonnes
-                for (let i = 0; i <= 7; i++) {
-                    const x = 10 + timeColWidth + (i * cellWidth);
-                    pdf.setDrawColor(220, 220, 220);
-                    pdf.line(x, gridStartY, x, gridStartY + (endHour - startHour) * hourHeight);
-                }
+                const daysWithOverflow: Array<{ date: Date; distributions: any[] }> = [];
 
-                // Dessiner les distributions de la semaine
+                // Dessiner les blocs de distribution pour chaque jour
                 for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
                     const dayDate = new Date(weekStart);
                     dayDate.setDate(dayDate.getDate() + dayIndex);
                     const dateKey = format(dayDate, 'yyyy-MM-dd');
 
-                    // Préparer les distributions pour ce jour
+                    // Récupérer toutes les distributions pour ce jour
                     const dayDistributions: Array<{
                         task: Tache;
                         distribution?: DistributionCharge;
-                        startHour: number;
-                        endHour: number;
+                        startTime: string;
+                        endTime: string;
                         color: any;
                     }> = [];
 
                     tasksToRender.forEach(task => {
-                        // Chercher une distribution pour ce jour
-                        const distribution = task.distributions_charge?.find(d => d.date === dateKey);
+                        // Chercher toutes les distributions pour ce jour
+                        const matchingDistributions = task.distributions_charge?.filter(d => d.date === dateKey);
 
-                        if (distribution) {
-                            // Tâche avec distribution
-                            const heureDebut = distribution.heure_debut || '08:00';
-                            const heureFin = distribution.heure_fin || '17:00';
+                        if (matchingDistributions && matchingDistributions.length > 0) {
+                            matchingDistributions.forEach(distribution => {
+                                const heureDebut = distribution.heure_debut || '08:00';
+                                const heureFin = distribution.heure_fin || '17:00';
 
-                            const [startH = 0, startM = 0] = heureDebut.split(':').map(Number);
-                            const [endH = 0, endM = 0] = heureFin.split(':').map(Number);
+                                // Couleur selon le statut de distribution
+                                const color = distribution.status === 'REALISEE'
+                                    ? { bg: colors.greenLight, text: colors.greenDark, border: colors.green }
+                                    : { bg: colors.blueLight, text: colors.blueDark, border: colors.blue };
 
-                            const startHourCalc = startH + startM / 60;
-                            const endHourCalc = endH + endM / 60;
-
-                            // Couleur selon le statut de distribution
-                            const color = distribution.status === 'REALISEE'
-                                ? { bg: colors.greenLight, text: colors.greenDark, border: colors.green }
-                                : { bg: colors.blueLight, text: colors.blueDark, border: colors.blue };
-
-                            dayDistributions.push({
-                                task,
-                                distribution,
-                                startHour: startHourCalc,
-                                endHour: endHourCalc,
-                                color
+                                dayDistributions.push({
+                                    task,
+                                    distribution,
+                                    startTime: heureDebut.substring(0, 5),
+                                    endTime: heureFin.substring(0, 5),
+                                    color
+                                });
                             });
                         } else {
-                            // Tâche sans distribution (fallback)
+                            // Tâche sans distribution - vérifier si elle correspond à ce jour
                             const taskDate = new Date(task.date_debut_planifiee);
                             if (taskDate.toDateString() === dayDate.toDateString()) {
                                 const taskStart = new Date(task.date_debut_planifiee);
                                 const taskEnd = new Date(task.date_fin_planifiee);
-                                const startHourCalc = taskStart.getHours() + taskStart.getMinutes() / 60;
-                                const endHourCalc = taskEnd.getHours() + taskEnd.getMinutes() / 60;
+
+                                let startHour = taskStart.getHours();
+                                let startMin = taskStart.getMinutes();
+                                let endHour = taskEnd.getHours();
+                                let endMin = taskEnd.getMinutes();
+
+                                // Si heures à 0 (minuit), mettre défaut journée
+                                if (startHour === 0 && startMin === 0) {
+                                    startHour = 8;
+                                    startMin = 0;
+                                    endHour = 17;
+                                    endMin = 0;
+                                }
+
+                                const startTime = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`;
+                                const endTime = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
 
                                 dayDistributions.push({
                                     task,
-                                    startHour: startHourCalc,
-                                    endHour: endHourCalc,
+                                    startTime,
+                                    endTime,
                                     color: getTaskColor(task)
                                 });
                             }
                         }
                     });
 
-                    // Dessiner les distributions
-                    dayDistributions.forEach(({ task, distribution, startHour: startHourTask, endHour: endHourTask, color }) => {
-                        if (startHourTask >= startHour && startHourTask < endHour) {
-                            const x = 10 + timeColWidth + (dayIndex * cellWidth) + 1;
-                            const y = gridStartY + (startHourTask - startHour) * hourHeight;
-                            const height = Math.min((endHourTask - startHourTask) * hourHeight, (endHour - startHourTask) * hourHeight);
-                            const width = cellWidth - 2;
+                    // Trier par heure de début
+                    dayDistributions.sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-                            // Fond de la carte
-                            pdf.setFillColor(color.bg.r, color.bg.g, color.bg.b);
-                            pdf.roundedRect(x, y, width, Math.max(height, 6), 1, 1, 'F');
+                    // Si trop de distributions, stocker pour page de détail
+                    if (dayDistributions.length > maxBlocksPerDay) {
+                        daysWithOverflow.push({
+                            date: dayDate,
+                            distributions: dayDistributions
+                        });
+                    }
+
+                    // Dessiner les blocs (limité à maxBlocksPerDay)
+                    const blocksToDisplay = dayDistributions.slice(0, maxBlocksPerDay);
+                    const x = 10 + (dayIndex * cellWidth) + 1;
+                    let blockY = startY + headerHeight + 2;
+
+                    blocksToDisplay.forEach(({ task, distribution, startTime, endTime, color }) => {
+                        const blockWidth = cellWidth - 2;
+
+                        // 📦 Fond du bloc avec coins arrondis
+                        pdf.setFillColor(color.bg.r, color.bg.g, color.bg.b);
+                        pdf.roundedRect(x, blockY, blockWidth, blockHeight, 1.5, 1.5, 'F');
+
+                        // 🎨 Bordure gauche colorée (indicateur de statut)
+                        pdf.setFillColor(color.border.r, color.border.g, color.border.b);
+                        pdf.rect(x, blockY + 1, 2, blockHeight - 2, 'F');
+
+                        // ⏰ LIGNE 1 : Horaire (en gras et plus grand)
+                        pdf.setFontSize(9);
+                        pdf.setFont('helvetica', 'bold');
+                        pdf.setTextColor(color.text.r, color.text.g, color.text.b);
+                        pdf.text(`${startTime} - ${endTime}`, x + 4, blockY + 5.5);
+
+                        // 📋 LIGNE 2 : Référence (si présente)
+                        let currentY = blockY + 10.5;
+                        if (task.reference) {
+                            pdf.setFontSize(7.5);
+                            pdf.setFont('helvetica', 'bold');
+                            pdf.setTextColor(colors.grayDark.r, colors.grayDark.g, colors.grayDark.b);
+                            let refText = `[${task.reference}]`;
+                            const maxRefWidth = blockWidth - 8;
+                            if (pdf.getTextWidth(refText) > maxRefWidth) {
+                                while (pdf.getTextWidth(refText + '…') > maxRefWidth && refText.length > 0) {
+                                    refText = refText.slice(0, -1);
+                                }
+                                refText += '…';
+                            }
+                            pdf.text(refText, x + 4, currentY);
+                            currentY += 4;
+                        }
+
+                        // 📋 LIGNE 3 : Nom de la tâche
+                        pdf.setFontSize(7.5);
+                        pdf.setFont('helvetica', 'normal');
+                        pdf.setTextColor(colors.grayDark.r, colors.grayDark.g, colors.grayDark.b);
+
+                        let taskName = task.type_tache_detail.nom_tache;
+                        const maxTextWidth = blockWidth - 8;
+                        if (pdf.getTextWidth(taskName) > maxTextWidth) {
+                            while (pdf.getTextWidth(taskName + '…') > maxTextWidth && taskName.length > 0) {
+                                taskName = taskName.slice(0, -1);
+                            }
+                            taskName += '…';
+                        }
+                        pdf.text(taskName, x + 4, currentY);
+
+                        // 👥 LIGNE 4 : Équipe
+                        pdf.setFontSize(5.5);
+                        pdf.setFont('helvetica', 'normal');
+                        pdf.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
+
+                        let equipeName = '';
+                        if (task.equipes_detail && task.equipes_detail.length > 0) {
+                            equipeName = task.equipes_detail.map((e: any) => e.nom_equipe || e.nomEquipe).join(', ');
+                        } else if (task.equipe_detail) {
+                            equipeName = (task.equipe_detail as any).nom_equipe || task.equipe_detail.nomEquipe || '';
+                        }
+
+                        if (equipeName) {
+                            const maxEquipeWidth = blockWidth - 12;
+                            if (pdf.getTextWidth(equipeName) > maxEquipeWidth) {
+                                while (pdf.getTextWidth(equipeName + '…') > maxEquipeWidth && equipeName.length > 0) {
+                                    equipeName = equipeName.slice(0, -1);
+                                }
+                                equipeName += '…';
+                            }
+                            pdf.text(`${equipeName}`, x + 4, blockY + 18);
+                        }
+
+                        // ✅ Badge "réalisée" en haut à droite
+                        if (distribution?.status === 'REALISEE') {
+                            pdf.setFillColor(colors.green.r, colors.green.g, colors.green.b);
+                            pdf.circle(x + blockWidth - 3.5, blockY + 3.5, 2, 'F');
+                            pdf.setTextColor(255, 255, 255);
+                            pdf.setFontSize(6);
+                            pdf.setFont('helvetica', 'bold');
+                            pdf.text('✓', x + blockWidth - 4.2, blockY + 4.8);
+                        }
+
+                        blockY += blockHeight + blockSpacing;
+                    });
+
+                    // 📌 Indicateur "+X autres" si dépassement
+                    if (dayDistributions.length > maxBlocksPerDay) {
+                        pdf.setFontSize(7);
+                        pdf.setFont('helvetica', 'bold');
+                        pdf.setTextColor(colors.red.r, colors.red.g, colors.red.b);
+                        const remaining = dayDistributions.length - maxBlocksPerDay;
+                        pdf.text(`+${remaining} autre${remaining > 1 ? 's' : ''}`, x + 3, blockY + 3);
+                    }
+                }
+
+                // 📄 Pages de détail pour les jours avec trop de distributions
+                if (daysWithOverflow.length > 0) {
+                    pdf.addPage();
+
+                    pdf.setFontSize(14);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.setTextColor(colors.grayDark.r, colors.grayDark.g, colors.grayDark.b);
+                    pdf.text('Détail des journées à forte charge', pageWidth / 2, 20, { align: 'center' });
+
+                    pdf.setFontSize(8);
+                    pdf.setFont('helvetica', 'normal');
+                    pdf.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
+                    pdf.text('Distributions complètes pour les jours dépassant la capacité d\'affichage', pageWidth / 2, 26, { align: 'center' });
+
+                    let detailY = 35;
+                    const rowHeight = 11;
+                    const maxYDetail = pageHeight - 20;
+
+                    daysWithOverflow.forEach((dayData) => {
+                        const estimatedHeight = 12 + (dayData.distributions.length * rowHeight);
+                        if (detailY + estimatedHeight > maxYDetail) {
+                            pdf.addPage();
+                            detailY = 20;
+                        }
+
+                        // En-tête du jour
+                        pdf.setFillColor(colors.emerald.r, colors.emerald.g, colors.emerald.b);
+                        pdf.rect(10, detailY, pageWidth - 20, 8, 'F');
+
+                        pdf.setFontSize(10);
+                        pdf.setFont('helvetica', 'bold');
+                        pdf.setTextColor(255, 255, 255);
+                        const dayLabel = format(dayData.date, 'EEEE d MMMM yyyy', { locale: fr });
+                        pdf.text(dayLabel, 15, detailY + 5.5);
+                        pdf.text(`${dayData.distributions.length} distribution${dayData.distributions.length > 1 ? 's' : ''}`, pageWidth - 15, detailY + 5.5, { align: 'right' });
+
+                        detailY += 10;
+
+                        // Liste des distributions
+                        dayData.distributions.forEach((dist, index) => {
+                            const { task, distribution, startTime, endTime, color } = dist;
+
+                            if (detailY + rowHeight > maxYDetail) {
+                                pdf.addPage();
+                                detailY = 20;
+                            }
+
+                            // Fond alterné
+                            if (index % 2 === 0) {
+                                pdf.setFillColor(250, 250, 252);
+                                pdf.rect(10, detailY, pageWidth - 20, rowHeight, 'F');
+                            }
 
                             // Bordure gauche colorée
                             pdf.setFillColor(color.border.r, color.border.g, color.border.b);
-                            pdf.rect(x, y + 0.5, 1, Math.max(height, 6) - 1, 'F');
+                            pdf.rect(10, detailY, 2, rowHeight, 'F');
 
-                            // Texte de la tâche
-                            pdf.setFontSize(6);
+                            // Horaire
+                            pdf.setFontSize(7.5);
+                            pdf.setFont('helvetica', 'bold');
+                            pdf.setTextColor(colors.grayDark.r, colors.grayDark.g, colors.grayDark.b);
+                            pdf.text(`${startTime}-${endTime}`, 15, detailY + 4.5);
+
+                            // Nom de la tâche
+                            pdf.setFont('helvetica', 'bold');
+                            let taskName = (task.reference ? `[${task.reference}] ` : '') + task.type_tache_detail.nom_tache;
+                            const maxTaskWidth = 120;
+                            if (pdf.getTextWidth(taskName) > maxTaskWidth) {
+                                while (pdf.getTextWidth(taskName + '…') > maxTaskWidth && taskName.length > 0) {
+                                    taskName = taskName.slice(0, -1);
+                                }
+                                taskName += '…';
+                            }
+                            pdf.text(taskName, 40, detailY + 4.5);
+
+                            // Statut
+                            const statusText = distribution?.status === 'REALISEE' ? 'Réalisée' : 'Non réalisée';
+                            pdf.setFillColor(color.bg.r, color.bg.g, color.bg.b);
+                            pdf.roundedRect(pageWidth - 38, detailY + 1.5, 28, 4.5, 0.8, 0.8, 'F');
+
+                            pdf.setFontSize(6.5);
                             pdf.setFont('helvetica', 'bold');
                             pdf.setTextColor(color.text.r, color.text.g, color.text.b);
+                            pdf.text(statusText, pageWidth - 24, detailY + 4.5, { align: 'center' });
 
-                            const taskText = (task.reference ? `[${task.reference}] ` : '') + task.type_tache_detail.nom_tache;
-                            const maxTextWidth = width - 3;
-                            let displayText = taskText;
-                            if (pdf.getTextWidth(taskText) > maxTextWidth) {
-                                let truncated = taskText;
-                                while (pdf.getTextWidth(truncated + '…') > maxTextWidth && truncated.length > 0) {
-                                    truncated = truncated.slice(0, -1);
-                                }
-                                displayText = truncated + '…';
+                            // Équipe
+                            pdf.setFontSize(6.5);
+                            pdf.setFont('helvetica', 'normal');
+                            pdf.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
+
+                            let equipeName = '';
+                            if (task.equipes_detail && task.equipes_detail.length > 0) {
+                                equipeName = task.equipes_detail.map((e: any) => e.nom_equipe || e.nomEquipe).join(', ');
+                            } else if (task.equipe_detail) {
+                                equipeName = (task.equipe_detail as any).nom_equipe || task.equipe_detail.nomEquipe || '';
                             }
-                            pdf.text(displayText, x + 2, y + 4);
 
-                            // Ajouter un indicateur visuel pour les distributions réalisées
-                            if (distribution?.status === 'REALISEE' && height > 8) {
+                            if (equipeName) {
+                                const maxEquipeWidth = 100;
+                                if (pdf.getTextWidth(equipeName) > maxEquipeWidth) {
+                                    while (pdf.getTextWidth(equipeName + '…') > maxEquipeWidth && equipeName.length > 0) {
+                                        equipeName = equipeName.slice(0, -1);
+                                    }
+                                    equipeName += '…';
+                                }
+                                pdf.text(`👥 ${equipeName}`, 15, detailY + 9);
+                            }
+
+                            // Badge réalisée
+                            if (distribution?.status === 'REALISEE') {
                                 pdf.setFillColor(colors.green.r, colors.green.g, colors.green.b);
-                                pdf.circle(x + width - 3, y + 3, 1.5, 'F');
+                                pdf.circle(pageWidth - 5, detailY + 7, 1.5, 'F');
                                 pdf.setTextColor(255, 255, 255);
                                 pdf.setFontSize(5);
-                                pdf.text('✓', x + width - 3.5, y + 4);
+                                pdf.text('✓', pageWidth - 5.5, detailY + 8);
                             }
-                        }
+
+                            detailY += rowHeight + 1;
+                        });
+
+                        detailY += 5;
                     });
                 }
             } else {
@@ -1939,6 +2163,32 @@ const Planning: FC = () => {
             console.error('Erreur suppression tâche:', err);
             await loadTaches();
             throw err; // Re-throw pour que le modal affiche l'erreur
+        }
+    };
+
+    const handleDeleteDistribution = (id: number) => {
+        setDistributionToDelete(id);
+        setPopoverInfo(null); // Fermer le popover
+    };
+
+    const confirmDeleteDistribution = async () => {
+        if (!distributionToDelete) return;
+
+        try {
+            await planningService.deleteDistribution(distributionToDelete);
+
+            // Mise à jour optimiste ou rechargement
+            await loadTaches(); // Recharger pour avoir l'état à jour (plus simple et sûr)
+
+            setDistributionToDelete(null);
+            setToast({
+                visible: true,
+                message: "Distribution supprimée avec succès"
+            });
+            setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
+        } catch (err) {
+            console.error('Erreur suppression distribution:', err);
+            alert("Erreur lors de la suppression de la distribution");
         }
     };
     const handleResetCharge = async (tacheId: number) => { try { await planningService.resetCharge(tacheId); await loadTaches(); } catch (err) { alert('Erreur charge'); } };
@@ -2446,14 +2696,14 @@ const Planning: FC = () => {
                             max={new Date(2024, 0, 1, 19, 0, 0)}
                             step={30}
                             timeslots={2}
-                            selectable={!isReadOnly}
+                            selectable={!isReadOnly && !(currentUser as any)?.roles?.includes('CLIENT')}
                             onSelectSlot={handleSelectSlot}
                             onSelectEvent={onSelectEvent}
                             views={['month', 'week', 'day', 'agenda']}
-                            onEventDrop={isReadOnly ? undefined : handleEventDrop}
-                            onEventResize={isReadOnly ? undefined : handleEventResize}
-                            resizable={!isReadOnly}
-                            draggableAccessor={() => !isReadOnly}
+                            onEventDrop={(isReadOnly || (currentUser as any)?.roles?.includes('CLIENT')) ? undefined : handleEventDrop}
+                            onEventResize={(isReadOnly || (currentUser as any)?.roles?.includes('CLIENT')) ? undefined : handleEventResize}
+                            resizable={!isReadOnly && !(currentUser as any)?.roles?.includes('CLIENT')}
+                            draggableAccessor={() => !isReadOnly && !(currentUser as any)?.roles?.includes('CLIENT')}
                             date={currentDate}
                             view={currentView as any}
                             onNavigate={setCurrentDate}
@@ -2653,13 +2903,20 @@ const Planning: FC = () => {
                     distributionId={popoverInfo.distributionId}
                     onClose={() => setPopoverInfo(null)}
                     onEdit={() => { setTacheToEdit(popoverInfo.tache); setShowCreateForm(true); }}
-                    onDelete={() => handleDeleteTache(popoverInfo.tache.id)}
+                    onDelete={() => {
+                        if (popoverInfo.distributionId) {
+                            handleDeleteDistribution(popoverInfo.distributionId);
+                        } else {
+                            handleDeleteTache(popoverInfo.tache.id);
+                        }
+                    }}
                     onToggleDistribution={
                         popoverInfo.distributionId && popoverInfo.distributionStatus
                             ? () => handleToggleDistribution(popoverInfo.distributionId!, popoverInfo.distributionStatus!)
                             : undefined
                     }
-                    isReadOnly={isReadOnly}
+                    onUpdate={loadTaches}
+                    isReadOnly={isReadOnly || (currentUser as any)?.roles?.includes('CLIENT')}
                 />
             )}
 
@@ -2706,6 +2963,16 @@ const Planning: FC = () => {
                     message="Cette action est irréversible."
                     onConfirm={confirmDelete}
                     onCancel={() => setTacheToDelete(null)}
+                />
+            )}
+
+            {/* Delete Distribution Confirmation Modal */}
+            {distributionToDelete && (
+                <ConfirmDeleteModal
+                    title="Supprimer la distribution ?"
+                    message="Voulez-vous vraiment supprimer cette journée d'intervention ? La tâche globale ne sera pas supprimée."
+                    onConfirm={confirmDeleteDistribution}
+                    onCancel={() => setDistributionToDelete(null)}
                 />
             )}
 

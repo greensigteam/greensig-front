@@ -333,6 +333,8 @@ export default function ClientUserDetailPage() {
                         contactPrincipal: structure.contactPrincipal,
                         emailFacturation: structure.emailFacturation,
                         logo: structure.logo,
+                        logoUrl: structure.logoUrl,
+                        logoDisplay: structure.logoDisplay,
                         actif: structure.actif,
                         dateCreation: structure.dateCreation,
                         utilisateursCount: structure.utilisateursCount,

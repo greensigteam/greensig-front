@@ -331,11 +331,18 @@ const Teams: React.FC = () => {
         chefsPotentiels.length === 0 ? fetchChefsPotentiels() : Promise.resolve(chefsPotentiels)
       ]);
       console.log('[Teams] ✅ Équipes loaded:', equipesRes.results.length, 'équipes');
-      console.log('[Teams] 📊 Équipes data:', equipesRes.results);
+      console.log('[Teams] 📊 Total équipes (count):', equipesRes.count);
+      console.log('[Teams] 📊 Équipes data complète:', equipesRes);
+
       // Debug: Log superviseur data for each team
-      equipesRes.results.forEach((eq: EquipeList) => {
-        console.log(`[Teams] 📋 ${eq.nomEquipe}: superviseurNom="${eq.superviseurNom}", siteNom="${eq.siteNom}"`);
-      });
+      if (equipesRes.results.length > 0) {
+        equipesRes.results.forEach((eq: EquipeList) => {
+          console.log(`[Teams] 📋 ${eq.nomEquipe}: superviseurNom="${eq.superviseurNom}", sitePrincipal="${eq.sitePrincipalNom}"`);
+        });
+      } else {
+        console.warn('[Teams] ⚠️ AUCUNE ÉQUIPE REÇUE DU BACKEND !');
+      }
+
       setEquipes(equipesRes.results);
       setEquipesTotal(equipesRes.count || 0);
       if (chefsPotentiels.length === 0) {
@@ -564,12 +571,25 @@ const Teams: React.FC = () => {
   const equipesColumns: Column<EquipeList>[] = [
     { key: 'nomEquipe', label: 'Nom' },
     { key: 'chefEquipeNom', label: "Chef d'équipe", render: (e) => e.chefEquipeNom || '-' },
-    { key: 'superviseurNom', label: 'Superviseur', render: (e) => e.superviseurNom || '-' },
-    { key: 'siteNom', label: "Site d'affectation", render: (e) => e.siteNom || '-' },
+    { key: 'sitePrincipalNom', label: "Site principal", render: (e) => e.sitePrincipalNom || '-' },
     {
       key: 'nombreMembres',
       label: 'Membres',
       render: (e) => `${e.nombreMembres} membre${e.nombreMembres > 1 ? 's' : ''}`
+    },
+    {
+      key: 'actif',
+      label: 'Actif',
+      render: (e) => (
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+          e.actif
+            ? 'bg-green-100 text-green-800'
+            : 'bg-gray-100 text-gray-800'
+        }`}>
+          {e.actif ? 'Actif' : 'Inactif'}
+        </span>
+      ),
+      sortable: false
     },
     {
       key: 'statutOperationnel',

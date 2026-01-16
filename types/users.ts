@@ -148,8 +148,8 @@ export interface StructureClient {
   logoDisplay: string | null; // URL finale à afficher (fichier ou URL)
   actif: boolean;
   dateCreation: string;
-  utilisateursCount: number;
-  sitesCount: number;
+  utilisateursCount: number;  // Transformé en camelCase par le frontend
+  sitesCount: number;         // Transformé en camelCase par le frontend
 }
 
 export interface StructureClientDetail extends StructureClient {

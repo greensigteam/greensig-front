@@ -665,12 +665,17 @@ const Reclamations: React.FC = () => {
     }, [reclamations, searchQuery]);
 
     const filteredTaches = useMemo(() => {
-        if (!searchQuery) return tachesLiees;
+        // ✅ FILTRAGE STRICT: On ne veut ici QUE les tâches qui possèdent un numéro de réclamation
+        // Cela corrige le cas où l'API renvoie des tâches sans réclamation malgré le filtre has_reclamation=true
+        const tachesAvecReclamation = tachesLiees.filter(t => t.reclamation_numero);
+
+        if (!searchQuery) return tachesAvecReclamation;
         const query = searchQuery.toLowerCase();
-        return tachesLiees.filter(t =>
+        return tachesAvecReclamation.filter(t =>
             t.type_tache_detail.nom_tache.toLowerCase().includes(query) ||
             ((t.client_detail as any)?.nom_structure || '').toLowerCase().includes(query) ||
-            t.description_travaux?.toLowerCase().includes(query)
+            t.description_travaux?.toLowerCase().includes(query) ||
+            (t.reclamation_numero && t.reclamation_numero.toLowerCase().includes(query))
         );
     }, [tachesLiees, searchQuery]);
 
@@ -998,65 +1003,72 @@ const Reclamations: React.FC = () => {
                                                             </button>
                                                         )}
 
-                                                        <div className="relative">
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setRowMenuOpen(rowMenuOpen === rec.id ? null : rec.id);
-                                                                }}
-                                                                className={`p-2 rounded-lg transition-all duration-200 ${rowMenuOpen === rec.id
-                                                                    ? 'bg-slate-100 text-slate-800'
-                                                                    : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
-                                                            >
-                                                                <MoreVertical className="w-5 h-5" />
-                                                            </button>
+                                                        {/* Menu Actions - Visible si ADMIN/SUPERVISEUR ou si CLIENT créateur de la réclamation */}
+                                                        {(!isClient || rec.createur === currentUser?.id) && (
+                                                            <div className="relative">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setRowMenuOpen(rowMenuOpen === rec.id ? null : rec.id);
+                                                                    }}
+                                                                    className={`p-2 rounded-lg transition-all duration-200 ${rowMenuOpen === rec.id
+                                                                        ? 'bg-slate-100 text-slate-800'
+                                                                        : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                                                                >
+                                                                    <MoreVertical className="w-5 h-5" />
+                                                                </button>
 
-                                                            {rowMenuOpen === rec.id && (
-                                                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-[60] animate-in fade-in slide-in-from-top-2 duration-150 ring-1 ring-black/5">
-                                                                    {!isClient && rec.statut !== 'CLOTUREE' && (
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                handleOpenTaskModal(rec);
-                                                                                setRowMenuOpen(null);
-                                                                            }}
-                                                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                                                                        >
-                                                                            <ClipboardList className="w-4 h-4 text-purple-500" />
-                                                                            Créer une tâche
-                                                                        </button>
-                                                                    )}
-
-                                                                    {!isClient && (isAdmin || (rec.createur === currentUser?.id)) && (
-                                                                        <>
-                                                                            <div className="my-1 border-t border-slate-100" />
+                                                                {rowMenuOpen === rec.id && (
+                                                                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-[60] animate-in fade-in slide-in-from-top-2 duration-150 ring-1 ring-black/5">
+                                                                        {/* Créer une tâche - Seulement ADMIN/SUPERVISEUR */}
+                                                                        {!isClient && rec.statut !== 'CLOTUREE' && (
                                                                             <button
                                                                                 onClick={(e) => {
                                                                                     e.stopPropagation();
-                                                                                    handleEdit(rec.id);
+                                                                                    handleOpenTaskModal(rec);
                                                                                     setRowMenuOpen(null);
                                                                                 }}
                                                                                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                                                                             >
-                                                                                <Edit2 className="w-4 h-4 text-emerald-500" />
-                                                                                Modifier
+                                                                                <ClipboardList className="w-4 h-4 text-purple-500" />
+                                                                                Créer une tâche
                                                                             </button>
-                                                                            <button
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    handleDelete(rec.id);
-                                                                                    setRowMenuOpen(null);
-                                                                                }}
-                                                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors font-medium"
-                                                                            >
-                                                                                <Trash2 className="w-4 h-4" />
-                                                                                Supprimer
-                                                                            </button>
-                                                                        </>
-                                                                    )}
+                                                                        )}
+
+                                                                        {/* Modifier/Supprimer - ADMIN ou créateur (CLIENT inclus) */}
+                                                                        {(isAdmin || rec.createur === currentUser?.id) && (
+                                                                            <>
+                                                                                {!isClient && rec.statut !== 'CLOTUREE' && (
+                                                                                    <div className="my-1 border-t border-slate-100" />
+                                                                                )}
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        handleEdit(rec.id);
+                                                                                        setRowMenuOpen(null);
+                                                                                    }}
+                                                                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                                                                                >
+                                                                                    <Edit2 className="w-4 h-4 text-emerald-500" />
+                                                                                    Modifier
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        handleDelete(rec.id);
+                                                                                        setRowMenuOpen(null);
+                                                                                    }}
+                                                                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors font-medium"
+                                                                                >
+                                                                                    <Trash2 className="w-4 h-4" />
+                                                                                    Supprimer
+                                                                                </button>
+                                                                            </>
+                                                                        )}
                                                                 </div>
                                                             )}
                                                         </div>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>

@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Calendar, X, CheckSquare, Clock, Settings2, AlertTriangle, RefreshCw } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Calendar, X, CheckSquare, Clock, Settings2, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
 import { DayPicker, Matcher } from 'react-day-picker';
 import { fr } from 'date-fns/locale/fr';
 import { format } from 'date-fns';
@@ -14,13 +14,20 @@ interface DaySelection {
   heure_fin: string;
 }
 
+interface ExistingDistribution {
+  date: string;
+  heure_debut: string;
+  heure_fin: string;
+}
+
 interface SelectDaysModalProps {
   dateDebut: Date;
   dateFin: Date;
-  onConfirm: (selectedDays: DaySelection[]) => void;
+  onConfirm: (selectedDays: DaySelection[]) => void | Promise<void>;
   onCancel: () => void;
   initialSelection?: string[]; // Liste des dates déjà sélectionnées (YYYY-MM-DD)
   protectedDates?: string[]; // ✅ NOUVEAU: Dates qui ne peuvent pas être désélectionnées (réalisées)
+  existingDistributions?: ExistingDistribution[]; // ✅ NOUVEAU: Distributions existantes avec leurs heures
 }
 
 const JOUR_NAMES = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
@@ -31,10 +38,12 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
   onConfirm,
   onCancel,
   initialSelection = [],
-  protectedDates = [] // ✅ NOUVEAU: Dates protégées
+  protectedDates = [], // ✅ NOUVEAU: Dates protégées
+  existingDistributions = [] // ✅ NOUVEAU: Distributions existantes avec heures
 }) => {
   const [defaultHeureDebut, setDefaultHeureDebut] = useState('08:00');
   const [defaultHeureFin, setDefaultHeureFin] = useState('17:00');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const calculerHeures = (debut: string, fin: string): number => {
     if (!debut || !fin) return 0;
@@ -51,39 +60,47 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
     const currentDate = new Date(dateDebut);
     const endDate = new Date(dateFin);
 
+    // Créer un map des distributions existantes pour un accès rapide
+    const existingDistMap = new Map(
+      existingDistributions.map(d => [d.date, d])
+    );
+
     while (currentDate <= endDate) {
       const dateString = format(currentDate, 'yyyy-MM-dd');
       const dayOfWeek = currentDate.getDay();
+      const existing = existingDistMap.get(dateString);
 
       days.push({
         date: dateString,
         dayName: JOUR_NAMES[dayOfWeek] ?? '',
         dayOfWeek,
         selected: initialSelection.includes(dateString),
-        heure_debut: defaultHeureDebut ?? '',
-        heure_fin: defaultHeureFin ?? ''
+        // Utiliser les heures de la distribution existante si disponible, sinon '08:00' et '17:00' par défaut
+        // Les horaires par défaut configurables sont appliqués uniquement lors de la sélection (handleSelect)
+        heure_debut: existing?.heure_debut ?? '08:00',
+        heure_fin: existing?.heure_fin ?? '17:00'
       });
 
       currentDate.setDate(currentDate.getDate() + 1);
     }
     return days;
-  }, [dateDebut, dateFin, initialSelection, defaultHeureDebut, defaultHeureFin]);
+  }, [dateDebut, dateFin, initialSelection, existingDistributions]);
 
   const [selectedDays, setSelectedDays] = useState<DaySelection[]>(allDays);
 
-  // ✅ Synchroniser selectedDays avec allDays quand il change (ex: initialSelection change)
-  useEffect(() => {
-    setSelectedDays(allDays);
-  }, [allDays]);
-
-  // ✅ Fonction pour appliquer les horaires par défaut à tous les jours sélectionnés
+  // ✅ Fonction pour appliquer les horaires par défaut à tous les jours sélectionnés (sauf les protégées)
   const appliquerHorairesParDefaut = () => {
     setSelectedDays(prev =>
-      prev.map(day =>
-        day.selected
+      prev.map(day => {
+        // Ne pas modifier les dates protégées (distributions existantes)
+        if (protectedDates.includes(day.date)) {
+          return day;
+        }
+        // Appliquer les horaires par défaut uniquement aux nouvelles dates sélectionnées
+        return day.selected
           ? { ...day, heure_debut: defaultHeureDebut, heure_fin: defaultHeureFin }
-          : day
-      )
+          : day;
+      })
     );
   };
 
@@ -200,9 +217,18 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
     );
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     const selected = selectedDays.filter(d => d.selected);
-    onConfirm(selected);
+    setIsSubmitting(true);
+    try {
+      await onConfirm(selected);
+      // Le parent gère la fermeture du modal en cas de succès
+    } catch (error) {
+      // En cas d'erreur, on reste sur le modal et on réinitialise l'état
+      console.error('Erreur lors de la confirmation:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleToggle = (dateString: string) => {
@@ -244,7 +270,9 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
           <button
             type="button"
             onClick={onCancel}
-            className="p-2 hover:bg-slate-100 rounded-full transition-all duration-200 text-slate-400 hover:text-slate-600"
+            disabled={isSubmitting}
+            className="p-2 hover:bg-slate-100 rounded-full transition-all duration-200 text-slate-400 hover:text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={isSubmitting ? "Ajout en cours..." : "Fermer"}
           >
             <X className="w-5 h-5" />
           </button>
@@ -277,14 +305,16 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
                 type="time"
                 value={defaultHeureDebut}
                 onChange={(e) => setDefaultHeureDebut(e.target.value)}
-                className="px-2 py-1 border border-emerald-200 rounded text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                disabled={isSubmitting}
+                className="px-2 py-1 border border-emerald-200 rounded text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <span className="text-slate-400">à</span>
               <input
                 type="time"
                 value={defaultHeureFin}
                 onChange={(e) => setDefaultHeureFin(e.target.value)}
-                className="px-2 py-1 border border-emerald-200 rounded text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                disabled={isSubmitting}
+                className="px-2 py-1 border border-emerald-200 rounded text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <span className="text-emerald-700 font-bold ml-2">
                 ({calculerHeures(defaultHeureDebut, defaultHeureFin).toFixed(2)}h)
@@ -293,7 +323,8 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
                 <button
                   type="button"
                   onClick={appliquerHorairesParDefaut}
-                  className="ml-2 px-3 py-1 text-xs font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all shadow-sm flex items-center gap-1.5"
+                  disabled={isSubmitting}
+                  className="ml-2 px-3 py-1 text-xs font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Appliquer ces horaires à tous les jours sélectionnés"
                 >
                   <RefreshCw className="w-3 h-3" />
@@ -310,7 +341,8 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
             <button
               type="button"
               onClick={handleSelectJoursOuvres}
-              className="px-4 py-2 text-sm font-semibold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-sm shadow-emerald-100 flex items-center gap-2"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-sm font-semibold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-sm shadow-emerald-100 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <CheckSquare className="w-4 h-4" />
               Jours ouvrés
@@ -318,14 +350,16 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
             <button
               type="button"
               onClick={handleSelectAll}
-              className="px-4 py-2 text-sm font-semibold bg-emerald-100 text-emerald-700 rounded-xl hover:bg-emerald-200 transition-all"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-sm font-semibold bg-emerald-100 text-emerald-700 rounded-xl hover:bg-emerald-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Tous les jours
             </button>
             <button
               type="button"
               onClick={handleDeselectAll}
-              className="px-4 py-2 text-sm font-semibold bg-slate-200 text-slate-700 rounded-xl hover:bg-slate-300 transition-all"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-sm font-semibold bg-slate-200 text-slate-700 rounded-xl hover:bg-slate-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Vider
             </button>
@@ -334,7 +368,7 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
 
         {/* Main Content */}
         <div className="flex-1 overflow-hidden flex">
-          <div className="flex-1 p-8 overflow-y-auto flex items-center justify-center">
+          <div className={`flex-1 p-8 overflow-y-auto flex items-center justify-center ${isSubmitting ? 'pointer-events-none opacity-60' : ''}`}>
             <style>{`
               .rdp {
                 --rdp-cell-size: 75px;
@@ -501,7 +535,7 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
           </div>
 
           {/* PANNEAU LATÉRAL - Jours sélectionnés */}
-          <div className="w-96 border-l border-slate-200 bg-slate-50 flex flex-col">
+          <div className={`w-96 border-l border-slate-200 bg-slate-50 flex flex-col ${isSubmitting ? 'pointer-events-none opacity-60' : ''}`}>
             <div className="p-5 border-b border-slate-200 bg-white">
               <h3 className="font-bold text-slate-800 flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
@@ -521,41 +555,58 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
                   <p className="text-xs mt-1">Cliquez sur le calendrier pour ajouter des jours</p>
                 </div>
               ) : (
-                selectedDays.filter(d => d.selected).map((day) => (
-                  <div key={day.date} className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow group">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <div className="text-sm font-bold text-slate-800">
-                          {new Date(day.date + 'T00:00:00').toLocaleDateString('fr-FR', {
-                            weekday: 'long',
-                            day: 'numeric',
-                            month: 'long'
-                          })}
+                selectedDays.filter(d => d.selected).map((day) => {
+                  const isProtected = protectedDates.includes(day.date);
+                  return (
+                    <div
+                      key={day.date}
+                      className={`p-4 rounded-xl border shadow-sm transition-shadow group ${isProtected
+                        ? 'bg-emerald-50/50 border-emerald-200 hover:shadow-none'
+                        : 'bg-white border-slate-200 hover:shadow-md'
+                        }`}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                            {new Date(day.date + 'T00:00:00').toLocaleDateString('fr-FR', {
+                              weekday: 'long',
+                              day: 'numeric',
+                              month: 'long'
+                            })}
+                            {isProtected && (
+                              <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                🔒 Existante
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {!isProtected && (
+                          <button
+                            type="button"
+                            onClick={() => handleToggle(day.date)}
+                            className="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                            title="Désélectionner"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      <div className={`flex items-center gap-3 p-2 rounded-lg ${isProtected ? 'bg-emerald-100/50' : 'bg-slate-50'
+                        }`}>
+                        <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                          <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>{day.heure_debut} - {day.heure_fin}</span>
+                        </div>
+                        <div className="ml-auto flex items-center gap-1">
+                          <span className="text-[10px] text-slate-400 uppercase font-bold">Charge:</span>
+                          <span className="text-xs font-bold text-emerald-600">
+                            {calculerHeures(day.heure_debut, day.heure_fin).toFixed(1)}h
+                          </span>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleToggle(day.date)}
-                        className="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                        title="Désélectionner"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
                     </div>
-                    <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-lg">
-                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-                        <Clock className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>{day.heure_debut} - {day.heure_fin}</span>
-                      </div>
-                      <div className="ml-auto flex items-center gap-1">
-                        <span className="text-[10px] text-slate-400 uppercase font-bold">Charge:</span>
-                        <span className="text-xs font-bold text-emerald-600">
-                          {calculerHeures(day.heure_debut, day.heure_fin).toFixed(1)}h
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -579,18 +630,28 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
             <button
               type="button"
               onClick={onCancel}
-              className="px-6 py-2.5 bg-white text-slate-700 border border-slate-300 rounded-xl hover:bg-slate-50 transition-all font-bold shadow-sm"
+              disabled={isSubmitting}
+              className="px-6 py-2.5 bg-white text-slate-700 border border-slate-300 rounded-xl hover:bg-slate-50 transition-all font-bold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Annuler
             </button>
             <button
               type="button"
               onClick={handleConfirm}
-              disabled={stats.count === 0}
+              disabled={stats.count === 0 || isSubmitting}
               className="px-8 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-bold shadow-lg shadow-emerald-200 flex items-center gap-2"
             >
-              <CheckSquare className="w-5 h-5" />
-              Confirmer ({stats.count})
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Ajout en cours...
+                </>
+              ) : (
+                <>
+                  <CheckSquare className="w-5 h-5" />
+                  Confirmer ({stats.count})
+                </>
+              )}
             </button>
           </div>
         </div>

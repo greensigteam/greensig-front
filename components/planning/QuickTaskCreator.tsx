@@ -13,7 +13,7 @@ import { DataTable, Column } from '../DataTable';
 import { StatusBadge } from '../StatusBadge';
 import { PremiumInput } from '../modals/PremiumFormComponents';
 import { planningService } from '../../services/planningService';
-import { RecurrenceSelector, type RecurrenceConfig } from './RecurrenceSelector';
+
 
 // ✅ PHASE 1: Interface pour les ratios de productivité
 interface RatioProductivite {
@@ -259,13 +259,7 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
     const [ratios, setRatios] = useState<RatioProductivite[]>([]);
     const [loadingRatios, setLoadingRatios] = useState(false);
 
-    // État pour la récurrence
-    const [recurrenceConfig, setRecurrenceConfig] = useState<RecurrenceConfig>({
-        enabled: false,
-        mode: 'frequency',
-        conserver_equipes: true,
-        conserver_objets: true
-    });
+
 
     // Loading states
     const [loadingObjects, setLoadingObjects] = useState(false);
@@ -528,14 +522,13 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
         let taskData: TacheCreate;
 
         if (modeDistribution === 'multi-jours' && distributionsCharge.length > 0) {
-            // Mode multi-jours: utiliser la plage de dates passée au DistributionChargeEditor
-            // Les distributions peuvent être partielles (ex: tâche du 1er au 31, distributions seulement sur 5, 10, 15, 20)
+            // Mode multi-jours: utiliser les dates réelles des distributions sélectionnées
             const sortedDistributions = [...distributionsCharge].sort((a, b) => a.date.localeCompare(b.date));
 
-            // ✅ CORRIGÉ: Utiliser la plage de dates de l'éditeur, pas les distributions
-            // La plage correspond à ce qui est passé au DistributionChargeEditor (initialDate + 30 jours)
-            const dateDebut = format(initialDate, 'yyyy-MM-dd');
-            const dateFin = format(new Date(initialDate.getTime() + 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
+            // ✅ NOUVEAU: Utiliser la première et dernière distribution pour définir la plage de dates planifiée
+            // Cela garantit que la date de fin planifiée correspond à la dernière distribution sélectionnée
+            const dateDebut = sortedDistributions[0]?.date ?? format(initialDate, 'yyyy-MM-dd');
+            const dateFin = sortedDistributions[sortedDistributions.length - 1]?.date ?? format(initialDate, 'yyyy-MM-dd');
 
             taskData = {
                 id_type_tache: selectedType.id,
@@ -581,15 +574,7 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
             };
         }
 
-        // Ajouter la configuration de récurrence si activée
-        const taskDataWithRecurrence: any = {
-            ...taskData,
-            ...(recurrenceConfig.enabled && {
-                recurrence_config: recurrenceConfig
-            })
-        };
-
-        onSubmit(taskDataWithRecurrence);
+        onSubmit(taskData);
         onClose();
     };
 
@@ -1233,15 +1218,7 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                                     </div>
                                 )}
 
-                                {/* Récurrence */}
-                                <div className="mt-6">
-                                    <RecurrenceSelector
-                                        dateDebut={format(initialDate, 'yyyy-MM-dd')}
-                                        dateFin={modeDistribution === 'simple' ? format(initialDate, 'yyyy-MM-dd') : format(new Date(initialDate.getTime() + 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd')}
-                                        value={recurrenceConfig}
-                                        onChange={setRecurrenceConfig}
-                                    />
-                                </div>
+
                             </div>
                         )}
                     </div>

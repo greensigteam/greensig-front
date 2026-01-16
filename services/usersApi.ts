@@ -704,9 +704,12 @@ export async function updateEquipe(
   id: number,
   data: EquipeUpdate
 ): Promise<EquipeList> {
+  const snakeData = camelToSnake(data as unknown as Record<string, unknown>);
+  console.log('[updateEquipe] Données envoyées (camelCase):', data);
+  console.log('[updateEquipe] Données envoyées (snake_case):', snakeData);
   const result = await fetchApi<EquipeList>(`${USERS_API_URL}/equipes/${id}/`, {
     method: 'PATCH',
-    body: JSON.stringify(camelToSnake(data as unknown as Record<string, unknown>))
+    body: JSON.stringify(snakeData)
   });
   return result;
 }

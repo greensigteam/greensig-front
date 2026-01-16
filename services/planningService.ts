@@ -8,6 +8,38 @@ import {
 
 const BASE_URL = '/api/planification';
 
+/**
+ * Parse les erreurs de validation DRF et crée un objet d'erreur structuré
+ * @param error - L'erreur retournée par l'API
+ * @param defaultMessage - Message par défaut si aucune erreur spécifique n'est trouvée
+ * @returns Error avec propriétés validationErrors et fieldErrors
+ */
+function parseValidationError(error: any, defaultMessage: string = 'Erreur de validation'): Error {
+    // Si c'est une erreur de validation DRF (format: { field: [errors] })
+    if (error && typeof error === 'object' && !error.error && !error.detail) {
+        // Collecter tous les messages d'erreur
+        const errorMessages: string[] = [];
+        for (const [field, messages] of Object.entries(error)) {
+            if (Array.isArray(messages)) {
+                errorMessages.push(...messages);
+            } else if (typeof messages === 'string') {
+                errorMessages.push(messages);
+            }
+        }
+
+        // Créer une erreur structurée avec tous les messages
+        if (errorMessages.length > 0) {
+            const validationError: any = new Error(errorMessages[0]);
+            validationError.validationErrors = errorMessages;
+            validationError.fieldErrors = error;
+            return validationError;
+        }
+    }
+
+    // Sinon, erreur standard
+    return new Error(error.error || error.detail || defaultMessage);
+}
+
 export const planningService = {
     // --- TACHES ---
 
@@ -78,7 +110,7 @@ export const planningService = {
         if (!response.ok) {
             const error = await response.json();
             console.error('Task creation error response:', error);
-            throw new Error(error.detail || JSON.stringify(error) || 'Erreur lors de la création de la tâche');
+            throw parseValidationError(error, 'Erreur lors de la création de la tâche');
         }
         return response.json();
     },
@@ -102,7 +134,10 @@ export const planningService = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-        if (!response.ok) throw new Error('Erreur modification tâche');
+        if (!response.ok) {
+            const error = await response.json();
+            throw parseValidationError(error, 'Erreur lors de la modification de la tâche');
+        }
         return response.json();
     },
 
@@ -191,7 +226,7 @@ export const planningService = {
         });
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.nom_tache?.[0] || error.detail || 'Erreur lors de la création du type de tâche');
+            throw parseValidationError(error, 'Erreur lors de la création du type de tâche');
         }
         return response.json();
     },
@@ -233,7 +268,7 @@ export const planningService = {
 
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.detail || 'Erreur lors du changement de statut');
+            throw parseValidationError(error, 'Erreur lors du changement de statut');
         }
         return response.json();
     },
@@ -252,7 +287,7 @@ export const planningService = {
 
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.error || 'Erreur lors de la validation');
+            throw parseValidationError(error, 'Erreur lors de la validation');
         }
         return response.json();
     },
@@ -309,13 +344,7 @@ export const planningService = {
         });
         if (!response.ok) {
             const error = await response.json();
-
-            // Gérer l'erreur de contrainte unique
-            if (error.non_field_errors && error.non_field_errors[0]?.includes('unique')) {
-                throw new Error('Un ratio existe déjà pour cette combinaison (Type de tâche × Type d\'objet). Veuillez modifier le ratio existant au lieu de créer un doublon.');
-            }
-
-            throw new Error(error.detail || error.non_field_errors?.[0] || 'Erreur lors de la création du ratio');
+            throw parseValidationError(error, 'Erreur lors de la création du ratio');
         }
         return response.json();
     },
@@ -366,7 +395,41 @@ export const planningService = {
 
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.error || error.detail || 'Erreur lors de la mise à jour des distributions');
+            throw parseValidationError(error, 'Erreur lors de la mise à jour des distributions');
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Met à jour une distribution spécifique (date et heures de travail).
+     * @param tacheId - ID de la tâche (non utilisé dans l'URL mais conservé pour compatibilité)
+     * @param distributionId - ID de la distribution à modifier
+     * @param data - Données à mettre à jour
+     * @returns Distribution mise à jour
+     */
+    async updateSingleDistribution(
+        tacheId: number,
+        distributionId: number,
+        data: {
+            date: string;
+            heure_debut: string;
+            heure_fin: string;
+            commentaire?: string;
+        }
+    ): Promise<{
+        message: string;
+        distribution: any;
+    }> {
+        const response = await apiFetch(`${BASE_URL}/distributions/${distributionId}/`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw parseValidationError(error, 'Erreur lors de la mise à jour de la distribution');
         }
 
         return response.json();
@@ -388,7 +451,7 @@ export const planningService = {
 
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.error || error.detail || 'Erreur lors du marquage de la distribution');
+            throw parseValidationError(error, 'Erreur lors du marquage de la distribution');
         }
 
         return response.json();
@@ -408,7 +471,51 @@ export const planningService = {
 
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.error || error.detail || 'Erreur lors du marquage de la distribution comme non réalisée');
+            throw parseValidationError(error, 'Erreur lors du marquage de la distribution comme non réalisée');
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Supprime une distribution.
+     *
+     * @param distributionId - ID de la distribution à supprimer
+     * @returns Promise<void>
+     */
+    async deleteDistribution(distributionId: number): Promise<void> {
+        const response = await apiFetch(`${BASE_URL}/distributions/${distributionId}/`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw parseValidationError(error, 'Erreur lors de la suppression de la distribution');
+        }
+    },
+
+    /**
+     * Crée une nouvelle distribution.
+     *
+     * @param data - Données de la distribution à créer
+     * @returns Distribution créée
+     */
+    async createDistribution(data: {
+        tache: number;
+        date: string;
+        heure_debut: string;
+        heure_fin: string;
+        commentaire?: string;
+    }): Promise<any> {
+        const response = await apiFetch(`${BASE_URL}/distributions/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw parseValidationError(error, 'Erreur lors de la création de la distribution');
         }
 
         return response.json();

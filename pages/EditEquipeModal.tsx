@@ -86,6 +86,7 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
   };
 
   const handleChange = (field: string, value: any) => {
+    console.log(`[EditEquipeModal] handleChange: ${field} =`, value);
     setForm(f => ({
       ...f,
       [field]: value
@@ -95,11 +96,14 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
   const handleSubmit = async () => {
     setLoading(true);
     setError(null);
+    console.log('[EditEquipeModal] Soumission du formulaire:', form);
+    console.log('[EditEquipeModal] Sites secondaires:', form.sitesSecondaires);
     try {
       await updateEquipe(equipe.id, form);
       onSaved();
       onClose();
     } catch (err: any) {
+      console.error('[EditEquipeModal] Erreur:', err);
       setError(err.message || 'Erreur lors de la modification');
     } finally {
       setLoading(false);
@@ -210,12 +214,18 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
           </div>
         ) : (
           <PremiumMultiSelect
-            value={(form.sitesSecondaires || []).map(String)}
-            onChange={(values) => handleChange('sitesSecondaires', values.map(Number))}
+            values={(form.sitesSecondaires || []).map(String)}
+            onChange={(values) => {
+              console.log('[EditEquipeModal] Sites secondaires sélectionnés:', values);
+              handleChange('sitesSecondaires', values.map(Number));
+            }}
             options={sites
-              .filter(site => form.sitePrincipal ? parseInt(site.id) !== form.sitePrincipal : true)
+              .filter(site => {
+                const siteIdNum = parseInt(site.id);
+                return form.sitePrincipal ? siteIdNum !== form.sitePrincipal : true;
+              })
               .map(site => ({
-                value: site.id,
+                value: site.id.toString(),
                 label: `${site.name}${site.code_site ? ` (${site.code_site})` : ''}`
               }))}
             label="Sites secondaires"

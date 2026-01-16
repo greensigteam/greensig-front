@@ -19,6 +19,8 @@ import { StructureClient, EquipeList } from '../types/users';
 import { useSearch } from '../contexts/SearchContext';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import TaskFormModal from '../components/planning/TaskFormModal';
+import { DistributionEditForm } from '../components/planning/DistributionEditForm';
+import SelectDaysModal from '../components/modals/SelectDaysModal';
 
 // Helper pour construire l'URL complète des images
 const getFullImageUrl = (url: string | null): string => {
@@ -37,6 +39,7 @@ const SuiviTaches: React.FC = () => {
     const [loadingTasks, setLoadingTasks] = useState(true);
     const [taches, setTaches] = useState<Tache[]>([]);
     const [selectedTache, setSelectedTache] = useState<Tache | null>(null);
+    const [detailKey, setDetailKey] = useState(0); // Clé pour forcer le remontage de la section détails
 
     // State Pagination
     const [currentPage, setCurrentPage] = useState(1);
@@ -64,6 +67,15 @@ const SuiviTaches: React.FC = () => {
 
     // Type de photo sélectionné pour l'upload
     const [selectedPhotoType, setSelectedPhotoType] = useState<'AVANT' | 'APRES'>('AVANT');
+
+    // État pour l'édition des distributions
+    const [editingDistributionId, setEditingDistributionId] = useState<number | null>(null);
+
+    // État pour la suppression des distributions
+    const [deletingDistributionId, setDeletingDistributionId] = useState<number | null>(null);
+
+    // État pour l'ajout de distributions
+    const [showAddDistributionsModal, setShowAddDistributionsModal] = useState(false);
 
     // Rôle utilisateur
     const [isAdmin, setIsAdmin] = useState(false);
@@ -106,7 +118,7 @@ const SuiviTaches: React.FC = () => {
 
     // Set search placeholder and cleanup on unmount
     useEffect(() => {
-        setPlaceholder('Rechercher une tâche...');
+        setPlaceholder('Rechercher par nom, équipe ou référence...');
         return () => {
             setPlaceholder('Rechercher...');
             setSearchQuery('');
@@ -178,7 +190,7 @@ const SuiviTaches: React.FC = () => {
 
     // Toggle du statut d'une distribution de charge
     const handleToggleDistribution = async (distributionId: number, currentStatus: StatusDistribution) => {
-        if (!selectedTache) return;
+        if (!selectedTache || isClientView) return; // ✅ Blocked for clients
 
         const tacheId = selectedTache.id;
         const newStatus: StatusDistribution = currentStatus === 'REALISEE' ? 'NON_REALISEE' : 'REALISEE';
@@ -205,13 +217,12 @@ const SuiviTaches: React.FC = () => {
             } else {
                 await planningService.marquerDistributionNonRealisee(distributionId);
             }
-            // Recharger les tâches pour avoir les données à jour (incluant le statut de la tâche)
-            await loadTaches();
-            // Recharger la tâche sélectionnée pour mettre à jour l'affichage
-            const updatedTache = await planningService.getTache(tacheId);
-            setSelectedTache(updatedTache);
-            // Recharger les détails (au cas où)
+            // Recharger la tâche avec ses distributions AVANT de forcer le remontage
+            await reloadSelectedTask(tacheId);
             await loadTaskDetails(tacheId);
+
+            // Forcer le remontage de la section détails APRÈS le rechargement
+            setDetailKey(prev => prev + 1);
         } catch (err) {
             // Rollback on error
             setSelectedTache({
@@ -224,6 +235,82 @@ const SuiviTaches: React.FC = () => {
                     : t
             ));
             alert("Erreur lors de la mise à jour de la distribution");
+        }
+    };
+
+    // Suppression d'une distribution
+    const handleDeleteDistribution = async (distributionId: number) => {
+        if (!selectedTache) return;
+
+        try {
+            await planningService.deleteDistribution(distributionId);
+
+            // Recharger la tâche avec ses distributions AVANT de forcer le remontage
+            await reloadSelectedTask(selectedTache.id);
+            await loadTaskDetails(selectedTache.id);
+
+            // Forcer le remontage de la section détails APRÈS le rechargement
+            setDetailKey(prev => prev + 1);
+
+            alert("Distribution supprimée avec succès");
+        } catch (err: any) {
+            console.error("Erreur lors de la suppression de la distribution:", err);
+            alert(err.message || "Erreur lors de la suppression de la distribution");
+        } finally {
+            setDeletingDistributionId(null);
+        }
+    };
+
+    // Ajout de nouvelles distributions
+    const handleAddDistributions = async (selectedDays: any[]) => {
+        if (!selectedTache) return;
+
+        try {
+            // Récupérer les dates des distributions existantes
+            const existingDates = selectedTache.distributions_charge?.map(d => d.date) || [];
+
+            console.log('📅 Dates existantes:', existingDates);
+            console.log('📅 Jours sélectionnés:', selectedDays.map(d => ({ date: d.date, selected: d.selected })));
+
+            // Créer les distributions uniquement pour les NOUVEAUX jours sélectionnés
+            const newDays = selectedDays.filter(day => {
+                const isSelected = day.selected;
+                const isExisting = existingDates.includes(day.date);
+                console.log(`  - ${day.date}: selected=${isSelected}, existing=${isExisting}`);
+                return isSelected && !isExisting;
+            });
+
+            console.log('✨ Nouvelles distributions à créer:', newDays.length);
+
+            if (newDays.length === 0) {
+                alert("Aucune nouvelle distribution à ajouter");
+                setShowAddDistributionsModal(false);
+                return;
+            }
+
+            const promises = newDays.map(day =>
+                planningService.createDistribution({
+                    tache: selectedTache.id,
+                    date: day.date,
+                    heure_debut: day.heure_debut,
+                    heure_fin: day.heure_fin,
+                    commentaire: ''
+                })
+            );
+
+            await Promise.all(promises);
+
+            // Recharger la tâche avec ses distributions AVANT de forcer le remontage
+            await reloadSelectedTask(selectedTache.id);
+            await loadTaskDetails(selectedTache.id);
+
+            // Forcer le remontage de la section détails APRÈS le rechargement
+            setDetailKey(prev => prev + 1);
+
+            setShowAddDistributionsModal(false);
+        } catch (err: any) {
+            console.error("Erreur lors de l'ajout des distributions:", err);
+            alert(err.message || "Erreur lors de l'ajout des distributions");
         }
     };
 
@@ -297,6 +384,22 @@ const SuiviTaches: React.FC = () => {
         } finally {
             setLoadingPhotos(false);
             setLoadingConsommations(false);
+        }
+    };
+
+    // Recharger la tâche sélectionnée avec ses distributions
+    const reloadSelectedTask = async (tacheId: number) => {
+        try {
+            const response = await planningService.getTaches();
+            const tachesData = Array.isArray(response) ? response : (response.results || []);
+            const updatedTache = tachesData.find((t: Tache) => t.id === tacheId);
+            if (updatedTache) {
+                setSelectedTache(updatedTache);
+                // Mettre à jour aussi dans la liste
+                setTaches(prev => prev.map(t => t.id === tacheId ? updatedTache : t));
+            }
+        } catch (error) {
+            console.error("Erreur rechargement tâche", error);
         }
     };
 
@@ -484,7 +587,8 @@ const SuiviTaches: React.FC = () => {
 
             const matchesSearch = !searchQuery ||
                 t.type_tache_detail?.nom_tache.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                teamNames.toLowerCase().includes(searchQuery.toLowerCase());
+                teamNames.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (t.reference && t.reference.toLowerCase().includes(searchQuery.toLowerCase()));
 
             if (!matchesSearch) return false;
 
@@ -784,7 +888,7 @@ const SuiviTaches: React.FC = () => {
 
                 {/* Right Panel: Task Detail */}
                 {selectedTache && (
-                    <div className="w-full lg:w-[500px] xl:w-[600px] bg-white border-l border-slate-200 flex flex-col overflow-hidden">
+                    <div key={detailKey} className="w-full lg:w-[500px] xl:w-[600px] bg-white border-l border-slate-200 flex flex-col overflow-hidden">
                         {/* Detail Header */}
                         <div className="p-4 border-b border-slate-100 shrink-0">
                             <div className="flex items-start justify-between mb-3">
@@ -1065,117 +1169,161 @@ const SuiviTaches: React.FC = () => {
                                     </div>
 
                                     {/* Distribution de charge */}
-                                    {selectedTache.distributions_charge && selectedTache.distributions_charge.length > 0 && (
-                                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                                            <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                                                 <Clock className="w-4 h-4 text-emerald-600" />
-                                                Distribution de charge ({selectedTache.distributions_charge.length} jour{selectedTache.distributions_charge.length > 1 ? 's' : ''})
+                                                Distribution de charge {selectedTache.distributions_charge && selectedTache.distributions_charge.length > 0 && `(${selectedTache.distributions_charge.length} jour${selectedTache.distributions_charge.length > 1 ? 's' : ''})`}
                                             </h3>
-                                            <div className="space-y-2">
-                                                {selectedTache.distributions_charge
-                                                    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                                                    .map((dist, index) => {
-                                                        const date = new Date(dist.date);
-                                                        const dayOfWeek = date.getDay();
-                                                        const isSunday = dayOfWeek === 0;
-                                                        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                                            {selectedTache.statut !== 'TERMINEE' && (selectedTache.equipes_detail?.length > 0 || selectedTache.equipe_detail) && !isClientView && (
+                                                <button
+                                                    onClick={async () => {
+                                                        // Recharger les données avant d'ouvrir le modal pour s'assurer qu'on a les dernières distributions
+                                                        if (selectedTache) {
+                                                            await loadTaskDetails(selectedTache.id);
+                                                        }
+                                                        setShowAddDistributionsModal(true);
+                                                    }}
+                                                    className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                                    title="Ajouter des distributions"
+                                                >
+                                                    <Plus className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
 
-                                                        const isRealisee = dist.status === 'REALISEE';
-                                                        const isTaskTerminee = selectedTache.statut === 'TERMINEE';
-                                                        const hasEquipe = (selectedTache.equipes_detail && selectedTache.equipes_detail.length > 0) || selectedTache.equipe_detail;
+                                        {selectedTache.distributions_charge && selectedTache.distributions_charge.length > 0 ? (
+                                            <>
+                                                <div className="space-y-2">
+                                                    {selectedTache.distributions_charge
+                                                        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                                                        .map((dist, index) => {
+                                                            const date = new Date(dist.date);
+                                                            const dayOfWeek = date.getDay();
+                                                            const isSunday = dayOfWeek === 0;
+                                                            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-                                                        return (
-                                                            <div
-                                                                key={dist.id || index}
-                                                                className={`
+                                                            const isRealisee = dist.status === 'REALISEE';
+                                                            const isTaskTerminee = selectedTache.statut === 'TERMINEE';
+                                                            const hasEquipe = (selectedTache.equipes_detail && selectedTache.equipes_detail.length > 0) || selectedTache.equipe_detail;
+
+                                                            return (
+                                                                <div
+                                                                    key={dist.id || index}
+                                                                    className={`
                                                                     p-3 rounded-lg border text-sm transition-all
                                                                     ${isRealisee ? 'bg-green-50 border-green-500 border-2' :
-                                                                        isSunday
-                                                                            ? 'bg-red-50 border-red-200'
-                                                                            : isWeekend
-                                                                                ? 'bg-blue-50 border-blue-200'
-                                                                                : 'bg-white border-slate-200'
-                                                                    }
+                                                                            isSunday
+                                                                                ? 'bg-red-50 border-red-200'
+                                                                                : isWeekend
+                                                                                    ? 'bg-blue-50 border-blue-200'
+                                                                                    : 'bg-white border-slate-200'
+                                                                        }
                                                                 `}
-                                                            >
-                                                                <div className="flex items-start justify-between gap-3">
-                                                                    {/* Checkbox pour toggle le statut */}
-                                                                    <button
-                                                                        onClick={(isTaskTerminee || !hasEquipe) ? undefined : () => handleToggleDistribution(dist.id, dist.status)}
-                                                                        disabled={isTaskTerminee || !hasEquipe}
-                                                                        title={(() => {
-                                                                            if (!hasEquipe) {
-                                                                                return '❌ Veuillez assigner une équipe avant de modifier les distributions';
-                                                                            }
-                                                                            if (isTaskTerminee) {
-                                                                                return '🔒 Les distributions ne peuvent pas être modifiées pour une tâche terminée';
-                                                                            }
-                                                                            if (isRealisee) {
+                                                                >
+                                                                    <div className="flex items-start justify-between gap-3">
+                                                                        {/* Checkbox pour toggle le statut */}
+                                                                        <button
+                                                                            onClick={(isTaskTerminee || !hasEquipe || isClientView) ? undefined : () => handleToggleDistribution(dist.id, dist.status)}
+                                                                            disabled={isTaskTerminee || !hasEquipe || isClientView}
+                                                                            title={(() => {
+                                                                                if (!hasEquipe) {
+                                                                                    return '❌ Veuillez assigner une équipe avant de modifier les distributions';
+                                                                                }
+                                                                                if (isTaskTerminee) {
+                                                                                    return '🔒 Les distributions ne peuvent pas être modifiées pour une tâche terminée';
+                                                                                }
+                                                                                if (isRealisee) {
+                                                                                    const heures = dist.heures_planifiees?.toFixed(2) || '0';
+                                                                                    return `✓ Distribution réalisée (${heures}h) - Cliquer pour marquer comme non réalisée`;
+                                                                                }
                                                                                 const heures = dist.heures_planifiees?.toFixed(2) || '0';
-                                                                                return `✓ Distribution réalisée (${heures}h) - Cliquer pour marquer comme non réalisée`;
-                                                                            }
-                                                                            const heures = dist.heures_planifiees?.toFixed(2) || '0';
-                                                                            return `○ Distribution non réalisée (${heures}h planifiées) - Cliquer pour marquer comme réalisée`;
-                                                                        })()}
-                                                                        className={`
+                                                                                return `○ Distribution non réalisée (${heures}h planifiées) - Cliquer pour marquer comme réalisée`;
+                                                                            })()}
+                                                                            className={`
                                                                             mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0
                                                                             ${isRealisee
-                                                                                ? 'bg-emerald-600 border-emerald-600 text-white'
-                                                                                : 'bg-white border-gray-400 hover:border-emerald-500 hover:bg-emerald-50'
-                                                                            }
-                                                                            ${(isTaskTerminee || !hasEquipe) ? 'cursor-not-allowed opacity-50' : ''}
+                                                                                    ? 'bg-emerald-600 border-emerald-600 text-white'
+                                                                                    : 'bg-white border-gray-400 hover:border-emerald-500 hover:bg-emerald-50'
+                                                                                }
+                                                                            ${(isTaskTerminee || !hasEquipe || isClientView) ? 'cursor-not-allowed opacity-50' : ''}
                                                                         `}
-                                                                    >
-                                                                        {isRealisee && <CheckCircle className="w-3 h-3" />}
-                                                                    </button>
+                                                                        >
+                                                                            {isRealisee && <CheckCircle className="w-3 h-3" />}
+                                                                        </button>
 
-                                                                    <div className="flex-1">
-                                                                        <div className="font-medium text-slate-800 mb-1">
-                                                                            {date.toLocaleDateString('fr-FR', {
-                                                                                weekday: 'long',
-                                                                                day: '2-digit',
-                                                                                month: 'long',
-                                                                                year: 'numeric'
-                                                                            })}
+                                                                        <div className="flex-1">
+                                                                            <div className="font-medium text-slate-800 mb-1">
+                                                                                {date.toLocaleDateString('fr-FR', {
+                                                                                    weekday: 'long',
+                                                                                    day: '2-digit',
+                                                                                    month: 'long',
+                                                                                    year: 'numeric'
+                                                                                })}
+                                                                            </div>
+                                                                            <div className="flex items-center gap-4 text-xs text-slate-600">
+                                                                                <span className="flex items-center gap-1">
+                                                                                    <Clock className="w-3 h-3" />
+                                                                                    {dist.heure_debut ? dist.heure_debut.substring(0, 5) : '08:00'} - {dist.heure_fin ? dist.heure_fin.substring(0, 5) : '17:00'}
+                                                                                </span>
+                                                                                <span className="font-semibold text-emerald-600">
+                                                                                    {dist.heures_planifiees?.toFixed(2) || '0.00'}h
+                                                                                </span>
+                                                                            </div>
+                                                                            {dist.commentaire && (
+                                                                                <p className="mt-2 text-xs text-slate-500 italic">
+                                                                                    {dist.commentaire}
+                                                                                </p>
+                                                                            )}
                                                                         </div>
-                                                                        <div className="flex items-center gap-4 text-xs text-slate-600">
-                                                                            <span className="flex items-center gap-1">
-                                                                                <Clock className="w-3 h-3" />
-                                                                                {dist.heure_debut ? dist.heure_debut.substring(0, 5) : '08:00'} - {dist.heure_fin ? dist.heure_fin.substring(0, 5) : '17:00'}
-                                                                            </span>
-                                                                            <span className="font-semibold text-emerald-600">
-                                                                                {dist.heures_planifiees?.toFixed(2) || '0.00'}h
-                                                                            </span>
-                                                                        </div>
-                                                                        {dist.commentaire && (
-                                                                            <p className="mt-2 text-xs text-slate-500 italic">
-                                                                                {dist.commentaire}
-                                                                            </p>
-                                                                        )}
-                                                                    </div>
 
-                                                                    {/* Badge de statut */}
-                                                                    <div className="flex flex-col items-end gap-1">
-                                                                        <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${STATUS_DISTRIBUTION_COLORS[dist.status].bg} ${STATUS_DISTRIBUTION_COLORS[dist.status].text}`}>
-                                                                            {STATUS_DISTRIBUTION_LABELS[dist.status]}
-                                                                        </span>
+                                                                        {/* Badge de statut et boutons d'action */}
+                                                                        <div className="flex flex-col items-end gap-1">
+                                                                            <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${STATUS_DISTRIBUTION_COLORS[dist.status].bg} ${STATUS_DISTRIBUTION_COLORS[dist.status].text}`}>
+                                                                                {STATUS_DISTRIBUTION_LABELS[dist.status]}
+                                                                            </span>
+                                                                            {!isTaskTerminee && hasEquipe && !isRealisee && !isClientView && (
+                                                                                <div className="flex items-center gap-1 mt-1">
+                                                                                    <button
+                                                                                        onClick={() => setEditingDistributionId(dist.id)}
+                                                                                        className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                                                                        title="Modifier la date et les heures"
+                                                                                    >
+                                                                                        <Pencil className="w-3.5 h-3.5" />
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => setDeletingDistributionId(dist.id)}
+                                                                                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                                                        title="Supprimer cette distribution"
+                                                                                    >
+                                                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                                                    </button>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
                                                                     </div>
                                                                 </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                            </div>
-                                            <div className="mt-3 pt-3 border-t border-slate-200">
-                                                <div className="flex items-center justify-between text-sm">
-                                                    <span className="text-slate-600 font-medium">Total planifié</span>
-                                                    <span className="text-emerald-600 font-bold">
-                                                        {selectedTache.charge_totale_distributions?.toFixed(2) ||
-                                                            selectedTache.distributions_charge.reduce((sum, d) => sum + (d.heures_planifiees || 0), 0).toFixed(2)}h
-                                                    </span>
+                                                            );
+                                                        })}
                                                 </div>
+                                                <div className="mt-3 pt-3 border-t border-slate-200">
+                                                    <div className="flex items-center justify-between text-sm">
+                                                        <span className="text-slate-600 font-medium">Total planifié</span>
+                                                        <span className="text-emerald-600 font-bold">
+                                                            {selectedTache.charge_totale_distributions?.toFixed(2) ||
+                                                                selectedTache.distributions_charge.reduce((sum, d) => sum + (d.heures_planifiees || 0), 0).toFixed(2)}h
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="text-center py-6 text-slate-500">
+                                                <Clock className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                                                <p className="text-sm">Aucune distribution de charge définie</p>
+                                                <p className="text-xs mt-1">Cliquez sur le bouton + pour en ajouter</p>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
 
                                     {/* Équipes assignées */}
                                     <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
@@ -1583,6 +1731,82 @@ const SuiviTaches: React.FC = () => {
                     />
                 )
             }
+
+            {/* Modal d'édition de distribution */}
+            {editingDistributionId && selectedTache && (() => {
+                const distribution = selectedTache.distributions_charge?.find(d => d.id === editingDistributionId);
+                if (!distribution) return null;
+
+                const eventStart = new Date(`${distribution.date}T${distribution.heure_debut || '08:00'}`);
+                const eventEnd = new Date(`${distribution.date}T${distribution.heure_fin || '17:00'}`);
+
+                return (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+                        <div className="max-w-md w-full mx-4 overflow-hidden rounded-2xl shadow-2xl">
+                            <DistributionEditForm
+                                distributionId={editingDistributionId}
+                                tacheId={selectedTache.id}
+                                eventStart={eventStart}
+                                eventEnd={eventEnd}
+                                commentaire={distribution.commentaire}
+                                tacheDateDebut={selectedTache.date_debut_planifiee}
+                                tacheDateFin={selectedTache.date_fin_planifiee}
+                                isReadOnly={false}
+                                isCompleted={distribution.status === 'REALISEE'}
+                                isExternalEditing={true}
+                                standalone={true}
+                                onSuccess={async () => {
+                                    // Recharger la tâche avec ses distributions AVANT de forcer le remontage
+                                    await reloadSelectedTask(selectedTache.id);
+                                    await loadTaskDetails(selectedTache.id);
+
+                                    // Forcer le remontage de la section détails APRÈS le rechargement
+                                    setDetailKey(prev => prev + 1);
+                                    setEditingDistributionId(null);
+                                }}
+                                onClose={() => setEditingDistributionId(null)}
+                            />
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* Modal de confirmation de suppression de distribution */}
+            {deletingDistributionId && selectedTache && (
+                <ConfirmDeleteModal
+                    title="Supprimer cette distribution ?"
+                    message={(() => {
+                        const dist = selectedTache.distributions_charge?.find(d => d.id === deletingDistributionId);
+                        if (!dist) return "Cette action est irréversible.";
+                        const date = new Date(dist.date).toLocaleDateString('fr-FR', {
+                            weekday: 'long',
+                            day: '2-digit',
+                            month: 'long',
+                            year: 'numeric'
+                        });
+                        return `Êtes-vous sûr de vouloir supprimer la distribution du ${date} ? Cette action est irréversible.`;
+                    })()}
+                    onConfirm={() => handleDeleteDistribution(deletingDistributionId)}
+                    onCancel={() => setDeletingDistributionId(null)}
+                />
+            )}
+
+            {/* Modal d'ajout de distributions */}
+            {showAddDistributionsModal && selectedTache && (
+                <SelectDaysModal
+                    dateDebut={new Date(selectedTache.date_debut_planifiee)}
+                    dateFin={new Date(selectedTache.date_fin_planifiee)}
+                    initialSelection={selectedTache.distributions_charge?.map(d => d.date) || []}
+                    protectedDates={selectedTache.distributions_charge?.map(d => d.date) || []}
+                    existingDistributions={selectedTache.distributions_charge?.map(d => ({
+                        date: d.date,
+                        heure_debut: d.heure_debut || '08:00',
+                        heure_fin: d.heure_fin || '17:00'
+                    })) || []}
+                    onConfirm={handleAddDistributions}
+                    onCancel={() => setShowAddDistributionsModal(false)}
+                />
+            )}
         </div >
     );
 };
