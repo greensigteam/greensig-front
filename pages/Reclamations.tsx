@@ -1297,7 +1297,7 @@ const Reclamations: React.FC = () => {
                                     <div className="text-sm font-medium text-slate-500 mb-1">Délai Moyen</div>
                                     <div className="flex items-end justify-between relative z-10">
                                         <div className="text-3xl font-bold text-slate-800">
-                                            {stats.delai_moyen_heures !== undefined ? `${Math.round(stats.delai_moyen_heures)}h` : 'N/A'}
+                                            {`${Math.round(stats.delai_moyen_heures ?? 0)}h`}
                                         </div>
                                     </div>
                                     <div className="absolute top-4 right-4 p-2 bg-slate-50 rounded-lg">
@@ -1310,9 +1310,9 @@ const Reclamations: React.FC = () => {
                                     <div className="text-sm font-medium text-slate-500 mb-1">Satisfaction Moyenne</div>
                                     <div className="flex items-end justify-between relative z-10">
                                         <div className="text-3xl font-bold text-slate-800">
-                                            {stats.satisfaction_moyenne !== undefined ? `${stats.satisfaction_moyenne.toFixed(1)}/5` : 'N/A'}
+                                            {`${(stats.satisfaction_moyenne ?? 0).toFixed(1)}/5`}
                                         </div>
-                                        {stats.nombre_evaluations !== undefined && stats.nombre_evaluations > 0 && (
+                                        {(stats.nombre_evaluations ?? 0) > 0 && (
                                             <div className="text-xs text-slate-400">
                                                 {stats.nombre_evaluations} avis
                                             </div>

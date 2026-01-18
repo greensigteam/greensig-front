@@ -158,15 +158,14 @@ export const FormModal: React.FC<FormModalProps> = ({
       size={size}
       closeOnOutsideClick={!loading}
       closeOnEscape={!loading}
-      showCloseButton={!loading && !useGradientHeader}
+      showCloseButton={false}
     >
       {/* Ajout de min-h-0 pour permettre le scroll interne dans les flex containers imbriqués */}
       <form onSubmit={handleSubmit} className={`flex flex-col h-full min-h-0 ${formClassName}`}>
         {/* Header */}
         {useGradientHeader ? (
-          <div className={`px-6 py-3 border-b flex items-center justify-between flex-shrink-0 ${
-            MODAL_DESIGN_TOKENS.colors.gradients.header
-          } ${MODAL_DESIGN_TOKENS.colors.borders.emerald}`}>
+          <div className={`px-6 py-3 border-b flex items-center justify-between flex-shrink-0 ${MODAL_DESIGN_TOKENS.colors.gradients.header
+            } ${MODAL_DESIGN_TOKENS.colors.borders.emerald}`}>
             <div className="flex items-center gap-3">
               {icon && (
                 <div className={`w-8 h-8 ${MODAL_DESIGN_TOKENS.colors.backgrounds.emerald100} ${MODAL_DESIGN_TOKENS.borderRadius.lg} flex items-center justify-center`}>
@@ -190,7 +189,13 @@ export const FormModal: React.FC<FormModalProps> = ({
             )}
           </div>
         ) : (
-          <ModalHeader title={title} subtitle={subtitle} icon={icon} />
+          <ModalHeader
+            title={title}
+            subtitle={subtitle}
+            icon={icon}
+            onClose={handleClose}
+            showCloseButton={!loading}
+          />
         )}
 
         {/* Step Indicator (if steps provided) */}
@@ -418,17 +423,17 @@ export const FormInput: React.FC<{
   step,
   className = '',
 }) => (
-  <input
-    type={type}
-    value={value}
-    onChange={(e) => onChange(e.target.value)}
-    placeholder={placeholder}
-    disabled={disabled}
-    required={required}
-    min={min}
-    max={max}
-    step={step}
-    className={`
+    <input
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      disabled={disabled}
+      required={required}
+      min={min}
+      max={max}
+      step={step}
+      className={`
       w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900
       placeholder:text-slate-400
       focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500
@@ -437,8 +442,8 @@ export const FormInput: React.FC<{
       shadow-sm hover:border-slate-400
       ${className}
     `}
-  />
-);
+    />
+  );
 
 /**
  * Textarea standard
@@ -460,14 +465,14 @@ export const FormTextarea: React.FC<{
   rows = 4,
   className = '',
 }) => (
-  <textarea
-    value={value}
-    onChange={(e) => onChange(e.target.value)}
-    placeholder={placeholder}
-    disabled={disabled}
-    required={required}
-    rows={rows}
-    className={`
+    <textarea
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      disabled={disabled}
+      required={required}
+      rows={rows}
+      className={`
       w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900
       placeholder:text-slate-400
       focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500
@@ -477,8 +482,8 @@ export const FormTextarea: React.FC<{
       resize-none
       ${className}
     `}
-  />
-);
+    />
+  );
 
 /**
  * Select standard
@@ -500,13 +505,13 @@ export const FormSelect: React.FC<{
   required,
   className = '',
 }) => (
-  <div className="relative">
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      disabled={disabled}
-      required={required}
-      className={`
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        required={required}
+        className={`
         w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900
         focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500
         disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed
@@ -515,25 +520,25 @@ export const FormSelect: React.FC<{
         appearance-none
         ${className}
       `}
-    >
-      {placeholder && (
-        <option value="" disabled>
-          {placeholder}
-        </option>
-      )}
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
-    <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-      </svg>
+      >
+        {placeholder && (
+          <option value="" disabled>
+            {placeholder}
+          </option>
+        )}
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+        <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
     </div>
-  </div>
-);
+  );
 
 // ============================================================================
 // EXPORT

@@ -15,7 +15,15 @@ import {
     ConsommationProduitCreate,
     Photo,
     PhotoList,
-    PhotoCreate
+    PhotoCreate,
+    FertilisantList,
+    FertilisantDetail,
+    FertilisantCreate,
+    RavageurMaladieList,
+    RavageurMaladieDetail,
+    RavageurMaladieCreate,
+    TypeFertilisant,
+    CategorieRavageurMaladie
 } from '../types/suiviTaches';
 const API_BASE_URL = '/api/suivi-taches';
 
@@ -362,4 +370,182 @@ export const deletePhoto = async (id: number): Promise<void> => {
     if (!response.ok) {
         throw new Error('Erreur lors de la suppression');
     }
+};
+
+// ============================================================================
+// FERTILISANTS
+// ============================================================================
+
+export const fetchFertilisants = async (params?: {
+    actif?: boolean;
+    type_fertilisant?: TypeFertilisant;
+    search?: string;
+    ordering?: string;
+}): Promise<FertilisantList[]> => {
+    const queryParams = new URLSearchParams();
+    if (params?.actif !== undefined) queryParams.append('actif', String(params.actif));
+    if (params?.type_fertilisant) queryParams.append('type_fertilisant', params.type_fertilisant);
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.ordering) queryParams.append('ordering', params.ordering);
+
+    const url = `${API_BASE_URL}/fertilisants/${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    const response = await fetch(url, { headers: getAuthHeaders() });
+    const data = await handleResponse<FertilisantList[] | { results: FertilisantList[] }>(response);
+    return Array.isArray(data) ? data : data.results;
+};
+
+export const fetchFertilisantById = async (id: number): Promise<FertilisantDetail> => {
+    const response = await fetch(`${API_BASE_URL}/fertilisants/${id}/`, {
+        headers: getAuthHeaders()
+    });
+    return handleResponse<FertilisantDetail>(response);
+};
+
+export const createFertilisant = async (data: FertilisantCreate): Promise<FertilisantDetail> => {
+    const response = await fetch(`${API_BASE_URL}/fertilisants/`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data)
+    });
+    return handleResponse<FertilisantDetail>(response);
+};
+
+export const updateFertilisant = async (id: number, data: Partial<FertilisantCreate>): Promise<FertilisantDetail> => {
+    const response = await fetch(`${API_BASE_URL}/fertilisants/${id}/`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data)
+    });
+    return handleResponse<FertilisantDetail>(response);
+};
+
+export const deleteFertilisant = async (id: number): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/fertilisants/${id}/`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+        throw new Error('Erreur lors de la suppression');
+    }
+};
+
+export const fetchFertilisantsActifs = async (): Promise<FertilisantList[]> => {
+    const response = await fetch(`${API_BASE_URL}/fertilisants/actifs/`, {
+        headers: getAuthHeaders()
+    });
+    const data = await handleResponse<FertilisantList[] | { results: FertilisantList[] }>(response);
+    return Array.isArray(data) ? data : data.results;
+};
+
+export const fetchFertilisantsParType = async (type: TypeFertilisant): Promise<FertilisantList[]> => {
+    const response = await fetch(`${API_BASE_URL}/fertilisants/par_type/?type=${type}`, {
+        headers: getAuthHeaders()
+    });
+    const data = await handleResponse<FertilisantList[] | { results: FertilisantList[] }>(response);
+    return Array.isArray(data) ? data : data.results;
+};
+
+export const softDeleteFertilisant = async (id: number): Promise<{ message: string; fertilisant: FertilisantDetail }> => {
+    const response = await fetch(`${API_BASE_URL}/fertilisants/${id}/soft_delete/`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+    });
+    return handleResponse<{ message: string; fertilisant: FertilisantDetail }>(response);
+};
+
+export const reactivateFertilisant = async (id: number): Promise<{ message: string; fertilisant: FertilisantDetail }> => {
+    const response = await fetch(`${API_BASE_URL}/fertilisants/${id}/reactivate/`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+    });
+    return handleResponse<{ message: string; fertilisant: FertilisantDetail }>(response);
+};
+
+// ============================================================================
+// RAVAGEURS ET MALADIES
+// ============================================================================
+
+export const fetchRavageursMaladies = async (params?: {
+    actif?: boolean;
+    categorie?: CategorieRavageurMaladie;
+    search?: string;
+    ordering?: string;
+}): Promise<RavageurMaladieList[]> => {
+    const queryParams = new URLSearchParams();
+    if (params?.actif !== undefined) queryParams.append('actif', String(params.actif));
+    if (params?.categorie) queryParams.append('categorie', params.categorie);
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.ordering) queryParams.append('ordering', params.ordering);
+
+    const url = `${API_BASE_URL}/ravageurs-maladies/${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    const response = await fetch(url, { headers: getAuthHeaders() });
+    const data = await handleResponse<RavageurMaladieList[] | { results: RavageurMaladieList[] }>(response);
+    return Array.isArray(data) ? data : data.results;
+};
+
+export const fetchRavageurMaladieById = async (id: number): Promise<RavageurMaladieDetail> => {
+    const response = await fetch(`${API_BASE_URL}/ravageurs-maladies/${id}/`, {
+        headers: getAuthHeaders()
+    });
+    return handleResponse<RavageurMaladieDetail>(response);
+};
+
+export const createRavageurMaladie = async (data: RavageurMaladieCreate): Promise<RavageurMaladieDetail> => {
+    const response = await fetch(`${API_BASE_URL}/ravageurs-maladies/`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data)
+    });
+    return handleResponse<RavageurMaladieDetail>(response);
+};
+
+export const updateRavageurMaladie = async (id: number, data: Partial<RavageurMaladieCreate>): Promise<RavageurMaladieDetail> => {
+    const response = await fetch(`${API_BASE_URL}/ravageurs-maladies/${id}/`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data)
+    });
+    return handleResponse<RavageurMaladieDetail>(response);
+};
+
+export const deleteRavageurMaladie = async (id: number): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/ravageurs-maladies/${id}/`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+        throw new Error('Erreur lors de la suppression');
+    }
+};
+
+export const fetchRavageursMaladiesActifs = async (): Promise<RavageurMaladieList[]> => {
+    const response = await fetch(`${API_BASE_URL}/ravageurs-maladies/actifs/`, {
+        headers: getAuthHeaders()
+    });
+    const data = await handleResponse<RavageurMaladieList[] | { results: RavageurMaladieList[] }>(response);
+    return Array.isArray(data) ? data : data.results;
+};
+
+export const fetchRavageursMaladiesParCategorie = async (categorie: CategorieRavageurMaladie): Promise<RavageurMaladieList[]> => {
+    const response = await fetch(`${API_BASE_URL}/ravageurs-maladies/par_categorie/?categorie=${categorie}`, {
+        headers: getAuthHeaders()
+    });
+    const data = await handleResponse<RavageurMaladieList[] | { results: RavageurMaladieList[] }>(response);
+    return Array.isArray(data) ? data : data.results;
+};
+
+export const softDeleteRavageurMaladie = async (id: number): Promise<{ message: string; ravageur_maladie: RavageurMaladieDetail }> => {
+    const response = await fetch(`${API_BASE_URL}/ravageurs-maladies/${id}/soft_delete/`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+    });
+    return handleResponse<{ message: string; ravageur_maladie: RavageurMaladieDetail }>(response);
+};
+
+export const reactivateRavageurMaladie = async (id: number): Promise<{ message: string; ravageur_maladie: RavageurMaladieDetail }> => {
+    const response = await fetch(`${API_BASE_URL}/ravageurs-maladies/${id}/reactivate/`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+    });
+    return handleResponse<{ message: string; ravageur_maladie: RavageurMaladieDetail }>(response);
 };

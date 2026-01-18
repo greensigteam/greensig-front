@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Plus, Trash2, Download, AlertTriangle, Check } from 'lucide-react';
 import { api } from '@/services/api';
+import { useToast } from '../contexts/ToastContext';
+import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 
 /**
  * ✅ PHASE 3.2: Configuration des jours fériés
@@ -37,10 +39,13 @@ const TYPE_FERIE_OPTIONS = [
 ];
 
 const JoursFeriesConfig: React.FC<{ triggerCreate?: number }> = ({ triggerCreate }) => {
+  const { showToast } = useToast();
   const [joursFeries, setJoursFeries] = useState<JourFerie[]>([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingJour, setEditingJour] = useState<JourFerie | null>(null);
+  const [deletingJourId, setDeletingJourId] = useState<number | null>(null);
+  const [importConfirmAnnee, setImportConfirmAnnee] = useState<number | null>(null);
   const [formData, setFormData] = useState<JourFerieForm>({
     nom: '',
     date: '',
@@ -108,46 +113,60 @@ const JoursFeriesConfig: React.FC<{ triggerCreate?: number }> = ({ triggerCreate
       if (editingJour) {
         // Mise à jour
         await api.patch(`/api/users/jours-feries/${editingJour.id}/`, formData);
+        showToast('Jour férié modifié avec succès', 'success');
       } else {
         // Création
         await api.post('/api/users/jours-feries/', formData);
+        showToast('Jour férié ajouté avec succès', 'success');
       }
 
       setShowModal(false);
       loadJoursFeries();
     } catch (error: any) {
       console.error('Erreur sauvegarde jour férié:', error);
-      alert(error.response?.data?.error || error.response?.data?.non_field_errors?.[0] || 'Erreur lors de la sauvegarde');
+      showToast(error.response?.data?.error || error.response?.data?.non_field_errors?.[0] || 'Erreur lors de la sauvegarde', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Supprimer ce jour férié ?')) return;
+  const handleDelete = (id: number) => {
+    setDeletingJourId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingJourId) return;
 
     try {
-      await api.delete(`/api/users/jours-feries/${id}/`);
+      await api.delete(`/api/users/jours-feries/${deletingJourId}/`);
+      showToast('Jour férié supprimé avec succès', 'success');
       loadJoursFeries();
     } catch (error) {
       console.error('Erreur suppression:', error);
-      alert('Erreur lors de la suppression');
+      showToast('Erreur lors de la suppression', 'error');
+    } finally {
+      setDeletingJourId(null);
     }
   };
 
-  const handleImporterMaroc = async (annee: number) => {
-    if (!confirm(`Importer automatiquement les jours fériés marocains pour l'année ${annee} ?`)) return;
+  const handleImporterMaroc = (annee: number) => {
+    setImportConfirmAnnee(annee);
+  };
+
+  const confirmImport = async () => {
+    if (!importConfirmAnnee) return;
 
     setLoading(true);
     try {
-      const response = await api.post('/api/users/jours-feries/importer_feries_maroc/', { annee });
-      alert(response.data.message);
+      const response = await api.post('/api/users/jours-feries/importer_feries_maroc/', { annee: importConfirmAnnee });
+      showToast(response.data.message, 'success');
       loadJoursFeries();
     } catch (error: any) {
       console.error('Erreur import:', error);
-      alert(error.response?.data?.error || 'Erreur lors de l\'import');
+      showToast(error.response?.data?.error || 'Erreur lors de l\'import', 'error');
     } finally {
       setLoading(false);
+      setImportConfirmAnnee(null);
     }
   };
 
@@ -410,6 +429,27 @@ const JoursFeriesConfig: React.FC<{ triggerCreate?: number }> = ({ triggerCreate
             </form>
           </div>
         </div>
+      )}
+
+      {/* Modal de confirmation de suppression */}
+      {deletingJourId && (
+        <ConfirmDeleteModal
+          title="Supprimer ce jour férié ?"
+          message="Cette action est irréversible. Le jour férié sera définitivement supprimé."
+          onConfirm={confirmDelete}
+          onCancel={() => setDeletingJourId(null)}
+        />
+      )}
+
+      {/* Modal de confirmation d'import */}
+      {importConfirmAnnee && (
+        <ConfirmDeleteModal
+          title="Importer les jours fériés ?"
+          message={`Importer automatiquement les jours fériés marocains pour l'année ${importConfirmAnnee} ?`}
+          confirmText="Importer"
+          onConfirm={confirmImport}
+          onCancel={() => setImportConfirmAnnee(null)}
+        />
       )}
     </div>
   );

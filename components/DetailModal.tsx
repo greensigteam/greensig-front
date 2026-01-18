@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BaseModal, ModalHeader, ModalBody, ModalFooter, ModalSize } from './BaseModal';
+import { BaseModal, ModalBody, ModalFooter, ModalSize } from './BaseModal';
 import { X } from 'lucide-react';
 import { MODAL_DESIGN_TOKENS } from './modals/designTokens';
 
@@ -128,13 +128,12 @@ export const DetailModal: React.FC<DetailModalProps> = ({
   // ============================================================================
 
   return (
-    <BaseModal isOpen={isOpen} onClose={onClose} size={size}>
+    <BaseModal isOpen={isOpen} onClose={onClose} size={size} showCloseButton={false}>
       {/* Header */}
-      <div className={`p-6 border-b flex items-start gap-4 ${
-        useGradientHeader
-          ? `${MODAL_DESIGN_TOKENS.colors.gradients.header} ${MODAL_DESIGN_TOKENS.colors.borders.emerald}`
-          : 'border-gray-200'
-      }`}>
+      <div className={`p-6 border-b flex items-start gap-4 ${useGradientHeader
+        ? `${MODAL_DESIGN_TOKENS.colors.gradients.header} ${MODAL_DESIGN_TOKENS.colors.borders.emerald}`
+        : 'border-gray-200'
+        }`}>
         {/* Avatar/Icon */}
         {(avatar || icon) && (
           <div className="flex-shrink-0">
@@ -142,9 +141,8 @@ export const DetailModal: React.FC<DetailModalProps> = ({
               <img
                 src={avatar}
                 alt={title}
-                className={`w-16 h-16 rounded-full object-cover ring-2 ${
-                  useGradientHeader ? 'ring-emerald-200' : 'ring-gray-200'
-                }`}
+                className={`w-16 h-16 rounded-full object-cover ring-2 ${useGradientHeader ? 'ring-emerald-200' : 'ring-gray-200'
+                  }`}
               />
             ) : (
               <div className={`p-3 ${MODAL_DESIGN_TOKENS.borderRadius.full} ${MODAL_DESIGN_TOKENS.colors.backgrounds.emerald100}`}>
@@ -186,10 +184,9 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                 className={`
                   relative flex items-center gap-2 px-6 py-3 text-sm font-medium whitespace-nowrap
                   border-b-2 -mb-px transition-all duration-200
-                  ${
-                    activeTab === tab.key
-                      ? 'border-emerald-500 text-emerald-600 bg-gradient-to-r from-emerald-50/50 to-transparent'
-                      : 'border-transparent text-gray-500 hover:text-emerald-600 hover:border-emerald-300'
+                  ${activeTab === tab.key
+                    ? 'border-emerald-500 text-emerald-600 bg-gradient-to-r from-emerald-50/50 to-transparent'
+                    : 'border-transparent text-gray-500 hover:text-emerald-600 hover:border-emerald-300'
                   }
                   ${tab.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                 `}
