@@ -17,6 +17,7 @@ import { Tache, TacheCreate, TypeTache, STATUT_TACHE_COLORS, STATUT_TACHE_LABELS
 import { PhotoList, ConsommationProduit, ProduitList } from '../types/suiviTaches';
 import { StructureClient, EquipeList } from '../types/users';
 import { useSearch } from '../contexts/SearchContext';
+import { useToast } from '../contexts/ToastContext';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import TaskFormModal from '../components/planning/TaskFormModal';
 import { DistributionEditForm } from '../components/planning/DistributionEditForm';
@@ -34,6 +35,7 @@ const getFullImageUrl = (url: string | null): string => {
 
 const SuiviTaches: React.FC = () => {
     const { searchQuery, setSearchQuery, setPlaceholder } = useSearch();
+    const { showToast } = useToast();
 
     // State UI
     const [loadingTasks, setLoadingTasks] = useState(true);
@@ -234,7 +236,7 @@ const SuiviTaches: React.FC = () => {
                     ? { ...t, distributions_charge: selectedTache.distributions_charge }
                     : t
             ));
-            alert("Erreur lors de la mise à jour de la distribution");
+            showToast('Erreur lors de la mise à jour de la distribution', 'error');
         }
     };
 
@@ -252,10 +254,10 @@ const SuiviTaches: React.FC = () => {
             // Forcer le remontage de la section détails APRÈS le rechargement
             setDetailKey(prev => prev + 1);
 
-            alert("Distribution supprimée avec succès");
+            showToast('Distribution supprimée avec succès', 'success');
         } catch (err: any) {
             console.error("Erreur lors de la suppression de la distribution:", err);
-            alert(err.message || "Erreur lors de la suppression de la distribution");
+            showToast(err.message || 'Erreur lors de la suppression de la distribution', 'error');
         } finally {
             setDeletingDistributionId(null);
         }
@@ -283,7 +285,7 @@ const SuiviTaches: React.FC = () => {
             console.log('✨ Nouvelles distributions à créer:', newDays.length);
 
             if (newDays.length === 0) {
-                alert("Aucune nouvelle distribution à ajouter");
+                showToast('Aucune nouvelle distribution à ajouter', 'info');
                 setShowAddDistributionsModal(false);
                 return;
             }
@@ -310,7 +312,7 @@ const SuiviTaches: React.FC = () => {
             setShowAddDistributionsModal(false);
         } catch (err: any) {
             console.error("Erreur lors de l'ajout des distributions:", err);
-            alert(err.message || "Erreur lors de l'ajout des distributions");
+            showToast(err.message || "Erreur lors de l'ajout des distributions", 'error');
         }
     };
 
@@ -423,7 +425,7 @@ const SuiviTaches: React.FC = () => {
             setPhotos(updatedPhotos);
         } catch (error) {
             console.error("Erreur upload photo", error);
-            alert("Erreur lors de l'upload des photos");
+            showToast("Erreur lors de l'upload des photos", 'error');
         } finally {
             setUploadingPhoto(false);
             e.target.value = '';
@@ -460,7 +462,7 @@ const SuiviTaches: React.FC = () => {
             setNewConsommation({ produit: '', quantite: '', unite: 'L', commentaire: '' });
         } catch (error) {
             console.error("Erreur ajout consommation", error);
-            alert("Erreur lors de l'ajout de la consommation");
+            showToast("Erreur lors de l'ajout de la consommation", 'error');
         }
     };
 
@@ -528,7 +530,7 @@ const SuiviTaches: React.FC = () => {
             await loadTaskDetails(tacheId);
         } catch (error) {
             console.error("Erreur changement statut", error);
-            alert("Erreur lors du changement de statut");
+            showToast("Erreur lors du changement de statut", 'error');
         } finally {
             setChangingStatut(false);
         }
@@ -566,7 +568,7 @@ const SuiviTaches: React.FC = () => {
             setValidationComment('');
         } catch (error) {
             console.error("Erreur validation", error);
-            alert("Erreur lors de la validation");
+            showToast("Erreur lors de la validation", 'error');
         } finally {
             setValidating(false);
         }
@@ -944,7 +946,8 @@ const SuiviTaches: React.FC = () => {
                                             </button>
                                         )}
                                         {(selectedTache.statut === 'PLANIFIEE' || selectedTache.statut === 'NON_DEBUTEE') && (() => {
-                                            const hasEquipe = (selectedTache.equipes_detail && selectedTache.equipes_detail.length > 0) || selectedTache.equipe_detail;
+                                            // ✅ Condition robuste: vérifie les deux systèmes (multi-équipes et legacy)
+                                            const hasEquipe = (selectedTache.equipes_detail?.length ?? 0) > 0 || !!selectedTache.equipe_detail;
                                             const nbEquipes = selectedTache.equipes_detail?.length || (selectedTache.equipe_detail ? 1 : 0);
                                             const nbObjets = selectedTache.objets_detail?.length || 0;
                                             const nbDistributions = selectedTache.distributions_charge?.length || 0;
@@ -1175,7 +1178,7 @@ const SuiviTaches: React.FC = () => {
                                                 <Clock className="w-4 h-4 text-emerald-600" />
                                                 Distribution de charge {selectedTache.distributions_charge && selectedTache.distributions_charge.length > 0 && `(${selectedTache.distributions_charge.length} jour${selectedTache.distributions_charge.length > 1 ? 's' : ''})`}
                                             </h3>
-                                            {selectedTache.statut !== 'TERMINEE' && (selectedTache.equipes_detail?.length > 0 || selectedTache.equipe_detail) && !isClientView && (
+                                            {selectedTache.statut !== 'TERMINEE' && ((selectedTache.equipes_detail?.length ?? 0) > 0 || !!selectedTache.equipe_detail) && !isClientView && (
                                                 <button
                                                     onClick={async () => {
                                                         // Recharger les données avant d'ouvrir le modal pour s'assurer qu'on a les dernières distributions
@@ -1205,7 +1208,7 @@ const SuiviTaches: React.FC = () => {
 
                                                             const isRealisee = dist.status === 'REALISEE';
                                                             const isTaskTerminee = selectedTache.statut === 'TERMINEE';
-                                                            const hasEquipe = (selectedTache.equipes_detail && selectedTache.equipes_detail.length > 0) || selectedTache.equipe_detail;
+                                                            const hasEquipe = (selectedTache.equipes_detail?.length ?? 0) > 0 || !!selectedTache.equipe_detail;
 
                                                             return (
                                                                 <div
@@ -1426,8 +1429,8 @@ const SuiviTaches: React.FC = () => {
 
                             {activeTab === 'photos' && (
                                 <div className="space-y-4">
-                                    {/* Upload Zone */}
-                                    {!isClientView && (
+                                    {/* Upload Zone - Bloque si tache TERMINEE + (VALIDEE ou REJETEE) */}
+                                    {!isClientView && !(selectedTache.statut === 'TERMINEE' && (selectedTache.etat_validation === 'VALIDEE' || selectedTache.etat_validation === 'REJETEE')) && (
                                         <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
                                             <div className="flex gap-2 mb-3">
                                                 <button
@@ -1446,7 +1449,7 @@ const SuiviTaches: React.FC = () => {
                                                         : 'bg-white text-slate-600 border border-slate-200'
                                                         }`}
                                                 >
-                                                    Après
+                                                    Apres
                                                 </button>
                                             </div>
                                             <input
@@ -1471,6 +1474,21 @@ const SuiviTaches: React.FC = () => {
                                                     </>
                                                 )}
                                             </label>
+                                        </div>
+                                    )}
+
+                                    {/* Message si tache TERMINEE + (VALIDEE ou REJETEE) (lecture seule) */}
+                                    {!isClientView && selectedTache.statut === 'TERMINEE' && (selectedTache.etat_validation === 'VALIDEE' || selectedTache.etat_validation === 'REJETEE') && (
+                                        <div className={`rounded-xl p-4 border flex items-start gap-3 ${selectedTache.etat_validation === 'VALIDEE' ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                                            <ShieldCheck className={`w-5 h-5 mt-0.5 shrink-0 ${selectedTache.etat_validation === 'VALIDEE' ? 'text-emerald-600' : 'text-red-600'}`} />
+                                            <div>
+                                                <h4 className={`font-semibold text-sm ${selectedTache.etat_validation === 'VALIDEE' ? 'text-emerald-800' : 'text-red-800'}`}>
+                                                    Tache {selectedTache.etat_validation === 'VALIDEE' ? 'validee' : 'rejetee'} - Lecture seule
+                                                </h4>
+                                                <p className={`text-sm mt-1 ${selectedTache.etat_validation === 'VALIDEE' ? 'text-emerald-700' : 'text-red-700'}`}>
+                                                    Cette tache est terminee et {selectedTache.etat_validation === 'VALIDEE' ? 'validee' : 'rejetee'}. Les photos ne peuvent plus etre modifiees.
+                                                </p>
+                                            </div>
                                         </div>
                                     )}
 
@@ -1502,7 +1520,7 @@ const SuiviTaches: React.FC = () => {
                                                         >
                                                             <Eye className="w-5 h-5" />
                                                         </a>
-                                                        {!isClientView && (
+                                                        {!isClientView && !(selectedTache.statut === 'TERMINEE' && (selectedTache.etat_validation === 'VALIDEE' || selectedTache.etat_validation === 'REJETEE')) && (
                                                             <button
                                                                 onClick={() => setDeletingPhotoId(photo.id)}
                                                                 className="p-2 bg-red-500/80 hover:bg-red-600 rounded-full text-white"
@@ -1523,8 +1541,8 @@ const SuiviTaches: React.FC = () => {
 
                             {activeTab === 'produits' && (
                                 <div className="space-y-4">
-                                    {/* Add Form */}
-                                    {!isClientView && (
+                                    {/* Add Form - Bloque si tache TERMINEE + (VALIDEE ou REJETEE) */}
+                                    {!isClientView && !(selectedTache.statut === 'TERMINEE' && (selectedTache.etat_validation === 'VALIDEE' || selectedTache.etat_validation === 'REJETEE')) && (
                                         <form onSubmit={handleAddConsommation} className="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-3">
                                             <select
                                                 value={newConsommation.produit}
@@ -1532,7 +1550,7 @@ const SuiviTaches: React.FC = () => {
                                                 className="w-full p-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500"
                                                 required
                                             >
-                                                <option value="">Sélectionner un produit...</option>
+                                                <option value="">Selectionner un produit...</option>
                                                 {produitsOptions.map(p => (
                                                     <option key={p.id} value={p.id}>{p.nom_produit}</option>
                                                 ))}
@@ -1542,7 +1560,7 @@ const SuiviTaches: React.FC = () => {
                                                     type="number"
                                                     step="0.01"
                                                     min="0.01"
-                                                    placeholder="Quantité"
+                                                    placeholder="Quantite"
                                                     className="flex-1 p-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500"
                                                     value={newConsommation.quantite}
                                                     onChange={e => setNewConsommation({ ...newConsommation, quantite: e.target.value })}
@@ -1568,6 +1586,21 @@ const SuiviTaches: React.FC = () => {
                                         </form>
                                     )}
 
+                                    {/* Message si tache TERMINEE + (VALIDEE ou REJETEE) (lecture seule) */}
+                                    {!isClientView && selectedTache.statut === 'TERMINEE' && (selectedTache.etat_validation === 'VALIDEE' || selectedTache.etat_validation === 'REJETEE') && (
+                                        <div className={`rounded-xl p-4 border flex items-start gap-3 ${selectedTache.etat_validation === 'VALIDEE' ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                                            <ShieldCheck className={`w-5 h-5 mt-0.5 shrink-0 ${selectedTache.etat_validation === 'VALIDEE' ? 'text-emerald-600' : 'text-red-600'}`} />
+                                            <div>
+                                                <h4 className={`font-semibold text-sm ${selectedTache.etat_validation === 'VALIDEE' ? 'text-emerald-800' : 'text-red-800'}`}>
+                                                    Tache {selectedTache.etat_validation === 'VALIDEE' ? 'validee' : 'rejetee'} - Lecture seule
+                                                </h4>
+                                                <p className={`text-sm mt-1 ${selectedTache.etat_validation === 'VALIDEE' ? 'text-emerald-700' : 'text-red-700'}`}>
+                                                    Cette tache est terminee et {selectedTache.etat_validation === 'VALIDEE' ? 'validee' : 'rejetee'}. Les produits consommes ne peuvent plus etre modifies.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* Consommations List */}
                                     {loadingConsommations ? (
                                         <div className="flex justify-center py-8">
@@ -1586,7 +1619,7 @@ const SuiviTaches: React.FC = () => {
                                                         <p className="font-medium text-slate-800 text-sm">{conso.produit_nom}</p>
                                                         <p className="text-slate-500 text-xs">{conso.quantite_utilisee} {conso.unite}</p>
                                                     </div>
-                                                    {!isClientView && (
+                                                    {!isClientView && !(selectedTache.statut === 'TERMINEE' && (selectedTache.etat_validation === 'VALIDEE' || selectedTache.etat_validation === 'REJETEE')) && (
                                                         <button
                                                             onClick={() => setDeletingConsommationId(conso.id)}
                                                             className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"

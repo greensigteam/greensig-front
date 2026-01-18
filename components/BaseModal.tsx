@@ -251,9 +251,11 @@ export const ModalHeader: React.FC<{
   subtitle?: string;
   icon?: React.ReactNode;
   className?: string;
-}> = ({ title, subtitle, icon, className = '' }) => (
-  <div className={`p-6 border-b border-slate-200 ${className}`}>
-    <div className="flex items-center gap-3">
+  onClose?: () => void;
+  showCloseButton?: boolean;
+}> = ({ title, subtitle, icon, className = '', onClose, showCloseButton = true }) => (
+  <div className={`p-6 border-b border-slate-200 flex items-center justify-between ${className}`}>
+    <div className="flex items-center gap-3 flex-1 min-w-0">
       {icon && (
         <div className="p-3 rounded-full bg-emerald-100 flex-shrink-0">
           {icon}
@@ -266,6 +268,16 @@ export const ModalHeader: React.FC<{
         )}
       </div>
     </div>
+    {showCloseButton && onClose && (
+      <button
+        type="button"
+        onClick={onClose}
+        className="p-2 ml-4 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors flex-shrink-0"
+        aria-label="Fermer"
+      >
+        <X className="w-5 h-5" />
+      </button>
+    )}
   </div>
 );
 

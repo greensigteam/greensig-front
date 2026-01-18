@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, Filter, Grid, X, MapIcon, ImageIcon, Mountain, Navigation, Trees, AlertTriangle } from 'lucide-react';
+import { Layers, Filter, X, MapIcon, ImageIcon, Mountain, Navigation, Trees, AlertTriangle } from 'lucide-react';
 import { MAP_LAYERS, VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND, RECLAMATION_LEGEND } from '../../constants';
 import type { MapLayerType, OverlayState } from '../../types';
 import { useMapContext } from '../../contexts/MapContext';
@@ -7,8 +7,8 @@ import { useMapContext } from '../../contexts/MapContext';
 interface MapLayersPanelProps {
   showLayers: boolean;
   setShowLayers: (show: boolean) => void;
-  layersPanelTab: 'layers' | 'filters' | 'symbology';
-  setLayersPanelTab: (tab: 'layers' | 'filters' | 'symbology') => void;
+  layersPanelTab: 'layers' | 'filters';
+  setLayersPanelTab: (tab: 'layers' | 'filters') => void;
   activeLayerId: MapLayerType;
   setActiveLayerId: (id: MapLayerType) => void;
   layerVisibility: Record<string, boolean>;
@@ -72,14 +72,7 @@ export const MapLayersPanel: React.FC<MapLayersPanelProps> = ({
             <Filter className="w-3 h-3" /> FILTRES
           </span>
         </button>
-        <button
-          onClick={() => setLayersPanelTab('symbology')}
-          className={`flex-1 text-xs font-bold py-2 px-3 rounded-lg transition-all ${layersPanelTab === 'symbology' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-          <span className="flex items-center justify-center gap-1.5">
-            <Grid className="w-3 h-3" /> SYMBOLES
-          </span>
-        </button>
+
       </div>
 
       <div className="p-4 space-y-4 overflow-y-auto custom-scrollbar" style={{ maxHeight: 'calc(100vh - 200px)' }}>
@@ -303,15 +296,7 @@ export const MapLayersPanel: React.FC<MapLayersPanelProps> = ({
           </div>
         )}
 
-        {/* Onglet SYMBOLOGIE - Simplified */}
-        {layersPanelTab === 'symbology' && (
-          <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="text-sm font-semibold text-gray-800 mb-1">Gestion de la Symbologie</div>
-            <div className="text-xs text-gray-500 mb-4">Personnalisez l'apparence des couches.</div>
-            {/* Symbology controls would go here */}
-            <p className="text-xs text-slate-500">Configuration symbologie disponible pour les couches de végétation et hydrologie.</p>
-          </div>
-        )}
+
       </div>
     </div>
   );

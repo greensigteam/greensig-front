@@ -229,7 +229,7 @@ export const MapPage: React.FC<MapPageProps> = ({
   const [editingSite, setEditingSite] = useState<SiteFrontend | null>(null);
 
   // États pour les onglets Filtres/Symbologie
-  const [layersPanelTab, setLayersPanelTab] = useState<'layers' | 'filters' | 'symbology'>('layers');
+  const [layersPanelTab, setLayersPanelTab] = useState<'layers' | 'filters'>('layers');
   const [symbologyConfig] = useState<Record<string, SymbologyConfig>>(createDefaultSymbology);
 
   const [isExporting, setIsExporting] = useState(false);
@@ -958,8 +958,6 @@ export const MapPage: React.FC<MapPageProps> = ({
 
       {/* 2. Floating Tools Component (includes drawing tools) */}
       <MapFloatingTools
-        isPanelOpen={isPanelOpen}
-        onToggleMap={onToggleMap}
         showLayers={showLayers}
         setShowLayers={setShowLayers}
         isExporting={isExporting}

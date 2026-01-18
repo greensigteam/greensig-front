@@ -163,3 +163,144 @@ export const TYPE_PHOTO_COLORS: Record<TypePhoto, { bg: string; text: string }> 
     RECLAMATION: { bg: 'bg-red-100', text: 'text-red-800' },
     INVENTAIRE: { bg: 'bg-purple-100', text: 'text-purple-800' }
 };
+
+// ============================================================================
+// ENUMERATIONS - FERTILISANT
+// ============================================================================
+
+export type TypeFertilisant = 'CHIMIQUE' | 'ORGANIQUE' | 'BIOLOGIQUE' | 'MINERAL' | 'SUBSTRAT';
+export type FormatFertilisant = 'GRANULE' | 'LIQUIDE' | 'POUDRE' | 'SOLIDE' | 'DECOMPOSE';
+
+export const TYPE_FERTILISANT_LABELS: Record<TypeFertilisant, string> = {
+    CHIMIQUE: 'Chimique',
+    ORGANIQUE: 'Organique',
+    BIOLOGIQUE: 'Biologique',
+    MINERAL: 'Amendement minéral',
+    SUBSTRAT: 'Substrat organique'
+};
+
+export const FORMAT_FERTILISANT_LABELS: Record<FormatFertilisant, string> = {
+    GRANULE: 'Granulé',
+    LIQUIDE: 'Liquide',
+    POUDRE: 'Poudre',
+    SOLIDE: 'Solide',
+    DECOMPOSE: 'Décomposé'
+};
+
+// ============================================================================
+// ENUMERATIONS - RAVAGEUR/MALADIE
+// ============================================================================
+
+export type CategorieRavageurMaladie = 'RAVAGEUR' | 'MALADIE';
+
+export const CATEGORIE_RAVAGEUR_MALADIE_LABELS: Record<CategorieRavageurMaladie, string> = {
+    RAVAGEUR: 'Ravageur',
+    MALADIE: 'Maladie'
+};
+
+// ============================================================================
+// INTERFACES - FERTILISANT
+// ============================================================================
+
+export interface FertilisantList {
+    id: number;
+    nom: string;
+    type_fertilisant: TypeFertilisant;
+    type_fertilisant_display: string;
+    format_fertilisant: FormatFertilisant;
+    format_fertilisant_display: string;
+    actif: boolean;
+    date_creation: string;
+}
+
+export interface FertilisantDetail {
+    id: number;
+    nom: string;
+    type_fertilisant: TypeFertilisant;
+    type_fertilisant_display: string;
+    format_fertilisant: FormatFertilisant;
+    format_fertilisant_display: string;
+    description: string;
+    actif: boolean;
+    date_creation: string;
+}
+
+export interface FertilisantCreate {
+    nom: string;
+    type_fertilisant: TypeFertilisant;
+    format_fertilisant: FormatFertilisant;
+    description?: string;
+    actif?: boolean;
+}
+
+// ============================================================================
+// INTERFACES - RAVAGEUR/MALADIE
+// ============================================================================
+
+export interface RavageurMaladieList {
+    id: number;
+    nom: string;
+    categorie: CategorieRavageurMaladie;
+    categorie_display: string;
+    symptomes: string;
+    partie_atteinte: string;
+    produits_count: number;
+    actif: boolean;
+    date_creation: string;
+}
+
+export interface RavageurMaladieDetail {
+    id: number;
+    nom: string;
+    categorie: CategorieRavageurMaladie;
+    categorie_display: string;
+    symptomes: string;
+    partie_atteinte: string;
+    produits_recommandes: ProduitList[];
+    actif: boolean;
+    date_creation: string;
+}
+
+export interface RavageurMaladieCreate {
+    nom: string;
+    categorie: CategorieRavageurMaladie;
+    symptomes: string;
+    partie_atteinte: string;
+    produits_recommandes?: number[];
+    actif?: boolean;
+}
+
+// ============================================================================
+// COULEURS UI - FERTILISANT & RAVAGEUR/MALADIE
+// ============================================================================
+
+export const TYPE_FERTILISANT_COLORS: Record<TypeFertilisant, { bg: string; text: string }> = {
+    CHIMIQUE: { bg: 'bg-blue-100', text: 'text-blue-800' },
+    ORGANIQUE: { bg: 'bg-green-100', text: 'text-green-800' },
+    BIOLOGIQUE: { bg: 'bg-emerald-100', text: 'text-emerald-800' },
+    MINERAL: { bg: 'bg-amber-100', text: 'text-amber-800' },
+    SUBSTRAT: { bg: 'bg-orange-100', text: 'text-orange-800' }
+};
+
+export const CATEGORIE_RAVAGEUR_MALADIE_COLORS: Record<CategorieRavageurMaladie, { bg: string; text: string }> = {
+    RAVAGEUR: { bg: 'bg-red-100', text: 'text-red-800' },
+    MALADIE: { bg: 'bg-purple-100', text: 'text-purple-800' }
+};
+
+// ============================================================================
+// TYPE UNIFIE POUR LA PAGE PRODUITS
+// ============================================================================
+
+export type TypeProduitUnifie = 'PHYTOSANITAIRE' | 'FERTILISANT' | 'RAVAGEUR_MALADIE';
+
+export const TYPE_PRODUIT_UNIFIE_LABELS: Record<TypeProduitUnifie, string> = {
+    PHYTOSANITAIRE: 'Produit phytosanitaire',
+    FERTILISANT: 'Fertilisant',
+    RAVAGEUR_MALADIE: 'Ravageur / Maladie'
+};
+
+export const TYPE_PRODUIT_UNIFIE_COLORS: Record<TypeProduitUnifie, { bg: string; text: string }> = {
+    PHYTOSANITAIRE: { bg: 'bg-cyan-100', text: 'text-cyan-800' },
+    FERTILISANT: { bg: 'bg-green-100', text: 'text-green-800' },
+    RAVAGEUR_MALADIE: { bg: 'bg-red-100', text: 'text-red-800' }
+};

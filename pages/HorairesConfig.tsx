@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Clock, Save, X, Plus, Trash2, Calendar, Edit2, Settings, Globe, Users, ChevronDown, ChevronUp } from 'lucide-react';
 import { api } from '@/services/api';
 import { useToast } from '../contexts/ToastContext';
+import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 
 /**
  * ✅ REFONTE: Configuration des horaires de travail
@@ -62,6 +63,7 @@ const HorairesConfig: React.FC<{ triggerCreate?: number }> = ({ triggerCreate })
   const [editingHoraire, setEditingHoraire] = useState<HoraireTravail | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForEquipe, setCreateForEquipe] = useState<number | null>(null);
+  const [deletingHoraireId, setDeletingHoraireId] = useState<number | null>(null);
 
   // Form state
   const [formData, setFormData] = useState<HoraireFormData>({
@@ -183,16 +185,22 @@ const HorairesConfig: React.FC<{ triggerCreate?: number }> = ({ triggerCreate })
     }
   };
 
-  const handleDelete = async (horaireId: number) => {
-    if (!confirm('Supprimer cet horaire ?')) return;
+  const handleDelete = (horaireId: number) => {
+    setDeletingHoraireId(horaireId);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingHoraireId) return;
 
     try {
-      await api.delete(`/api/users/horaires/${horaireId}/`);
+      await api.delete(`/api/users/horaires/${deletingHoraireId}/`);
       showToast('Horaire supprimé avec succès', 'success');
       loadData();
     } catch (error) {
       console.error('Erreur suppression:', error);
       showToast('Erreur lors de la suppression', 'error');
+    } finally {
+      setDeletingHoraireId(null);
     }
   };
 
@@ -617,6 +625,16 @@ const HorairesConfig: React.FC<{ triggerCreate?: number }> = ({ triggerCreate })
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de confirmation de suppression */}
+      {deletingHoraireId && (
+        <ConfirmDeleteModal
+          title="Supprimer cet horaire ?"
+          message="Cette action est irréversible. L'horaire sera définitivement supprimé."
+          onConfirm={confirmDelete}
+          onCancel={() => setDeletingHoraireId(null)}
+        />
       )}
     </div>
   );

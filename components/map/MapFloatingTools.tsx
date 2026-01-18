@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import {
   Layers,
-  Maximize2,
-  LayoutTemplate,
   Loader2,
   Printer,
   Ruler,
@@ -31,8 +29,6 @@ import { Utilisateur } from '../../types/users';
 export type ReportDrawingMode = 'none' | 'point' | 'circle' | 'polygon';
 
 interface MapFloatingToolsProps {
-  isPanelOpen: boolean;
-  onToggleMap?: () => void;
   showLayers: boolean;
   setShowLayers: (show: boolean) => void;
   isExporting: boolean;
@@ -70,8 +66,6 @@ interface MapFloatingToolsProps {
  * - PDF export button
  */
 export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
-  isPanelOpen,
-  onToggleMap,
   showLayers,
   setShowLayers,
   isExporting,
@@ -215,19 +209,7 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
     <div className="absolute top-24 right-4 pointer-events-auto flex flex-col gap-2 z-50 items-end">
       {/* Main button bar */}
       <div className="bg-white/90 backdrop-blur-md shadow-xl rounded-xl border border-white/20 overflow-hidden flex flex-col ring-1 ring-black/5 w-12">
-        {/* View Toggle Button */}
-        {onToggleMap && (
-          <>
-            <button
-              onClick={onToggleMap}
-              className={`p-3 transition-colors ${!isPanelOpen ? 'bg-emerald-600 text-white' : 'hover:bg-slate-50 text-slate-600'}`}
-              title={isPanelOpen ? "Carte Plein Écran" : "Afficher le Panneau"}
-            >
-              {isPanelOpen ? <Maximize2 className="w-5 h-5" /> : <LayoutTemplate className="w-5 h-5" />}
-            </button>
-            <div className="h-px bg-slate-100 w-full" />
-          </>
-        )}
+
 
         {/* Layers Toggle */}
         <button
@@ -435,39 +417,38 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
           </div>
 
           <div className="mb-3">
-              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Données</div>
-              <div className="flex gap-2">
-                {/* Import button - disabled for CLIENT with tooltip (backend: CanImportData) */}
-                {(() => {
-                  const canImport = !currentUser?.roles?.includes('CLIENT');
-                  return (
-                    <button
-                      onClick={canImport ? onImport : undefined}
-                      className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium border ${
-                        canImport
-                          ? 'bg-slate-50 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 border-transparent hover:border-emerald-200 cursor-pointer'
-                          : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Données</div>
+            <div className="flex gap-2">
+              {/* Import button - disabled for CLIENT with tooltip (backend: CanImportData) */}
+              {(() => {
+                const canImport = !currentUser?.roles?.includes('CLIENT');
+                return (
+                  <button
+                    onClick={canImport ? onImport : undefined}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium border ${canImport
+                      ? 'bg-slate-50 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 border-transparent hover:border-emerald-200 cursor-pointer'
+                      : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
                       }`}
-                      title={canImport ? "Importer des données" : "Import réservé aux administrateurs et superviseurs"}
-                      aria-disabled={!canImport}
-                    >
-                      {!canImport && <Lock className="w-3 h-3" />}
-                      <FolderInput className="w-3.5 h-3.5" />
-                      Importer
-                    </button>
-                  );
-                })()}
-                {/* Export button - visible for all (backend: CanExportData allows all authenticated users) */}
-                <button
-                  onClick={onExport}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 bg-slate-50 hover:bg-blue-50 hover:text-blue-700 text-slate-600 rounded-lg transition-colors text-xs font-medium border border-transparent hover:border-blue-200"
-                  title="Exporter des données"
-                >
-                  <FileOutput className="w-3.5 h-3.5" />
-                  Exporter
-                </button>
-              </div>
+                    title={canImport ? "Importer des données" : "Import réservé aux administrateurs et superviseurs"}
+                    aria-disabled={!canImport}
+                  >
+                    {!canImport && <Lock className="w-3 h-3" />}
+                    <FolderInput className="w-3.5 h-3.5" />
+                    Importer
+                  </button>
+                );
+              })()}
+              {/* Export button - visible for all (backend: CanExportData allows all authenticated users) */}
+              <button
+                onClick={onExport}
+                className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 bg-slate-50 hover:bg-blue-50 hover:text-blue-700 text-slate-600 rounded-lg transition-colors text-xs font-medium border border-transparent hover:border-blue-200"
+                title="Exporter des données"
+              >
+                <FileOutput className="w-3.5 h-3.5" />
+                Exporter
+              </button>
             </div>
+          </div>
 
           <div className="mb-3">
             <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Historique</div>
