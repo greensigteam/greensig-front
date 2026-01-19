@@ -19,6 +19,8 @@ const RatiosProductivite = lazy(() => import('./pages/RatiosProductivite'));
 const SuiviTaches = lazy(() => import('./pages/SuiviTaches'));
 const Produits = lazy(() => import('./pages/Produits'));
 const Reporting = lazy(() => import('./pages/Reporting'));
+const KPIDetail = lazy(() => import('./pages/KPIDetail'));
+const KPIHistorique = lazy(() => import('./pages/KPIHistorique'));
 const MonthlyReport = lazy(() => import('./pages/MonthlyReport'));
 const WeeklyReport = lazy(() => import('./pages/WeeklyReport'));
 const Users = lazy(() => import('./pages/Users'));
@@ -386,6 +388,16 @@ function App() {
                       <Route path="reporting" element={
                         <RequireRole user={user} roles={['ADMIN', 'SUPERVISEUR']}>
                           <Suspense fallback={<PageLoadingFallback />}><Reporting /></Suspense>
+                        </RequireRole>
+                      } />
+                      <Route path="reporting/kpi/:kpiKey" element={
+                        <RequireRole user={user} roles={['ADMIN', 'SUPERVISEUR']}>
+                          <Suspense fallback={<PageLoadingFallback />}><KPIDetail /></Suspense>
+                        </RequireRole>
+                      } />
+                      <Route path="reporting/kpis/historique" element={
+                        <RequireRole user={user} roles={['ADMIN', 'SUPERVISEUR']}>
+                          <Suspense fallback={<PageLoadingFallback />}><KPIHistorique /></Suspense>
                         </RequireRole>
                       } />
                       <Route path="monthly-report" element={

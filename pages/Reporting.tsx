@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     BarChart3, TrendingUp, Users, AlertTriangle, RefreshCw, Calendar,
-    Trees, Droplet, Building2, FileText
+    Trees, Droplet, Building2, FileText, Target
 } from 'lucide-react';
 import {
     BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
@@ -11,6 +11,7 @@ import { apiFetch } from '../services/api';
 import LoadingScreen from '../components/LoadingScreen';
 import MonthlyReport from './MonthlyReport';
 import WeeklyReport from './WeeklyReport';
+import KPIReport from './KPIReport';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -140,7 +141,7 @@ const ProgressBar: React.FC<{
     </div>
 );
 
-type TabType = 'statistics' | 'monthly' | 'weekly';
+type TabType = 'statistics' | 'monthly' | 'weekly' | 'kpis';
 
 const Reporting: React.FC = () => {
     const [activeTab, setActiveTab] = useState<TabType>('statistics');
@@ -171,6 +172,7 @@ const Reporting: React.FC = () => {
 
     const tabs = [
         { id: 'statistics' as TabType, label: 'Statistiques', icon: BarChart3 },
+        { id: 'kpis' as TabType, label: 'KPIs', icon: Target },
         { id: 'monthly' as TabType, label: 'Rapport de Site mensuel', icon: FileText },
         { id: 'weekly' as TabType, label: 'Rapport Hebdomadaire', icon: Calendar },
     ];
@@ -230,6 +232,35 @@ const Reporting: React.FC = () => {
                     </div>
                 </div>
                 <WeeklyReport />
+            </div>
+        );
+    }
+
+    if (activeTab === 'kpis') {
+        return (
+            <div className="h-full flex flex-col overflow-hidden">
+                {/* Tab Navigation */}
+                <div className="bg-white border-b border-slate-100 px-6 py-4 flex-shrink-0">
+                    <div className="w-full">
+                        <div className="flex gap-1">
+                            {tabs.map((tab) => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`flex items-center gap-2 px-4 py-3 font-medium text-sm rounded-t-lg transition-colors ${
+                                        activeTab === tab.id
+                                            ? 'bg-emerald-50 text-emerald-700 border-b-2 border-emerald-600'
+                                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    <tab.icon className="w-4 h-4" />
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+                <KPIReport />
             </div>
         );
     }
@@ -426,8 +457,8 @@ const Reporting: React.FC = () => {
                         Charge des Équipes
                     </h2>
                     {equipeChargeData.length > 0 ? (
-                        <div className="h-64">
-                            <ResponsiveContainer width="100%" height="100%">
+                        <div className="h-64 w-full">
+                            <ResponsiveContainer width="100%" height={256} minWidth={0}>
                                 <BarChart data={equipeChargeData} layout="vertical" margin={{ left: 60 }}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis type="number" domain={[0, 100]} />
@@ -498,8 +529,8 @@ const Reporting: React.FC = () => {
                     <div>
                         <h3 className="text-sm font-semibold text-slate-700 mb-3">Répartition par type</h3>
                         {reclamationsParTypeData.length > 0 ? (
-                            <div className="h-48">
-                                <ResponsiveContainer width="100%" height="100%">
+                            <div className="h-48 w-full">
+                                <ResponsiveContainer width="100%" height={192} minWidth={0}>
                                     <PieChart>
                                         <Pie
                                             data={reclamationsParTypeData}
@@ -530,8 +561,8 @@ const Reporting: React.FC = () => {
                     <div>
                         <h3 className="text-sm font-semibold text-slate-700 mb-3">Répartition par statut</h3>
                         {reclamationsParStatutData.length > 0 ? (
-                            <div className="h-48">
-                                <ResponsiveContainer width="100%" height="100%">
+                            <div className="h-48 w-full">
+                                <ResponsiveContainer width="100%" height={192} minWidth={0}>
                                     <BarChart data={reclamationsParStatutData}>
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis dataKey="name" tick={{ fontSize: 10 }} />
@@ -562,8 +593,8 @@ const Reporting: React.FC = () => {
                         <BarChart3 className="w-5 h-5 text-emerald-600" />
                         Répartition de l'Inventaire
                     </h2>
-                    <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div className="h-64 w-full">
+                        <ResponsiveContainer width="100%" height={256} minWidth={0}>
                             <PieChart>
                                 <Pie
                                     data={inventaireData}
@@ -606,8 +637,8 @@ const Reporting: React.FC = () => {
                     <h2 className="text-lg font-bold text-slate-800 mb-4">Distribution par État</h2>
                     {etatData.length > 0 ? (
                         <>
-                            <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
+                            <div className="h-64 w-full">
+                                <ResponsiveContainer width="100%" height={256} minWidth={0}>
                                     <PieChart>
                                         <Pie
                                             data={etatData}
