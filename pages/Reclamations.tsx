@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { AlertCircle, Edit2, Trash2, X, MapPin, ClipboardList, Calendar, TrendingUp, RefreshCw, Loader2, Settings, MoreVertical, Clock, Star, BarChart3, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText, AlertOctagon, Camera, Filter, Check, ChevronDown } from 'lucide-react';
+import { AlertCircle, Edit2, Trash2, X, MapPin, ClipboardList, Calendar, TrendingUp, RefreshCw, Loader2, Settings, MoreVertical, Clock, Star, BarChart3, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText, AlertOctagon, Camera, Filter, Check, ChevronDown, Download } from 'lucide-react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useSearch } from '../contexts/SearchContext';
 import { Reclamation, TypeReclamation, Urgence, ReclamationCreate, ReclamationStats } from '../types/reclamations';
@@ -13,7 +13,8 @@ import {
     deleteReclamation,
     updateReclamation,
     uploadPhoto,
-    fetchReclamationStats
+    fetchReclamationStats,
+    exportReclamationsExcel
 } from '../services/reclamationsApi';
 import { planningService } from '../services/planningService';
 import { fetchEquipes, fetchCurrentUser } from '../services/usersApi';
@@ -120,6 +121,9 @@ const Reclamations: React.FC = () => {
     // Stats
     const [stats, setStats] = useState<ReclamationStats | null>(null);
     const [statsLoading, setStatsLoading] = useState(false);
+
+    // Export
+    const [exporting, setExporting] = useState(false);
 
     // Referentiels Réclamation
     const [types, setTypes] = useState<TypeReclamation[]>([]);
@@ -501,6 +505,50 @@ const Reclamations: React.FC = () => {
         setPreSelectedSiteName(null);
     };
 
+    // Export Excel
+    const handleExportExcel = async () => {
+        setExporting(true);
+        try {
+            const blob = await exportReclamationsExcel({
+                statut: filterStatut || undefined,
+                site: filterSite ? parseInt(filterSite) : undefined,
+                date_debut: filterDateDebut || undefined,
+                date_fin: filterDateFin || undefined
+            });
+
+            // Télécharger le fichier
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const dateStr = format(new Date(), 'yyyy-MM-dd_HH-mm');
+            a.download = `reclamations_${dateStr}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            setModalConfig({
+                isOpen: true,
+                title: 'Export réussi',
+                message: 'Le fichier Excel a été téléchargé avec succès.',
+                variant: 'success',
+                onConfirm: () => setModalConfig(p => ({ ...p, isOpen: false }))
+            });
+        } catch (error: any) {
+            console.error('Export error:', error);
+            setModalConfig({
+                isOpen: true,
+                title: 'Erreur',
+                message: error.message || "Erreur lors de l'export.",
+                variant: 'danger',
+                onConfirm: () => setModalConfig(p => ({ ...p, isOpen: false }))
+            });
+        } finally {
+            setExporting(false);
+            setActionsMenuOpen(false);
+        }
+    };
+
     // ===================================
     // HANDLERS TACHE
     // ===================================
@@ -764,6 +812,21 @@ const Reclamations: React.FC = () => {
                         </button>
                     )}
 
+                    {/* Export Button */}
+                    <button
+                        onClick={handleExportExcel}
+                        disabled={exporting || loading}
+                        className="flex items-center gap-2 px-4 py-2 border border-slate-300 bg-white text-slate-700 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+                        title="Exporter en Excel"
+                    >
+                        {exporting ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Download className="w-4 h-4" />
+                        )}
+                        <span>Export</span>
+                    </button>
+
                     {/* Actions Dropdown */}
                     <div className="relative" ref={actionsMenuRef}>
                         <button
@@ -1020,8 +1083,16 @@ const Reclamations: React.FC = () => {
 
                                                                 {rowMenuOpen === rec.id && (
                                                                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-[60] animate-in fade-in slide-in-from-top-2 duration-150 ring-1 ring-black/5">
-                                                                        {/* Créer une tâche - Seulement ADMIN/SUPERVISEUR */}
-                                                                        {!isClient && rec.statut !== 'CLOTUREE' && (
+                                                                        {/* Message lecture seule si rejetée */}
+                                                                        {rec.statut === 'REJETEE' && (
+                                                                            <div className="px-4 py-2.5 text-xs text-red-600 bg-red-50 border-b border-red-100">
+                                                                                <X className="w-3 h-3 inline mr-1" />
+                                                                                Réclamation rejetée (lecture seule)
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* Créer une tâche - Seulement ADMIN/SUPERVISEUR, pas si clôturée/rejetée */}
+                                                                        {!isClient && rec.statut !== 'CLOTUREE' && rec.statut !== 'REJETEE' && (
                                                                             <button
                                                                                 onClick={(e) => {
                                                                                     e.stopPropagation();
@@ -1035,10 +1106,10 @@ const Reclamations: React.FC = () => {
                                                                             </button>
                                                                         )}
 
-                                                                        {/* Modifier/Supprimer - ADMIN ou créateur (CLIENT inclus) */}
-                                                                        {(isAdmin || rec.createur === currentUser?.id) && (
+                                                                        {/* Modifier - ADMIN ou créateur, pas si clôturée/rejetée */}
+                                                                        {(isAdmin || rec.createur === currentUser?.id) && rec.statut !== 'CLOTUREE' && rec.statut !== 'REJETEE' && (
                                                                             <>
-                                                                                {!isClient && rec.statut !== 'CLOTUREE' && (
+                                                                                {!isClient && (
                                                                                     <div className="my-1 border-t border-slate-100" />
                                                                                 )}
                                                                                 <button
@@ -1052,6 +1123,13 @@ const Reclamations: React.FC = () => {
                                                                                     <Edit2 className="w-4 h-4 text-emerald-500" />
                                                                                     Modifier
                                                                                 </button>
+                                                                            </>
+                                                                        )}
+
+                                                                        {/* Supprimer - ADMIN seulement (même si rejetée, pour nettoyage) */}
+                                                                        {isAdmin && (
+                                                                            <>
+                                                                                <div className="my-1 border-t border-slate-100" />
                                                                                 <button
                                                                                     onClick={(e) => {
                                                                                         e.stopPropagation();
