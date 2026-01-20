@@ -22,6 +22,8 @@ import {
     validerCloture,
     refuserCloture,
     rejeterReclamation,
+    refuserIntervention,
+    reprendreIntervention,
     createSatisfaction,
     deleteReclamation
 } from '../services/reclamationsApi';
@@ -180,6 +182,11 @@ const ReclamationDetailPage: React.FC = () => {
     const [showRejeterModal, setShowRejeterModal] = useState(false);
     const [justificationRejet, setJustificationRejet] = useState('');
     const [isSubmittingRejet, setIsSubmittingRejet] = useState(false);
+
+    // Refus d'intervention par le client
+    const [showRefuserInterventionModal, setShowRefuserInterventionModal] = useState(false);
+    const [motifRefusIntervention, setMotifRefusIntervention] = useState('');
+    const [isSubmittingRefusIntervention, setIsSubmittingRefusIntervention] = useState(false);
 
     // Modal de confirmation/notification
     const [modalConfig, setModalConfig] = useState<{
@@ -499,6 +506,69 @@ const ReclamationDetailPage: React.FC = () => {
         }
     };
 
+    // Refus d'intervention par le client
+    const handleRefuserIntervention = async () => {
+        if (!reclamation) return;
+
+        // Validation du motif
+        if (!motifRefusIntervention.trim()) {
+            setModalConfig({
+                isOpen: true,
+                title: 'Motif requis',
+                message: 'Vous devez obligatoirement expliquer pourquoi vous refusez l\'intervention.',
+                variant: 'warning'
+            });
+            return;
+        }
+
+        setIsSubmittingRefusIntervention(true);
+        try {
+            const updatedRec = await refuserIntervention(reclamation.id, motifRefusIntervention.trim());
+            setReclamation(updatedRec);
+
+            // Fermer le modal et réinitialiser
+            setShowRefuserInterventionModal(false);
+            setMotifRefusIntervention('');
+
+            window.dispatchEvent(new Event('refresh-reclamations'));
+
+            // Notification toast
+            showToast('Votre refus a bien été enregistré. Une nouvelle intervention sera planifiée.', 'info');
+        } catch (error: any) {
+            console.error(error);
+            setModalConfig({
+                isOpen: true,
+                title: 'Erreur',
+                message: error.message || 'Erreur lors du refus de l\'intervention.',
+                variant: 'danger'
+            });
+        } finally {
+            setIsSubmittingRefusIntervention(false);
+        }
+    };
+
+    // Reprendre l'intervention après refus (Admin/Superviseur)
+    const handleReprendreIntervention = async () => {
+        if (!reclamation) return;
+
+        try {
+            const updatedRec = await reprendreIntervention(reclamation.id);
+            setReclamation(updatedRec);
+
+            window.dispatchEvent(new Event('refresh-reclamations'));
+
+            showToast('Réclamation reprise. Une nouvelle intervention peut être planifiée.', 'success');
+        } catch (error: any) {
+            console.error(error);
+            setModalConfig({
+                isOpen: true,
+                title: 'Erreur',
+                message: error.message || 'Erreur lors de la reprise de l\'intervention.',
+                variant: 'danger'
+            });
+        }
+    };
+
     // Satisfaction
     const handleSatisfactionSubmit = async (data: { reclamation: number; note: number; commentaire?: string }) => {
         try {
@@ -597,6 +667,26 @@ const ReclamationDetailPage: React.FC = () => {
 
     return (
         <div className="h-full bg-slate-50">
+            {/* Bannière Réclamation Rejetée */}
+            {reclamation.statut === 'REJETEE' && (
+                <div className="bg-red-600 text-white px-6 py-3 flex items-center justify-center gap-3">
+                    <X className="w-5 h-5" />
+                    <span className="font-medium">
+                        Cette réclamation a été rejetée et est en lecture seule. Aucune action n'est possible.
+                    </span>
+                </div>
+            )}
+
+            {/* Bannière Réclamation Clôturée */}
+            {reclamation.statut === 'CLOTUREE' && (
+                <div className="bg-emerald-600 text-white px-6 py-3 flex items-center justify-center gap-3">
+                    <Star className="w-5 h-5" />
+                    <span className="font-medium">
+                        Cette réclamation a été clôturée avec succès.
+                    </span>
+                </div>
+            )}
+
             {/* Header */}
             <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
                 <div className="px-6">
@@ -621,8 +711,8 @@ const ReclamationDetailPage: React.FC = () => {
 
                         {/* Actions */}
                         <div className="flex items-center gap-3">
-                            {/* Bouton Modifier - visible pour Admin ou créateur si pas clôturée */}
-                            {(isAdmin || (currentUser && reclamation.createur === currentUser.id)) && reclamation.statut !== 'CLOTUREE' && (
+                            {/* Bouton Modifier - visible pour Admin ou créateur si pas clôturée/rejetée */}
+                            {(isAdmin || (currentUser && reclamation.createur === currentUser.id)) && reclamation.statut !== 'CLOTUREE' && reclamation.statut !== 'REJETEE' && (
                                 <button
                                     onClick={handleEdit}
                                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2 text-sm transition-colors"
@@ -632,7 +722,7 @@ const ReclamationDetailPage: React.FC = () => {
                                 </button>
                             )}
 
-                            {/* Bouton Supprimer - visible pour Admin seulement */}
+                            {/* Bouton Supprimer - visible pour Admin seulement (même si rejetée, pour nettoyage) */}
                             {isAdmin && (
                                 <button
                                     onClick={() => setShowDeleteConfirm(true)}
@@ -643,7 +733,8 @@ const ReclamationDetailPage: React.FC = () => {
                                 </button>
                             )}
 
-                            {isAdmin && reclamation.statut !== 'CLOTUREE' && (
+                            {/* Bouton Créer une tâche - pas si clôturée ou rejetée */}
+                            {isAdmin && reclamation.statut !== 'CLOTUREE' && reclamation.statut !== 'REJETEE' && (
                                 <button
                                     onClick={handleOpenTaskModal}
                                     className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-2 text-sm"
@@ -706,6 +797,33 @@ const ReclamationDetailPage: React.FC = () => {
                                 >
                                     <Star className="w-4 h-4" />
                                     Évaluer
+                                </button>
+                            )}
+
+                            {/* Bouton Refuser l'intervention - Client quand intervention terminée (pas si rejetée) */}
+                            {(isClient || (currentUser && reclamation.createur === currentUser.id)) &&
+                             reclamation.statut !== 'REJETEE' &&
+                             (reclamation.statut === 'RESOLUE' || reclamation.statut === 'EN_ATTENTE_VALIDATION_CLOTURE') &&
+                             reclamation.taches_liees_details?.some((t: any) => t.statut === 'TERMINEE') && (
+                                <button
+                                    onClick={() => setShowRefuserInterventionModal(true)}
+                                    className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium flex items-center gap-2 text-sm"
+                                    title="Refuser l'intervention effectuée (commentaire obligatoire)"
+                                >
+                                    <AlertCircle className="w-4 h-4" />
+                                    Refuser l'intervention
+                                </button>
+                            )}
+
+                            {/* Bouton Reprendre l'intervention - Admin quand intervention refusée */}
+                            {isAdmin && reclamation.statut === 'INTERVENTION_REFUSEE' && (
+                                <button
+                                    onClick={handleReprendreIntervention}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2 text-sm"
+                                    title="Reprendre l'intervention suite au refus client"
+                                >
+                                    <ClipboardList className="w-4 h-4" />
+                                    Reprendre l'intervention
                                 </button>
                             )}
                         </div>
@@ -786,13 +904,133 @@ const ReclamationDetailPage: React.FC = () => {
                                 </div>
                             </div>
 
+                            {/* Section Rejet par l'administrateur */}
                             {reclamation.justification_rejet && (
-                                <div className="mt-6 bg-red-50 p-4 rounded-lg border border-red-100">
-                                    <h4 className="text-xs font-semibold uppercase text-red-600 mb-1 flex items-center gap-1">
-                                        <AlertCircle className="w-3 h-3" />
-                                        Réponse Administrateur
+                                <div className="mt-6 bg-red-50 p-4 rounded-lg border border-red-200">
+                                    <h4 className="text-xs font-semibold uppercase text-red-600 mb-3 flex items-center gap-1">
+                                        <X className="w-3 h-3" />
+                                        Réclamation rejetée par l'administrateur
                                     </h4>
-                                    <p className="text-sm text-red-800 italic">{reclamation.justification_rejet}</p>
+                                    <div className="space-y-2">
+                                        {reclamation.rejetee_par_nom && (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs text-red-600 font-medium w-24">Rejetée par :</span>
+                                                <span className="text-sm font-semibold text-red-800">
+                                                    {reclamation.rejetee_par_nom}
+                                                </span>
+                                            </div>
+                                        )}
+                                        {reclamation.date_rejet && (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs text-red-600 font-medium w-24">Date :</span>
+                                                <span className="text-sm text-red-800">
+                                                    {formatLocalDate(reclamation.date_rejet, {
+                                                        day: 'numeric',
+                                                        month: 'long',
+                                                        year: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })}
+                                                </span>
+                                            </div>
+                                        )}
+                                        <div className="mt-3 pt-3 border-t border-red-200">
+                                            <span className="text-xs text-red-600 font-medium block mb-1">Motif du rejet :</span>
+                                            <p className="text-sm text-red-800 italic bg-white/50 rounded-lg p-3">
+                                                "{reclamation.justification_rejet}"
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Section Refus de clôture par le client (créateur) */}
+                            {reclamation.commentaire_refus_cloture && (
+                                <div className="mt-6 bg-purple-50 p-4 rounded-lg border border-purple-200">
+                                    <h4 className="text-xs font-semibold uppercase text-purple-600 mb-3 flex items-center gap-1">
+                                        <Clock className="w-3 h-3" />
+                                        Clôture refusée par le client
+                                    </h4>
+                                    <div className="space-y-2">
+                                        {reclamation.cloture_refusee_par_nom && (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs text-purple-600 font-medium w-24">Refusée par :</span>
+                                                <span className="text-sm font-semibold text-purple-800">
+                                                    {reclamation.cloture_refusee_par_nom}
+                                                </span>
+                                            </div>
+                                        )}
+                                        {reclamation.date_refus_cloture && (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs text-purple-600 font-medium w-24">Date :</span>
+                                                <span className="text-sm text-purple-800">
+                                                    {formatLocalDate(reclamation.date_refus_cloture, {
+                                                        day: 'numeric',
+                                                        month: 'long',
+                                                        year: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })}
+                                                </span>
+                                            </div>
+                                        )}
+                                        <div className="mt-3 pt-3 border-t border-purple-200">
+                                            <span className="text-xs text-purple-600 font-medium block mb-1">Motif du refus :</span>
+                                            <p className="text-sm text-purple-800 italic bg-white/50 rounded-lg p-3">
+                                                "{reclamation.commentaire_refus_cloture}"
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Section Refus d'intervention par le client */}
+                            {(reclamation.statut === 'INTERVENTION_REFUSEE' || reclamation.motif_refus_intervention) && (
+                                <div className="mt-6 bg-orange-50 p-4 rounded-lg border border-orange-200">
+                                    <h4 className="text-xs font-semibold uppercase text-orange-600 mb-3 flex items-center gap-1">
+                                        <AlertCircle className="w-3 h-3" />
+                                        Intervention refusée par le client
+                                    </h4>
+                                    <div className="space-y-2">
+                                        {reclamation.intervention_refusee_par_nom && (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs text-orange-600 font-medium w-24">Refusée par :</span>
+                                                <span className="text-sm font-semibold text-orange-800">
+                                                    {reclamation.intervention_refusee_par_nom}
+                                                </span>
+                                            </div>
+                                        )}
+                                        {reclamation.date_refus_intervention && (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs text-orange-600 font-medium w-24">Date :</span>
+                                                <span className="text-sm text-orange-800">
+                                                    {formatLocalDate(reclamation.date_refus_intervention, {
+                                                        day: 'numeric',
+                                                        month: 'long',
+                                                        year: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })}
+                                                </span>
+                                            </div>
+                                        )}
+                                        {reclamation.nombre_refus && reclamation.nombre_refus > 0 && (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs text-orange-600 font-medium w-24">Nb de refus :</span>
+                                                <span className="text-sm font-semibold text-orange-800">
+                                                    {reclamation.nombre_refus} fois
+                                                </span>
+                                            </div>
+                                        )}
+                                        {reclamation.motif_refus_intervention && (
+                                            <div className="mt-3 pt-3 border-t border-orange-200">
+                                                <span className="text-xs text-orange-600 font-medium block mb-1">Motif du refus :</span>
+                                                <p className="text-sm text-orange-800 italic bg-white/50 rounded-lg p-3">
+                                                    "{reclamation.motif_refus_intervention}"
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -1241,6 +1479,108 @@ const ReclamationDetailPage: React.FC = () => {
                                     <>
                                         <AlertCircle className="w-4 h-4" />
                                         Confirmer le rejet
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de refus d'intervention par le client */}
+            {showRefuserInterventionModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl max-w-lg w-full shadow-xl border border-slate-200 animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                    <AlertCircle className="w-5 h-5 text-orange-600" />
+                                    Refuser l'intervention
+                                </h2>
+                                <p className="text-sm text-slate-500 mt-1">
+                                    L'intervention effectuée ne vous convient pas ?
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setShowRefuserInterventionModal(false);
+                                    setMotifRefusIntervention('');
+                                }}
+                                className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+                                disabled={isSubmittingRefusIntervention}
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 flex items-start gap-3">
+                                <Info className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                                <div className="text-sm text-orange-800">
+                                    <p className="font-semibold mb-1">Commentaire obligatoire</p>
+                                    <p>
+                                        Veuillez expliquer précisément ce qui ne convient pas dans l'intervention effectuée.
+                                        Cela permettra à l'équipe de comprendre le problème et d'effectuer les corrections nécessaires.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {reclamation && reclamation.nombre_refus && reclamation.nombre_refus > 0 && (
+                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center gap-2">
+                                    <AlertCircle className="w-4 h-4 text-yellow-600" />
+                                    <span className="text-sm text-yellow-800">
+                                        Cette réclamation a déjà été refusée {reclamation.nombre_refus} fois.
+                                    </span>
+                                </div>
+                            )}
+
+                            <PremiumTextarea
+                                value={motifRefusIntervention}
+                                onChange={(value) => setMotifRefusIntervention(value)}
+                                label="Motif du refus"
+                                placeholder="Décrivez précisément ce qui ne va pas : qualité insuffisante, travaux incomplets, erreur de réalisation..."
+                                icon={<Edit2 className="w-4 h-4" />}
+                                required
+                                variant="outlined"
+                                size="md"
+                                rows={5}
+                            />
+
+                            <div className="text-xs text-slate-500 bg-slate-50 rounded-lg p-3">
+                                <p className="font-semibold mb-1">Après validation de votre refus :</p>
+                                <ul className="list-disc list-inside space-y-1">
+                                    <li>La réclamation passera au statut "Intervention refusée"</li>
+                                    <li>L'équipe sera notifiée de votre refus avec votre commentaire</li>
+                                    <li>Une nouvelle intervention sera planifiée pour résoudre le problème</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowRefuserInterventionModal(false);
+                                    setMotifRefusIntervention('');
+                                }}
+                                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors font-medium"
+                                disabled={isSubmittingRefusIntervention}
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleRefuserIntervention}
+                                disabled={isSubmittingRefusIntervention || !motifRefusIntervention.trim()}
+                                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
+                            >
+                                {isSubmittingRefusIntervention ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        Envoi...
+                                    </>
+                                ) : (
+                                    <>
+                                        <AlertCircle className="w-4 h-4" />
+                                        Confirmer le refus
                                     </>
                                 )}
                             </button>

@@ -39,13 +39,6 @@ interface FormatOption {
 
 const FORMAT_OPTIONS: FormatOption[] = [
     {
-        id: 'csv',
-        name: 'CSV',
-        description: 'Tableur (Excel, LibreOffice)',
-        icon: <FileSpreadsheet className="w-5 h-5" />,
-        category: 'data',
-    },
-    {
         id: 'xlsx',
         name: 'Excel',
         description: 'Microsoft Excel (.xlsx)',

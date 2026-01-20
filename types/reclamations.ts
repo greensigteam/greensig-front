@@ -71,6 +71,24 @@ export interface Reclamation {
     cloture_proposee_par?: number | null;
     date_proposition_cloture?: string | null;
 
+    // Rejet par l'administrateur
+    rejetee_par?: number | null;
+    rejetee_par_nom?: string | null;
+    date_rejet?: string | null;
+
+    // Refus de clôture par le client (créateur)
+    cloture_refusee_par?: number | null;
+    cloture_refusee_par_nom?: string | null;
+    date_refus_cloture?: string | null;
+    commentaire_refus_cloture?: string | null;
+
+    // Refus d'intervention par le client
+    intervention_refusee_par?: number | null;
+    intervention_refusee_par_nom?: string | null;
+    date_refus_intervention?: string | null;
+    motif_refus_intervention?: string | null;
+    nombre_refus?: number;
+
     photos?: any[]; // Photos directes de la réclamation
     photos_taches?: any[]; // Photos des tâches liées
     historique?: HistoriqueReclamation[];

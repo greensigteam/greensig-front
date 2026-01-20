@@ -74,7 +74,8 @@ export const RECLAMATION_STATUS_COLORS: Record<string, string> = {
   'PRISE_EN_COMPTE': '#f97316', // Orange - prise en compte
   'EN_COURS': '#f97316',        // Orange - en attente de réalisation
   'RESOLUE': '#22c55e',         // Vert - tâche terminée côté administrateur
-  'EN_ATTENTE_VALIDATION_CLOTURE': '#22c55e', // Vert - en attente de validation client
+  'EN_ATTENTE_VALIDATION_CLOTURE': '#10b981', // Vert clair - en attente de validation client
+  'INTERVENTION_REFUSEE': '#dc2626', // Rouge foncé - intervention refusée par le client
   'CLOTUREE': '#22c55e',        // Vert - validée côté client
   'REJETEE': '#6b7280',         // Gris - rejetée
 };
@@ -85,6 +86,7 @@ export const RECLAMATION_STATUS_LABELS: Record<string, string> = {
   'EN_COURS': 'En attente de réalisation',
   'RESOLUE': 'Tâche terminée côté administrateur',
   'EN_ATTENTE_VALIDATION_CLOTURE': 'En attente de validation de clôture',
+  'INTERVENTION_REFUSEE': 'Intervention refusée par le client',
   'CLOTUREE': 'Validée côté client',
   'REJETEE': 'Rejetée',
 };

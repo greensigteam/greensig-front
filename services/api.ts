@@ -839,12 +839,12 @@ export async function exportPDF(data: ExportPDFRequest): Promise<Blob> {
 }
 
 // ==============================================================================
-// EXPORT DONNÉES (CSV/Excel)
+// EXPORT DONNÉES (Excel)
 // ==============================================================================
 
 export async function exportData(
   model: string,  // 'arbres', 'gazons', 'puits', etc.
-  format: 'csv' | 'xlsx'
+  format: 'xlsx' = 'xlsx'
 ): Promise<Blob> {
   try {
     const response = await apiFetch(`${API_BASE_URL}/export/${model}/?format=${format}`)
@@ -1474,7 +1474,7 @@ export async function importExecute(
 // EXPORT GÉOGRAPHIQUE
 // ==============================================================================
 
-export type ExportFormat = 'csv' | 'xlsx' | 'geojson' | 'kml' | 'shapefile';
+export type ExportFormat = 'xlsx' | 'geojson' | 'kml' | 'shapefile';
 
 /**
  * Export data in various formats
@@ -1531,7 +1531,6 @@ export async function exportSelection(
  */
 export function getExportFileExtension(format: ExportFormat): string {
   switch (format) {
-    case 'csv': return '.csv';
     case 'xlsx': return '.xlsx';
     case 'geojson': return '.geojson';
     case 'kml': return '.kml';
@@ -1545,7 +1544,6 @@ export function getExportFileExtension(format: ExportFormat): string {
  */
 export function getExportMimeType(format: ExportFormat): string {
   switch (format) {
-    case 'csv': return 'text/csv';
     case 'xlsx': return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
     case 'geojson': return 'application/geo+json';
     case 'kml': return 'application/vnd.google-earth.kml+xml';
