@@ -250,6 +250,32 @@ export const rejeterReclamation = async (id: number, justification: string): Pro
     return result.reclamation || result;
 };
 
+/**
+ * Refuser une intervention (Client uniquement)
+ * Le motif de refus est obligatoire
+ */
+export const refuserIntervention = async (id: number, motifRefus: string): Promise<Reclamation> => {
+    const response = await fetch(`${API_BASE_URL}/reclamations/${id}/refuser_intervention/`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ motif_refus: motifRefus })
+    });
+    const result = await handleResponse<any>(response);
+    return result.reclamation || result;
+};
+
+/**
+ * Reprendre une intervention après refus client (Admin/Superviseur)
+ */
+export const reprendreIntervention = async (id: number): Promise<Reclamation> => {
+    const response = await fetch(`${API_BASE_URL}/reclamations/${id}/reprendre_intervention/`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+    });
+    const result = await handleResponse<any>(response);
+    return result.reclamation || result;
+};
+
 // ============================================================================
 // USER 6.6.13 - SATISFACTION CLIENT
 // ============================================================================
@@ -374,5 +400,50 @@ export const fetchReclamationStats = async (filters?: {
         headers: getAuthHeaders()
     });
     return handleResponse<ReclamationStats>(response);
+};
+
+// ============================================================================
+// EXPORT EXCEL
+// ============================================================================
+
+export interface ReclamationExportFilters {
+    statut?: string;
+    urgence?: number;
+    type_reclamation?: number;
+    site?: number;
+    date_debut?: string;
+    date_fin?: string;
+}
+
+/**
+ * Export des réclamations en Excel avec horodatage de toutes les étapes
+ * Retourne un Blob du fichier Excel
+ */
+export const exportReclamationsExcel = async (filters?: ReclamationExportFilters): Promise<Blob> => {
+    const params = new URLSearchParams();
+
+    if (filters?.statut) params.append('statut', filters.statut);
+    if (filters?.urgence) params.append('urgence', filters.urgence.toString());
+    if (filters?.type_reclamation) params.append('type_reclamation', filters.type_reclamation.toString());
+    if (filters?.site) params.append('site', filters.site.toString());
+    if (filters?.date_debut) params.append('date_debut', filters.date_debut);
+    if (filters?.date_fin) params.append('date_fin', filters.date_fin);
+
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/export/excel/?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+            ...(token && { Authorization: `Bearer ${token}` })
+        }
+    });
+
+    if (!response.ok) {
+        if (response.status === 404) {
+            throw new Error('Aucune réclamation à exporter');
+        }
+        throw new Error(`Erreur export: ${response.status}`);
+    }
+
+    return response.blob();
 };
 
