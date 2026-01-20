@@ -111,6 +111,7 @@ const SuiviTaches: React.FC = () => {
     // Delete confirmation modals
     const [deletingPhotoId, setDeletingPhotoId] = useState<number | null>(null);
     const [deletingConsommationId, setDeletingConsommationId] = useState<number | null>(null);
+    const [deletingTacheId, setDeletingTacheId] = useState<number | null>(null);
 
     // Edit modal state
     const [showEditModal, setShowEditModal] = useState(false);
@@ -473,6 +474,21 @@ const SuiviTaches: React.FC = () => {
             setDeletingConsommationId(null);
         } catch (error) {
             console.error("Erreur suppression consommation", error);
+            throw error;
+        }
+    };
+
+    // --- SUPPRESSION TÂCHE ---
+    const handleDeleteTache = async (tacheId: number) => {
+        try {
+            await planningService.deleteTache(tacheId);
+            setTaches(prev => prev.filter(t => t.id !== tacheId));
+            setSelectedTache(null);
+            setDeletingTacheId(null);
+            showToast("Tâche supprimée avec succès", 'success');
+        } catch (error) {
+            console.error("Erreur suppression tâche", error);
+            showToast("Erreur lors de la suppression de la tâche", 'error');
             throw error;
         }
     };
@@ -943,6 +959,17 @@ const SuiviTaches: React.FC = () => {
                                             >
                                                 {loadingTypesTaches ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />}
                                                 Modifier
+                                            </button>
+                                        )}
+                                        {/* Delete Button */}
+                                        {(selectedTache.statut === 'PLANIFIEE' || selectedTache.statut === 'NON_DEBUTEE') && (
+                                            <button
+                                                onClick={() => setDeletingTacheId(selectedTache.id)}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm"
+                                                title="Supprimer la tâche"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                                Supprimer
                                             </button>
                                         )}
                                         {(selectedTache.statut === 'PLANIFIEE' || selectedTache.statut === 'NON_DEBUTEE') && (() => {
@@ -1704,6 +1731,17 @@ const SuiviTaches: React.FC = () => {
                         message="Cette action est irréversible."
                         onConfirm={() => handleDeleteConsommation(deletingConsommationId)}
                         onCancel={() => setDeletingConsommationId(null)}
+                    />
+                )
+            }
+
+            {
+                deletingTacheId && (
+                    <ConfirmDeleteModal
+                        title="Supprimer cette tâche ?"
+                        message="Cette action supprimera définitivement la tâche ainsi que toutes ses distributions, photos et consommations associées. Cette action est irréversible."
+                        onConfirm={() => handleDeleteTache(deletingTacheId)}
+                        onCancel={() => setDeletingTacheId(null)}
                     />
                 )
             }
