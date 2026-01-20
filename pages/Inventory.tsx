@@ -128,7 +128,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, options, i
 };
 
 // Composant ExportDropdown
-const ExportDropdown = ({ onExportCSV, onExportExcel, onPrint }: { onExportCSV: () => void, onExportExcel: () => void, onPrint: () => void }) => {
+const ExportDropdown = ({ onExportExcel, onPrint }: { onExportExcel: () => void, onPrint: () => void }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -155,13 +155,6 @@ const ExportDropdown = ({ onExportCSV, onExportExcel, onPrint }: { onExportCSV: 
 
       {isOpen && (
         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-100 z-50 py-1 animate-in fade-in zoom-in-95 duration-100">
-          <button
-            onClick={() => { onExportCSV(); setIsOpen(false); }}
-            className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-          >
-            <FileText className="w-4 h-4 text-emerald-600" />
-            CSV
-          </button>
           <button
             onClick={() => { onExportExcel(); setIsOpen(false); }}
             className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
@@ -872,42 +865,6 @@ const Inventory: React.FC<InventoryProps> = ({ user }) => {
 
   const columns = getColumns();
 
-  // Export CSV
-  const handleExportCSV = () => {
-    const filename = `inventaire_${filters.type !== 'all' ? filters.type + '_' : ''}${new Date().toISOString().split('T')[0]}.csv`;
-    const headers = columns.map(col => col.label);
-    const dataToExport = inventoryData.map(item => {
-      return columns.map(col => {
-        if (col.render) {
-          if (col.key === 'siteId') {
-            const site = sites.find(s => s.id === item.siteId);
-            return site?.name || item.siteId || '-';
-          } else if (col.key === 'type') return item.type;
-          else if (col.key === 'state') return item.state;
-          else if (col.key === 'species') return item.species || '-';
-          else if (col.key === 'height') return item.height ? `${item.height} m` : '-';
-          else if (col.key === 'diameter') return item.diameter ? `${item.diameter} cm` : '-';
-          else if (col.key === 'surface') return item.surface ? `${item.surface} m²` : '-';
-          else if (col.key === 'lastIntervention') return item.lastIntervention ? new Date(item.lastIntervention).toLocaleDateString('fr-FR') : '-';
-        }
-        return (item as any)[col.key] || '-';
-      });
-    });
-
-    if (dataToExport.length === 0) {
-      alert("Aucune donnée à exporter.");
-      return;
-    }
-
-    const csvContent = '\uFEFF' + [
-      headers.join(';'),
-      ...dataToExport.map(row => row.map((cell: any) => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    downloadBlob(blob, filename);
-  };
-
   // Export Excel amélioré
   const handleExportExcel = async () => {
     try {
@@ -1119,7 +1076,6 @@ const Inventory: React.FC<InventoryProps> = ({ user }) => {
 
           {/* Export Dropdown */}
           <ExportDropdown
-            onExportCSV={handleExportCSV}
             onExportExcel={handleExportExcel}
             onPrint={handlePrint}
           />
