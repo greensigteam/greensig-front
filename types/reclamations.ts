@@ -99,6 +99,9 @@ export interface Reclamation {
         commentaire?: string;
         date_evaluation: string;
     } | null;
+
+    // Visibilité client (réclamations internes)
+    visible_client?: boolean;
 }
 
 export interface ReclamationCreate {
@@ -110,6 +113,7 @@ export interface ReclamationCreate {
     date_constatation?: string;
     localisation?: any;
     photos?: any[];
+    visible_client?: boolean; // false = réclamation interne (admin/superviseur only)
 }
 
 // User 6.6.13 - Satisfaction Client

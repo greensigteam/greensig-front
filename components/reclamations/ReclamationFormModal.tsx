@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Calendar, Circle, Pentagon, Target, AlertTriangle, Loader2, CheckCircle2, FileText, AlertOctagon, Camera } from 'lucide-react';
+import { MapPin, Calendar, Circle, Pentagon, Target, AlertTriangle, Loader2, CheckCircle2, FileText, AlertOctagon, Camera, EyeOff } from 'lucide-react';
 import { TypeReclamation, Urgence, ReclamationCreate, Reclamation } from '../../types/reclamations';
 import { GeoJSONGeometry } from '../../types';
 import { createReclamation, uploadPhoto, detectSiteFromGeometry, DetectedSiteInfo } from '../../services/reclamationsApi';
@@ -17,6 +17,7 @@ interface ReclamationFormModalProps {
     urgences: Urgence[];
     preSelectedSiteId?: number;
     preSelectedSiteName?: string;
+    userRole?: string; // Pour afficher l'option visible_client (ADMIN/SUPERVISEUR uniquement)
 }
 
 export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
@@ -28,10 +29,14 @@ export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
     urgences,
     preSelectedSiteId,
     preSelectedSiteName,
+    userRole,
 }) => {
+    // Déterminer si l'utilisateur peut créer des réclamations internes (masquées au client)
+    const canCreateInternal = userRole === 'ADMIN' || userRole === 'SUPERVISEUR';
     const [formData, setFormData] = useState<Partial<ReclamationCreate>>({
         site: preSelectedSiteId,
         date_constatation: new Date().toISOString(), // Valeur par défaut: maintenant
+        visible_client: true, // Visible au client par défaut
     });
     const [photos, setPhotos] = useState<File[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -165,6 +170,7 @@ export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
                 date_constatation: formData.date_constatation,
                 site: formData.site,
                 localisation: geometry, // Include drawn geometry
+                visible_client: formData.visible_client ?? true, // Par défaut visible
             };
 
             // Create reclamation
@@ -351,6 +357,34 @@ export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
                         onChange={setPhotos}
                     />
                 </div>
+
+                {/* Option de visibilité client (admin/superviseur uniquement) */}
+                {canCreateInternal && (
+                    <div className="border-t border-slate-200 pt-4 mt-4">
+                        <label className="flex items-start gap-3 cursor-pointer group">
+                            <input
+                                type="checkbox"
+                                checked={formData.visible_client === false}
+                                onChange={(e) => setFormData({
+                                    ...formData,
+                                    visible_client: !e.target.checked
+                                })}
+                                className="mt-0.5 w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 focus:ring-offset-0"
+                            />
+                            <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                    <EyeOff className="w-4 h-4 text-amber-600" />
+                                    <span className="text-sm font-medium text-slate-700 group-hover:text-slate-900">
+                                        Réclamation interne (masquée au client)
+                                    </span>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    Cocher cette case pour créer une réclamation visible uniquement par l'administration
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+                )}
             </div>
         </FormModal>
     );

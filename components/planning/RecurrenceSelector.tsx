@@ -15,6 +15,9 @@ export interface RecurrenceConfig {
     mode: 'frequency' | 'custom' | 'dates';
     // Mode fréquence
     frequency?: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+    // Jours spécifiques (pour WEEKLY: 0=Lundi, 6=Dimanche; pour MONTHLY: 1-31)
+    jours_semaine?: number[];
+    jours_mois?: number[];
     // Mode custom
     decalage_jours?: number;
     // Mode dates
@@ -41,6 +44,17 @@ const FREQUENCE_MAPPING = {
     'MONTHLY': { label: 'Mensuel (tous les mois)', decalage: 30 },
     'YEARLY': { label: 'Annuel (tous les ans)', decalage: 365 }
 };
+
+// Jours de la semaine (0 = Lundi, 6 = Dimanche - convention ISO)
+const JOURS_SEMAINE = [
+    { value: 0, label: 'Lun', fullLabel: 'Lundi' },
+    { value: 1, label: 'Mar', fullLabel: 'Mardi' },
+    { value: 2, label: 'Mer', fullLabel: 'Mercredi' },
+    { value: 3, label: 'Jeu', fullLabel: 'Jeudi' },
+    { value: 4, label: 'Ven', fullLabel: 'Vendredi' },
+    { value: 5, label: 'Sam', fullLabel: 'Samedi' },
+    { value: 6, label: 'Dim', fullLabel: 'Dimanche' }
+];
 
 // ============================================================================
 // COMPONENT
@@ -75,6 +89,12 @@ export const RecurrenceSelector: FC<RecurrenceSelectorProps> = ({
 
     const [conserverEquipes, setConserverEquipes] = useState(value?.conserver_equipes ?? true);
     const [conserverObjets, setConserverObjets] = useState(value?.conserver_objets ?? true);
+
+    // Jours spécifiques de la semaine (pour WEEKLY/MONTHLY)
+    const [joursSemaine, setJoursSemaine] = useState<number[]>(value?.jours_semaine ?? []);
+    const [useSpecificDays, setUseSpecificDays] = useState(
+        (value?.jours_semaine && value.jours_semaine.length > 0) ?? false
+    );
 
     // Calculer la durée de la tâche en jours
     const dureeTache = useMemo(() => {
@@ -149,6 +169,10 @@ export const RecurrenceSelector: FC<RecurrenceSelectorProps> = ({
 
         if (mode === 'frequency') {
             config.frequency = frequency;
+            // Ajouter les jours spécifiques si activé et pertinent
+            if (useSpecificDays && joursSemaine.length > 0 && (frequency === 'WEEKLY' || frequency === 'MONTHLY')) {
+                config.jours_semaine = joursSemaine;
+            }
         } else if (mode === 'custom') {
             config.decalage_jours = decalageJours;
         } else if (mode === 'dates') {
@@ -162,7 +186,7 @@ export const RecurrenceSelector: FC<RecurrenceSelectorProps> = ({
         }
 
         onChange(config);
-    }, [enabled, mode, frequency, decalageJours, datesCibles, limitMode, nombreOccurrences, dateFinRecurrence, conserverEquipes, conserverObjets]);
+    }, [enabled, mode, frequency, decalageJours, datesCibles, limitMode, nombreOccurrences, dateFinRecurrence, conserverEquipes, conserverObjets, useSpecificDays, joursSemaine]);
 
     if (!enabled) {
         return (
@@ -268,18 +292,101 @@ export const RecurrenceSelector: FC<RecurrenceSelectorProps> = ({
                 {/* Configuration selon le mode */}
                 <div className="bg-white rounded-lg p-4 border border-emerald-100">
                     {mode === 'frequency' && (
-                        <PremiumSelect
-                            value={frequency}
-                            onChange={(val) => setFrequency(val as typeof frequency)}
-                            options={Object.entries(FREQUENCE_MAPPING).map(([key, data]) => ({
-                                value: key,
-                                label: data.label
-                            }))}
-                            label="Fréquence"
-                            icon={<Clock className="w-4 h-4" />}
-                            variant="outlined"
-                            size="md"
-                        />
+                        <div className="space-y-4">
+                            <PremiumSelect
+                                value={frequency}
+                                onChange={(val) => {
+                                    setFrequency(val as typeof frequency);
+                                    // Réinitialiser les jours si on change de fréquence
+                                    if (val === 'DAILY' || val === 'YEARLY') {
+                                        setUseSpecificDays(false);
+                                        setJoursSemaine([]);
+                                    }
+                                }}
+                                options={Object.entries(FREQUENCE_MAPPING).map(([key, data]) => ({
+                                    value: key,
+                                    label: data.label
+                                }))}
+                                label="Fréquence"
+                                icon={<Clock className="w-4 h-4" />}
+                                variant="outlined"
+                                size="md"
+                            />
+
+                            {/* Sélection des jours spécifiques - uniquement pour WEEKLY ou MONTHLY */}
+                            {(frequency === 'WEEKLY' || frequency === 'MONTHLY') && (
+                                <div className="border-t border-gray-100 pt-4">
+                                    <label className="flex items-center gap-2 cursor-pointer mb-3">
+                                        <input
+                                            type="checkbox"
+                                            checked={useSpecificDays}
+                                            onChange={(e) => {
+                                                setUseSpecificDays(e.target.checked);
+                                                if (!e.target.checked) {
+                                                    setJoursSemaine([]);
+                                                }
+                                            }}
+                                            className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                                        />
+                                        <span className="text-sm font-medium text-gray-700">
+                                            Sélectionner des jours spécifiques
+                                        </span>
+                                    </label>
+
+                                    {useSpecificDays && (
+                                        <div className="space-y-2">
+                                            <p className="text-xs text-gray-500 mb-2">
+                                                {frequency === 'WEEKLY'
+                                                    ? 'Choisissez les jours de la semaine où la tâche sera répétée'
+                                                    : 'Choisissez les jours du mois où la tâche sera répétée'}
+                                            </p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {JOURS_SEMAINE.map((jour) => {
+                                                    const isSelected = joursSemaine.includes(jour.value);
+                                                    return (
+                                                        <button
+                                                            key={jour.value}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                if (isSelected) {
+                                                                    setJoursSemaine(joursSemaine.filter(j => j !== jour.value));
+                                                                } else {
+                                                                    setJoursSemaine([...joursSemaine, jour.value].sort((a, b) => a - b));
+                                                                }
+                                                            }}
+                                                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                                                                isSelected
+                                                                    ? 'bg-emerald-600 text-white shadow-sm'
+                                                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                            }`}
+                                                            title={jour.fullLabel}
+                                                        >
+                                                            {jour.label}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                            {joursSemaine.length > 0 && (
+                                                <p className="text-xs text-emerald-700 mt-2 bg-emerald-50 px-3 py-2 rounded-lg">
+                                                    La tâche sera répétée chaque {frequency === 'WEEKLY' ? 'semaine' : 'mois'} les : {' '}
+                                                    <strong>
+                                                        {joursSemaine
+                                                            .map(j => JOURS_SEMAINE.find(js => js.value === j)?.fullLabel)
+                                                            .join(', ')}
+                                                    </strong>
+                                                </p>
+                                            )}
+                                            {joursSemaine.length === 0 && (
+                                                <p className="text-xs text-amber-700 mt-2 bg-amber-50 px-3 py-2 rounded-lg flex items-center gap-2">
+                                                    <AlertTriangle className="w-4 h-4" />
+                                                    Sélectionnez au moins un jour
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     )}
 
                     {mode === 'custom' && (

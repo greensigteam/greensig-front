@@ -256,12 +256,12 @@ const OngletReclamations: React.FC<{
                                 )}
                             </div>
                             <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                                rec.statut === 'RESOLUE' ? 'bg-emerald-100 text-emerald-700' :
-                                rec.statut === 'NOUVELLE' ? 'bg-blue-100 text-blue-700' :
-                                rec.statut === 'EN_COURS' ? 'bg-amber-100 text-amber-700' :
+                                rec.statut === 'RESOLUE' || rec.statut === 'CLOTUREE' ? 'bg-emerald-100 text-emerald-700' :
+                                rec.statut === 'NOUVELLE' ? 'bg-red-100 text-red-700' :
+                                rec.statut === 'EN_COURS' ? 'bg-orange-100 text-orange-700' :
                                 'bg-slate-100 text-slate-600'
                             }`}>
-                                {rec.statut?.replace('_', ' ')}
+                                {rec.statut_display || rec.statut?.replace('_', ' ')}
                             </span>
                         </div>
                     </div>

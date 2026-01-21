@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { AlertCircle, Edit2, Trash2, X, MapPin, ClipboardList, Calendar, TrendingUp, RefreshCw, Loader2, Settings, MoreVertical, Clock, Star, BarChart3, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText, AlertOctagon, Camera, Filter, Check, ChevronDown, Download } from 'lucide-react';
+import { AlertCircle, Edit2, Trash2, X, MapPin, ClipboardList, Calendar, TrendingUp, RefreshCw, Loader2, Settings, MoreVertical, Clock, Star, BarChart3, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertOctagon, Filter, Check, ChevronDown, Download, EyeOff } from 'lucide-react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useSearch } from '../contexts/SearchContext';
 import { Reclamation, TypeReclamation, Urgence, ReclamationCreate, ReclamationStats } from '../types/reclamations';
@@ -21,12 +21,10 @@ import { fetchEquipes, fetchCurrentUser } from '../services/usersApi';
 import { fetchAllSites, SiteFrontend } from '../services/api';
 import { TypeTache, TacheCreate, PRIORITE_LABELS, Tache, STATUT_TACHE_COLORS } from '../types/planning';
 import { EquipeList, Utilisateur } from '../types/users';
-import { PhotoUpload } from '../components/shared/PhotoUpload';
 import TaskFormModal from '../components/planning/TaskFormModal';
-import { utcToLocalInput } from '../utils/dateHelpers';
+import { ReclamationEditModal } from '../components/reclamations/ReclamationEditModal';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import LoadingScreen from '../components/LoadingScreen';
-import { PremiumInput, PremiumSelect, PremiumTextarea } from '../components/modals/PremiumFormComponents';
 import { RECLAMATION_STATUS_LABELS } from '../constants';
 
 import ConfirmModal from '../components/ConfirmModal';
@@ -232,17 +230,6 @@ const Reclamations: React.FC = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Initialiser date_constatation avec la date actuelle lors de l'ouverture du modal en mode création
-    // On utilise toISOString() pour stocker en UTC, puis utcToLocalInput() convertit en heure locale pour l'affichage
-    useEffect(() => {
-        if (isCreateModalOpen && !editingId && !formData.date_constatation) {
-            setFormData(prev => ({
-                ...prev,
-                date_constatation: new Date().toISOString()
-            }));
-        }
-    }, [isCreateModalOpen, editingId]);
-
     useEffect(() => {
         loadData();
     }, []);
@@ -301,22 +288,8 @@ const Reclamations: React.FC = () => {
 
         // Éditer une réclamation depuis la page de détails
         if (state?.editReclamationId) {
-            // Si les données sont déjà fournies, ouvrir immédiatement
-            if (state.editReclamationData) {
-                setEditingId(Number(state.editReclamationId));
-                setFormData({
-                    type_reclamation: state.editReclamationData.type_reclamation,
-                    urgence: state.editReclamationData.urgence,
-                    description: state.editReclamationData.description,
-                    zone: state.editReclamationData.zone,
-                    date_constatation: state.editReclamationData.date_constatation,
-                });
-                setExistingPhotos(state.editReclamationData.photos || []);
-                setIsCreateModalOpen(true);
-            } else {
-                // Sinon, charger les données
-                handleEdit(Number(state.editReclamationId));
-            }
+            // Ouvrir le modal - il chargera les données lui-même
+            handleEdit(Number(state.editReclamationId));
             // Clear the navigation state
             navigate(location.pathname, { replace: true, state: {} });
         }
@@ -386,69 +359,6 @@ const Reclamations: React.FC = () => {
     // HANDLERS RECLAMATION
     // ===================================
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        // Validation basique
-        if (!formData.type_reclamation || !formData.urgence || !formData.description || !formData.date_constatation) {
-            setModalConfig({
-                isOpen: true,
-                title: 'Champs manquants',
-                message: 'Veuillez remplir tous les champs obligatoires (*)',
-                variant: 'warning'
-            });
-            return;
-        }
-
-        try {
-            // 1. Création / Mise à jour de la réclamation (JSON)
-            const payload = {
-                ...formData,
-                date_constatation: formData.date_constatation || new Date().toISOString(),
-            };
-
-            let targetId = editingId;
-
-            if (editingId) {
-                await updateReclamation(editingId, payload);
-            } else {
-                const newRec = await createReclamation(payload as ReclamationCreate);
-                targetId = newRec.id;
-            }
-
-            // 2. Upload des photos réelles
-            if (photos.length > 0 && targetId) {
-                const uploadPromises = photos.map(file => {
-                    const fd = new FormData();
-                    fd.append('fichier', file);
-                    fd.append('type_photo', 'RECLAMATION');
-                    fd.append('reclamation', String(targetId));
-                    fd.append('legende', 'Photo jointe');
-                    return uploadPhoto(fd);
-                });
-                await Promise.all(uploadPromises);
-            }
-
-            setModalConfig({
-                isOpen: true,
-                title: 'Succès',
-                message: editingId ? 'Réclamation mise à jour avec succès.' : 'Réclamation créée avec succès.',
-                variant: 'success',
-                onConfirm: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
-            });
-
-            closeCreateModal();
-            loadData();
-        } catch (error) {
-            console.error(error);
-            setModalConfig({
-                isOpen: true,
-                title: 'Erreur',
-                message: "Une erreur est survenue lors de l'enregistrement.",
-                variant: 'danger'
-            });
-        }
-    };
-
     const handleDelete = (id: number) => {
         setDeletingReclamationId(id);
     };
@@ -473,27 +383,12 @@ const Reclamations: React.FC = () => {
         navigate(`/reclamations/${id}`);
     };
 
-    const handleEdit = async (id: number) => {
-        // Ouvrir la modale immédiatement
+    const handleEdit = (id: number) => {
+        // Ouvrir la modale - le composant ReclamationEditModal chargera les données
         setEditingId(id);
+        setFormData({}); // Reset pour que le modal charge les données fraîches
+        setExistingPhotos([]);
         setIsCreateModalOpen(true);
-
-        try {
-            const fullRec = await fetchReclamationById(id);
-            setFormData({
-                type_reclamation: fullRec.type_reclamation,
-                urgence: fullRec.urgence,
-                description: fullRec.description,
-                zone: fullRec.zone,
-                date_constatation: fullRec.date_constatation,
-            });
-            setExistingPhotos(fullRec.photos || []);
-        } catch (error) {
-            console.error(error);
-            setIsCreateModalOpen(false);
-            setEditingId(null);
-            setModalConfig({ isOpen: true, title: 'Erreur', message: "Impossible de charger pour édition.", variant: 'danger' });
-        }
     };
 
     const closeCreateModal = () => {
@@ -1006,7 +901,14 @@ const Reclamations: React.FC = () => {
                                                 className="hover:bg-slate-50 transition-colors group cursor-pointer"
                                             >
                                                 <td className="px-6 py-4 whitespace-nowrap">
-                                                    <span className="text-sm font-medium text-slate-800">{rec.numero_reclamation}</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm font-medium text-slate-800">{rec.numero_reclamation}</span>
+                                                        {rec.visible_client === false && (
+                                                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700" title="Réclamation interne (masquée au client)">
+                                                                <EyeOff className="w-3 h-3" />
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">{rec.type_reclamation_nom}</td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
@@ -1035,18 +937,19 @@ const Reclamations: React.FC = () => {
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <span className={`
                                                     inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium
-                                                    ${rec.statut === 'NOUVELLE' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
+                                                    ${rec.statut === 'NOUVELLE' ? 'bg-red-50 text-red-700 border border-red-100' :
                                                             rec.statut === 'RESOLUE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                                                                rec.statut === 'EN_COURS' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                                                                    rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'bg-orange-50 text-orange-700 border border-orange-100' :
-                                                                        rec.statut === 'CLOTUREE' ? 'bg-slate-100 text-slate-600 border border-slate-200' :
+                                                                rec.statut === 'EN_COURS' ? 'bg-orange-50 text-orange-700 border border-orange-100' :
+                                                                    rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                                                                        rec.statut === 'CLOTUREE' ? 'bg-green-50 text-green-700 border border-green-100' :
                                                                             'bg-slate-100 text-slate-600 border border-slate-200'}
                                                 `}>
-                                                        <div className={`w-1.5 h-1.5 rounded-full ${rec.statut === 'NOUVELLE' ? 'bg-blue-500' :
+                                                        <div className={`w-1.5 h-1.5 rounded-full ${rec.statut === 'NOUVELLE' ? 'bg-red-500' :
                                                             rec.statut === 'RESOLUE' ? 'bg-emerald-500' :
-                                                                rec.statut === 'EN_COURS' ? 'bg-amber-500' :
-                                                                    rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'bg-orange-500' :
-                                                                        'bg-slate-400'
+                                                                rec.statut === 'EN_COURS' ? 'bg-orange-500' :
+                                                                    rec.statut === 'EN_ATTENTE_VALIDATION_CLOTURE' ? 'bg-emerald-500' :
+                                                                        rec.statut === 'CLOTUREE' ? 'bg-green-500' :
+                                                                            'bg-slate-400'
                                                             }`} />
                                                         {rec.statut_display || rec.statut}
                                                     </span>
@@ -1532,142 +1435,27 @@ const Reclamations: React.FC = () => {
             }
 
             {/* Modal Création / Edition Réclamation */}
-            {
-                isCreateModalOpen && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-                            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
-                                <h2 className="text-lg font-bold text-slate-800">
-                                    {editingId ? 'Modifier la Réclamation' : 'Nouvelle Réclamation'}
-                                </h2>
-                                <button onClick={closeCreateModal} className="text-slate-400 hover:text-red-500 transition-colors">
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
-
-                            <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-                                <div className="p-6 space-y-4 overflow-y-auto flex-1">
-                                    {/* Pre-selected site indicator */}
-                                    {preSelectedSiteName && (
-                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2">
-                                            <MapPin className="w-4 h-4 text-blue-600" />
-                                            <span className="text-sm text-blue-800">
-                                                Site: <strong>{preSelectedSiteName}</strong>
-                                            </span>
-                                        </div>
-                                    )}
-                                    <PremiumSelect
-                                        value={formData.type_reclamation?.toString() || ''}
-                                        onChange={(value) => setFormData({ ...formData, type_reclamation: Number(value) })}
-                                        options={types.map(t => ({
-                                            value: t.id.toString(),
-                                            label: t.nom_reclamation
-                                        }))}
-                                        label="Type de réclamation"
-                                        placeholder="Sélectionner un type..."
-                                        icon={<FileText className="w-4 h-4" />}
-                                        required
-                                        variant="outlined"
-                                        size="md"
-                                    />
-
-                                    <PremiumSelect
-                                        value={formData.urgence?.toString() || ''}
-                                        onChange={(value) => setFormData({ ...formData, urgence: Number(value) })}
-                                        options={urgences.map(u => ({
-                                            value: u.id.toString(),
-                                            label: u.niveau_urgence
-                                        }))}
-                                        label="Urgence"
-                                        placeholder="Sélectionner un niveau d'urgence..."
-                                        icon={<AlertOctagon className="w-4 h-4" />}
-                                        required
-                                        variant="outlined"
-                                        size="md"
-                                    />
-
-                                    <PremiumTextarea
-                                        value={formData.description || ''}
-                                        onChange={(value) => setFormData({ ...formData, description: value })}
-                                        label="Description"
-                                        placeholder="Décrivez le problème rencontré..."
-                                        rows={4}
-                                        required
-                                        variant="outlined"
-                                        size="md"
-                                    />
-
-                                    <PremiumInput
-                                        type="date"
-                                        value={formData.date_constatation || ''}
-                                        onChange={(value) => {
-                                            setFormData({
-                                                ...formData,
-                                                date_constatation: value || undefined
-                                            });
-                                        }}
-                                        label="Date de constatation"
-                                        icon={<Calendar className="w-4 h-4" />}
-                                        hint="Date où le problème a été constaté"
-                                        required
-                                        variant="outlined"
-                                        size="md"
-                                    />
-
-                                    {/* Section Photos Existantes (Edition) */}
-                                    {existingPhotos.length > 0 && (
-                                        <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                                            <label className="block text-xs font-semibold text-slate-500 uppercase mb-2">
-                                                Photos existantes
-                                            </label>
-                                            <div className="flex gap-2 overflow-x-auto">
-                                                {existingPhotos.map((p, i) => (
-                                                    <div key={p.id || i} className="relative group shrink-0">
-                                                        <img
-                                                            src={p.url_fichier}
-                                                            alt={p.legende || 'Photo'}
-                                                            className="h-20 w-20 object-cover rounded-md border border-slate-200"
-                                                        />
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="space-y-2">
-                                        <div className="flex items-center gap-2 pb-2">
-                                            <Camera className="w-4 h-4 text-slate-600" />
-                                            <label className="text-sm font-semibold text-slate-800">
-                                                {editingId ? 'Ajouter des photos' : 'Photos'} <span className="text-xs text-slate-500 font-normal">(optionnel)</span>
-                                            </label>
-                                        </div>
-                                        <PhotoUpload
-                                            photos={photos}
-                                            onChange={setPhotos}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="p-4 border-t border-slate-100 shrink-0 bg-slate-50 flex gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={closeCreateModal}
-                                        className="flex-1 px-4 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium transition-colors"
-                                    >
-                                        Annuler
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium shadow-sm hover:shadow-md transition-all"
-                                    >
-                                        {editingId ? 'Enregistrer' : 'Créer'}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )
-            }
+            <ReclamationEditModal
+                isOpen={isCreateModalOpen}
+                onClose={closeCreateModal}
+                onSuccess={() => {
+                    setModalConfig({
+                        isOpen: true,
+                        title: 'Succès',
+                        message: editingId ? 'Réclamation mise à jour avec succès.' : 'Réclamation créée avec succès.',
+                        variant: 'success',
+                        onConfirm: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
+                    });
+                    loadData();
+                }}
+                types={types}
+                urgences={urgences}
+                editingId={editingId}
+                initialData={formData}
+                existingPhotos={existingPhotos}
+                preSelectedSiteName={preSelectedSiteName}
+                canSetVisibility={isAdmin || isSupervisor}
+            />
 
 
 

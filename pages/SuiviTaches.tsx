@@ -13,6 +13,7 @@ import {
     fetchConsommationsParTache, createConsommation, deleteConsommation,
     fetchProduitsActifs
 } from '../services/suiviTachesApi';
+import { cloturerReclamation } from '../services/reclamationsApi';
 import { Tache, TacheCreate, TypeTache, STATUT_TACHE_COLORS, STATUT_TACHE_LABELS, PRIORITE_LABELS, ETAT_VALIDATION_COLORS, ETAT_VALIDATION_LABELS, PlanningFilters, EMPTY_PLANNING_FILTERS, StatusDistribution, STATUS_DISTRIBUTION_LABELS, STATUS_DISTRIBUTION_COLORS } from '../types/planning';
 import { PhotoList, ConsommationProduit, ProduitList } from '../types/suiviTaches';
 import { StructureClient, EquipeList } from '../types/users';
@@ -90,6 +91,14 @@ const SuiviTaches: React.FC = () => {
     } | null>(null);
     const [validationComment, setValidationComment] = useState('');
     const [validating, setValidating] = useState(false);
+
+    // Modal de proposition de clôture de réclamation
+    const [clotureProposalModal, setClotureProposalModal] = useState<{
+        reclamation_id: number;
+        reclamation_numero: string;
+        nombre_taches_validees: number;
+    } | null>(null);
+    const [processingCloture, setProcessingCloture] = useState(false);
 
     // Form States
     const [newConsommation, setNewConsommation] = useState({
@@ -564,7 +573,7 @@ const SuiviTaches: React.FC = () => {
         const tacheId = selectedTache.id;
         setValidating(true);
         try {
-            await planningService.validerTache(
+            const response = await planningService.validerTache(
                 tacheId,
                 validationModal.type,
                 validationComment
@@ -582,11 +591,38 @@ const SuiviTaches: React.FC = () => {
 
             setValidationModal(null);
             setValidationComment('');
+
+            // Si toutes les tâches de la réclamation sont validées, proposer la clôture
+            if (response.proposition_cloture_possible && response.reclamation_id && response.reclamation_numero) {
+                setClotureProposalModal({
+                    reclamation_id: response.reclamation_id,
+                    reclamation_numero: response.reclamation_numero,
+                    nombre_taches_validees: response.nombre_taches_validees || 0
+                });
+            }
         } catch (error) {
             console.error("Erreur validation", error);
             showToast("Erreur lors de la validation", 'error');
         } finally {
             setValidating(false);
+        }
+    };
+
+    // --- PROPOSITION DE CLOTURE DE RECLAMATION ---
+    const handleProposerCloture = async () => {
+        if (!clotureProposalModal) return;
+
+        setProcessingCloture(true);
+        try {
+            await cloturerReclamation(clotureProposalModal.reclamation_id);
+            showToast(`Clôture proposée pour la réclamation ${clotureProposalModal.reclamation_numero}`, 'success');
+            setClotureProposalModal(null);
+        } catch (error: any) {
+            console.error("Erreur proposition clôture", error);
+            const errorMessage = error?.message || "Erreur lors de la proposition de clôture";
+            showToast(errorMessage, 'error');
+        } finally {
+            setProcessingCloture(false);
         }
     };
 
@@ -1802,6 +1838,48 @@ const SuiviTaches: React.FC = () => {
                     />
                 )
             }
+
+            {/* Modal de proposition de clôture de réclamation */}
+            {clotureProposalModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6">
+                            <div className="flex items-center gap-4 mb-4">
+                                <div className="p-3 bg-emerald-100 rounded-xl">
+                                    <CheckCircle className="w-6 h-6 text-emerald-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-semibold text-gray-900">Toutes les tâches validées</h3>
+                                    <p className="text-sm text-gray-500">Réclamation {clotureProposalModal.reclamation_numero}</p>
+                                </div>
+                            </div>
+
+                            <p className="text-gray-600 mb-6">
+                                Les {clotureProposalModal.nombre_taches_validees} tâche{clotureProposalModal.nombre_taches_validees > 1 ? 's' : ''} corrective{clotureProposalModal.nombre_taches_validees > 1 ? 's' : ''} de cette réclamation {clotureProposalModal.nombre_taches_validees > 1 ? 'ont été validées' : 'a été validée'}.
+                                Souhaitez-vous proposer la clôture au client ?
+                            </p>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setClotureProposalModal(null)}
+                                    disabled={processingCloture}
+                                    className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                    Plus tard
+                                </button>
+                                <button
+                                    onClick={handleProposerCloture}
+                                    disabled={processingCloture}
+                                    className="flex-1 px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {processingCloture && <Loader2 className="w-4 h-4 animate-spin" />}
+                                    Proposer la clôture
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Modal d'édition de distribution */}
             {editingDistributionId && selectedTache && (() => {

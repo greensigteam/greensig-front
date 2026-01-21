@@ -278,7 +278,14 @@ export const planningService = {
     /**
      * Valide ou rejette une tâche terminée (ADMIN uniquement).
      */
-    async validerTache(tacheId: number, etat: 'VALIDEE' | 'REJETEE', commentaire?: string): Promise<{ message: string; tache: Tache }> {
+    async validerTache(tacheId: number, etat: 'VALIDEE' | 'REJETEE', commentaire?: string): Promise<{
+        message: string;
+        tache: Tache;
+        proposition_cloture_possible?: boolean;
+        reclamation_id?: number;
+        reclamation_numero?: string;
+        nombre_taches_validees?: number;
+    }> {
         const response = await apiFetch(`${BASE_URL}/taches/${tacheId}/valider/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

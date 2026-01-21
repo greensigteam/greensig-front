@@ -1231,6 +1231,7 @@ export const MapPage: React.FC<MapPageProps> = ({
           geometry={reportGeometry}
           types={typesReclamation}
           urgences={urgences}
+          userRole={userRole}
         />
       )}
     </>

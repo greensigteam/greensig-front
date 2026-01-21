@@ -624,10 +624,11 @@ const Dashboard: React.FC = () => {
                           <span className="text-slate-400 truncate max-w-[100px]" title={claim.client ? 'Client #' + claim.client : 'Interne'}>
                             {claim.client ? 'Client #' + claim.client : 'Interne'}
                           </span>
-                          <span className={`px-2 py-0.5 rounded-full font-medium text-[10px] ${claim.statut === 'RESOLUE' ? 'bg-green-100 text-green-700' :
-                            claim.statut === 'NOUVELLE' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
+                          <span className={`px-2 py-0.5 rounded-full font-medium text-[10px] ${claim.statut === 'RESOLUE' || claim.statut === 'CLOTUREE' ? 'bg-green-100 text-green-700' :
+                            claim.statut === 'NOUVELLE' ? 'bg-red-100 text-red-700' :
+                            claim.statut === 'EN_COURS' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-700'
                             }`}>
-                            {claim.statut}
+                            {claim.statut_display || claim.statut}
                           </span>
                         </div>
                       </div>

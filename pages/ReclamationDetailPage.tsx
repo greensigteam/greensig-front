@@ -10,12 +10,13 @@ import {
     ClipboardList,
     Star,
     Eye,
+    EyeOff,
     X,
     Info,
     Edit2,
     Trash2
 } from 'lucide-react';
-import { Reclamation } from '../types/reclamations';
+import { Reclamation, TypeReclamation, Urgence } from '../types/reclamations';
 import {
     fetchReclamationById,
     cloturerReclamation,
@@ -25,8 +26,11 @@ import {
     refuserIntervention,
     reprendreIntervention,
     createSatisfaction,
-    deleteReclamation
+    deleteReclamation,
+    fetchTypesReclamations,
+    fetchUrgences
 } from '../services/reclamationsApi';
+import { ReclamationEditModal } from '../components/reclamations/ReclamationEditModal';
 import { planningService } from '../services/planningService';
 import { fetchEquipes, fetchCurrentUser } from '../services/usersApi';
 import { TypeTache, TacheCreate } from '../types/planning';
@@ -157,6 +161,11 @@ const ReclamationDetailPage: React.FC = () => {
     // Referentiels
     const [typesTaches, setTypesTaches] = useState<TypeTache[]>([]);
     const [equipes, setEquipes] = useState<EquipeList[]>([]);
+    const [typesReclamation, setTypesReclamation] = useState<TypeReclamation[]>([]);
+    const [urgences, setUrgences] = useState<Urgence[]>([]);
+
+    // Edit modal
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
     // Task modal
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -205,6 +214,7 @@ const ReclamationDetailPage: React.FC = () => {
 
     // Helpers rôles
     const isAdmin = !!currentUser?.roles?.includes('ADMIN');
+    const isSupervisor = !!currentUser?.roles?.includes('SUPERVISEUR');
     const isClient = !!currentUser?.roles?.includes('CLIENT');
 
     useEffect(() => {
@@ -220,16 +230,20 @@ const ReclamationDetailPage: React.FC = () => {
 
         setLoading(true);
         try {
-            const [recData, typesTachesData, equipesData, currentUserData] = await Promise.all([
+            const [recData, typesTachesData, equipesData, currentUserData, typesRecData, urgencesData] = await Promise.all([
                 fetchReclamationById(Number(id)),
                 planningService.getTypesTaches(),
                 fetchEquipes(),
-                fetchCurrentUser()
+                fetchCurrentUser(),
+                fetchTypesReclamations(),
+                fetchUrgences()
             ]);
 
             setReclamation(recData);
             setTypesTaches(typesTachesData);
             setCurrentUser(currentUserData);
+            setTypesReclamation(typesRecData);
+            setUrgences(urgencesData);
 
             const eqList = Array.isArray(equipesData) ? equipesData : (equipesData as any).results || [];
             setEquipes(eqList);
@@ -596,19 +610,15 @@ const ReclamationDetailPage: React.FC = () => {
     // Éditer la réclamation
     const handleEdit = () => {
         if (!reclamation) return;
-        navigate('/reclamations', {
-            state: {
-                editReclamationId: reclamation.id,
-                editReclamationData: {
-                    type_reclamation: reclamation.type_reclamation,
-                    urgence: reclamation.urgence,
-                    description: reclamation.description,
-                    zone: reclamation.zone,
-                    date_constatation: reclamation.date_constatation,
-                    photos: reclamation.photos || []
-                }
-            }
-        });
+        setIsEditModalOpen(true);
+    };
+
+    // Callback après édition réussie
+    const handleEditSuccess = async () => {
+        setIsEditModalOpen(false);
+        // Recharger les données pour afficher les modifications
+        await loadData();
+        showToast('Réclamation mise à jour avec succès', 'success');
     };
 
     // Supprimer la réclamation
@@ -702,6 +712,13 @@ const ReclamationDetailPage: React.FC = () => {
                                 <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                                     <AlertCircle className="w-6 h-6 text-emerald-600" />
                                     {reclamation.numero_reclamation}
+                                    {/* Indicateur de réclamation interne (visible_client=false) */}
+                                    {reclamation.visible_client === false && (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
+                                            <EyeOff className="w-3 h-3" />
+                                            Interne
+                                        </span>
+                                    )}
                                 </h1>
                                 <p className="text-sm text-slate-500">
                                     Créée le {formatLocalDate(reclamation.date_creation, { day: 'numeric', month: 'long', year: 'numeric' })}
@@ -1587,6 +1604,19 @@ const ReclamationDetailPage: React.FC = () => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Modal d'édition de réclamation */}
+            {reclamation && (
+                <ReclamationEditModal
+                    isOpen={isEditModalOpen}
+                    onClose={() => setIsEditModalOpen(false)}
+                    onSuccess={handleEditSuccess}
+                    types={typesReclamation}
+                    urgences={urgences}
+                    editingId={reclamation.id}
+                    canSetVisibility={isAdmin || isSupervisor}
+                />
             )}
         </div>
     );
