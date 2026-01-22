@@ -330,6 +330,29 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
     // Exemple: Une tâche peut être planifiée du 1er au 31 janvier avec des distributions
     // seulement sur certains jours (5, 10, 15, 20 janvier)
 
+    // ✅ NOUVEAU: Réinitialiser les distributions quand les dates de la tâche changent
+    // Si les distributions existantes sont TOUTES hors de la nouvelle plage de dates,
+    // les supprimer pour permettre une replanification propre
+    useEffect(() => {
+        // Seulement en mode édition et si des distributions existent
+        if (!tache || distributionsCharge.length === 0) return;
+        if (!formData.date_debut_planifiee || !formData.date_fin_planifiee) return;
+
+        const newStart = new Date(formData.date_debut_planifiee);
+        const newEnd = new Date(formData.date_fin_planifiee);
+
+        // Vérifier si TOUTES les distributions sont hors de la nouvelle plage
+        const allOutOfRange = distributionsCharge.every(dist => {
+            const distDate = new Date(dist.date);
+            return distDate < newStart || distDate > newEnd;
+        });
+
+        if (allOutOfRange) {
+            console.log('📅 Dates changed - clearing out-of-range distributions for reschedule');
+            setDistributionsCharge([]);
+        }
+    }, [formData.date_debut_planifiee, formData.date_fin_planifiee]);
+
     // Filter task types based on selected objects
     useEffect(() => {
         // If no objects selected, show all task types
@@ -547,17 +570,21 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         // Préparer les données pour soumission
         let distributionsToSend = distributionsCharge;
 
-        // ✅ Si c'est une tâche d'un seul jour et pas de distributions multi-jours, créer une distribution avec les heures
-        if (formData.date_debut_planifiee === formData.date_fin_planifiee && distributionsCharge.length === 0) {
+        // ✅ Tâche d'un seul jour : créer/mettre à jour la distribution avec la date du formulaire
+        // FIX: Même si des distributions existent, on les remplace avec la nouvelle date
+        // pour permettre la replanification correcte des tâches expirées
+        if (formData.date_debut_planifiee === formData.date_fin_planifiee) {
             if (startTime >= endTime) {
                 setValidationError("L'heure de fin doit être postérieure à l'heure de début.");
                 return;
             }
+            // Créer une nouvelle distribution avec la date mise à jour
+            // On ne garde pas l'ancien ID pour forcer la recréation avec la nouvelle date
             distributionsToSend = [{
                 date: formData.date_debut_planifiee,
                 heure_debut: startTime,
                 heure_fin: endTime,
-                commentaire: ''
+                commentaire: distributionsCharge[0]?.commentaire || ''
             }];
         }
 
@@ -568,6 +595,10 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         console.log('🔍 DEBUG - recurrenceConfig:', recurrenceConfig);
         console.log('🔍 DEBUG - recurrenceConfig.enabled:', recurrenceConfig.enabled);
 
+        // ✅ REPLANIFICATION: Si la tâche était ANNULEE, EXPIREE ou REJETEE, forcer le statut à PLANIFIEE
+        const statutsAReplanifier = ['ANNULEE', 'EXPIREE', 'REJETEE'];
+        const doitReplanifier = tache && statutsAReplanifier.includes(tache.statut);
+
         const payload: any = {
             ...formData,
             // ✅ Distributions de charge (multi-jours ou jour unique avec heures)
@@ -577,8 +608,16 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
             // ✅ Configuration de récurrence (seulement pour création et si activée)
             ...((recurrenceConfig.enabled) && {
                 recurrence_config: recurrenceConfig
+            }),
+            // ✅ Forcer le statut à PLANIFIEE pour réactiver les tâches annulées/expirées/rejetées
+            ...(doitReplanifier && {
+                statut: 'PLANIFIEE'
             })
         };
+
+        if (doitReplanifier) {
+            console.log(`🔄 Replanification: ${tache.statut} → PLANIFIEE`);
+        }
 
         console.log('📤 Submitting task data:', payload);
         console.log('📤 Submitting distributions_charge_data:', payload.distributions_charge_data);

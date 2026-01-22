@@ -33,10 +33,11 @@ import {
 import { ReclamationEditModal } from '../components/reclamations/ReclamationEditModal';
 import { planningService } from '../services/planningService';
 import { fetchEquipes, fetchCurrentUser } from '../services/usersApi';
+import { getObjectsInGeometry, type ObjectInGeometry } from '../services/api';
 import { TypeTache, TacheCreate } from '../types/planning';
 import { EquipeList, Utilisateur } from '../types/users';
 import { SatisfactionForm } from '../components/SatisfactionForm';
-import TaskFormModal from '../components/planning/TaskFormModal';
+import TaskFormModal, { type InventoryObjectOption } from '../components/planning/TaskFormModal';
 import { formatLocalDate } from '../utils/dateHelpers';
 import { format } from 'date-fns';
 import LoadingScreen from '../components/LoadingScreen';
@@ -172,6 +173,8 @@ const ReclamationDetailPage: React.FC = () => {
     const [isSubmittingTask, setIsSubmittingTask] = useState(false);
     const [taskInitialValues, setTaskInitialValues] = useState<Partial<TacheCreate>>({});
     const [taskSiteFilter, setTaskSiteFilter] = useState<{ id: number; name: string } | undefined>(undefined);
+    const [taskPreSelectedObjects, setTaskPreSelectedObjects] = useState<InventoryObjectOption[]>([]);
+    const [isLoadingObjects, setIsLoadingObjects] = useState(false);
 
     // Satisfaction
     const [showSatisfactionForm, setShowSatisfactionForm] = useState(false);
@@ -259,7 +262,7 @@ const ReclamationDetailPage: React.FC = () => {
     // HANDLERS
     // ===================================
 
-    const handleOpenTaskModal = () => {
+    const handleOpenTaskModal = async () => {
         if (!reclamation) return;
 
         setTaskInitialValues({
@@ -278,6 +281,45 @@ const ReclamationDetailPage: React.FC = () => {
             });
         } else {
             setTaskSiteFilter(undefined);
+        }
+
+        // Récupérer automatiquement les objets dans la zone de la réclamation
+        setTaskPreSelectedObjects([]);
+        if (reclamation.localisation) {
+            setIsLoadingObjects(true);
+            try {
+                console.log('🔍 Récupération des objets dans la zone de la réclamation...');
+                console.log('📍 Géométrie:', typeof reclamation.localisation, reclamation.localisation);
+
+                const result = await getObjectsInGeometry(reclamation.localisation, {
+                    site_id: reclamation.site || undefined
+                });
+
+                if (result.objects && result.objects.length > 0) {
+                    // Convertir ObjectInGeometry vers InventoryObjectOption
+                    const preSelected: InventoryObjectOption[] = result.objects.map(obj => ({
+                        id: obj.id,
+                        type: obj.type,
+                        nom: obj.nom || `${obj.type} #${obj.id}`,
+                        site: obj.site_nom || '',
+                        soussite: obj.sous_site_nom || undefined
+                    }));
+                    setTaskPreSelectedObjects(preSelected);
+                    console.log(`✅ ${result.count} objet(s) trouvé(s) dans la zone:`, result.by_type);
+                    showToast(`${result.count} objet(s) trouvé(s) dans la zone de la réclamation`, 'info');
+                } else {
+                    console.log('ℹ️ Aucun objet trouvé dans la zone de la réclamation');
+                    // C'est normal - l'utilisateur peut sélectionner manuellement des objets du site
+                }
+            } catch (error: any) {
+                console.error('❌ Erreur lors de la récupération des objets:', error);
+                console.error('❌ Détails:', error?.message || error);
+                // On continue sans objets pré-sélectionnés - l'utilisateur choisira manuellement
+            } finally {
+                setIsLoadingObjects(false);
+            }
+        } else {
+            console.log('ℹ️ Pas de localisation sur cette réclamation');
         }
 
         setIsTaskModalOpen(true);
@@ -1107,9 +1149,18 @@ const ReclamationDetailPage: React.FC = () => {
                                                         <p className="text-xs text-slate-500">{t.equipe || 'Équipe non assignée'}</p>
                                                     </div>
                                                 </div>
-                                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${t.statut === 'TERMINEE' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                                                    {t.statut}
-                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${t.statut === 'TERMINEE' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                        {t.statut}
+                                                    </span>
+                                                    <Link
+                                                        to={`/suivi-taches?task_id=${t.id}`}
+                                                        className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                                        title="Voir le détail de la tâche"
+                                                    >
+                                                        <Eye className="w-4 h-4" />
+                                                    </Link>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
@@ -1250,8 +1301,9 @@ const ReclamationDetailPage: React.FC = () => {
                     initialValues={taskInitialValues}
                     equipes={equipes}
                     typesTaches={typesTaches}
+                    preSelectedObjects={taskPreSelectedObjects}
                     siteFilter={taskSiteFilter}
-                    isSubmitting={isSubmittingTask}
+                    isSubmitting={isSubmittingTask || isLoadingObjects}
                     onClose={handleCloseTaskModal}
                     onSubmit={handleTaskSubmit}
                 />

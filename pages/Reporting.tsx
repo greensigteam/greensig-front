@@ -202,7 +202,9 @@ const Reporting: React.FC = () => {
                         </div>
                     </div>
                 </div>
-                <MonthlyReport />
+                <div className="flex-1 overflow-y-auto bg-slate-50">
+                    <MonthlyReport />
+                </div>
             </div>
         );
     }
@@ -231,7 +233,9 @@ const Reporting: React.FC = () => {
                         </div>
                     </div>
                 </div>
-                <WeeklyReport />
+                <div className="flex-1 overflow-y-auto bg-slate-50">
+                    <WeeklyReport />
+                </div>
             </div>
         );
     }
@@ -260,7 +264,9 @@ const Reporting: React.FC = () => {
                         </div>
                     </div>
                 </div>
-                <KPIReport />
+                <div className="flex-1 overflow-y-auto bg-slate-50">
+                    <KPIReport />
+                </div>
             </div>
         );
     }
@@ -369,8 +375,8 @@ const Reporting: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar">
-                <div className="p-6 space-y-6 w-full">
+            <div className="flex-1 overflow-y-auto bg-slate-50">
+                <div className="p-6 space-y-6 w-full max-w-[1920px] mx-auto">
 
             {/* KPIs principaux */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

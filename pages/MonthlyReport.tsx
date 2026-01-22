@@ -473,14 +473,21 @@ export default function MonthlyReport() {
           // Opérateurs
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(9);
-          doc.setTextColor(...darkColor);
           for (const op of (equipe.operateurs || [])) {
-            doc.text(`• ${op.nom || 'Opérateur'}`, margin + 10, y);
-            doc.setTextColor(...grayColor);
-            doc.text(`${(op.heures ?? 0).toFixed(1)}h`, pageWidth - margin - 25, y);
-            doc.setTextColor(...darkColor);
+            // Si absent, afficher en gris clair avec indication
+            if (op.absent) {
+              doc.setTextColor(150, 150, 150); // Gris clair
+              doc.text(`• ${op.nom || 'Opérateur'} (absent)`, margin + 10, y);
+              doc.text(`${(op.heures ?? 0).toFixed(1)}h`, pageWidth - margin - 25, y);
+            } else {
+              doc.setTextColor(...darkColor);
+              doc.text(`• ${op.nom || 'Opérateur'}`, margin + 10, y);
+              doc.setTextColor(...grayColor);
+              doc.text(`${(op.heures ?? 0).toFixed(1)}h`, pageWidth - margin - 25, y);
+            }
             y += 5;
           }
+          doc.setTextColor(...darkColor);
           y += 5;
         }
         y += 10;
@@ -1142,13 +1149,13 @@ export default function MonthlyReport() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6" style={{ fontFamily: "'Poppins', sans-serif" }}>
+    <div className="bg-gray-50 p-6" style={{ fontFamily: "'Poppins', sans-serif" }}>
       {/* Import Poppins font */}
       <style>
         {`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');`}
       </style>
 
-      <div className="w-full">
+      <div className="w-full max-w-[1920px] mx-auto">
         {/* Header amélioré */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 mb-6">
           {/* Bandeau supérieur avec couleur sidebar */}
@@ -1488,9 +1495,19 @@ export default function MonthlyReport() {
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                         {(equipe.operateurs || []).map((op, i) => (
-                          <div key={i} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
-                            <span className="text-sm text-gray-700">{op.nom || 'Opérateur'}</span>
-                            <span className="text-xs text-gray-500">{(op.heures ?? 0).toFixed(1)}h</span>
+                          <div
+                            key={i}
+                            className={`flex items-center justify-between rounded-lg px-3 py-2 ${
+                              op.absent ? 'bg-red-50 border border-red-200' : 'bg-gray-50'
+                            }`}
+                          >
+                            <span className={`text-sm ${op.absent ? 'text-red-600 line-through' : 'text-gray-700'}`}>
+                              {op.nom || 'Opérateur'}
+                              {op.absent && <span className="ml-1 text-xs">(absent)</span>}
+                            </span>
+                            <span className={`text-xs ${op.absent ? 'text-red-500' : 'text-gray-500'}`}>
+                              {(op.heures ?? 0).toFixed(1)}h
+                            </span>
                           </div>
                         ))}
                       </div>

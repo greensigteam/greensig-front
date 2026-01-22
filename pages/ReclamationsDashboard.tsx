@@ -15,7 +15,7 @@ const STATUT_LABELS: { [key: string]: string } = {
     'RESOLUE': 'Tâche terminée côté admin.',
     'EN_ATTENTE_VALIDATION_CLOTURE': 'En attente validation clôture',
     'INTERVENTION_REFUSEE': 'Intervention refusée',
-    'CLOTUREE': 'Validée côté client',
+    'CLOTUREE': 'Clôturée',
     'REJETEE': 'Rejetée'
 };
 

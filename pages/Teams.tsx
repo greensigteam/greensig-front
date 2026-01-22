@@ -1,117 +1,44 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React from 'react';
 import {
-  Plus,
-  Users,
-  UserCheck,
-  Calendar,
-  Award,
-  Search,
-  Check,
-  Clock,
-  Edit2,
-  Trash2,
-  Eye,
-  X,
-  RefreshCw,
-  Edit3,
-  LayoutGrid,
-  Table,
-  Filter,
-  BarChart3,
-  Ban,
-  Star,
-  TrendingUp,
-  CheckCircle,
-  FolderOpen,
-  ChevronDown,
-  Umbrella,
-  HeartPulse,
-  GraduationCap,
-  MoreHorizontal,
-  CheckCircle2,
-  XCircle,
-  CalendarClock,
-  CalendarCheck
+  Plus, Users, UserCheck, Calendar, Award, RefreshCw,
+  Edit3, LayoutGrid, Table, Filter, X, Eye,
+  Clock, Ban, Star, TrendingUp, CheckCircle, FolderOpen, ChevronDown,
+  Umbrella, HeartPulse, GraduationCap, MoreHorizontal,
+  CheckCircle2, XCircle, CalendarCheck, CalendarClock
 } from 'lucide-react';
 import { Listbox, Transition } from '@headlessui/react';
-import { DataTable, Column } from '../components/DataTable';
-import { StatusBadge } from '../components/StatusBadge';
-import { useSearch } from '../contexts/SearchContext';
-import { useToast } from '../contexts/ToastContext';
 
+import { useTeamsData, TabType } from '../hooks/useTeamsData';
+import { EquipesTab, OperateursTab, AbsencesTab } from '../components/teams';
+import CompetenceMatrix from '../components/CompetenceMatrix';
+import LoadingScreen from '../components/LoadingScreen';
+
+// Modals
 import EditEquipeModal from './EditEquipeModal';
 import CreateAbsenceModal from './CreateAbsenceModal';
 import AbsenceDetailModal from './AbsenceDetailModal';
 import EditAbsenceModal from './EditAbsenceModal';
-import CompetenceMatrix, { ViewMode } from '../components/CompetenceMatrix';
-
-// Modales extraites
 import CreateTeamModal from '../components/modals/CreateTeamModal';
 import CreateOperateurModal from '../components/modals/CreateOperateurModal';
 import EditOperateurModal from '../components/modals/EditOperateurModal';
 import EquipeDetailModal from '../components/modals/EquipeDetailModal';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import { OperateurDetailModal } from './OperateurDetailPage';
-import { useNavigate } from 'react-router-dom';
-
-// Types
-import {
-  OperateurList,
-  OperateurDetail,
-  EquipeList,
-  EquipeDetail,
-  Absence,
-  Competence,
-  StatutOperateur,
-  StatutEquipe,
-  StatutAbsence,
-  STATUT_ABSENCE_LABELS,
-  TYPE_ABSENCE_LABELS,
-  NOM_ROLE_LABELS,
-  Utilisateur,
-  Client,
-  NiveauCompetence
-} from '../types/users';
-
 import EditUserModal from '../components/EditUserModal';
-import LoadingScreen from '../components/LoadingScreen';
-import { usePermissions } from '../hooks/usePermissions';
-import type { User, Role } from '../types';
 
-// API
-import {
-  fetchOperateurs,
-  fetchOperateurById,
-  fetchEquipes,
-  fetchEquipeById,
-  fetchAbsences,
-  fetchAbsencesAValider,
-  fetchCompetences,
-  fetchChefsPotentiels,
-  validerAbsence,
-  refuserAbsence,
-  annulerAbsence,
-  fetchStatistiquesUtilisateurs,
-  fetchUtilisateurs,
-  fetchClients,
-  deleteOperateur,
-  deleteEquipe,
-  fetchCurrentUser,
-  fetchUtilisateurById
-} from '../services/usersApi';
+import { NiveauCompetence } from '../types/users';
 
 // ============================================================================
-// COMPOSANT - Carte Statistiques Moderne
+// STAT CARD COMPONENT
 // ============================================================================
 
 interface StatCardCompactProps {
   icon: React.ReactNode;
   label: string;
   value: number | string;
-  color: string;
 }
 
-const StatCardCompact: React.FC<StatCardCompactProps> = ({ icon, label, value, color }) => (
+const StatCardCompact: React.FC<StatCardCompactProps> = ({ icon, label, value }) => (
   <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
     <div className="text-sm font-medium text-slate-500 mb-1">{label}</div>
     <div className="flex items-end justify-between relative z-10">
@@ -124,743 +51,13 @@ const StatCardCompact: React.FC<StatCardCompactProps> = ({ icon, label, value, c
 );
 
 // ============================================================================
-// COMPOSANT PRINCIPAL - Teams
+// MAIN COMPONENT
 // ============================================================================
 
-type TabType = 'equipes' | 'operateurs' | 'absences' | 'competences';
-
 const Teams: React.FC = () => {
-  // Search context from Header
-  const { searchQuery, setSearchQuery, setPlaceholder } = useSearch();
-  const { showToast } = useToast();
+  const data = useTeamsData();
 
-  // State
-  const [activeTab, setActiveTab] = useState<TabType>('equipes');
-  const [loading, setLoading] = useState(true);
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-
-  // Data
-  const [equipes, setEquipes] = useState<EquipeList[]>([]);
-  const [operateurs, setOperateurs] = useState<OperateurList[]>([]);
-  // const [utilisateurs, setUtilisateurs] = useState<Utilisateur[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [absences, setAbsences] = useState<Absence[]>([]);
-  const [absencesAValider, setAbsencesAValider] = useState<Absence[]>([]);
-  const [chefsPotentiels, setChefsPotentiels] = useState<OperateurList[]>([]);
-  const [competences, setCompetences] = useState<Competence[]>([]);
-
-  // Pagination states
-  const [equipesPage, setEquipesPage] = useState(1);
-  const [equipesTotal, setEquipesTotal] = useState(0);
-  const [operateursPage, setOperateursPage] = useState(1);
-  const [operateursTotal, setOperateursTotal] = useState(0);
-  const [absencesPage, setAbsencesPage] = useState(1);
-  const [absencesTotal, setAbsencesTotal] = useState(0);
-
-  // Stats (pour barre KPI compacte)
-  const [stats, setStats] = useState<{
-    totalOperateurs: number;
-    disponibles: number;
-    totalEquipes: number;
-    absencesEnAttente: number;
-  } | null>(null);
-
-  const navigate = useNavigate();
-
-  // Modals
-  const [showCreateTeam, setShowCreateTeam] = useState(false);
-  const [showCreateOperateur, setShowCreateOperateur] = useState(false);
-  const [selectedEquipe, setSelectedEquipe] = useState<EquipeDetail | null>(null);
-  const [selectedOperateur, setSelectedOperateur] = useState<OperateurDetail | null>(null);
-  const [editingUser, setEditingUser] = useState<Utilisateur | null>(null);
-  const [showCreateAbsence, setShowCreateAbsence] = useState(false);
-  const [selectedAbsence, setSelectedAbsence] = useState<Absence | null>(null);
-  const [editingAbsence, setEditingAbsence] = useState<Absence | null>(null);
-  const [deleteAbsenceId, setDeleteAbsenceId] = useState<number | null>(null);
-
-  // Filtres absences
-  const [absenceFilters, setAbsenceFilters] = useState<{
-    statut: string;
-    typeAbsence: string;
-    dateDebut: string;
-    dateFin: string;
-  }>({
-    statut: '',
-    typeAbsence: '',
-    dateDebut: '',
-    dateFin: ''
-  });
-
-  // Filtres opérateurs
-  const [operateurFilters, setOperateurFilters] = useState<{
-    statut: string;
-    equipe: string;
-    estChef: string;
-    disponible: string;
-  }>({
-    statut: '',
-    equipe: '',
-    estChef: '',
-    disponible: ''
-  });
-  const [showOperateurFilters, setShowOperateurFilters] = useState(false);
-
-  const [currentUser, setCurrentUser] = useState<Utilisateur | null>(null);
-
-  // Matrice compétences states
-  const [matrixViewMode, setMatrixViewMode] = useState<ViewMode>('cards');
-  const [matrixEditMode, setMatrixEditMode] = useState(false);
-  const [matrixNiveauFilter, setMatrixNiveauFilter] = useState<NiveauCompetence | ''>('');
-  const [matrixCategorieFilter, setMatrixCategorieFilter] = useState('');
-  const [matrixShowFilters, setMatrixShowFilters] = useState(false);
-
-  // Absences filters toggle
-  const [showAbsenceFilters, setShowAbsenceFilters] = useState(false);
-
-  // Helpers rôles
-  const isAdmin = !!currentUser?.roles?.includes('ADMIN');
-  const isChefEquipe = !!currentUser?.roles?.includes('SUPERVISEUR');
-  const isClient = !!currentUser?.roles?.includes('CLIENT');
-  const isReadOnly = isClient; // Seul CLIENT est en lecture seule (SUPERVISEUR a accès complet RH)
-
-  // Convert Utilisateur to User type for usePermissions
-  const tempUser: User | null = currentUser ? {
-    id: String(currentUser.id),
-    name: currentUser.nom || '',
-    email: currentUser.email,
-    role: (currentUser.roles?.[0] || 'CLIENT') as Role
-  } : null;
-  const permissions = usePermissions(tempUser);
-
-  // Debounce search query (300ms delay)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  // Update search placeholder based on active tab and cleanup on unmount
-  useEffect(() => {
-    const placeholders: Record<TabType, string> = {
-      equipes: 'Rechercher une équipe...',
-      operateurs: 'Rechercher un opérateur (nom, matricule)...',
-      competences: 'Voir la matrice de compétences...',
-      absences: 'Rechercher une absence (opérateur, motif, type)...'
-    };
-    setPlaceholder(placeholders[activeTab]);
-    return () => {
-      setPlaceholder('Rechercher...');
-      setSearchQuery('');
-    };
-  }, [activeTab, setPlaceholder, setSearchQuery]);
-
-  // Load stable data once (currentUser + stats - doesn't change during session)
-  useEffect(() => {
-    const initializeData = async () => {
-      setLoading(true);
-      try {
-        // Load stable data first
-        await loadStableData();
-        // Then load initial tab data
-        await loadTabData(activeTab);
-      } catch (error) {
-        console.error('Erreur initialisation:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    initializeData();
-  }, []);
-
-  // Lazy load data when tab changes
-  useEffect(() => {
-    if (stats) { // Only load if already initialized
-      loadTabData(activeTab);
-    }
-  }, [activeTab]);
-
-  const loadStableData = async () => {
-    try {
-      const [currentUserRes, statsRes] = await Promise.all([
-        fetchCurrentUser(),
-        fetchStatistiquesUtilisateurs()
-      ]);
-      setCurrentUser(currentUserRes);
-      setStats({
-        totalOperateurs: statsRes.operateurs.total,
-        disponibles: statsRes.operateurs.disponiblesAujourdhui,
-        totalEquipes: statsRes.equipes.total,
-        absencesEnAttente: statsRes.absences.enAttente
-      });
-    } catch (error) {
-      console.error('Erreur chargement données stables:', error);
-    }
-  };
-
-  const loadTabData = async (tab: TabType) => {
-    setLoading(true);
-    try {
-      switch (tab) {
-        case 'equipes':
-          await loadEquipesData(equipesPage, true); // Force refresh to bypass cache
-          break;
-        case 'operateurs':
-          await loadOperateursData();
-          break;
-        case 'competences':
-          await loadCompetencesData();
-          break;
-        case 'absences':
-          await loadAbsencesData();
-          break;
-      }
-    } catch (error) {
-      console.error('Erreur chargement données:', error);
-      showToast('Erreur lors du chargement des données', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadEquipesData = async (page: number = equipesPage, forceRefresh: boolean = false) => {
-    console.log('[Teams] 🔄 Loading équipes data, page:', page, 'forceRefresh:', forceRefresh);
-    try {
-      const [equipesRes, chefsPotentielsRes] = await Promise.all([
-        fetchEquipes({ page, pageSize: 50 }),
-        chefsPotentiels.length === 0 ? fetchChefsPotentiels() : Promise.resolve(chefsPotentiels)
-      ]);
-      console.log('[Teams] ✅ Équipes loaded:', equipesRes.results.length, 'équipes');
-      console.log('[Teams] 📊 Total équipes (count):', equipesRes.count);
-      console.log('[Teams] 📊 Équipes data complète:', equipesRes);
-
-      // Debug: Log superviseur data for each team
-      if (equipesRes.results.length > 0) {
-        equipesRes.results.forEach((eq: EquipeList) => {
-          console.log(`[Teams] 📋 ${eq.nomEquipe}: superviseurNom="${eq.superviseurNom}", sitePrincipal="${eq.sitePrincipalNom}"`);
-        });
-      } else {
-        console.warn('[Teams] ⚠️ AUCUNE ÉQUIPE REÇUE DU BACKEND !');
-      }
-
-      setEquipes(equipesRes.results);
-      setEquipesTotal(equipesRes.count || 0);
-      if (chefsPotentiels.length === 0) {
-        setChefsPotentiels(chefsPotentielsRes);
-      }
-    } catch (error) {
-      console.error('[Teams] ❌ Error loading équipes:', error);
-      showToast('Erreur lors du chargement des équipes', 'error');
-    }
-  };
-
-  const loadOperateursData = async (page: number = operateursPage, filters = operateurFilters) => {
-    console.log('[Teams] 🔄 Loading opérateurs data, page:', page, 'filters:', filters);
-    try {
-      // Construire les filtres pour l'API
-      const apiFilters: Record<string, unknown> = { page, pageSize: 50 };
-      if (filters.statut) apiFilters.statut = filters.statut;
-      if (filters.equipe === 'sans_equipe') {
-        apiFilters.sansEquipe = true;
-      } else if (filters.equipe) {
-        apiFilters.equipe = parseInt(filters.equipe);
-      }
-      if (filters.estChef === 'true') apiFilters.estChef = true;
-      if (filters.estChef === 'false') apiFilters.estChef = false;
-      if (filters.disponible === 'true') apiFilters.disponible = true;
-      if (filters.disponible === 'false') apiFilters.disponible = false;
-
-      // Charger aussi les équipes si pas encore chargées (pour le filtre)
-      const [operateursRes] = await Promise.all([
-        fetchOperateurs(apiFilters),
-        equipes.length === 0 ? fetchEquipes({ pageSize: 100 }).then(res => setEquipes(res.results)) : Promise.resolve()
-      ]);
-      console.log('[Teams] ✅ Opérateurs loaded:', operateursRes.results.length, 'opérateurs');
-      setOperateurs(operateursRes.results);
-      setOperateursTotal(operateursRes.count || 0);
-    } catch (error) {
-      console.error('[Teams] ❌ Error loading opérateurs:', error);
-      showToast('Erreur lors du chargement des opérateurs', 'error');
-    }
-  };
-
-  const loadCompetencesData = async () => {
-    if (competences.length > 0 && operateurs.length > 0) return; // Already loaded
-    const [competencesRes, operateursRes] = await Promise.all([
-      competences.length === 0 ? fetchCompetences() : Promise.resolve(competences),
-      // Reduced from 1000 to 200 - only load what's needed for competence matrix
-      operateurs.length === 0 ? fetchOperateurs({ pageSize: 200 }) : Promise.resolve({ results: operateurs })
-    ]);
-    if (competences.length === 0) {
-      setCompetences(competencesRes);
-    }
-    if (operateurs.length === 0) {
-      setOperateurs(operateursRes.results);
-    }
-  };
-
-  const loadAbsencesData = async (page: number = absencesPage) => {
-    const [absencesRes, absencesAValiderRes, operateursRes] = await Promise.all([
-      fetchAbsences({ page, pageSize: 50 }),
-      fetchAbsencesAValider(),
-      // Reduced from 1000 to 100 - only load what's visible
-      operateurs.length === 0 ? fetchOperateurs({ page: 1, pageSize: 100 }) : Promise.resolve({ results: operateurs })
-    ]);
-    setAbsences(absencesRes.results);
-    setAbsencesTotal(absencesRes.count || 0);
-    setAbsencesAValider(absencesAValiderRes);
-    if (operateurs.length === 0) {
-      setOperateurs(operateursRes.results);
-    }
-  };
-
-  // Refresh all data (called after create/update/delete)
-  const loadData = async () => {
-    await loadTabData(activeTab);
-    // Refresh stats bar
-    try {
-      const statsRes = await fetchStatistiquesUtilisateurs();
-      setStats({
-        totalOperateurs: statsRes.operateurs.total,
-        disponibles: statsRes.operateurs.disponiblesAujourdhui,
-        totalEquipes: statsRes.equipes.total,
-        absencesEnAttente: statsRes.absences.enAttente
-      });
-    } catch (error) {
-      console.error('Erreur refresh stats:', error);
-    }
-  };
-
-  // Handlers
-  const handleViewOperateur = async (operateurId: number) => {
-    try {
-      const detail = await fetchOperateurById(operateurId);
-      setSelectedOperateur(detail);
-    } catch (error) {
-      console.error('Erreur chargement opérateur:', error);
-      showToast('Erreur lors du chargement des détails de l\'opérateur', 'error');
-    }
-  };
-
-  const handleViewEquipe = async (equipeId: number) => {
-    try {
-      const detail = await fetchEquipeById(equipeId);
-      setSelectedEquipe(detail);
-    } catch (error) {
-      console.error('Erreur chargement equipe:', error);
-    }
-  };
-
-  const handleValiderAbsence = async (absenceId: number) => {
-    try {
-      await validerAbsence(absenceId, 'Approuve');
-      loadData();
-    } catch (error) {
-      console.error('Erreur validation absence:', error);
-    }
-  };
-
-  const handleRefuserAbsence = async (absenceId: number) => {
-    try {
-      await refuserAbsence(absenceId, 'Refuse');
-      loadData();
-    } catch (error) {
-      console.error('Erreur refus absence:', error);
-    }
-  };
-
-  const handleOpenCreateAbsence = async () => {
-    // Ensure operators are loaded before opening the modal
-    if (operateurs.length === 0) {
-      try {
-        const operateursRes = await fetchOperateurs({ page: 1, pageSize: 200 });
-        setOperateurs(operateursRes.results);
-      } catch (error) {
-        console.error('Erreur chargement opérateurs:', error);
-        showToast('Erreur lors du chargement des opérateurs', 'error');
-        return;
-      }
-    }
-    setShowCreateAbsence(true);
-  };
-
-  const handleOpenCreateTeam = async () => {
-    // Ensure operators are loaded before opening the modal
-    if (operateurs.length === 0) {
-      try {
-        const operateursRes = await fetchOperateurs({ page: 1, pageSize: 200 });
-        setOperateurs(operateursRes.results);
-      } catch (error) {
-        console.error('Erreur chargement opérateurs:', error);
-        showToast('Erreur lors du chargement des opérateurs', 'error');
-        return;
-      }
-    }
-    setShowCreateTeam(true);
-  };
-
-  // Filter data (using debounced search for performance)
-  const filteredEquipes = useMemo(() => equipes
-    .filter(e => e.actif)
-    .filter(e =>
-      e.nomEquipe.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-      (e.chefEquipeNom || '').toLowerCase().includes(debouncedSearchQuery.toLowerCase())
-    ), [equipes, debouncedSearchQuery]);
-
-  const filteredOperateurs = useMemo(() => operateurs.filter(o =>
-    (o.fullName || '').toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-    (o.numeroImmatriculation || '').toLowerCase().includes(debouncedSearchQuery.toLowerCase())
-  ), [operateurs, debouncedSearchQuery]);
-
-  const filteredAbsences = useMemo(() => absences.filter(a => {
-    // Filtre par recherche (operateur, motif, type)
-    if (debouncedSearchQuery) {
-      const query = debouncedSearchQuery.toLowerCase();
-      const matchOperateur = a.operateurNom.toLowerCase().includes(query);
-      const matchMotif = a.motif?.toLowerCase().includes(query);
-      const matchType = TYPE_ABSENCE_LABELS[a.typeAbsence]?.toLowerCase().includes(query);
-      const matchStatut = STATUT_ABSENCE_LABELS[a.statut]?.toLowerCase().includes(query);
-      if (!matchOperateur && !matchMotif && !matchType && !matchStatut) {
-        return false;
-      }
-    }
-    // Filtre par statut
-    if (absenceFilters.statut && a.statut !== absenceFilters.statut) {
-      return false;
-    }
-    // Filtre par type
-    if (absenceFilters.typeAbsence && a.typeAbsence !== absenceFilters.typeAbsence) {
-      return false;
-    }
-    // Filtre par date debut
-    if (absenceFilters.dateDebut && new Date(a.dateDebut) < new Date(absenceFilters.dateDebut)) {
-      return false;
-    }
-    // Filtre par date fin
-    if (absenceFilters.dateFin && new Date(a.dateFin) > new Date(absenceFilters.dateFin)) {
-      return false;
-    }
-    return true;
-  }), [absences, debouncedSearchQuery, absenceFilters]);
-
-  // Filter active operators available for team assignment
-  // Show ALL active operators (not just those without a team) to allow reassignment
-  const operateursSansEquipe = operateurs.filter(o => {
-    const estActif = o.actif === true || (o.actif === undefined && o.statut === 'ACTIF');
-    return estActif;
-  });
-
-  // Get unique categories from competences
-  const competenceCategories = useMemo(() => {
-    const cats = new Set<string>();
-    competences.forEach(c => {
-      if (c.categorieDisplay || c.categorie) {
-        cats.add(c.categorieDisplay || c.categorie);
-      }
-    });
-    return Array.from(cats);
-  }, [competences]);
-
-  // Columns
-  const [editEquipe, setEditEquipe] = useState<EquipeList | null>(null);
-  const [deleteEquipeId, setDeleteEquipeId] = useState<number | null>(null);
-  const [deleteOperateurId, setDeleteOperateurId] = useState<number | null>(null);
-
-  const [editingOperateur, setEditingOperateur] = useState<OperateurList | null>(null);
-
-  const equipesColumns: Column<EquipeList>[] = [
-    { key: 'nomEquipe', label: 'Nom' },
-    { key: 'chefEquipeNom', label: "Chef d'équipe", render: (e) => e.chefEquipeNom || '-' },
-    { key: 'sitePrincipalNom', label: "Site principal", render: (e) => e.sitePrincipalNom || '-' },
-    {
-      key: 'nombreMembres',
-      label: 'Membres',
-      render: (e) => `${e.nombreMembres} membre${e.nombreMembres > 1 ? 's' : ''}`
-    },
-    {
-      key: 'actif',
-      label: 'Actif',
-      render: (e) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-          e.actif
-            ? 'bg-green-100 text-green-800'
-            : 'bg-gray-100 text-gray-800'
-        }`}>
-          {e.actif ? 'Actif' : 'Inactif'}
-        </span>
-      ),
-      sortable: false
-    },
-    {
-      key: 'statutOperationnel',
-      label: 'Statut',
-      render: (e) => <StatusBadge variant="status" type="equipe" value={e.statutOperationnel || ''} />,
-      sortable: false
-    },
-    {
-      key: 'actions',
-      label: 'Actions',
-      render: (e) => (
-        <div className="flex gap-1">
-          {/* Edit button - ADMIN or SUPERVISEUR (if owns team) */}
-          {permissions.canEditTeam(e) && (
-            <button
-              className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-              title="Modifier"
-              onClick={(ev) => { ev.stopPropagation(); setEditEquipe(e); }}
-            >
-              <Edit2 className="w-4 h-4" />
-            </button>
-          )}
-          {/* Delete button - ADMIN only */}
-          {permissions.canDeleteTeam(e) && (
-            <button
-              className="p-1 text-red-600 hover:bg-red-100 rounded"
-              title="Supprimer"
-              onClick={(ev) => { ev.stopPropagation(); setDeleteEquipeId(e.id); }}
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
-          {/* View button - For users who can't edit */}
-          {!permissions.canEditTeam(e) && !permissions.canDeleteTeam(e) && (
-            <button
-              className="p-1 text-gray-600 hover:bg-gray-100 rounded"
-              title="Voir détails"
-              onClick={(ev) => { ev.stopPropagation(); handleViewEquipe(e.id); }}
-            >
-              <Eye className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      ),
-      sortable: false
-    }
-  ];
-
-  const operateursColumns: Column<OperateurList>[] = [
-    { key: 'numeroImmatriculation', label: 'Matricule' },
-    { key: 'nom', label: 'Nom' },
-    { key: 'prenom', label: 'Prénom' },
-    { key: 'equipeNom', label: 'Équipe', render: (o) => o.equipeNom || '-' },
-    {
-      key: 'estChefEquipe',
-      label: 'Chef',
-      render: (o) => o.estChefEquipe ? (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
-          <Star className="w-3 h-3" />
-          Chef
-        </span>
-      ) : null,
-      sortable: false
-    },
-    {
-      key: 'statut',
-      label: 'Statut',
-      render: (o) => <StatusBadge variant="status" type="operateur" value={o.statut || ''} />,
-      sortable: false
-    },
-    {
-      key: 'actions',
-      label: 'Actions',
-      render: (o) => (
-        <div className="flex gap-1">
-          {/* Edit button - ADMIN or SUPERVISEUR (if owns operator) */}
-          {permissions.canEditOperateur(o) && (
-            <button
-              className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-              title="Modifier"
-              onClick={(ev) => { ev.stopPropagation(); setEditingOperateur(o); }}
-            >
-              <Edit2 className="w-4 h-4" />
-            </button>
-          )}
-          {/* Delete button - ADMIN only */}
-          {permissions.canDeleteOperateur(o) && (
-            <button
-              className="p-1 text-red-600 hover:bg-red-100 rounded"
-              title="Supprimer"
-              onClick={(ev) => { ev.stopPropagation(); setDeleteOperateurId(o.id); }}
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
-          {/* View button - For users who can't edit */}
-          {!permissions.canEditOperateur(o) && !permissions.canDeleteOperateur(o) && (
-            <button
-              className="p-1 text-gray-600 hover:bg-gray-100 rounded"
-              title="Voir détails"
-              onClick={(ev) => { ev.stopPropagation(); handleViewOperateur(o.id); }}
-            >
-              <Eye className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      ),
-      sortable: false
-    }
-  ];
-
-  const absencesColumns: Column<Absence>[] = [
-    {
-      key: 'operateurNom',
-      label: 'Opérateur',
-      render: (a) => (
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
-            {a.operateurNom?.split(' ').map(n => n[0]).join('').substring(0, 2) || '??'}
-          </div>
-          <span className="font-semibold text-gray-900">{a.operateurNom}</span>
-        </div>
-      )
-    },
-    {
-      key: 'typeAbsence',
-      label: 'Type',
-      render: (a) => {
-        const typeIcons = {
-          CONGE: <Umbrella className="w-4 h-4" />,
-          MALADIE: <HeartPulse className="w-4 h-4" />,
-          FORMATION: <GraduationCap className="w-4 h-4" />,
-          AUTRE: <MoreHorizontal className="w-4 h-4" />
-        };
-        const typeColors = {
-          CONGE: 'bg-blue-100 text-blue-700 border-blue-300',
-          MALADIE: 'bg-red-100 text-red-700 border-red-300',
-          FORMATION: 'bg-purple-100 text-purple-700 border-purple-300',
-          AUTRE: 'bg-gray-100 text-gray-700 border-gray-300'
-        };
-        const type = a.typeAbsence as keyof typeof typeIcons;
-        return (
-          <span className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg font-semibold border-2 ${typeColors[type] || typeColors.AUTRE}`}>
-            {typeIcons[type] || typeIcons.AUTRE}
-            <span>{TYPE_ABSENCE_LABELS[type]}</span>
-          </span>
-        );
-      },
-      sortable: false
-    },
-    {
-      key: 'dateDebut',
-      label: 'Début',
-      render: (a) => (
-        <div className="flex items-center gap-2">
-          <CalendarCheck className="w-4 h-4 text-gray-400" />
-          <span className="text-sm font-medium text-gray-700">
-            {new Date(a.dateDebut).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
-          </span>
-        </div>
-      )
-    },
-    {
-      key: 'dateFin',
-      label: 'Fin',
-      render: (a) => (
-        <div className="flex items-center gap-2">
-          <CalendarClock className="w-4 h-4 text-gray-400" />
-          <span className="text-sm font-medium text-gray-700">
-            {new Date(a.dateFin).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
-          </span>
-        </div>
-      )
-    },
-    {
-      key: 'dureeJours',
-      label: 'Durée',
-      render: (a) => (
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-semibold border border-emerald-200">
-          <Clock className="w-3.5 h-3.5" />
-          {a.dureeJours} jour{a.dureeJours > 1 ? 's' : ''}
-        </span>
-      )
-    },
-    {
-      key: 'statut',
-      label: 'Statut',
-      render: (a) => {
-        const statutIcons = {
-          DEMANDEE: <Clock className="w-4 h-4" />,
-          VALIDEE: <CheckCircle2 className="w-4 h-4" />,
-          REFUSEE: <XCircle className="w-4 h-4" />,
-          ANNULEE: <Ban className="w-4 h-4" />
-        };
-        const statutColors = {
-          DEMANDEE: 'bg-orange-100 text-orange-700 border-orange-300',
-          VALIDEE: 'bg-green-100 text-green-700 border-green-300',
-          REFUSEE: 'bg-red-100 text-red-700 border-red-300',
-          ANNULEE: 'bg-gray-100 text-gray-700 border-gray-300'
-        };
-        const statut = a.statut as keyof typeof statutIcons;
-        return (
-          <span className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg font-semibold border-2 ${statutColors[statut] || statutColors.DEMANDEE}`}>
-            {statutIcons[statut] || statutIcons.DEMANDEE}
-            <span>{STATUT_ABSENCE_LABELS[statut]}</span>
-          </span>
-        );
-      },
-      sortable: false
-    },
-    {
-      key: 'id',
-      label: 'Actions',
-      render: (a) => (
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={(e) => { e.stopPropagation(); setSelectedAbsence(a); }}
-            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors shadow-sm border border-gray-200"
-            title="Voir détails"
-          >
-            <Eye className="w-4 h-4" />
-          </button>
-
-          {/* Edit button - ADMIN or SUPERVISEUR (if owns absence) */}
-          {permissions.canValidateAbsence(a) && (a.statut === 'DEMANDEE' || a.statut === 'VALIDEE') && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setEditingAbsence(a); }}
-              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-sm border border-blue-200"
-              title="Modifier"
-            >
-              <Edit2 className="w-4 h-4" />
-            </button>
-          )}
-
-          {/* Validate/Refuse buttons - ADMIN or SUPERVISEUR (if owns absence) */}
-          {permissions.canValidateAbsence(a) && a.statut === 'DEMANDEE' && (
-            <>
-              <button
-                onClick={(e) => { e.stopPropagation(); handleValiderAbsence(a.id); }}
-                className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors shadow-sm border border-green-200"
-                title="Valider"
-              >
-                <Check className="w-4 h-4" />
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); handleRefuserAbsence(a.id); }}
-                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors shadow-sm border border-red-200"
-                title="Refuser"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </>
-          )}
-
-          {/* Delete button - ADMIN or SUPERVISEUR (if owns absence) */}
-          {permissions.canValidateAbsence(a) && (a.statut === 'DEMANDEE' || a.statut === 'VALIDEE') && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setDeleteAbsenceId(a.id); }}
-              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors shadow-sm border border-red-200"
-              title="Supprimer (annuler)"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      ),
-      sortable: false
-    }
-  ];
-
-  if (loading) {
+  if (data.loading) {
     return (
       <div className="fixed inset-0 z-50">
         <LoadingScreen isLoading={true} loop={true} minDuration={0} />
@@ -870,435 +67,97 @@ const Teams: React.FC = () => {
 
   return (
     <div className="p-6 h-full flex flex-col gap-6">
-      {/* Barre KPI Moderne - Toujours visible */}
-      {stats && (
+      {/* Stats Bar */}
+      {data.stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 flex-shrink-0">
-          <StatCardCompact
-            icon={<Users className="w-5 h-5 text-blue-500" />}
-            label="Total Opérateurs"
-            value={stats.totalOperateurs}
-            color="bg-blue-500"
-          />
-          <StatCardCompact
-            icon={<UserCheck className="w-5 h-5 text-emerald-500" />}
-            label="Disponibles"
-            value={stats.disponibles}
-            color="bg-emerald-500"
-          />
-          <StatCardCompact
-            icon={<Users className="w-5 h-5 text-purple-500" />}
-            label="Équipes"
-            value={stats.totalEquipes}
-            color="bg-purple-500"
-          />
-          <StatCardCompact
-            icon={<Clock className="w-5 h-5 text-orange-500" />}
-            label="Absences en attente"
-            value={stats.absencesEnAttente}
-            color="bg-orange-500"
-          />
+          <StatCardCompact icon={<Users className="w-5 h-5 text-blue-500" />} label="Total Opérateurs" value={data.stats.totalOperateurs} />
+          <StatCardCompact icon={<UserCheck className="w-5 h-5 text-emerald-500" />} label="Disponibles" value={data.stats.disponibles} />
+          <StatCardCompact icon={<Users className="w-5 h-5 text-purple-500" />} label="Équipes" value={data.stats.totalEquipes} />
+          <StatCardCompact icon={<Clock className="w-5 h-5 text-orange-500" />} label="Absences en attente" value={data.stats.absencesEnAttente} />
         </div>
       )}
 
-      {/* Toolbar - Tabs et Actions */}
+      {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex-shrink-0">
-        {/* Left: Main Tabs */}
+        {/* Tabs */}
         <div className="flex items-center bg-gray-100 p-1 rounded-lg">
-          <button
-            onClick={() => setActiveTab('equipes')}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'equipes'
-              ? 'bg-white text-emerald-700 shadow-sm'
-              : 'text-gray-500 hover:text-gray-700'
+          {(['equipes', 'operateurs', 'absences', 'competences'] as TabType[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => data.setActiveTab(tab)}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                data.activeTab === tab
+                  ? 'bg-white text-emerald-700 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
-          >
-            <Users className="w-4 h-4" />
-            Équipes
-          </button>
-          <button
-            onClick={() => setActiveTab('operateurs')}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'operateurs'
-              ? 'bg-white text-emerald-700 shadow-sm'
-              : 'text-gray-500 hover:text-gray-700'
-              }`}
-          >
-            <UserCheck className="w-4 h-4" />
-            Opérateurs
-          </button>
-          <button
-            onClick={() => setActiveTab('absences')}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'absences'
-              ? 'bg-white text-emerald-700 shadow-sm'
-              : 'text-gray-500 hover:text-gray-700'
-              }`}
-          >
-            <Calendar className="w-4 h-4" />
-            <span>Absences</span>
-            {stats && stats.absencesEnAttente > 0 && (
-              <span className="px-1.5 py-0.5 bg-orange-500 text-white text-xs rounded-full font-bold">
-                {stats.absencesEnAttente}
+            >
+              {tab === 'equipes' && <Users className="w-4 h-4" />}
+              {tab === 'operateurs' && <UserCheck className="w-4 h-4" />}
+              {tab === 'absences' && <Calendar className="w-4 h-4" />}
+              {tab === 'competences' && <Award className="w-4 h-4" />}
+              <span className="capitalize">
+                {tab === 'equipes' ? 'Équipes' : tab === 'operateurs' ? 'Opérateurs' : tab === 'competences' ? 'Compétences' : 'Absences'}
               </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('competences')}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'competences'
-              ? 'bg-white text-emerald-700 shadow-sm'
-              : 'text-gray-500 hover:text-gray-700'
-              }`}
-          >
-            <Award className="w-4 h-4" />
-            Compétences
-          </button>
+              {tab === 'absences' && data.stats && data.stats.absencesEnAttente > 0 && (
+                <span className="px-1.5 py-0.5 bg-orange-500 text-white text-xs rounded-full font-bold">
+                  {data.stats.absencesEnAttente}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
 
-        {/* Right: Action Buttons */}
+        {/* Action Buttons */}
         <div className="flex items-center gap-2.5">
-          {/* Competences Tab Controls - Simplified */}
-          {activeTab === 'competences' && (
+          {/* Competences Tab Controls */}
+          {data.activeTab === 'competences' && (
             <>
-              {/* Edit Mode Toggle - Only ADMIN can edit competence matrix */}
-              {permissions.isAdmin && (
+              {data.permissions.isAdmin && (
                 <button
-                  onClick={() => setMatrixEditMode(!matrixEditMode)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${matrixEditMode
-                    ? 'bg-orange-500 text-white shadow-md hover:bg-orange-600'
-                    : 'bg-emerald-600 text-white shadow-md hover:bg-emerald-700'
-                    }`}
+                  onClick={() => data.setMatrixEditMode(!data.matrixEditMode)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${
+                    data.matrixEditMode
+                      ? 'bg-orange-500 text-white shadow-md hover:bg-orange-600'
+                      : 'bg-emerald-600 text-white shadow-md hover:bg-emerald-700'
+                  }`}
                 >
-                  {matrixEditMode ? (
-                    <>
-                      <Eye className="w-4 h-4" />
-                      <span className="hidden sm:inline">Consultation</span>
-                    </>
-                  ) : (
-                    <>
-                      <Edit3 className="w-4 h-4" />
-                      <span className="hidden sm:inline">Édition</span>
-                    </>
-                  )}
+                  {data.matrixEditMode ? <Eye className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />}
+                  <span className="hidden sm:inline">{data.matrixEditMode ? 'Consultation' : 'Édition'}</span>
                 </button>
               )}
-
-              {/* View Mode Toggle */}
               <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
                 <button
-                  onClick={() => setMatrixViewMode('cards')}
-                  className={`p-2 rounded-md transition-all duration-200 ${matrixViewMode === 'cards'
-                    ? 'bg-white text-emerald-700 shadow-sm'
-                    : 'text-gray-600 hover:bg-white/50 hover:text-gray-900'
-                    }`}
+                  onClick={() => data.setMatrixViewMode('cards')}
+                  className={`p-2 rounded-md transition-all ${data.matrixViewMode === 'cards' ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-600 hover:bg-white/50'}`}
                   title="Vue cartes"
                 >
                   <LayoutGrid className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => setMatrixViewMode('table')}
-                  className={`p-2 rounded-md transition-all duration-200 ${matrixViewMode === 'table'
-                    ? 'bg-white text-emerald-700 shadow-sm'
-                    : 'text-gray-600 hover:bg-white/50 hover:text-gray-900'
-                    }`}
+                  onClick={() => data.setMatrixViewMode('table')}
+                  className={`p-2 rounded-md transition-all ${data.matrixViewMode === 'table' ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-600 hover:bg-white/50'}`}
                   title="Vue tableau"
                 >
                   <Table className="w-4 h-4" />
                 </button>
               </div>
-
-              {/* Refresh Button */}
-              <button
-                onClick={loadData}
-                className="p-2.5 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 shadow-sm"
-                title="Rafraîchir"
-              >
+              <button onClick={data.loadData} className="p-2.5 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 shadow-sm" title="Rafraîchir">
                 <RefreshCw className="w-4 h-4" />
               </button>
             </>
           )}
 
           {/* Absences Tab Controls */}
-          {activeTab === 'absences' && (
+          {data.activeTab === 'absences' && (
             <>
-              {/* Filters Toggle - Icon only */}
-              <button
-                onClick={() => setShowAbsenceFilters(!showAbsenceFilters)}
-                className={`relative p-2.5 rounded-lg transition-all duration-200 ${showAbsenceFilters || absenceFilters.statut || absenceFilters.typeAbsence || absenceFilters.dateDebut || absenceFilters.dateFin
-                  ? 'bg-emerald-600 text-white shadow-md'
-                  : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 shadow-sm'
-                  }`}
-                title="Filtres"
-              >
-                <Filter className="w-4 h-4" />
-                {(absenceFilters.statut || absenceFilters.typeAbsence || absenceFilters.dateDebut || absenceFilters.dateFin) && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold shadow">
-                    {(absenceFilters.statut ? 1 : 0) + (absenceFilters.typeAbsence ? 1 : 0) + (absenceFilters.dateDebut ? 1 : 0) + (absenceFilters.dateFin ? 1 : 0)}
-                  </span>
-                )}
-              </button>
-
-              {/* Inline Filters - Custom selects with icons */}
-              {showAbsenceFilters && (
-                <>
-                  {/* Statut Filter */}
-                  <Listbox value={absenceFilters.statut} onChange={(val) => setAbsenceFilters({ ...absenceFilters, statut: val })}>
-                    <div className="relative">
-                      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]">
-                        <CalendarCheck className="w-4 h-4 text-gray-500" />
-                        <span className="flex-1 text-left">
-                          {absenceFilters.statut === '' && 'Statut'}
-                          {absenceFilters.statut === 'DEMANDEE' && 'Demandée'}
-                          {absenceFilters.statut === 'VALIDEE' && 'Validée'}
-                          {absenceFilters.statut === 'REFUSEE' && 'Refusée'}
-                          {absenceFilters.statut === 'ANNULEE' && 'Annulée'}
-                        </span>
-                        <ChevronDown className="w-4 h-4 text-gray-400" />
-                      </Listbox.Button>
-                      <Transition
-                        as={React.Fragment}
-                        leave="transition ease-in duration-100"
-                        leaveFrom="opacity-100"
-                        leaveTo="opacity-0"
-                      >
-                        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                          <Listbox.Option
-                            value=""
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <CalendarCheck className="w-4 h-4 text-gray-500" />
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>
-                                  Tous statuts
-                                </span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                          <Listbox.Option
-                            value="DEMANDEE"
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <Clock className="w-4 h-4 text-orange-500" />
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>
-                                  Demandée
-                                </span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                          <Listbox.Option
-                            value="VALIDEE"
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <CheckCircle2 className="w-4 h-4 text-green-500" />
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>
-                                  Validée
-                                </span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                          <Listbox.Option
-                            value="REFUSEE"
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <XCircle className="w-4 h-4 text-red-500" />
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>
-                                  Refusée
-                                </span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                          <Listbox.Option
-                            value="ANNULEE"
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <Ban className="w-4 h-4 text-gray-500" />
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>
-                                  Annulée
-                                </span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                        </Listbox.Options>
-                      </Transition>
-                    </div>
-                  </Listbox>
-
-                  {/* Type Filter */}
-                  <Listbox value={absenceFilters.typeAbsence} onChange={(val) => setAbsenceFilters({ ...absenceFilters, typeAbsence: val })}>
-                    <div className="relative">
-                      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]">
-                        <CalendarClock className="w-4 h-4 text-gray-500" />
-                        <span className="flex-1 text-left truncate">
-                          {absenceFilters.typeAbsence === '' && 'Type'}
-                          {absenceFilters.typeAbsence === 'CONGE' && 'Congé'}
-                          {absenceFilters.typeAbsence === 'MALADIE' && 'Maladie'}
-                          {absenceFilters.typeAbsence === 'FORMATION' && 'Formation'}
-                          {absenceFilters.typeAbsence === 'AUTRE' && 'Autre'}
-                        </span>
-                        <ChevronDown className="w-4 h-4 text-gray-400" />
-                      </Listbox.Button>
-                      <Transition
-                        as={React.Fragment}
-                        leave="transition ease-in duration-100"
-                        leaveFrom="opacity-100"
-                        leaveTo="opacity-0"
-                      >
-                        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                          <Listbox.Option
-                            value=""
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <CalendarClock className="w-4 h-4 text-gray-500" />
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>
-                                  Tous types
-                                </span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                          <Listbox.Option
-                            value="CONGE"
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <Umbrella className="w-4 h-4 text-blue-500" />
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>
-                                  Congé
-                                </span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                          <Listbox.Option
-                            value="MALADIE"
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <HeartPulse className="w-4 h-4 text-red-500" />
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>
-                                  Maladie
-                                </span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                          <Listbox.Option
-                            value="FORMATION"
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <GraduationCap className="w-4 h-4 text-purple-500" />
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>
-                                  Formation
-                                </span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                          <Listbox.Option
-                            value="AUTRE"
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <MoreHorizontal className="w-4 h-4 text-gray-500" />
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>
-                                  Autre
-                                </span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                        </Listbox.Options>
-                      </Transition>
-                    </div>
-                  </Listbox>
-
-                  {/* Date Filters */}
-                  <input
-                    type="date"
-                    value={absenceFilters.dateDebut}
-                    onChange={(e) => setAbsenceFilters({ ...absenceFilters, dateDebut: e.target.value })}
-                    placeholder="Date début"
-                    className="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all hover:border-gray-300 shadow-sm cursor-pointer"
-                  />
-                  <input
-                    type="date"
-                    value={absenceFilters.dateFin}
-                    onChange={(e) => setAbsenceFilters({ ...absenceFilters, dateFin: e.target.value })}
-                    placeholder="Date fin"
-                    className="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all hover:border-gray-300 shadow-sm cursor-pointer"
-                  />
-
-                  {/* Reset Filters */}
-                  {(absenceFilters.statut || absenceFilters.typeAbsence || absenceFilters.dateDebut || absenceFilters.dateFin) && (
-                    <button
-                      onClick={() => {
-                        setAbsenceFilters({ statut: '', typeAbsence: '', dateDebut: '', dateFin: '' });
-                      }}
-                      className="p-2.5 rounded-lg text-red-600 hover:bg-red-50 transition-all duration-200 border border-red-200 hover:border-red-300 shadow-sm"
-                      title="Réinitialiser les filtres"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </>
-              )}
-
-              {/* Separator */}
-              <div className="h-8 w-px bg-gray-300"></div>
-
-              {/* Refresh Button */}
-              <button
-                onClick={loadData}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors font-medium shadow-sm"
-                title="Rafraîchir"
-              >
+              <AbsenceFiltersToolbar data={data} />
+              <div className="h-8 w-px bg-gray-300" />
+              <button onClick={data.loadData} className="flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-100 font-medium shadow-sm">
                 <RefreshCw className="w-4 h-4" />
                 Rafraîchir
               </button>
-
-              {/* Create Button - ADMIN and SUPERVISEUR can create absences */}
-              {permissions.canCreateAbsence && (
-                <button
-                  onClick={handleOpenCreateAbsence}
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm"
-                >
+              {data.permissions.canCreateAbsence && (
+                <button onClick={data.handleOpenCreateAbsence} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium text-sm shadow-sm">
                   <Plus className="w-4 h-4" />
                   Absence
                 </button>
@@ -1306,25 +165,15 @@ const Teams: React.FC = () => {
             </>
           )}
 
-          {/* Equipes tab controls */}
-          {activeTab === 'equipes' && (
+          {/* Equipes Tab Controls */}
+          {data.activeTab === 'equipes' && (
             <>
-              {/* Refresh Button */}
-              <button
-                onClick={loadData}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors font-medium shadow-sm"
-                title="Rafraîchir"
-              >
+              <button onClick={data.loadData} className="flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-100 font-medium shadow-sm">
                 <RefreshCw className="w-4 h-4" />
                 Rafraîchir
               </button>
-
-              {/* Create Button - Only ADMIN can create teams */}
-              {permissions.canCreateTeam && (
-                <button
-                  onClick={handleOpenCreateTeam}
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm"
-                >
+              {data.permissions.canCreateTeam && (
+                <button onClick={data.handleOpenCreateTeam} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium text-sm shadow-sm">
                   <Plus className="w-4 h-4" />
                   Équipe
                 </button>
@@ -1332,262 +181,17 @@ const Teams: React.FC = () => {
             </>
           )}
 
-          {/* Operateurs tab controls */}
-          {activeTab === 'operateurs' && (
+          {/* Operateurs Tab Controls */}
+          {data.activeTab === 'operateurs' && (
             <>
-              {/* Filters Toggle */}
-              <button
-                onClick={() => setShowOperateurFilters(!showOperateurFilters)}
-                className={`relative p-2.5 rounded-lg transition-all duration-200 ${showOperateurFilters || operateurFilters.statut || operateurFilters.equipe || operateurFilters.estChef || operateurFilters.disponible
-                  ? 'bg-emerald-600 text-white shadow-md'
-                  : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 shadow-sm'
-                  }`}
-                title="Filtres"
-              >
-                <Filter className="w-4 h-4" />
-                {(operateurFilters.statut || operateurFilters.equipe || operateurFilters.estChef || operateurFilters.disponible) && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold shadow">
-                    {(operateurFilters.statut ? 1 : 0) + (operateurFilters.equipe ? 1 : 0) + (operateurFilters.estChef ? 1 : 0) + (operateurFilters.disponible ? 1 : 0)}
-                  </span>
-                )}
-              </button>
-
-              {/* Inline Filters */}
-              {showOperateurFilters && (
-                <>
-                  {/* Statut Filter */}
-                  <Listbox value={operateurFilters.statut} onChange={(val) => {
-                    const newFilters = { ...operateurFilters, statut: val };
-                    setOperateurFilters(newFilters);
-                    setOperateursPage(1);
-                    loadOperateursData(1, newFilters);
-                  }}>
-                    <div className="relative">
-                      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[130px]">
-                        <UserCheck className="w-4 h-4 text-gray-500" />
-                        <span className="flex-1 text-left">
-                          {operateurFilters.statut === '' && 'Statut'}
-                          {operateurFilters.statut === 'ACTIF' && 'Actif'}
-                          {operateurFilters.statut === 'INACTIF' && 'Inactif'}
-                          {operateurFilters.statut === 'EN_CONGE' && 'En congé'}
-                        </span>
-                        <ChevronDown className="w-4 h-4 text-gray-400" />
-                      </Listbox.Button>
-                      <Transition
-                        as={React.Fragment}
-                        leave="transition ease-in duration-100"
-                        leaveFrom="opacity-100"
-                        leaveTo="opacity-0"
-                      >
-                        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                          <Listbox.Option value="" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
-                            {({ selected }) => <span className={selected ? 'font-semibold' : 'font-normal'}>Tous statuts</span>}
-                          </Listbox.Option>
-                          <Listbox.Option value="ACTIF" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>Actif</span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                          <Listbox.Option value="INACTIF" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-gray-400"></span>
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>Inactif</span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                          <Listbox.Option value="EN_CONGE" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>En congé</span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                        </Listbox.Options>
-                      </Transition>
-                    </div>
-                  </Listbox>
-
-                  {/* Équipe Filter */}
-                  <Listbox value={operateurFilters.equipe} onChange={(val) => {
-                    const newFilters = { ...operateurFilters, equipe: val };
-                    setOperateurFilters(newFilters);
-                    setOperateursPage(1);
-                    loadOperateursData(1, newFilters);
-                  }}>
-                    <div className="relative">
-                      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]">
-                        <Users className="w-4 h-4 text-gray-500" />
-                        <span className="flex-1 text-left truncate">
-                          {operateurFilters.equipe === '' ? 'Équipe' : equipes.find(e => e.id === parseInt(operateurFilters.equipe))?.nomEquipe || 'Équipe'}
-                        </span>
-                        <ChevronDown className="w-4 h-4 text-gray-400" />
-                      </Listbox.Button>
-                      <Transition
-                        as={React.Fragment}
-                        leave="transition ease-in duration-100"
-                        leaveFrom="opacity-100"
-                        leaveTo="opacity-0"
-                      >
-                        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-48 overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                          <Listbox.Option value="" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
-                            {({ selected }) => <span className={selected ? 'font-semibold' : 'font-normal'}>Toutes équipes</span>}
-                          </Listbox.Option>
-                          <Listbox.Option value="sans_equipe" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <Ban className="w-4 h-4 text-gray-400" />
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>Sans équipe</span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                          {equipes.filter(e => e.actif).map(eq => (
-                            <Listbox.Option key={eq.id} value={String(eq.id)} className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
-                              {({ selected }) => <span className={`block truncate ${selected ? 'font-semibold' : 'font-normal'}`}>{eq.nomEquipe}</span>}
-                            </Listbox.Option>
-                          ))}
-                        </Listbox.Options>
-                      </Transition>
-                    </div>
-                  </Listbox>
-
-                  {/* Chef d'équipe Filter */}
-                  <Listbox value={operateurFilters.estChef} onChange={(val) => {
-                    const newFilters = { ...operateurFilters, estChef: val };
-                    setOperateurFilters(newFilters);
-                    setOperateursPage(1);
-                    loadOperateursData(1, newFilters);
-                  }}>
-                    <div className="relative">
-                      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]">
-                        <Star className="w-4 h-4 text-gray-500" />
-                        <span className="flex-1 text-left">
-                          {operateurFilters.estChef === '' && "Chef d'équipe"}
-                          {operateurFilters.estChef === 'true' && 'Chefs uniquement'}
-                          {operateurFilters.estChef === 'false' && 'Non-chefs'}
-                        </span>
-                        <ChevronDown className="w-4 h-4 text-gray-400" />
-                      </Listbox.Button>
-                      <Transition
-                        as={React.Fragment}
-                        leave="transition ease-in duration-100"
-                        leaveFrom="opacity-100"
-                        leaveTo="opacity-0"
-                      >
-                        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                          <Listbox.Option value="" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
-                            {({ selected }) => <span className={selected ? 'font-semibold' : 'font-normal'}>Tous</span>}
-                          </Listbox.Option>
-                          <Listbox.Option value="true" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <Star className="w-4 h-4 text-amber-500" />
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>Chefs d'équipe</span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                          <Listbox.Option value="false" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <Users className="w-4 h-4 text-gray-500" />
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>Membres uniquement</span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                        </Listbox.Options>
-                      </Transition>
-                    </div>
-                  </Listbox>
-
-                  {/* Disponibilité Filter */}
-                  <Listbox value={operateurFilters.disponible} onChange={(val) => {
-                    const newFilters = { ...operateurFilters, disponible: val };
-                    setOperateurFilters(newFilters);
-                    setOperateursPage(1);
-                    loadOperateursData(1, newFilters);
-                  }}>
-                    <div className="relative">
-                      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]">
-                        <Calendar className="w-4 h-4 text-gray-500" />
-                        <span className="flex-1 text-left">
-                          {operateurFilters.disponible === '' && 'Disponibilité'}
-                          {operateurFilters.disponible === 'true' && 'Disponibles'}
-                          {operateurFilters.disponible === 'false' && 'Indisponibles'}
-                        </span>
-                        <ChevronDown className="w-4 h-4 text-gray-400" />
-                      </Listbox.Button>
-                      <Transition
-                        as={React.Fragment}
-                        leave="transition ease-in duration-100"
-                        leaveFrom="opacity-100"
-                        leaveTo="opacity-0"
-                      >
-                        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                          <Listbox.Option value="" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
-                            {({ selected }) => <span className={selected ? 'font-semibold' : 'font-normal'}>Tous</span>}
-                          </Listbox.Option>
-                          <Listbox.Option value="true" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <CheckCircle className="w-4 h-4 text-green-500" />
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>Disponibles aujourd'hui</span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                          <Listbox.Option value="false" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
-                            {({ selected }) => (
-                              <div className="flex items-center gap-2">
-                                <XCircle className="w-4 h-4 text-red-500" />
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>Indisponibles</span>
-                              </div>
-                            )}
-                          </Listbox.Option>
-                        </Listbox.Options>
-                      </Transition>
-                    </div>
-                  </Listbox>
-
-                  {/* Reset Filters */}
-                  {(operateurFilters.statut || operateurFilters.equipe || operateurFilters.estChef || operateurFilters.disponible) && (
-                    <button
-                      onClick={() => {
-                        const emptyFilters = { statut: '', equipe: '', estChef: '', disponible: '' };
-                        setOperateurFilters(emptyFilters);
-                        setOperateursPage(1);
-                        loadOperateursData(1, emptyFilters);
-                      }}
-                      className="p-2.5 rounded-lg text-red-600 hover:bg-red-50 transition-all duration-200 border border-red-200 hover:border-red-300 shadow-sm"
-                      title="Réinitialiser les filtres"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </>
-              )}
-
-              {/* Separator */}
-              <div className="h-8 w-px bg-gray-300"></div>
-
-              {/* Refresh Button */}
-              <button
-                onClick={loadData}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors font-medium shadow-sm"
-                title="Rafraîchir"
-              >
+              <OperateurFiltersToolbar data={data} />
+              <div className="h-8 w-px bg-gray-300" />
+              <button onClick={data.loadData} className="flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-100 font-medium shadow-sm">
                 <RefreshCw className="w-4 h-4" />
                 Rafraîchir
               </button>
-
-              {/* Create Button - Only ADMIN can create operators */}
-              {permissions.canCreateOperateur && (
-                <button
-                  onClick={() => setShowCreateOperateur(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm"
-                >
+              {data.permissions.canCreateOperateur && (
+                <button onClick={() => data.setShowCreateOperateur(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium text-sm shadow-sm">
                   <Plus className="w-4 h-4" />
                   Opérateur
                 </button>
@@ -1597,347 +201,582 @@ const Teams: React.FC = () => {
         </div>
       </div>
 
-
-      {/* Competences Filter Bar - Dedicated section */}
-      {activeTab === 'competences' && (
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex-shrink-0">
-          <div className="flex flex-wrap items-center gap-4">
-            {/* Label */}
-            <div className="flex items-center gap-2 text-sm font-medium text-gray-600">
-              <Filter className="w-4 h-4" />
-              <span>Filtrer par :</span>
-            </div>
-
-            {/* Niveau Filter - Chip style buttons */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">Niveau</span>
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  onClick={() => setMatrixNiveauFilter('')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${matrixNiveauFilter === ''
-                    ? 'bg-gray-800 text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                >
-                  Tous
-                </button>
-                <button
-                  onClick={() => setMatrixNiveauFilter('NON')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all ${matrixNiveauFilter === 'NON'
-                    ? 'bg-red-500 text-white shadow-sm'
-                    : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
-                    }`}
-                >
-                  <Ban className="w-3 h-3" />
-                  Aucune
-                </button>
-                <button
-                  onClick={() => setMatrixNiveauFilter('DEBUTANT')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all ${matrixNiveauFilter === 'DEBUTANT'
-                    ? 'bg-orange-500 text-white shadow-sm'
-                    : 'bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200'
-                    }`}
-                >
-                  <Star className="w-3 h-3" />
-                  Débutant
-                </button>
-                <button
-                  onClick={() => setMatrixNiveauFilter('INTERMEDIAIRE')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all ${matrixNiveauFilter === 'INTERMEDIAIRE'
-                    ? 'bg-blue-500 text-white shadow-sm'
-                    : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
-                    }`}
-                >
-                  <TrendingUp className="w-3 h-3" />
-                  Intermédiaire
-                </button>
-                <button
-                  onClick={() => setMatrixNiveauFilter('EXPERT')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all ${matrixNiveauFilter === 'EXPERT'
-                    ? 'bg-green-500 text-white shadow-sm'
-                    : 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
-                    }`}
-                >
-                  <CheckCircle className="w-3 h-3" />
-                  Expert
-                </button>
-              </div>
-            </div>
-
-            {/* Separator */}
-            <div className="h-8 w-px bg-gray-200 hidden md:block"></div>
-
-            {/* Catégorie Filter */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">Catégorie</span>
-              <Listbox value={matrixCategorieFilter} onChange={setMatrixCategorieFilter}>
-                <div className="relative">
-                  <Listbox.Button className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-full text-xs font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all cursor-pointer min-w-[140px]">
-                    <FolderOpen className="w-3.5 h-3.5 text-gray-500" />
-                    <span className="flex-1 text-left truncate">
-                      {matrixCategorieFilter || 'Toutes'}
-                    </span>
-                    <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-                  </Listbox.Button>
-                  <Transition
-                    as={React.Fragment}
-                    leave="transition ease-in duration-100"
-                    leaveFrom="opacity-100"
-                    leaveTo="opacity-0"
-                  >
-                    <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-48 overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                      <Listbox.Option
-                        value=""
-                        className={({ active }) =>
-                          `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
-                          }`
-                        }
-                      >
-                        {({ selected }) => (
-                          <div className="flex items-center gap-2">
-                            <FolderOpen className="w-4 h-4 text-gray-500" />
-                            <span className={selected ? 'font-semibold' : 'font-normal'}>
-                              Toutes les catégories
-                            </span>
-                          </div>
-                        )}
-                      </Listbox.Option>
-                      {competenceCategories.map(cat => (
-                        <Listbox.Option
-                          key={cat}
-                          value={cat}
-                          className={({ active }) =>
-                            `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'
-                            }`
-                          }
-                        >
-                          {({ selected }) => (
-                            <span className={`block truncate ${selected ? 'font-semibold' : 'font-normal'}`}>
-                              {cat}
-                            </span>
-                          )}
-                        </Listbox.Option>
-                      ))}
-                    </Listbox.Options>
-                  </Transition>
-                </div>
-              </Listbox>
-            </div>
-
-            {/* Reset button */}
-            {(matrixNiveauFilter || matrixCategorieFilter) && (
-              <button
-                onClick={() => {
-                  setMatrixNiveauFilter('');
-                  setMatrixCategorieFilter('');
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-full transition-all border border-red-200"
-              >
-                <X className="w-3 h-3" />
-                Réinitialiser
-              </button>
-            )}
-
-            {/* Active filters count */}
-            {(matrixNiveauFilter || matrixCategorieFilter) && (
-              <div className="ml-auto flex items-center gap-2">
-                <span className="text-xs text-gray-500">
-                  {(matrixNiveauFilter ? 1 : 0) + (matrixCategorieFilter ? 1 : 0)} filtre{((matrixNiveauFilter ? 1 : 0) + (matrixCategorieFilter ? 1 : 0)) > 1 ? 's' : ''} actif{((matrixNiveauFilter ? 1 : 0) + (matrixCategorieFilter ? 1 : 0)) > 1 ? 's' : ''}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Competences Filter Bar */}
+      {data.activeTab === 'competences' && <CompetencesFilterBar data={data} />}
 
       {/* Content */}
       <div className="flex-1 overflow-auto min-h-0">
-        {activeTab === 'equipes' && (
-          <DataTable
-            data={filteredEquipes}
-            columns={equipesColumns}
-            serverSide={true}
-            totalItems={equipesTotal}
-            currentPage={equipesPage}
-            onPageChange={async (page) => {
-              setEquipesPage(page);
-              await loadEquipesData(page);
-            }}
-            itemsPerPage={50}
-            onRowClick={(equipe) => handleViewEquipe(equipe.id)}
+        {data.activeTab === 'equipes' && (
+          <EquipesTab
+            filteredEquipes={data.filteredEquipes}
+            equipesTotal={data.equipesTotal}
+            equipesPage={data.equipesPage}
+            onPageChange={async (page) => { data.setEquipesPage(page); await data.loadEquipesData(page); }}
+            onRowClick={(eq) => data.handleViewEquipe(eq.id)}
+            onEdit={(eq) => data.setEditEquipe(eq)}
+            onDelete={(id) => data.setDeleteEquipeId(id)}
+            onView={(id) => data.handleViewEquipe(id)}
+            permissions={data.permissions}
           />
         )}
 
-        {activeTab === 'operateurs' && (
-          <DataTable
-            data={filteredOperateurs}
-            columns={operateursColumns}
-            serverSide={true}
-            totalItems={operateursTotal}
-            currentPage={operateursPage}
-            onPageChange={async (page) => {
-              setOperateursPage(page);
-              await loadOperateursData(page);
-            }}
-            itemsPerPage={50}
-            onRowClick={(op) => handleViewOperateur(op.id)}
+        {data.activeTab === 'operateurs' && (
+          <OperateursTab
+            filteredOperateurs={data.filteredOperateurs}
+            operateursTotal={data.operateursTotal}
+            operateursPage={data.operateursPage}
+            onPageChange={async (page) => { data.setOperateursPage(page); await data.loadOperateursData(page); }}
+            onRowClick={(op) => data.handleViewOperateur(op.id)}
+            onEdit={(op) => data.setEditingOperateur(op)}
+            onDelete={(id) => data.setDeleteOperateurId(id)}
+            onView={(id) => data.handleViewOperateur(id)}
+            permissions={data.permissions}
           />
         )}
 
-        {activeTab === 'absences' && (
-          <DataTable
-            data={filteredAbsences}
-            columns={absencesColumns}
-            serverSide={true}
-            totalItems={absencesTotal}
-            currentPage={absencesPage}
-            onPageChange={async (page) => {
-              setAbsencesPage(page);
-              await loadAbsencesData(page);
-            }}
-            itemsPerPage={50}
+        {data.activeTab === 'absences' && (
+          <AbsencesTab
+            filteredAbsences={data.filteredAbsences}
+            absencesTotal={data.absencesTotal}
+            absencesPage={data.absencesPage}
+            onPageChange={async (page) => { data.setAbsencesPage(page); await data.loadAbsencesData(page); }}
+            onView={(a) => data.setSelectedAbsence(a)}
+            onEdit={(a) => data.setEditingAbsence(a)}
+            onDelete={(id) => data.setDeleteAbsenceId(id)}
+            onValider={data.handleValiderAbsence}
+            onRefuser={data.handleRefuserAbsence}
+            permissions={data.permissions}
           />
         )}
 
-        {activeTab === 'competences' && (
+        {data.activeTab === 'competences' && (
           <CompetenceMatrix
-            operateurs={operateurs}
-            competences={competences}
-            searchQuery={debouncedSearchQuery}
-            viewMode={matrixViewMode}
-            isEditMode={matrixEditMode}
-            isReadOnly={isReadOnly}
-            niveauFilter={matrixNiveauFilter}
-            categorieFilter={matrixCategorieFilter}
-            onViewModeChange={setMatrixViewMode}
-            onEditModeChange={setMatrixEditMode}
-            onNiveauFilterChange={setMatrixNiveauFilter}
-            onCategorieFilterChange={setMatrixCategorieFilter}
+            operateurs={data.operateurs}
+            competences={data.competences}
+            searchQuery={data.debouncedSearchQuery}
+            viewMode={data.matrixViewMode}
+            isEditMode={data.matrixEditMode}
+            isReadOnly={data.isReadOnly}
+            niveauFilter={data.matrixNiveauFilter}
+            categorieFilter={data.matrixCategorieFilter}
+            onViewModeChange={data.setMatrixViewMode}
+            onEditModeChange={data.setMatrixEditMode}
+            onNiveauFilterChange={data.setMatrixNiveauFilter}
+            onCategorieFilterChange={data.setMatrixCategorieFilter}
           />
         )}
       </div>
 
       {/* Modals */}
-      {showCreateTeam && (
-        <CreateTeamModal
-          onClose={() => setShowCreateTeam(false)}
-          onCreated={loadData}
-          chefsPotentiels={chefsPotentiels}
-          operateursSansEquipe={operateursSansEquipe}
-        />
-      )}
-
-      {showCreateOperateur && (
-        <CreateOperateurModal
-          onClose={() => setShowCreateOperateur(false)}
-          onCreated={loadData}
-        />
-      )}
-
-      {selectedEquipe && (
-        <EquipeDetailModal
-          equipe={selectedEquipe}
-          onClose={() => setSelectedEquipe(null)}
-        />
-      )}
-
-      {editingUser && (
-        <EditUserModal
-          user={editingUser}
-          clients={clients}
-          operateurs={operateurs}
-          onClose={() => setEditingUser(null)}
-          onUpdated={loadData}
-        />
-      )}
-
-      {editingOperateur && (
-        <EditOperateurModal
-          operateur={editingOperateur}
-          onClose={() => setEditingOperateur(null)}
-          onUpdated={loadData}
-        />
-      )}
-
-      {editEquipe && (
-        <EditEquipeModal
-          equipe={editEquipe}
-          onClose={() => setEditEquipe(null)}
-          onSaved={loadData}
-        />
-      )}
-
-      {deleteEquipeId !== null && (
-        <ConfirmDeleteModal
-          title="Supprimer l'équipe ?"
-          message="Cette action est irréversible."
-          onConfirm={async () => {
-            await deleteEquipe(deleteEquipeId);
-            showToast('Équipe supprimée avec succès', 'success');
-            loadData();
-          }}
-          onCancel={() => setDeleteEquipeId(null)}
-        />
-      )}
-
-      {deleteOperateurId !== null && (
-        <ConfirmDeleteModal
-          title="Supprimer l'opérateur ?"
-          message="Cette action est irréversible."
-          onConfirm={async () => {
-            await deleteOperateur(deleteOperateurId);
-            showToast('Opérateur supprimé avec succès', 'success');
-            loadData();
-          }}
-          onCancel={() => setDeleteOperateurId(null)}
-        />
-      )}
-
-      {showCreateAbsence && (
-        <CreateAbsenceModal
-          operateurs={operateurs}
-          onClose={() => setShowCreateAbsence(false)}
-          onCreated={loadData}
-        />
-      )}
-
-      {selectedAbsence && (
-        <AbsenceDetailModal
-          absence={selectedAbsence}
-          onClose={() => setSelectedAbsence(null)}
-        />
-      )}
-
-      {editingAbsence && (
-        <EditAbsenceModal
-          absence={editingAbsence}
-          onClose={() => setEditingAbsence(null)}
-          onUpdated={loadData}
-        />
-      )}
-
-      {deleteAbsenceId !== null && (
-        <ConfirmDeleteModal
-          title="Annuler l'absence ?"
-          message="L'absence sera marquée comme annulée. Cette action ne peut pas être annulée."
-          onConfirm={async () => {
-            await annulerAbsence(deleteAbsenceId);
-            showToast('Absence annulée avec succès', 'success');
-            loadData();
-          }}
-          onCancel={() => setDeleteAbsenceId(null)}
-          confirmText="Annuler l'absence"
-        />
-      )}
-
-      {selectedOperateur && (
-        <OperateurDetailModal
-          operateur={selectedOperateur}
-          onClose={() => setSelectedOperateur(null)}
-        />
-      )}
-    </div >
+      <TeamsModals data={data} />
+    </div>
   );
 };
+
+// ============================================================================
+// FILTERS TOOLBAR COMPONENTS
+// ============================================================================
+
+const AbsenceFiltersToolbar: React.FC<{ data: ReturnType<typeof useTeamsData> }> = ({ data }) => {
+  const hasFilters = data.absenceFilters.statut || data.absenceFilters.typeAbsence || data.absenceFilters.dateDebut || data.absenceFilters.dateFin;
+
+  return (
+    <>
+      <button
+        onClick={() => data.setShowAbsenceFilters(!data.showAbsenceFilters)}
+        className={`relative p-2.5 rounded-lg transition-all ${
+          data.showAbsenceFilters || hasFilters
+            ? 'bg-emerald-600 text-white shadow-md'
+            : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 shadow-sm'
+        }`}
+        title="Filtres"
+      >
+        <Filter className="w-4 h-4" />
+        {hasFilters && (
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold shadow">
+            {(data.absenceFilters.statut ? 1 : 0) + (data.absenceFilters.typeAbsence ? 1 : 0) + (data.absenceFilters.dateDebut ? 1 : 0) + (data.absenceFilters.dateFin ? 1 : 0)}
+          </span>
+        )}
+      </button>
+
+      {data.showAbsenceFilters && (
+        <>
+          <StatutAbsenceFilter value={data.absenceFilters.statut} onChange={(val) => data.setAbsenceFilters({ ...data.absenceFilters, statut: val })} />
+          <TypeAbsenceFilter value={data.absenceFilters.typeAbsence} onChange={(val) => data.setAbsenceFilters({ ...data.absenceFilters, typeAbsence: val })} />
+          <input
+            type="date"
+            value={data.absenceFilters.dateDebut}
+            onChange={(e) => data.setAbsenceFilters({ ...data.absenceFilters, dateDebut: e.target.value })}
+            className="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all hover:border-gray-300 shadow-sm cursor-pointer"
+          />
+          <input
+            type="date"
+            value={data.absenceFilters.dateFin}
+            onChange={(e) => data.setAbsenceFilters({ ...data.absenceFilters, dateFin: e.target.value })}
+            className="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all hover:border-gray-300 shadow-sm cursor-pointer"
+          />
+          {hasFilters && (
+            <button
+              onClick={() => data.setAbsenceFilters({ statut: '', typeAbsence: '', dateDebut: '', dateFin: '' })}
+              className="p-2.5 rounded-lg text-red-600 hover:bg-red-50 transition-all border border-red-200 hover:border-red-300 shadow-sm"
+              title="Réinitialiser les filtres"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </>
+      )}
+    </>
+  );
+};
+
+const OperateurFiltersToolbar: React.FC<{ data: ReturnType<typeof useTeamsData> }> = ({ data }) => {
+  const hasFilters = data.operateurFilters.statut || data.operateurFilters.equipe || data.operateurFilters.estChef || data.operateurFilters.disponible;
+
+  const handleFilterChange = (newFilters: typeof data.operateurFilters) => {
+    data.setOperateurFilters(newFilters);
+    data.setOperateursPage(1);
+    data.loadOperateursData(1, newFilters);
+  };
+
+  return (
+    <>
+      <button
+        onClick={() => data.setShowOperateurFilters(!data.showOperateurFilters)}
+        className={`relative p-2.5 rounded-lg transition-all ${
+          data.showOperateurFilters || hasFilters
+            ? 'bg-emerald-600 text-white shadow-md'
+            : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400 shadow-sm'
+        }`}
+        title="Filtres"
+      >
+        <Filter className="w-4 h-4" />
+        {hasFilters && (
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold shadow">
+            {(data.operateurFilters.statut ? 1 : 0) + (data.operateurFilters.equipe ? 1 : 0) + (data.operateurFilters.estChef ? 1 : 0) + (data.operateurFilters.disponible ? 1 : 0)}
+          </span>
+        )}
+      </button>
+
+      {data.showOperateurFilters && (
+        <>
+          <StatutOperateurFilter value={data.operateurFilters.statut} onChange={(val) => handleFilterChange({ ...data.operateurFilters, statut: val })} />
+          <EquipeFilter value={data.operateurFilters.equipe} equipes={data.equipes} onChange={(val) => handleFilterChange({ ...data.operateurFilters, equipe: val })} />
+          <ChefFilter value={data.operateurFilters.estChef} onChange={(val) => handleFilterChange({ ...data.operateurFilters, estChef: val })} />
+          <DisponibiliteFilter value={data.operateurFilters.disponible} onChange={(val) => handleFilterChange({ ...data.operateurFilters, disponible: val })} />
+          {hasFilters && (
+            <button
+              onClick={() => handleFilterChange({ statut: '', equipe: '', estChef: '', disponible: '' })}
+              className="p-2.5 rounded-lg text-red-600 hover:bg-red-50 transition-all border border-red-200 hover:border-red-300 shadow-sm"
+              title="Réinitialiser les filtres"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </>
+      )}
+    </>
+  );
+};
+
+// ============================================================================
+// FILTER SELECT COMPONENTS
+// ============================================================================
+
+const StatutAbsenceFilter: React.FC<{ value: string; onChange: (val: string) => void }> = ({ value, onChange }) => (
+  <Listbox value={value} onChange={onChange}>
+    <div className="relative">
+      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]">
+        <CalendarCheck className="w-4 h-4 text-gray-500" />
+        <span className="flex-1 text-left">{value === '' ? 'Statut' : value === 'DEMANDEE' ? 'Demandée' : value === 'VALIDEE' ? 'Validée' : value === 'REFUSEE' ? 'Refusée' : 'Annulée'}</span>
+        <ChevronDown className="w-4 h-4 text-gray-400" />
+      </Listbox.Button>
+      <Transition as={React.Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
+        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+          {['', 'DEMANDEE', 'VALIDEE', 'REFUSEE', 'ANNULEE'].map((opt) => (
+            <Listbox.Option key={opt} value={opt} className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+              {({ selected }) => (
+                <div className="flex items-center gap-2">
+                  {opt === 'DEMANDEE' && <Clock className="w-4 h-4 text-orange-500" />}
+                  {opt === 'VALIDEE' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
+                  {opt === 'REFUSEE' && <XCircle className="w-4 h-4 text-red-500" />}
+                  {opt === 'ANNULEE' && <Ban className="w-4 h-4 text-gray-500" />}
+                  {opt === '' && <CalendarCheck className="w-4 h-4 text-gray-500" />}
+                  <span className={selected ? 'font-semibold' : 'font-normal'}>{opt === '' ? 'Tous statuts' : opt === 'DEMANDEE' ? 'Demandée' : opt === 'VALIDEE' ? 'Validée' : opt === 'REFUSEE' ? 'Refusée' : 'Annulée'}</span>
+                </div>
+              )}
+            </Listbox.Option>
+          ))}
+        </Listbox.Options>
+      </Transition>
+    </div>
+  </Listbox>
+);
+
+const TypeAbsenceFilter: React.FC<{ value: string; onChange: (val: string) => void }> = ({ value, onChange }) => (
+  <Listbox value={value} onChange={onChange}>
+    <div className="relative">
+      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]">
+        <CalendarClock className="w-4 h-4 text-gray-500" />
+        <span className="flex-1 text-left truncate">{value === '' ? 'Type' : value === 'CONGE' ? 'Congé' : value === 'MALADIE' ? 'Maladie' : value === 'FORMATION' ? 'Formation' : 'Autre'}</span>
+        <ChevronDown className="w-4 h-4 text-gray-400" />
+      </Listbox.Button>
+      <Transition as={React.Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
+        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+          {['', 'CONGE', 'MALADIE', 'FORMATION', 'AUTRE'].map((opt) => (
+            <Listbox.Option key={opt} value={opt} className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+              {({ selected }) => (
+                <div className="flex items-center gap-2">
+                  {opt === 'CONGE' && <Umbrella className="w-4 h-4 text-blue-500" />}
+                  {opt === 'MALADIE' && <HeartPulse className="w-4 h-4 text-red-500" />}
+                  {opt === 'FORMATION' && <GraduationCap className="w-4 h-4 text-purple-500" />}
+                  {opt === 'AUTRE' && <MoreHorizontal className="w-4 h-4 text-gray-500" />}
+                  {opt === '' && <CalendarClock className="w-4 h-4 text-gray-500" />}
+                  <span className={selected ? 'font-semibold' : 'font-normal'}>{opt === '' ? 'Tous types' : opt === 'CONGE' ? 'Congé' : opt === 'MALADIE' ? 'Maladie' : opt === 'FORMATION' ? 'Formation' : 'Autre'}</span>
+                </div>
+              )}
+            </Listbox.Option>
+          ))}
+        </Listbox.Options>
+      </Transition>
+    </div>
+  </Listbox>
+);
+
+const StatutOperateurFilter: React.FC<{ value: string; onChange: (val: string) => void }> = ({ value, onChange }) => (
+  <Listbox value={value} onChange={onChange}>
+    <div className="relative">
+      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[130px]">
+        <UserCheck className="w-4 h-4 text-gray-500" />
+        <span className="flex-1 text-left">{value === '' ? 'Statut' : value === 'ACTIF' ? 'Actif' : value === 'INACTIF' ? 'Inactif' : 'En congé'}</span>
+        <ChevronDown className="w-4 h-4 text-gray-400" />
+      </Listbox.Button>
+      <Transition as={React.Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
+        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+          {['', 'ACTIF', 'INACTIF', 'EN_CONGE'].map((opt) => (
+            <Listbox.Option key={opt} value={opt} className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+              {({ selected }) => (
+                <div className="flex items-center gap-2">
+                  {opt !== '' && <span className={`w-2 h-2 rounded-full ${opt === 'ACTIF' ? 'bg-green-500' : opt === 'INACTIF' ? 'bg-gray-400' : 'bg-yellow-500'}`} />}
+                  <span className={selected ? 'font-semibold' : 'font-normal'}>{opt === '' ? 'Tous statuts' : opt === 'ACTIF' ? 'Actif' : opt === 'INACTIF' ? 'Inactif' : 'En congé'}</span>
+                </div>
+              )}
+            </Listbox.Option>
+          ))}
+        </Listbox.Options>
+      </Transition>
+    </div>
+  </Listbox>
+);
+
+const EquipeFilter: React.FC<{ value: string; equipes: { id: number; nomEquipe: string; actif: boolean }[]; onChange: (val: string) => void }> = ({ value, equipes, onChange }) => (
+  <Listbox value={value} onChange={onChange}>
+    <div className="relative">
+      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]">
+        <Users className="w-4 h-4 text-gray-500" />
+        <span className="flex-1 text-left truncate">{value === '' ? 'Équipe' : value === 'sans_equipe' ? 'Sans équipe' : equipes.find(e => e.id === parseInt(value))?.nomEquipe || 'Équipe'}</span>
+        <ChevronDown className="w-4 h-4 text-gray-400" />
+      </Listbox.Button>
+      <Transition as={React.Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
+        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-48 overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+          <Listbox.Option value="" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+            {({ selected }) => <span className={selected ? 'font-semibold' : 'font-normal'}>Toutes équipes</span>}
+          </Listbox.Option>
+          <Listbox.Option value="sans_equipe" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+            {({ selected }) => (
+              <div className="flex items-center gap-2">
+                <Ban className="w-4 h-4 text-gray-400" />
+                <span className={selected ? 'font-semibold' : 'font-normal'}>Sans équipe</span>
+              </div>
+            )}
+          </Listbox.Option>
+          {equipes.filter(e => e.actif).map(eq => (
+            <Listbox.Option key={eq.id} value={String(eq.id)} className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+              {({ selected }) => <span className={`block truncate ${selected ? 'font-semibold' : 'font-normal'}`}>{eq.nomEquipe}</span>}
+            </Listbox.Option>
+          ))}
+        </Listbox.Options>
+      </Transition>
+    </div>
+  </Listbox>
+);
+
+const ChefFilter: React.FC<{ value: string; onChange: (val: string) => void }> = ({ value, onChange }) => (
+  <Listbox value={value} onChange={onChange}>
+    <div className="relative">
+      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]">
+        <Star className="w-4 h-4 text-gray-500" />
+        <span className="flex-1 text-left">{value === '' ? "Chef d'équipe" : value === 'true' ? 'Chefs uniquement' : 'Non-chefs'}</span>
+        <ChevronDown className="w-4 h-4 text-gray-400" />
+      </Listbox.Button>
+      <Transition as={React.Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
+        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+          <Listbox.Option value="" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+            {({ selected }) => <span className={selected ? 'font-semibold' : 'font-normal'}>Tous</span>}
+          </Listbox.Option>
+          <Listbox.Option value="true" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+            {({ selected }) => (
+              <div className="flex items-center gap-2">
+                <Star className="w-4 h-4 text-amber-500" />
+                <span className={selected ? 'font-semibold' : 'font-normal'}>Chefs d'équipe</span>
+              </div>
+            )}
+          </Listbox.Option>
+          <Listbox.Option value="false" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+            {({ selected }) => (
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-gray-500" />
+                <span className={selected ? 'font-semibold' : 'font-normal'}>Membres uniquement</span>
+              </div>
+            )}
+          </Listbox.Option>
+        </Listbox.Options>
+      </Transition>
+    </div>
+  </Listbox>
+);
+
+const DisponibiliteFilter: React.FC<{ value: string; onChange: (val: string) => void }> = ({ value, onChange }) => (
+  <Listbox value={value} onChange={onChange}>
+    <div className="relative">
+      <Listbox.Button className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[140px]">
+        <Calendar className="w-4 h-4 text-gray-500" />
+        <span className="flex-1 text-left">{value === '' ? 'Disponibilité' : value === 'true' ? 'Disponibles' : 'Indisponibles'}</span>
+        <ChevronDown className="w-4 h-4 text-gray-400" />
+      </Listbox.Button>
+      <Transition as={React.Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
+        <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+          <Listbox.Option value="" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+            {({ selected }) => <span className={selected ? 'font-semibold' : 'font-normal'}>Tous</span>}
+          </Listbox.Option>
+          <Listbox.Option value="true" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+            {({ selected }) => (
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-green-500" />
+                <span className={selected ? 'font-semibold' : 'font-normal'}>Disponibles aujourd'hui</span>
+              </div>
+            )}
+          </Listbox.Option>
+          <Listbox.Option value="false" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+            {({ selected }) => (
+              <div className="flex items-center gap-2">
+                <XCircle className="w-4 h-4 text-red-500" />
+                <span className={selected ? 'font-semibold' : 'font-normal'}>Indisponibles</span>
+              </div>
+            )}
+          </Listbox.Option>
+        </Listbox.Options>
+      </Transition>
+    </div>
+  </Listbox>
+);
+
+// ============================================================================
+// COMPETENCES FILTER BAR
+// ============================================================================
+
+const CompetencesFilterBar: React.FC<{ data: ReturnType<typeof useTeamsData> }> = ({ data }) => (
+  <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex-shrink-0">
+    <div className="flex flex-wrap items-center gap-4">
+      <div className="flex items-center gap-2 text-sm font-medium text-gray-600">
+        <Filter className="w-4 h-4" />
+        <span>Filtrer par :</span>
+      </div>
+
+      {/* Niveau Filter */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">Niveau</span>
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { val: '' as const, label: 'Tous', color: 'bg-gray-800 text-white', inactiveColor: 'bg-gray-100 text-gray-600 hover:bg-gray-200' },
+            { val: 'NON' as NiveauCompetence, label: 'Aucune', icon: <Ban className="w-3 h-3" />, color: 'bg-red-500 text-white', inactiveColor: 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200' },
+            { val: 'DEBUTANT' as NiveauCompetence, label: 'Débutant', icon: <Star className="w-3 h-3" />, color: 'bg-orange-500 text-white', inactiveColor: 'bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200' },
+            { val: 'INTERMEDIAIRE' as NiveauCompetence, label: 'Intermédiaire', icon: <TrendingUp className="w-3 h-3" />, color: 'bg-blue-500 text-white', inactiveColor: 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200' },
+            { val: 'EXPERT' as NiveauCompetence, label: 'Expert', icon: <CheckCircle className="w-3 h-3" />, color: 'bg-green-500 text-white', inactiveColor: 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200' },
+          ].map((item) => (
+            <button
+              key={item.val}
+              onClick={() => data.setMatrixNiveauFilter(item.val)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all ${
+                data.matrixNiveauFilter === item.val ? `${item.color} shadow-sm` : item.inactiveColor
+              }`}
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="h-8 w-px bg-gray-200 hidden md:block" />
+
+      {/* Catégorie Filter */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">Catégorie</span>
+        <Listbox value={data.matrixCategorieFilter} onChange={data.setMatrixCategorieFilter}>
+          <div className="relative">
+            <Listbox.Button className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-full text-xs font-medium text-gray-700 bg-white hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all cursor-pointer min-w-[140px]">
+              <FolderOpen className="w-3.5 h-3.5 text-gray-500" />
+              <span className="flex-1 text-left truncate">{data.matrixCategorieFilter || 'Toutes'}</span>
+              <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+            </Listbox.Button>
+            <Transition as={React.Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
+              <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-48 overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                <Listbox.Option value="" className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+                  {({ selected }) => (
+                    <div className="flex items-center gap-2">
+                      <FolderOpen className="w-4 h-4 text-gray-500" />
+                      <span className={selected ? 'font-semibold' : 'font-normal'}>Toutes les catégories</span>
+                    </div>
+                  )}
+                </Listbox.Option>
+                {data.competenceCategories.map(cat => (
+                  <Listbox.Option key={cat} value={cat} className={({ active }) => `relative cursor-pointer select-none py-2 px-3 ${active ? 'bg-emerald-50 text-emerald-900' : 'text-gray-900'}`}>
+                    {({ selected }) => <span className={`block truncate ${selected ? 'font-semibold' : 'font-normal'}`}>{cat}</span>}
+                  </Listbox.Option>
+                ))}
+              </Listbox.Options>
+            </Transition>
+          </div>
+        </Listbox>
+      </div>
+
+      {(data.matrixNiveauFilter || data.matrixCategorieFilter) && (
+        <>
+          <button
+            onClick={() => { data.setMatrixNiveauFilter(''); data.setMatrixCategorieFilter(''); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-full transition-all border border-red-200"
+          >
+            <X className="w-3 h-3" />
+            Réinitialiser
+          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-xs text-gray-500">
+              {(data.matrixNiveauFilter ? 1 : 0) + (data.matrixCategorieFilter ? 1 : 0)} filtre{((data.matrixNiveauFilter ? 1 : 0) + (data.matrixCategorieFilter ? 1 : 0)) > 1 ? 's' : ''} actif{((data.matrixNiveauFilter ? 1 : 0) + (data.matrixCategorieFilter ? 1 : 0)) > 1 ? 's' : ''}
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  </div>
+);
+
+// ============================================================================
+// MODALS COMPONENT
+// ============================================================================
+
+const TeamsModals: React.FC<{ data: ReturnType<typeof useTeamsData> }> = ({ data }) => (
+  <>
+    {data.showCreateTeam && (
+      <CreateTeamModal
+        onClose={() => data.setShowCreateTeam(false)}
+        onCreated={data.loadData}
+        chefsPotentiels={data.chefsPotentiels}
+        operateursSansEquipe={data.operateursSansEquipe}
+      />
+    )}
+
+    {data.showCreateOperateur && (
+      <CreateOperateurModal
+        onClose={() => data.setShowCreateOperateur(false)}
+        onCreated={data.loadData}
+      />
+    )}
+
+    {data.selectedEquipe && (
+      <EquipeDetailModal
+        equipe={data.selectedEquipe}
+        onClose={() => data.setSelectedEquipe(null)}
+      />
+    )}
+
+    {data.editingUser && (
+      <EditUserModal
+        user={data.editingUser}
+        clients={data.clients}
+        operateurs={data.operateurs}
+        onClose={() => data.setEditingUser(null)}
+        onUpdated={data.loadData}
+      />
+    )}
+
+    {data.editingOperateur && (
+      <EditOperateurModal
+        operateur={data.editingOperateur}
+        onClose={() => data.setEditingOperateur(null)}
+        onUpdated={data.loadData}
+      />
+    )}
+
+    {data.editEquipe && (
+      <EditEquipeModal
+        equipe={data.editEquipe}
+        onClose={() => data.setEditEquipe(null)}
+        onSaved={data.loadData}
+      />
+    )}
+
+    {data.deleteEquipeId !== null && (
+      <ConfirmDeleteModal
+        isOpen={true}
+        title="Supprimer l'équipe ?"
+        message="Cette action est irréversible."
+        onConfirm={() => data.handleDeleteEquipe(data.deleteEquipeId!)}
+        onClose={() => data.setDeleteEquipeId(null)}
+      />
+    )}
+
+    {data.deleteOperateurId !== null && (
+      <ConfirmDeleteModal
+        isOpen={true}
+        title="Supprimer l'opérateur ?"
+        message="Cette action est irréversible."
+        onConfirm={() => data.handleDeleteOperateur(data.deleteOperateurId!)}
+        onClose={() => data.setDeleteOperateurId(null)}
+      />
+    )}
+
+    {data.showCreateAbsence && (
+      <CreateAbsenceModal
+        operateurs={data.operateurs}
+        onClose={() => data.setShowCreateAbsence(false)}
+        onCreated={data.loadData}
+      />
+    )}
+
+    {data.selectedAbsence && (
+      <AbsenceDetailModal
+        absence={data.selectedAbsence}
+        onClose={() => data.setSelectedAbsence(null)}
+      />
+    )}
+
+    {data.editingAbsence && (
+      <EditAbsenceModal
+        absence={data.editingAbsence}
+        onClose={() => data.setEditingAbsence(null)}
+        onUpdated={data.loadData}
+      />
+    )}
+
+    {data.deleteAbsenceId !== null && (
+      <ConfirmDeleteModal
+        isOpen={true}
+        title="Annuler l'absence ?"
+        message="L'absence sera marquée comme annulée. Cette action ne peut pas être annulée."
+        onConfirm={() => data.handleAnnulerAbsence(data.deleteAbsenceId!)}
+        onClose={() => data.setDeleteAbsenceId(null)}
+        confirmText="Annuler l'absence"
+      />
+    )}
+
+    {data.selectedOperateur && (
+      <OperateurDetailModal
+        operateur={data.selectedOperateur}
+        onClose={() => data.setSelectedOperateur(null)}
+      />
+    )}
+  </>
+);
 
 export default Teams;

@@ -63,6 +63,7 @@ export interface MonthlyReportOperateur {
   id: number;
   nom: string;
   heures: number;
+  absent?: boolean; // Indique si l'opérateur était absent durant la période
 }
 
 export interface MonthlyReportEquipe {

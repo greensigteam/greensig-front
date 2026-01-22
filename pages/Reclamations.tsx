@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { AlertCircle, Edit2, Trash2, X, MapPin, ClipboardList, Calendar, TrendingUp, RefreshCw, Loader2, Settings, MoreVertical, Clock, Star, BarChart3, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertOctagon, Filter, Check, ChevronDown, Download, EyeOff } from 'lucide-react';
+import { AlertCircle, Edit2, Trash2, X, MapPin, ClipboardList, Calendar, TrendingUp, RefreshCw, Loader2, Settings, MoreVertical, Clock, Star, BarChart3, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertOctagon, Filter, Check, ChevronDown, Download, Eye, EyeOff } from 'lucide-react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useSearch } from '../contexts/SearchContext';
 import { Reclamation, TypeReclamation, Urgence, ReclamationCreate, ReclamationStats } from '../types/reclamations';
@@ -770,7 +770,7 @@ const Reclamations: React.FC = () => {
                                 { value: 'EN_COURS', label: 'En attente de réalisation' },
                                 { value: 'RESOLUE', label: 'Tâche terminée côté admin.' },
                                 { value: 'EN_ATTENTE_VALIDATION_CLOTURE', label: 'En attente validation clôture' },
-                                { value: 'CLOTUREE', label: 'Validée côté client' },
+                                { value: 'CLOTUREE', label: 'Clôturée' },
                                 { value: 'REJETEE', label: 'Rejetée' }
                             ]}
                             icon={<AlertOctagon className="w-4 h-4" />}
@@ -1187,11 +1187,11 @@ const Reclamations: React.FC = () => {
                                                     <td className="px-6 py-4">
                                                         <div className="flex justify-end">
                                                             <button
-                                                                onClick={() => navigate(`/planning?date=${t.date_debut_planifiee?.split('T')[0] || ''}`)}
-                                                                className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                                                                title="Voir dans l'agenda"
+                                                                onClick={() => navigate(`/suivi-taches?task_id=${t.id}`)}
+                                                                className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                                                title="Voir le détail de la tâche"
                                                             >
-                                                                <Calendar className="w-4 h-4" />
+                                                                <Eye className="w-4 h-4" />
                                                             </button>
                                                         </div>
                                                     </td>

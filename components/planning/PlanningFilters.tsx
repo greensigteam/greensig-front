@@ -40,7 +40,7 @@ const PlanningFiltersComponent: FC<PlanningFiltersProps> = ({
     const hasActiveFilters = activeCount > 0;
 
     // Statuts disponibles
-    const statutsOptions: StatutTache[] = ['PLANIFIEE', 'NON_DEBUTEE', 'EN_COURS', 'TERMINEE', 'ANNULEE'];
+    const statutsOptions: StatutTache[] = ['PLANIFIEE', 'EN_RETARD', 'EXPIREE', 'EN_COURS', 'TERMINEE', 'ANNULEE'];
 
     // Floating UI pour popover Statut
     const { refs, floatingStyles, context } = useFloating({
@@ -80,6 +80,7 @@ const PlanningFiltersComponent: FC<PlanningFiltersProps> = ({
 
     const handleReset = () => {
         onFiltersChange({
+            ...filters,
             clientId: null,
             siteId: null,
             equipeId: null,

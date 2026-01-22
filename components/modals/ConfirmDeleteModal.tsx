@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { AlertCircle, X } from 'lucide-react';
 
 interface ConfirmDeleteModalProps {
+  isOpen?: boolean;
   title: string;
   message?: string;
   onConfirm: () => Promise<void> | void;
-  onCancel: () => void;
+  onCancel?: () => void;
+  onClose?: () => void;
   confirmText?: string;
   cancelText?: string;
 }
@@ -16,23 +18,32 @@ interface ConfirmDeleteModalProps {
  * Usage:
  * ```tsx
  * <ConfirmDeleteModal
+ *   isOpen={showModal}
  *   title="Supprimer l'équipe ?"
  *   message="Cette action est irréversible."
  *   onConfirm={async () => await deleteEquipe(id)}
- *   onCancel={() => setShowModal(false)}
+ *   onClose={() => setShowModal(false)}
  * />
  * ```
  */
 const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
+  isOpen = true,
   title,
   message = 'Cette action est irréversible.',
   onConfirm,
   onCancel,
+  onClose,
   confirmText = 'Supprimer',
   cancelText = 'Annuler'
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Support both onCancel and onClose for backward compatibility
+  const handleClose = onClose || onCancel || (() => {});
+
+  // Don't render if not open
+  if (!isOpen) return null;
 
   const handleConfirm = async () => {
     setLoading(true);
@@ -40,7 +51,7 @@ const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
 
     try {
       await onConfirm();
-      onCancel(); // Fermer la modale après succès
+      handleClose(); // Fermer la modale après succès
     } catch (err: any) {
       console.error('Erreur lors de la suppression:', err);
       setError(err?.message || 'Erreur lors de la suppression');
@@ -68,7 +79,7 @@ const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
         <div className="flex gap-2 w-full">
           <button
             className="flex-1 px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50"
-            onClick={onCancel}
+            onClick={handleClose}
             disabled={loading}
           >
             {cancelText}

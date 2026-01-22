@@ -1302,6 +1302,54 @@ export async function splitPolygon(
 }
 
 // ==============================================================================
+// OBJETS DANS UNE GÉOMÉTRIE
+// ==============================================================================
+
+export interface ObjectInGeometry {
+  id: number;
+  objet_id: number;
+  type: string;
+  nom?: string;
+  site_id?: number;
+  site_nom?: string;
+  sous_site_id?: number;
+  sous_site_nom?: string;
+}
+
+export interface ObjectsInGeometryResponse {
+  objects: ObjectInGeometry[];
+  count: number;
+  by_type: Record<string, number>;
+}
+
+/**
+ * Récupère tous les objets GIS qui intersectent avec une géométrie donnée.
+ * Utilisé notamment pour récupérer les objets dans la zone d'une réclamation.
+ */
+export async function getObjectsInGeometry(
+  geometry: any,
+  options?: {
+    site_id?: number;
+    object_types?: string[];
+  }
+): Promise<ObjectsInGeometryResponse> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/objects-in-geometry/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        geometry,
+        site_id: options?.site_id,
+        object_types: options?.object_types,
+      }),
+    });
+    return handleResponse<ObjectsInGeometryResponse>(response);
+  } catch (error) {
+    logger.error('Error getting objects in geometry:', error);
+    throw error;
+  }
+}
+
+// ==============================================================================
 // IMPORT GÉOGRAPHIQUE
 // ==============================================================================
 

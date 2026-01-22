@@ -76,7 +76,7 @@ export const RECLAMATION_STATUS_COLORS: Record<string, string> = {
   'RESOLUE': '#22c55e',         // Vert - tâche terminée côté administrateur
   'EN_ATTENTE_VALIDATION_CLOTURE': '#10b981', // Vert clair - en attente de validation client
   'INTERVENTION_REFUSEE': '#dc2626', // Rouge foncé - intervention refusée par le client
-  'CLOTUREE': '#22c55e',        // Vert - validée côté client
+  'CLOTUREE': '#22c55e',        // Vert - clôturée
   'REJETEE': '#6b7280',         // Gris - rejetée
 };
 
@@ -87,7 +87,7 @@ export const RECLAMATION_STATUS_LABELS: Record<string, string> = {
   'RESOLUE': 'Tâche terminée côté administrateur',
   'EN_ATTENTE_VALIDATION_CLOTURE': 'En attente de validation de clôture',
   'INTERVENTION_REFUSEE': 'Intervention refusée par le client',
-  'CLOTUREE': 'Validée côté client',
+  'CLOTUREE': 'Clôturée',
   'REJETEE': 'Rejetée',
 };
 
@@ -97,5 +97,5 @@ export const RECLAMATION_LEGEND = [
   { type: "EN_COURS", color: "#f97316", label: "En attente de réalisation" },
   { type: "RESOLUE", color: "#22c55e", label: "Tâche terminée côté administrateur" },
   { type: "EN_ATTENTE_VALIDATION_CLOTURE", color: "#22c55e", label: "En attente de validation de clôture" },
-  { type: "CLOTUREE", color: "#22c55e", label: "Validée côté client" },
+  { type: "CLOTUREE", color: "#22c55e", label: "Clôturée" },
 ];

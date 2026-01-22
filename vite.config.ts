@@ -56,8 +56,8 @@ export default defineConfig(({ mode }) => {
           }
         }
       },
-      // Increase chunk size warning limit since we're intentionally creating larger vendor chunks
-      chunkSizeWarningLimit: 600,
+      // Increase chunk size warning limit for large vendor chunks (ExcelJS ~940kB)
+      chunkSizeWarningLimit: 1000,
     }
   };
 });

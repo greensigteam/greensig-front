@@ -120,7 +120,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside
       className={`
-        relative bg-emerald-950/95 backdrop-blur-md text-emerald-50 flex flex-col h-full shrink-0 
+        relative bg-emerald-950/95 backdrop-blur-md text-emerald-50 flex flex-col h-full shrink-0
         transition-all duration-300 ease-[cubic-bezier(0.25,0.8,0.25,1)] z-50 shadow-2xl
         ${collapsed ? 'w-[72px]' : 'w-[260px]'}
       `}
@@ -283,7 +283,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <button
           onClick={onToggle}
           className={`
-              flex items-center justify-center w-full h-8 rounded-md 
+              flex items-center justify-center w-full h-8 rounded-md
               hover:bg-emerald-800/30 text-emerald-400 hover:text-white transition-colors
             `}
         >

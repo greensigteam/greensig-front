@@ -815,12 +815,12 @@ export default function WeeklyReport() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6" style={{ fontFamily: "'Poppins', sans-serif" }}>
+    <div className="bg-gray-50 p-6" style={{ fontFamily: "'Poppins', sans-serif" }}>
       <style>
         {`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');`}
       </style>
 
-      <div className="w-full">
+      <div className="w-full max-w-[1920px] mx-auto">
         {/* Header amélioré */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 mb-6">
           {/* Bandeau supérieur avec couleur sidebar */}

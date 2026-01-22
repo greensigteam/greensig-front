@@ -633,5 +633,35 @@ export const planningService = {
         const result = await response.json();
         console.log('✅ [planningService] dupliquerTacheDates - résultat:', result);
         return result;
+    },
+
+    // --- GESTION DES RETARDS ET EXPIRATIONS ---
+
+    /**
+     * Rafraîchit les statuts des tâches en retard et expirées.
+     * - PLANIFIEE → EN_RETARD si heure de début passée
+     * - PLANIFIEE/EN_RETARD → EXPIREE si heure de fin passée
+     *
+     * @returns Résultat avec le nombre de tâches mises à jour
+     */
+    async refreshTaskStatuses(): Promise<{
+        message: string;
+        late_count: number;
+        late_ids: number[];
+        expired_count: number;
+        expired_ids: number[];
+        total_updated: number;
+    }> {
+        const response = await apiFetch(`${BASE_URL}/taches/refresh-task-statuses/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erreur lors du rafraîchissement des statuts');
+        }
+
+        return response.json();
     }
 };

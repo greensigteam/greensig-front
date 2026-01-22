@@ -10,7 +10,7 @@ import { Client, EquipeList, OperateurList } from './users';
 
 export type PrioriteTache = 1 | 2 | 3 | 4 | 5;
 
-export type StatutTache = 'PLANIFIEE' | 'NON_DEBUTEE' | 'EN_COURS' | 'TERMINEE' | 'ANNULEE';
+export type StatutTache = 'PLANIFIEE' | 'EN_RETARD' | 'EXPIREE' | 'EN_COURS' | 'TERMINEE' | 'ANNULEE';
 
 export type EtatValidation = 'EN_ATTENTE' | 'VALIDEE' | 'REJETEE';
 
@@ -31,7 +31,8 @@ export const PRIORITE_LABELS: Record<PrioriteTache, string> = {
 
 export const STATUT_TACHE_LABELS: Record<StatutTache, string> = {
     PLANIFIEE: 'Planifiée',
-    NON_DEBUTEE: 'Non débutée',
+    EN_RETARD: 'En retard',
+    EXPIREE: 'Expirée',
     EN_COURS: 'En cours',
     TERMINEE: 'Terminée',
     ANNULEE: 'Annulée'
@@ -218,6 +219,10 @@ export interface Tache {
     reclamation?: number | null;
     reclamation_numero?: string;
 
+    // Site déduit (depuis objets OU réclamation)
+    site_id?: number | null;
+    site_nom?: string | null;
+
     // ✅ NOUVEAU: Distributions de charge (tâches multi-jours)
     distributions_charge?: DistributionCharge[];
     charge_totale_distributions?: number;
@@ -298,13 +303,17 @@ export interface PlanningFilters {
     siteId: number | null;
     equipeId: number | null;
     statuts: StatutTache[]; // Multi-select
+    dateDebut: string | null; // Format YYYY-MM-DD
+    dateFin: string | null;   // Format YYYY-MM-DD
 }
 
 export const EMPTY_PLANNING_FILTERS: PlanningFilters = {
     clientId: null,
     siteId: null,
     equipeId: null,
-    statuts: []
+    statuts: [],
+    dateDebut: null,
+    dateFin: null
 };
 
 /**
@@ -316,6 +325,7 @@ export function countActivePlanningFilters(filters: PlanningFilters): number {
     if (filters.siteId !== null) count++;
     if (filters.equipeId !== null) count++;
     if (filters.statuts.length > 0) count++;
+    if (filters.dateDebut !== null || filters.dateFin !== null) count++;
     return count;
 }
 
@@ -325,7 +335,8 @@ export function countActivePlanningFilters(filters: PlanningFilters): number {
 
 export const STATUT_TACHE_COLORS: Record<StatutTache, { bg: string; text: string }> = {
     PLANIFIEE: { bg: 'bg-blue-100', text: 'text-blue-800' },
-    NON_DEBUTEE: { bg: 'bg-gray-100', text: 'text-gray-800' },
+    EN_RETARD: { bg: 'bg-amber-100', text: 'text-amber-800' },  // Jaune/Orange pour alerte
+    EXPIREE: { bg: 'bg-rose-100', text: 'text-rose-800' },      // Rose/Rouge pour expirée
     EN_COURS: { bg: 'bg-orange-100', text: 'text-orange-800' },
     TERMINEE: { bg: 'bg-green-100', text: 'text-green-800' },
     ANNULEE: { bg: 'bg-red-100', text: 'text-red-800' }
