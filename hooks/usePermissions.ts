@@ -39,6 +39,7 @@ export interface Permissions {
   // General action permissions
   canImport: boolean;
   canExport: boolean;
+  canEditGeometry: boolean; // Opérations géométriques (simplify, merge, split, buffer)
   canAccessAdmin: boolean;
   canManageUsers: boolean;
   canManageStructures: boolean;
@@ -171,8 +172,9 @@ export function usePermissions(
       role,
 
       // General action permissions
-      canImport: isAdmin || isSuperviseur,
-      canExport: true, // All authenticated users can export (filtered by backend)
+      canImport: isAdmin, // Seul ADMIN peut importer des données GIS
+      canExport: isAdmin || isSuperviseur, // ADMIN et SUPERVISEUR peuvent exporter
+      canEditGeometry: isAdmin || isSuperviseur, // Opérations géométriques
       canAccessAdmin: isAdmin,
       canManageUsers: isAdmin,
       canManageStructures: isAdmin,

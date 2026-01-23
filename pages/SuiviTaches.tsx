@@ -402,6 +402,7 @@ const SuiviTaches: React.FC = () => {
                             onHistorique={handleDistributionHistorique}
                             onSelectTask={handleSelectTaskFromDistribution}
                             isActionLoading={distributionActionLoading}
+                            isClientView={data.isClientView}
                         />
                     </div>
                 ) : (

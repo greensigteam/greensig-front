@@ -979,6 +979,7 @@ export const MapPage: React.FC<MapPageProps> = ({
         reportDrawingMode={reportDrawingMode}
         onStartReportDrawing={handleStartReportDrawing}
         onCancelReporting={handleCancelReporting}
+        currentUser={tempUser}
       />
 
       {/* 3. Selection Panel */}
@@ -1121,13 +1122,15 @@ export const MapPage: React.FC<MapPageProps> = ({
         />
       )}
 
-      {/* 9. Export Panel Modal */}
-      <ExportPanel
-        isOpen={showExportPanel}
-        onClose={() => setShowExportPanel(false)}
-        selectedType={selectedObjects.length > 0 ? selectedObjects[0]?.type : undefined}
-        selectedIds={getSelectedIds()}
-      />
+      {/* 9. Export Panel Modal - ADMIN/SUPERVISEUR only */}
+      {permissions.canExport && (
+        <ExportPanel
+          isOpen={showExportPanel}
+          onClose={() => setShowExportPanel(false)}
+          selectedType={selectedObjects.length > 0 ? selectedObjects[0]?.type : undefined}
+          selectedIds={getSelectedIds()}
+        />
+      )}
 
       {/* 10. Create Site Modal */}
       <CreateSiteModal

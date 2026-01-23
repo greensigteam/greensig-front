@@ -44,6 +44,8 @@ interface DistributionsParJourProps {
     onHistorique?: (distribution: DistributionWithTask) => void;
     onSelectTask?: (tacheId: number) => void;
     isActionLoading?: boolean;
+    /** Si true, les actions de modification sont cachées (vue client) */
+    isClientView?: boolean;
 }
 
 export const DistributionsParJour: React.FC<DistributionsParJourProps> = ({
@@ -58,7 +60,8 @@ export const DistributionsParJour: React.FC<DistributionsParJourProps> = ({
     onRestaurer,
     onHistorique,
     onSelectTask,
-    isActionLoading = false
+    isActionLoading = false,
+    isClientView = false
 }) => {
     // Statistiques par statut
     const stats = useMemo(() => {
@@ -331,79 +334,81 @@ export const DistributionsParJour: React.FC<DistributionsParJourProps> = ({
                                         </p>
                                     )}
 
-                                    {/* Actions */}
-                                    <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200/50">
-                                        {/* Démarrer */}
-                                        {canDemarrer && onDemarrer && (
-                                            <button
-                                                onClick={() => onDemarrer(distribution.id)}
-                                                disabled={isActionLoading}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors disabled:opacity-50"
-                                            >
-                                                <Play className="w-3.5 h-3.5" />
-                                                Démarrer
-                                            </button>
-                                        )}
+                                    {/* Actions - cachées pour les clients */}
+                                    {!isClientView && (
+                                        <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200/50">
+                                            {/* Démarrer */}
+                                            {canDemarrer && onDemarrer && (
+                                                <button
+                                                    onClick={() => onDemarrer(distribution.id)}
+                                                    disabled={isActionLoading}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors disabled:opacity-50"
+                                                >
+                                                    <Play className="w-3.5 h-3.5" />
+                                                    Démarrer
+                                                </button>
+                                            )}
 
-                                        {/* Terminer */}
-                                        {canTerminer && onTerminer && (
-                                            <button
-                                                onClick={() => onTerminer(distribution.id)}
-                                                disabled={isActionLoading}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-green-500 hover:bg-green-600 rounded-lg transition-colors disabled:opacity-50"
-                                            >
-                                                <CheckCircle className="w-3.5 h-3.5" />
-                                                Terminer
-                                            </button>
-                                        )}
+                                            {/* Terminer */}
+                                            {canTerminer && onTerminer && (
+                                                <button
+                                                    onClick={() => onTerminer(distribution.id)}
+                                                    disabled={isActionLoading}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-green-500 hover:bg-green-600 rounded-lg transition-colors disabled:opacity-50"
+                                                >
+                                                    <CheckCircle className="w-3.5 h-3.5" />
+                                                    Terminer
+                                                </button>
+                                            )}
 
-                                        {/* Reporter */}
-                                        {canReporter && onReporter && (
-                                            <button
-                                                onClick={() => onReporter(distribution)}
-                                                disabled={isActionLoading}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors disabled:opacity-50"
-                                            >
-                                                <CalendarClock className="w-3.5 h-3.5" />
-                                                Reporter
-                                            </button>
-                                        )}
+                                            {/* Reporter */}
+                                            {canReporter && onReporter && (
+                                                <button
+                                                    onClick={() => onReporter(distribution)}
+                                                    disabled={isActionLoading}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors disabled:opacity-50"
+                                                >
+                                                    <CalendarClock className="w-3.5 h-3.5" />
+                                                    Reporter
+                                                </button>
+                                            )}
 
-                                        {/* Annuler */}
-                                        {canAnnuler && onAnnuler && (
-                                            <button
-                                                onClick={() => onAnnuler(distribution)}
-                                                disabled={isActionLoading}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-lg transition-colors disabled:opacity-50"
-                                            >
-                                                <XCircle className="w-3.5 h-3.5" />
-                                                Annuler
-                                            </button>
-                                        )}
+                                            {/* Annuler */}
+                                            {canAnnuler && onAnnuler && (
+                                                <button
+                                                    onClick={() => onAnnuler(distribution)}
+                                                    disabled={isActionLoading}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-lg transition-colors disabled:opacity-50"
+                                                >
+                                                    <XCircle className="w-3.5 h-3.5" />
+                                                    Annuler
+                                                </button>
+                                            )}
 
-                                        {/* Restaurer */}
-                                        {canRestaurer && onRestaurer && (
-                                            <button
-                                                onClick={() => onRestaurer(distribution.id)}
-                                                disabled={isActionLoading}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-50"
-                                            >
-                                                <RotateCcw className="w-3.5 h-3.5" />
-                                                Restaurer
-                                            </button>
-                                        )}
+                                            {/* Restaurer */}
+                                            {canRestaurer && onRestaurer && (
+                                                <button
+                                                    onClick={() => onRestaurer(distribution.id)}
+                                                    disabled={isActionLoading}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-50"
+                                                >
+                                                    <RotateCcw className="w-3.5 h-3.5" />
+                                                    Restaurer
+                                                </button>
+                                            )}
 
-                                        {/* Historique */}
-                                        {hasHistorique && onHistorique && (
-                                            <button
-                                                onClick={() => onHistorique(distribution)}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
-                                            >
-                                                <History className="w-3.5 h-3.5" />
-                                                Historique
-                                            </button>
-                                        )}
-                                    </div>
+                                            {/* Historique - visible pour tous car lecture seule */}
+                                            {hasHistorique && onHistorique && (
+                                                <button
+                                                    onClick={() => onHistorique(distribution)}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                                                >
+                                                    <History className="w-3.5 h-3.5" />
+                                                    Historique
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}

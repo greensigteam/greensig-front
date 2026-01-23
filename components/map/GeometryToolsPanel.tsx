@@ -23,6 +23,8 @@ interface GeometryToolsPanelProps {
     onGeometryChange?: (geometry: GeoJSONGeometry) => void;
     onSplitStart?: () => void;
     siteId?: number;
+    /** Si false, les outils de modification sont désactivés (lecture seule) */
+    canEdit?: boolean;
 }
 
 type ToolTab = 'transform' | 'validate' | 'measure';
@@ -35,8 +37,10 @@ export default function GeometryToolsPanel({
     onGeometryChange,
     onSplitStart,
     siteId,
+    canEdit = true, // Par défaut autorisé pour compatibilité, mais doit être passé depuis le parent
 }: GeometryToolsPanelProps) {
-    const [activeTab, setActiveTab] = useState<ToolTab>('transform');
+    // L'onglet par défaut est 'validate' si l'utilisateur n'a pas le droit d'éditer
+    const [activeTab, setActiveTab] = useState<ToolTab>(canEdit ? 'transform' : 'validate');
     const [simplifyTolerance, setSimplifyTolerance] = useState(0.0001);
     const [bufferDistance, setBufferDistance] = useState(5);
 
@@ -120,25 +124,27 @@ export default function GeometryToolsPanel({
                 </button>
             </div>
 
-            {/* Tabs */}
+            {/* Tabs - L'onglet Transformer est caché pour les utilisateurs sans permission d'édition */}
             <div className="flex border-b">
                 {[
-                    { id: 'transform' as ToolTab, label: 'Transformer' },
-                    { id: 'validate' as ToolTab, label: 'Valider' },
-                    { id: 'measure' as ToolTab, label: 'Mesurer' },
-                ].map((tab) => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`flex-1 py-2 text-sm font-medium transition-colors ${
-                            activeTab === tab.id
-                                ? 'text-blue-600 border-b-2 border-blue-600'
-                                : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                    >
-                        {tab.label}
-                    </button>
-                ))}
+                    { id: 'transform' as ToolTab, label: 'Transformer', requiresEdit: true },
+                    { id: 'validate' as ToolTab, label: 'Valider', requiresEdit: false },
+                    { id: 'measure' as ToolTab, label: 'Mesurer', requiresEdit: false },
+                ]
+                    .filter((tab) => !tab.requiresEdit || canEdit)
+                    .map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                                activeTab === tab.id
+                                    ? 'text-blue-600 border-b-2 border-blue-600'
+                                    : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
             </div>
 
             {/* Content */}
@@ -151,7 +157,7 @@ export default function GeometryToolsPanel({
                     </div>
                 )}
 
-                {/* Transform Tab */}
+                {/* Transform Tab - visible uniquement si canEdit (l'onglet est filtré) */}
                 {activeTab === 'transform' && selectedGeometry && (
                     <div className="space-y-4">
                         {/* Simplify */}
@@ -163,7 +169,7 @@ export default function GeometryToolsPanel({
                                 </div>
                                 <button
                                     onClick={handleSimplify}
-                                    disabled={isProcessing || !isPolygon && !isLine}
+                                    disabled={isProcessing || (!isPolygon && !isLine)}
                                     className="px-3 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {isProcessing ? (

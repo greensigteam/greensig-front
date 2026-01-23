@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import {
   Layers,
   Loader2,
@@ -17,13 +17,11 @@ import {
   FileOutput,
   AlertTriangle,
   Target,
-  Lock,
 } from 'lucide-react';
-import { Measurement, MeasurementType, DrawingMode } from '../../types';
+import { Measurement, MeasurementType, DrawingMode, User } from '../../types';
 import { useDrawing, getObjectTypesByGeometry } from '../../contexts/DrawingContext';
 import ObjectTypeSelector from './ObjectTypeSelector';
-import { fetchCurrentUser } from '../../services/usersApi';
-import { Utilisateur } from '../../types/users';
+import { usePermissions } from '../../hooks/usePermissions';
 
 // Type for reclamation drawing mode (subset of DrawingMode)
 export type ReportDrawingMode = 'none' | 'point' | 'circle' | 'polygon';
@@ -52,6 +50,8 @@ interface MapFloatingToolsProps {
   reportDrawingMode?: ReportDrawingMode;
   onStartReportDrawing?: (mode: ReportDrawingMode) => void;
   onCancelReporting?: () => void;
+  // User for permissions
+  currentUser?: User | null;
 }
 
 /**
@@ -87,16 +87,15 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
   reportDrawingMode = 'none',
   onStartReportDrawing,
   onCancelReporting,
+  currentUser,
 }) => {
   const [showMeasureTools, setShowMeasureTools] = useState(false);
   const [showDrawingTools, setShowDrawingTools] = useState(false);
   const [showTypeSelector, setShowTypeSelector] = useState(false);
   const [pendingDrawingMode, setPendingDrawingMode] = useState<DrawingMode | null>(null);
-  const [currentUser, setCurrentUser] = useState<Utilisateur | null>(null);
 
-  React.useEffect(() => {
-    fetchCurrentUser().then(setCurrentUser).catch(console.error);
-  }, []);
+  // Get permissions based on user role
+  const permissions = usePermissions(currentUser ?? null);
 
   // Drawing context
   const {
@@ -222,8 +221,8 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
 
         <div className="h-px bg-slate-100 w-full" />
 
-        {/* Drawing Tools Toggle - Hidden for Clients */}
-        {!currentUser?.roles?.includes('CLIENT') && (
+        {/* Drawing Tools Toggle - ADMIN/SUPERVISEUR only */}
+        {permissions.canEditGeometry && (
           <button
             onClick={toggleDrawingTools}
             className={`p-3 transition-colors ${showDrawingTools || isDrawingActive ? 'bg-emerald-600 text-white' : 'hover:bg-slate-50 text-slate-600'}`}
@@ -233,7 +232,7 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
           </button>
         )}
 
-        {(!currentUser?.roles?.includes('CLIENT')) && <div className="h-px bg-slate-100 w-full" />}
+        {permissions.canEditGeometry && <div className="h-px bg-slate-100 w-full" />}
 
         {/* Measurement Toggle */}
         <button
@@ -416,39 +415,36 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
             </div>
           </div>
 
-          <div className="mb-3">
-            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Données</div>
-            <div className="flex gap-2">
-              {/* Import button - disabled for CLIENT with tooltip (backend: CanImportData) */}
-              {(() => {
-                const canImport = !currentUser?.roles?.includes('CLIENT');
-                return (
+          {/* Section Données - visible uniquement si l'utilisateur a au moins une permission */}
+          {(permissions.canImport || permissions.canExport) && (
+            <div className="mb-3">
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Données</div>
+              <div className="flex gap-2">
+                {/* Import button - ADMIN only */}
+                {permissions.canImport && (
                   <button
-                    onClick={canImport ? onImport : undefined}
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium border ${canImport
-                      ? 'bg-slate-50 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 border-transparent hover:border-emerald-200 cursor-pointer'
-                      : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                      }`}
-                    title={canImport ? "Importer des données" : "Import réservé aux administrateurs et superviseurs"}
-                    aria-disabled={!canImport}
+                    onClick={onImport}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 bg-slate-50 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 rounded-lg transition-colors text-xs font-medium border border-transparent hover:border-emerald-200"
+                    title="Importer des données"
                   >
-                    {!canImport && <Lock className="w-3 h-3" />}
                     <FolderInput className="w-3.5 h-3.5" />
                     Importer
                   </button>
-                );
-              })()}
-              {/* Export button - visible for all (backend: CanExportData allows all authenticated users) */}
-              <button
-                onClick={onExport}
-                className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 bg-slate-50 hover:bg-blue-50 hover:text-blue-700 text-slate-600 rounded-lg transition-colors text-xs font-medium border border-transparent hover:border-blue-200"
-                title="Exporter des données"
-              >
-                <FileOutput className="w-3.5 h-3.5" />
-                Exporter
-              </button>
+                )}
+                {/* Export button - ADMIN/SUPERVISEUR only */}
+                {permissions.canExport && (
+                  <button
+                    onClick={onExport}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 bg-slate-50 hover:bg-blue-50 hover:text-blue-700 text-slate-600 rounded-lg transition-colors text-xs font-medium border border-transparent hover:border-blue-200"
+                    title="Exporter des données"
+                  >
+                    <FileOutput className="w-3.5 h-3.5" />
+                    Exporter
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="mb-3">
             <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Historique</div>

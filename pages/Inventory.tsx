@@ -1074,11 +1074,13 @@ const Inventory: React.FC<InventoryProps> = ({ user }) => {
             )}
           </button>
 
-          {/* Export Dropdown */}
-          <ExportDropdown
-            onExportExcel={handleExportExcel}
-            onPrint={handlePrint}
-          />
+          {/* Export Dropdown - ADMIN et SUPERVISEUR uniquement */}
+          {permissions.canExport && (
+            <ExportDropdown
+              onExportExcel={handleExportExcel}
+              onPrint={handlePrint}
+            />
+          )}
         </div>
       </div>
 
