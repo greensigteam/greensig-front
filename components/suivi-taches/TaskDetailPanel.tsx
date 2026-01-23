@@ -46,6 +46,13 @@ interface TaskDetailPanelProps {
     onEditDistribution: (distributionId: number) => void;
     onDeleteDistribution: (distributionId: number) => void;
     onAddDistributions: () => void;
+    // Nouvelles actions de distribution (système 6 statuts)
+    onDemarrerDistribution?: (distributionId: number) => void;
+    onTerminerDistribution?: (distributionId: number) => void;
+    onReporterDistribution?: (distributionId: number) => void;
+    onAnnulerDistribution?: (distributionId: number) => void;
+    onRestaurerDistribution?: (distributionId: number) => void;
+    onHistoriqueDistribution?: (distributionId: number) => void;
     onPhotoUpload: (files: FileList, photoType: 'AVANT' | 'APRES') => void;
     onPhotoDelete: (photoId: number) => void;
     onConsommationAdd: (data: { produit: number; quantite: number; unite: string; commentaire: string }) => void;
@@ -79,6 +86,12 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     onEditDistribution,
     onDeleteDistribution,
     onAddDistributions,
+    onDemarrerDistribution,
+    onTerminerDistribution,
+    onReporterDistribution,
+    onAnnulerDistribution,
+    onRestaurerDistribution,
+    onHistoriqueDistribution,
     onPhotoUpload,
     onPhotoDelete,
     onConsommationAdd,
@@ -210,6 +223,12 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                         onEditDistribution={onEditDistribution}
                         onDeleteDistribution={onDeleteDistribution}
                         onAddDistributions={onAddDistributions}
+                        onDemarrerDistribution={onDemarrerDistribution}
+                        onTerminerDistribution={onTerminerDistribution}
+                        onReporterDistribution={onReporterDistribution}
+                        onAnnulerDistribution={onAnnulerDistribution}
+                        onRestaurerDistribution={onRestaurerDistribution}
+                        onHistoriqueDistribution={onHistoriqueDistribution}
                         onShowPhotos={() => setActiveTab('photos')}
                         onAssignEquipe={onAssignEquipe}
                         onRemoveEquipe={onRemoveEquipe}
@@ -493,6 +512,13 @@ interface TaskInfoTabProps {
     onEditDistribution: (distributionId: number) => void;
     onDeleteDistribution: (distributionId: number) => void;
     onAddDistributions: () => void;
+    // Nouvelles actions de distribution
+    onDemarrerDistribution?: (distributionId: number) => void;
+    onTerminerDistribution?: (distributionId: number) => void;
+    onReporterDistribution?: (distributionId: number) => void;
+    onAnnulerDistribution?: (distributionId: number) => void;
+    onRestaurerDistribution?: (distributionId: number) => void;
+    onHistoriqueDistribution?: (distributionId: number) => void;
     onShowPhotos: () => void;
     onAssignEquipe: (equipeId: number) => void;
     onRemoveEquipe: (equipeId: number) => void;
@@ -508,6 +534,12 @@ const TaskInfoTab: React.FC<TaskInfoTabProps> = ({
     onEditDistribution,
     onDeleteDistribution,
     onAddDistributions,
+    onDemarrerDistribution,
+    onTerminerDistribution,
+    onReporterDistribution,
+    onAnnulerDistribution,
+    onRestaurerDistribution,
+    onHistoriqueDistribution,
     onShowPhotos,
     onAssignEquipe,
     onRemoveEquipe,
@@ -645,6 +677,12 @@ const TaskInfoTab: React.FC<TaskInfoTabProps> = ({
                 onEditDistribution={onEditDistribution}
                 onDeleteDistribution={onDeleteDistribution}
                 onAddDistributions={onAddDistributions}
+                onDemarrer={onDemarrerDistribution}
+                onTerminer={onTerminerDistribution}
+                onReporter={onReporterDistribution}
+                onAnnuler={onAnnulerDistribution}
+                onRestaurer={onRestaurerDistribution}
+                onHistorique={onHistoriqueDistribution}
             />
 
             {/* Équipes assignées */}

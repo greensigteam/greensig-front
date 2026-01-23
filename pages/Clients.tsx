@@ -546,7 +546,8 @@ export default function Clients() {
     };
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="h-full flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
             {/* Toolbar */}
             <div className="flex items-center justify-between bg-white p-4 rounded-xl shadow-sm">
                 <div className="flex items-center gap-3">
@@ -776,6 +777,7 @@ export default function Clients() {
                         </div>
                     </div>
                 )}
+            </div>
             </div>
 
             {/* Create Modal */}

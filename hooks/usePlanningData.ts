@@ -7,7 +7,9 @@ import { fetchCurrentUser, fetchAllSites, fetchInventory, SiteFrontend } from '.
 import {
     Tache, TacheCreate, TacheUpdate, TypeTache,
     PlanningFilters, EMPTY_PLANNING_FILTERS,
-    type StatusDistribution
+    DistributionChargeEnriched,
+    type StatusDistribution, type MotifDistribution,
+    ALLOWED_DISTRIBUTION_TRANSITIONS
 } from '../types/planning';
 import { EquipeList, StructureClient } from '../types/users';
 import { usePermissions } from './usePermissions';
@@ -72,6 +74,13 @@ export interface UsePlanningDataReturn {
     tacheToEdit: Tache | null;
     setTacheToEdit: React.Dispatch<React.SetStateAction<Tache | null>>;
 
+    // Distribution action modals
+    reporterModalDistribution: DistributionChargeEnriched | null;
+    setReporterModalDistribution: React.Dispatch<React.SetStateAction<DistributionChargeEnriched | null>>;
+    annulerModalDistribution: DistributionChargeEnriched | null;
+    setAnnulerModalDistribution: React.Dispatch<React.SetStateAction<DistributionChargeEnriched | null>>;
+    distributionActionLoading: boolean;
+
     // Quick Creator
     showQuickCreator: boolean;
     setShowQuickCreator: React.Dispatch<React.SetStateAction<boolean>>;
@@ -100,8 +109,13 @@ export interface UsePlanningDataReturn {
     handleDeleteDistribution: () => Promise<void>;
     handleResetCharge: (tacheId: number) => Promise<void>;
 
-    // Actions - Status
-    handleToggleDistribution: (distributionId: number, currentStatus: StatusDistribution) => Promise<void>;
+    // Actions - Distribution Status (nouveau workflow)
+    handleDistributionDemarrer: (distributionId: number) => Promise<void>;
+    handleDistributionTerminer: (distributionId: number) => Promise<void>;
+    handleDistributionReporter: (nouvelleDate: string, motif: MotifDistribution, commentaire: string) => Promise<void>;
+    handleDistributionAnnuler: (motif: MotifDistribution, commentaire: string) => Promise<void>;
+    handleDistributionRestaurer: (distributionId: number) => Promise<void>;
+    canPerformDistributionAction: (currentStatus: StatusDistribution, targetStatus: StatusDistribution) => boolean;
 
     // Actions - Helpers
     handleLoadObjects: (siteId: number) => Promise<InventoryObjectOption[]>;
@@ -145,6 +159,11 @@ export function usePlanningData(): UsePlanningDataReturn {
     const [tacheToDelete, setTacheToDelete] = useState<number | null>(null);
     const [distributionToDelete, setDistributionToDelete] = useState<number | null>(null);
     const [tacheToEdit, setTacheToEdit] = useState<Tache | null>(null);
+
+    // Distribution action modals
+    const [reporterModalDistribution, setReporterModalDistribution] = useState<DistributionChargeEnriched | null>(null);
+    const [annulerModalDistribution, setAnnulerModalDistribution] = useState<DistributionChargeEnriched | null>(null);
+    const [distributionActionLoading, setDistributionActionLoading] = useState(false);
 
     // Quick Creator
     const [showQuickCreator, setShowQuickCreator] = useState(false);
@@ -453,56 +472,106 @@ export function usePlanningData(): UsePlanningDataReturn {
     }, [loadTaches]);
 
     // ========================================================================
-    // STATUS OPERATIONS
+    // DISTRIBUTION STATUS OPERATIONS (Nouveau workflow complet)
     // ========================================================================
 
-    const handleToggleDistribution = useCallback(async (distributionId: number, currentStatus: StatusDistribution) => {
-        const newStatus: StatusDistribution = currentStatus === 'REALISEE' ? 'NON_REALISEE' : 'REALISEE';
+    const canPerformDistributionAction = useCallback((currentStatus: StatusDistribution, targetStatus: StatusDistribution): boolean => {
+        return ALLOWED_DISTRIBUTION_TRANSITIONS[currentStatus]?.includes(targetStatus) || false;
+    }, []);
 
-        // Optimistic Update
-        setTaches(prev => prev.map(t => ({
-            ...t,
-            distributions_charge: t.distributions_charge?.map(d =>
-                d.id === distributionId ? { ...d, status: newStatus } : d
-            )
-        })));
-
-        if (popoverInfo && popoverInfo.distributionId === distributionId) {
-            setPopoverInfo({ ...popoverInfo, distributionStatus: newStatus });
-        }
-
-        showToast(
-            newStatus === 'REALISEE' ? 'Journée marquée comme réalisée' : 'Journée marquée comme non réalisée',
-            () => handleToggleDistribution(distributionId, newStatus)
-        );
-
+    const handleDistributionDemarrer = useCallback(async (distributionId: number) => {
+        setDistributionActionLoading(true);
         try {
-            let result;
-            if (newStatus === 'REALISEE') {
-                result = await planningService.marquerDistributionRealisee(distributionId);
-            } else {
-                result = await planningService.marquerDistributionNonRealisee(distributionId);
-            }
-
+            await planningService.demarrerDistribution(distributionId);
             await loadTaches();
 
-            if (result.tache_statut_modifie) {
-                setTimeout(() => {
-                    showToast(
-                        newStatus === 'REALISEE'
-                            ? 'La tâche est maintenant en cours'
-                            : 'La tâche est repassée en planifiée'
-                    );
-                }, 500);
+            // Update popover if open
+            if (popoverInfo && popoverInfo.distributionId === distributionId) {
+                setPopoverInfo({ ...popoverInfo, distributionStatus: 'EN_COURS' });
             }
-        } catch (err) {
-            setTaches(prev => prev.map(t => ({
-                ...t,
-                distributions_charge: t.distributions_charge?.map(d =>
-                    d.id === distributionId ? { ...d, status: currentStatus } : d
-                )
-            })));
-            alert("Erreur lors de la mise à jour de la distribution");
+
+            showToast('Distribution démarrée');
+        } catch (err: any) {
+            console.error('Erreur démarrage distribution:', err);
+            showToast(err.message || 'Erreur lors du démarrage');
+        } finally {
+            setDistributionActionLoading(false);
+        }
+    }, [popoverInfo, loadTaches, showToast]);
+
+    const handleDistributionTerminer = useCallback(async (distributionId: number) => {
+        setDistributionActionLoading(true);
+        try {
+            await planningService.terminerDistribution(distributionId);
+            await loadTaches();
+
+            // Update popover if open
+            if (popoverInfo && popoverInfo.distributionId === distributionId) {
+                setPopoverInfo({ ...popoverInfo, distributionStatus: 'REALISEE' });
+            }
+
+            showToast('Distribution terminée');
+        } catch (err: any) {
+            console.error('Erreur terminaison distribution:', err);
+            showToast(err.message || 'Erreur lors de la terminaison');
+        } finally {
+            setDistributionActionLoading(false);
+        }
+    }, [popoverInfo, loadTaches, showToast]);
+
+    const handleDistributionReporter = useCallback(async (nouvelleDate: string, motif: MotifDistribution, commentaire: string) => {
+        if (!reporterModalDistribution) return;
+
+        setDistributionActionLoading(true);
+        try {
+            await planningService.reporterDistribution(reporterModalDistribution.id, nouvelleDate, motif, commentaire);
+            setReporterModalDistribution(null);
+            setPopoverInfo(null);
+            await loadTaches();
+            showToast('Distribution reportée');
+        } catch (err: any) {
+            console.error('Erreur report distribution:', err);
+            showToast(err.message || 'Erreur lors du report');
+        } finally {
+            setDistributionActionLoading(false);
+        }
+    }, [reporterModalDistribution, loadTaches, showToast]);
+
+    const handleDistributionAnnuler = useCallback(async (motif: MotifDistribution, commentaire: string) => {
+        if (!annulerModalDistribution) return;
+
+        setDistributionActionLoading(true);
+        try {
+            await planningService.annulerDistribution(annulerModalDistribution.id, motif, commentaire);
+            setAnnulerModalDistribution(null);
+            setPopoverInfo(null);
+            await loadTaches();
+            showToast('Distribution annulée');
+        } catch (err: any) {
+            console.error('Erreur annulation distribution:', err);
+            showToast(err.message || 'Erreur lors de l\'annulation');
+        } finally {
+            setDistributionActionLoading(false);
+        }
+    }, [annulerModalDistribution, loadTaches, showToast]);
+
+    const handleDistributionRestaurer = useCallback(async (distributionId: number) => {
+        setDistributionActionLoading(true);
+        try {
+            await planningService.restaurerDistribution(distributionId);
+            await loadTaches();
+
+            // Update popover if open
+            if (popoverInfo && popoverInfo.distributionId === distributionId) {
+                setPopoverInfo({ ...popoverInfo, distributionStatus: 'NON_REALISEE' });
+            }
+
+            showToast('Distribution restaurée');
+        } catch (err: any) {
+            console.error('Erreur restauration distribution:', err);
+            showToast(err.message || 'Erreur lors de la restauration');
+        } finally {
+            setDistributionActionLoading(false);
         }
     }, [popoverInfo, loadTaches, showToast]);
 
@@ -582,6 +651,13 @@ export function usePlanningData(): UsePlanningDataReturn {
         tacheToEdit,
         setTacheToEdit,
 
+        // Distribution action modals
+        reporterModalDistribution,
+        setReporterModalDistribution,
+        annulerModalDistribution,
+        setAnnulerModalDistribution,
+        distributionActionLoading,
+
         // Quick Creator
         showQuickCreator,
         setShowQuickCreator,
@@ -610,8 +686,13 @@ export function usePlanningData(): UsePlanningDataReturn {
         handleDeleteDistribution,
         handleResetCharge,
 
-        // Actions - Status
-        handleToggleDistribution,
+        // Actions - Distribution Status (nouveau workflow)
+        handleDistributionDemarrer,
+        handleDistributionTerminer,
+        handleDistributionReporter,
+        handleDistributionAnnuler,
+        handleDistributionRestaurer,
+        canPerformDistributionAction,
 
         // Actions - Helpers
         handleLoadObjects,

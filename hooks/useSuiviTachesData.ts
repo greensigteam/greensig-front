@@ -246,14 +246,9 @@ export function useSuiviTachesData(): UseSuiviTachesDataReturn {
     const loadTaches = useCallback(async () => {
         setLoadingTasks(true);
         try {
-            try {
-                const refreshResult = await planningService.refreshTaskStatuses();
-                if (refreshResult.total_updated > 0) {
-                    console.log(`[SuiviTaches] ${refreshResult.total_updated} tâche(s) mise(s) à jour`);
-                }
-            } catch (refreshError) {
-                console.warn("Erreur lors du rafraîchissement des statuts", refreshError);
-            }
+            // ⚡ OPTIMISATION: Le rafraîchissement des statuts est maintenant géré par Celery Beat
+            // (toutes les 5 minutes en arrière-plan). Plus besoin de l'appeler ici.
+            // La liste des tâches est aussi mise en cache Redis (1 minute).
 
             const response = await planningService.getTaches();
             const tachesData = Array.isArray(response) ? response : (response.results || []);

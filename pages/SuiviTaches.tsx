@@ -1,14 +1,70 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSuiviTachesData } from '../hooks/useSuiviTachesData';
-import { TaskListPanel, TaskDetailPanel, SuiviTachesToolbar } from '../components/suivi-taches';
-import { TacheCreate, StatusDistribution } from '../types/planning';
+import {
+    TaskListPanel, TaskDetailPanel, SuiviTachesToolbar,
+    DistributionsParJour,
+    ReporterDistributionModal, AnnulerDistributionModal, HistoriqueDistributionModal
+} from '../components/suivi-taches';
+import { ViewMode } from '../components/suivi-taches/SuiviTachesToolbar';
+import {
+    TacheCreate, DistributionChargeEnriched,
+    DistributionCharge, MotifDistribution, DistributionHistorique,
+    DistributionFilters as DistributionFiltersType
+} from '../types/planning';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import TaskFormModal from '../components/planning/TaskFormModal';
 import { DistributionEditForm } from '../components/planning/DistributionEditForm';
 import SelectDaysModal from '../components/modals/SelectDaysModal';
+import { planningService } from '../services/planningService';
+import { useSearch } from '../contexts/SearchContext';
+import { useToast } from '../contexts/ToastContext';
 
 const SuiviTaches: React.FC = () => {
     const data = useSuiviTachesData();
+    const { searchQuery, setPlaceholder, setSearchQuery } = useSearch();
+    const { showToast } = useToast();
+
+    // View mode state
+    const [viewMode, setViewMode] = useState<ViewMode>('tasks');
+    const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const [distributionsParJour, setDistributionsParJour] = useState<DistributionChargeEnriched[]>([]);
+    const [loadingDistributions, setLoadingDistributions] = useState(false);
+    const [distributionActionLoading, setDistributionActionLoading] = useState(false);
+
+    // Filtres avancés pour les distributions
+    const [distributionFilters, setDistributionFilters] = useState<DistributionFiltersType>({});
+    const [useAdvancedFilters, setUseAdvancedFilters] = useState(false);
+
+    // Mettre à jour le placeholder de recherche selon le mode de vue
+    useEffect(() => {
+        if (viewMode === 'distributions') {
+            setPlaceholder('Rechercher une distribution (référence, tâche, type...)');
+        } else {
+            setPlaceholder('Rechercher une tâche...');
+        }
+        // Cleanup: reset placeholder when leaving the page
+        return () => setPlaceholder('Rechercher...');
+    }, [viewMode, setPlaceholder]);
+
+    // Synchroniser la recherche du header avec les filtres de distribution
+    useEffect(() => {
+        if (viewMode === 'distributions') {
+            setDistributionFilters(prev => ({
+                ...prev,
+                search: searchQuery || undefined
+            }));
+        }
+    }, [searchQuery, viewMode]);
+
+    // Modal states for distribution actions
+    const [reporterModalDistribution, setReporterModalDistribution] = useState<DistributionChargeEnriched | null>(null);
+    const [annulerModalDistribution, setAnnulerModalDistribution] = useState<DistributionChargeEnriched | null>(null);
+    const [historiqueModalData, setHistoriqueModalData] = useState<{
+        isOpen: boolean;
+        historique: DistributionHistorique[] | null;
+        nombreReports: number;
+        isLoading: boolean;
+    }>({ isOpen: false, historique: null, nombreReports: 0, isLoading: false });
 
     // Local modal states
     const [showEditModal, setShowEditModal] = useState(false);
@@ -38,6 +94,170 @@ const SuiviTaches: React.FC = () => {
         reclamation_numero: string;
         nombre_taches_validees: number;
     } | null>(null);
+
+    // --- Distributions par jour ---
+
+    const loadDistributionsParJour = useCallback(async (date: string) => {
+        setLoadingDistributions(true);
+        try {
+            const response = await planningService.getDistributionsParJour(date);
+            setDistributionsParJour(response.distributions);
+        } catch (error) {
+            console.error('Erreur chargement distributions:', error);
+            setDistributionsParJour([]);
+        } finally {
+            setLoadingDistributions(false);
+        }
+    }, []);
+
+    // Charger les distributions avec filtres avancés
+    const loadDistributionsWithFilters = useCallback(async (filters: DistributionFiltersType, date?: string) => {
+        setLoadingDistributions(true);
+        try {
+            // Ajouter la date si fournie et pas de filtre de date défini
+            const filtersWithDate = {
+                ...filters,
+                date: filters.date || date
+            };
+            const distributions = await planningService.getDistributions(filtersWithDate);
+            // Convertir en DistributionChargeEnriched (les champs enrichis peuvent être vides)
+            setDistributionsParJour(distributions as DistributionChargeEnriched[]);
+        } catch (error) {
+            console.error('Erreur chargement distributions filtrées:', error);
+            setDistributionsParJour([]);
+        } finally {
+            setLoadingDistributions(false);
+        }
+    }, []);
+
+    // Charger les distributions quand on passe en mode distributions ou change de date/filtres
+    useEffect(() => {
+        if (viewMode === 'distributions') {
+            // Vérifier si des filtres avancés sont actifs
+            const hasAdvancedFilters = Object.keys(distributionFilters).some(
+                key => distributionFilters[key as keyof DistributionFiltersType] !== undefined
+            );
+
+            if (hasAdvancedFilters) {
+                setUseAdvancedFilters(true);
+                loadDistributionsWithFilters(distributionFilters, selectedDate);
+            } else {
+                setUseAdvancedFilters(false);
+                loadDistributionsParJour(selectedDate);
+            }
+        }
+    }, [viewMode, selectedDate, distributionFilters, loadDistributionsParJour, loadDistributionsWithFilters]);
+
+    // Handlers pour les actions de distribution (vue par jour)
+    const handleDistributionDemarrer = async (distributionId: number) => {
+        setDistributionActionLoading(true);
+        try {
+            await planningService.demarrerDistribution(distributionId);
+            await loadDistributionsParJour(selectedDate);
+            showToast('Distribution démarrée', 'success');
+        } catch (error: any) {
+            console.error('Erreur démarrage distribution:', error);
+            showToast(error.message || 'Erreur lors du démarrage', 'error');
+        } finally {
+            setDistributionActionLoading(false);
+        }
+    };
+
+    const handleDistributionTerminer = async (distributionId: number) => {
+        setDistributionActionLoading(true);
+        try {
+            await planningService.terminerDistribution(distributionId);
+            await loadDistributionsParJour(selectedDate);
+            showToast('Distribution terminée', 'success');
+        } catch (error: any) {
+            console.error('Erreur terminaison distribution:', error);
+            showToast(error.message || 'Erreur lors de la terminaison', 'error');
+        } finally {
+            setDistributionActionLoading(false);
+        }
+    };
+
+    const handleDistributionReporter = async (nouvelleDate: string, motif: MotifDistribution, commentaire: string) => {
+        if (!reporterModalDistribution) return;
+        setDistributionActionLoading(true);
+        try {
+            await planningService.reporterDistribution(reporterModalDistribution.id, nouvelleDate, motif, commentaire);
+            setReporterModalDistribution(null);
+            await loadDistributionsParJour(selectedDate);
+            showToast('Distribution reportée', 'success');
+        } catch (error: any) {
+            console.error('Erreur report distribution:', error);
+            showToast(error.message || 'Erreur lors du report', 'error');
+        } finally {
+            setDistributionActionLoading(false);
+        }
+    };
+
+    const handleDistributionAnnuler = async (motif: MotifDistribution, commentaire: string) => {
+        if (!annulerModalDistribution) return;
+        setDistributionActionLoading(true);
+        try {
+            await planningService.annulerDistribution(annulerModalDistribution.id, motif, commentaire);
+            setAnnulerModalDistribution(null);
+            await loadDistributionsParJour(selectedDate);
+            showToast('Distribution annulée', 'success');
+        } catch (error: any) {
+            console.error('Erreur annulation distribution:', error);
+            showToast(error.message || 'Erreur lors de l\'annulation', 'error');
+        } finally {
+            setDistributionActionLoading(false);
+        }
+    };
+
+    const handleDistributionRestaurer = async (distributionId: number) => {
+        setDistributionActionLoading(true);
+        try {
+            await planningService.restaurerDistribution(distributionId);
+            await loadDistributionsParJour(selectedDate);
+            showToast('Distribution restaurée', 'success');
+        } catch (error: any) {
+            console.error('Erreur restauration distribution:', error);
+            showToast(error.message || 'Erreur lors de la restauration', 'error');
+        } finally {
+            setDistributionActionLoading(false);
+        }
+    };
+
+    const handleDistributionHistorique = async (distribution: DistributionChargeEnriched) => {
+        setHistoriqueModalData({ isOpen: true, historique: null, nombreReports: distribution.nombre_reports || 0, isLoading: true });
+        try {
+            const response = await planningService.getHistoriqueDistribution(distribution.id);
+            setHistoriqueModalData({
+                isOpen: true,
+                historique: response.chaine_reports,
+                nombreReports: response.nombre_reports,
+                isLoading: false
+            });
+        } catch (error: any) {
+            console.error('Erreur chargement historique:', error);
+            setHistoriqueModalData(prev => ({ ...prev, isLoading: false }));
+            showToast(error.message || 'Erreur lors du chargement de l\'historique', 'error');
+        }
+    };
+
+    const handleSelectTaskFromDistribution = async (tacheId: number) => {
+        // Passer en mode tâches et sélectionner la tâche
+        setViewMode('tasks');
+        // Chercher la tâche dans la liste existante ou la charger
+        const existingTache = data.taches.find(t => t.id === tacheId);
+        if (existingTache) {
+            data.setSelectedTache(existingTache);
+        } else {
+            // Charger la tâche depuis le backend
+            try {
+                const tache = await planningService.getTache(tacheId);
+                data.setSelectedTache(tache);
+            } catch (error: any) {
+                console.error('Erreur chargement tâche:', error);
+                showToast(error.message || 'Erreur lors du chargement de la tâche', 'error');
+            }
+        }
+    };
 
     // --- Modal Handlers ---
     const openEditModal = async () => {
@@ -137,32 +357,70 @@ const SuiviTaches: React.FC = () => {
                 onShowFiltersChange={data.setShowFilters}
                 activeFiltersCount={data.activeFiltersCount}
                 onClearFilters={data.clearFilters}
+                distributionFilters={distributionFilters}
+                onDistributionFiltersChange={setDistributionFilters}
                 structures={data.structures}
                 equipes={data.equipes}
                 filteredSites={data.filteredSites}
                 loadingFilters={data.loadingFilters}
                 filteredTachesCount={data.filteredTaches.length}
-                loadingTasks={data.loadingTasks}
-                onRefresh={data.loadTaches}
+                loadingTasks={data.loadingTasks || loadingDistributions}
+                onRefresh={viewMode === 'distributions'
+                    ? () => useAdvancedFilters
+                        ? loadDistributionsWithFilters(distributionFilters, selectedDate)
+                        : loadDistributionsParJour(selectedDate)
+                    : data.loadTaches}
+                viewMode={viewMode}
+                onViewModeChange={(mode) => {
+                    setViewMode(mode);
+                    setSearchQuery(''); // Clear search when switching modes
+                }}
+                distributionsCount={distributionsParJour.length}
             />
 
             {/* Main Content */}
             <div className="flex-1 flex overflow-hidden min-h-0">
-                {/* Left Panel: Task List */}
-                <div className={`${data.selectedTache ? 'hidden lg:flex' : 'flex'} flex-1 flex-col min-h-0`}>
-                    <TaskListPanel
-                        taches={data.taches}
-                        paginatedTaches={data.paginatedTaches}
-                        filteredTachesCount={data.filteredTaches.length}
-                        selectedTache={data.selectedTache}
-                        onSelectTache={data.setSelectedTache}
-                        loading={data.loadingTasks}
-                        currentPage={data.currentPage}
-                        totalPages={data.totalPages}
-                        itemsPerPage={data.itemsPerPage}
-                        onPageChange={data.setCurrentPage}
-                    />
-                </div>
+                {/* View: Distributions par jour */}
+                {viewMode === 'distributions' ? (
+                    <div className="flex-1 p-4 overflow-hidden">
+                        <DistributionsParJour
+                            distributions={distributionsParJour}
+                            selectedDate={selectedDate}
+                            onDateChange={(date) => {
+                                // Si filtres avancés actifs, réinitialiser avant de changer de date
+                                if (useAdvancedFilters) {
+                                    setDistributionFilters({});
+                                }
+                                setSelectedDate(date);
+                            }}
+                            loading={loadingDistributions}
+                            onDemarrer={handleDistributionDemarrer}
+                            onTerminer={handleDistributionTerminer}
+                            onReporter={setReporterModalDistribution}
+                            onAnnuler={setAnnulerModalDistribution}
+                            onRestaurer={handleDistributionRestaurer}
+                            onHistorique={handleDistributionHistorique}
+                            onSelectTask={handleSelectTaskFromDistribution}
+                            isActionLoading={distributionActionLoading}
+                        />
+                    </div>
+                ) : (
+                    <>
+                        {/* Left Panel: Task List */}
+                        <div className={`${data.selectedTache ? 'hidden lg:flex' : 'flex'} flex-1 flex-col min-h-0`}>
+                            <TaskListPanel
+                                taches={data.taches}
+                                paginatedTaches={data.paginatedTaches}
+                                filteredTachesCount={data.filteredTaches.length}
+                                selectedTache={data.selectedTache}
+                                onSelectTache={data.setSelectedTache}
+                                loading={data.loadingTasks}
+                                currentPage={data.currentPage}
+                                totalPages={data.totalPages}
+                                itemsPerPage={data.itemsPerPage}
+                                onPageChange={data.setCurrentPage}
+                            />
+                        </div>
 
                 {/* Right Panel: Task Detail */}
                 {data.selectedTache && (
@@ -204,6 +462,8 @@ const SuiviTaches: React.FC = () => {
                         onAssignEquipe={data.handleAssignEquipe}
                         onRemoveEquipe={data.handleRemoveEquipe}
                     />
+                )}
+                    </>
                 )}
             </div>
 
@@ -333,10 +593,20 @@ const SuiviTaches: React.FC = () => {
             {/* Distribution Edit Modal */}
             {editingDistributionId && data.selectedTache && (() => {
                 const distribution = data.selectedTache.distributions_charge?.find(d => d.id === editingDistributionId);
-                if (!distribution) return null;
+                if (!distribution || !distribution.date) return null;
 
-                const eventStart = new Date(`${distribution.date}T${distribution.heure_debut || '08:00'}`);
-                const eventEnd = new Date(`${distribution.date}T${distribution.heure_fin || '17:00'}`);
+                // Créer les dates avec validation
+                const dateStr = distribution.date;
+                const heureDebut = distribution.heure_debut || '08:00';
+                const heureFin = distribution.heure_fin || '17:00';
+                const eventStart = new Date(`${dateStr}T${heureDebut}`);
+                const eventEnd = new Date(`${dateStr}T${heureFin}`);
+
+                // Si les dates sont invalides, ne pas afficher le modal
+                if (isNaN(eventStart.getTime()) || isNaN(eventEnd.getTime())) {
+                    console.error('Distribution dates invalides:', { dateStr, heureDebut, heureFin });
+                    return null;
+                }
 
                 return (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -398,6 +668,39 @@ const SuiviTaches: React.FC = () => {
                     onCancel={() => setShowAddDistributionsModal(false)}
                 />
             )}
+
+            {/* Modals pour les actions de distribution (vue par jour) */}
+
+            {/* Reporter Distribution Modal */}
+            {reporterModalDistribution && (
+                <ReporterDistributionModal
+                    isOpen={true}
+                    distribution={reporterModalDistribution as unknown as DistributionCharge}
+                    onClose={() => setReporterModalDistribution(null)}
+                    onConfirm={handleDistributionReporter}
+                    isLoading={distributionActionLoading}
+                />
+            )}
+
+            {/* Annuler Distribution Modal */}
+            {annulerModalDistribution && (
+                <AnnulerDistributionModal
+                    isOpen={true}
+                    distribution={annulerModalDistribution as unknown as DistributionCharge}
+                    onClose={() => setAnnulerModalDistribution(null)}
+                    onConfirm={handleDistributionAnnuler}
+                    isLoading={distributionActionLoading}
+                />
+            )}
+
+            {/* Historique Distribution Modal */}
+            <HistoriqueDistributionModal
+                isOpen={historiqueModalData.isOpen}
+                historique={historiqueModalData.historique}
+                nombreReports={historiqueModalData.nombreReports}
+                onClose={() => setHistoriqueModalData({ isOpen: false, historique: null, nombreReports: 0, isLoading: false })}
+                isLoading={historiqueModalData.isLoading}
+            />
         </div>
     );
 };

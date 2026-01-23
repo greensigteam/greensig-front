@@ -250,7 +250,8 @@ export default function Sites() {
     };
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="h-full flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
             {/* Toolbar */}
             <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
 
@@ -449,6 +450,7 @@ export default function Sites() {
                         </div>
                     </>
                 )}
+            </div>
             </div>
 
             {/* Edit Modal */}

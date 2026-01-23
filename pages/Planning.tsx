@@ -16,6 +16,12 @@ import TaskFormModal from '../components/planning/TaskFormModal';
 import QuickTaskCreator from '../components/planning/QuickTaskCreator';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import LoadingScreen from '../components/LoadingScreen';
+import {
+    ReporterDistributionModal,
+    AnnulerDistributionModal,
+    HistoriqueDistributionModal
+} from '../components/suivi-taches';
+import { DistributionCharge, DistributionHistorique } from '../types/planning';
 
 // ============================================================================
 // STYLES CUSTOM (Google Tasks Look & Feel)
@@ -246,6 +252,13 @@ const Planning: FC = () => {
         preSelectedObjects,
         setPreSelectedObjects,
 
+        // Distribution action modals
+        reporterModalDistribution,
+        setReporterModalDistribution,
+        annulerModalDistribution,
+        setAnnulerModalDistribution,
+        distributionActionLoading,
+
         // Toast
         toast,
 
@@ -255,9 +268,16 @@ const Planning: FC = () => {
         handleUpdateTache,
         handleDeleteTache,
         handleDeleteDistribution,
-        handleToggleDistribution,
         handleLoadObjects,
         handleCheckTaskTypeCompatibility,
+
+        // Actions - Distribution Status (nouveau workflow)
+        handleDistributionDemarrer,
+        handleDistributionTerminer,
+        handleDistributionReporter,
+        handleDistributionAnnuler,
+        handleDistributionRestaurer,
+        canPerformDistributionAction,
 
         // Calendar helpers
         tasksByDate,
@@ -270,6 +290,14 @@ const Planning: FC = () => {
     const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
     const [isExporting, setIsExporting] = useState(false);
     const calendarRef = useRef<HTMLDivElement>(null);
+
+    // Historique modal state
+    const [historiqueModalData, setHistoriqueModalData] = useState<{
+        isOpen: boolean;
+        historique: DistributionHistorique[] | null;
+        nombreReports: number;
+        isLoading: boolean;
+    }>({ isOpen: false, historique: null, nombreReports: 0, isLoading: false });
 
     // ========================================================================
     // NAVIGATION HANDLERS
@@ -369,6 +397,26 @@ const Planning: FC = () => {
             distributionId: distribution?.id
         });
     }, [setPopoverInfo]);
+
+    // ========================================================================
+    // DISTRIBUTION HISTORIQUE HANDLER
+    // ========================================================================
+
+    const handleDistributionHistorique = useCallback(async (distributionId: number, nombreReports: number) => {
+        setHistoriqueModalData({ isOpen: true, historique: null, nombreReports, isLoading: true });
+        try {
+            const response = await planningService.getHistoriqueDistribution(distributionId);
+            setHistoriqueModalData({
+                isOpen: true,
+                historique: response.chaine_reports,
+                nombreReports: response.nombre_reports,
+                isLoading: false
+            });
+        } catch (error) {
+            console.error('Erreur chargement historique:', error);
+            setHistoriqueModalData(prev => ({ ...prev, isLoading: false }));
+        }
+    }, []);
 
     // ========================================================================
     // PDF EXPORT (simplified - delegates to external function if needed)
@@ -497,9 +545,59 @@ const Planning: FC = () => {
                         }
                         setPopoverInfo(null);
                     }}
-                    onToggleDistribution={popoverInfo.distributionId ? () => {
-                        handleToggleDistribution(popoverInfo.distributionId!, popoverInfo.distributionStatus!);
+                    // Nouveau workflow distribution
+                    onDemarrer={popoverInfo.distributionId ? () => {
+                        handleDistributionDemarrer(popoverInfo.distributionId!);
                     } : undefined}
+                    onTerminer={popoverInfo.distributionId ? () => {
+                        handleDistributionTerminer(popoverInfo.distributionId!);
+                    } : undefined}
+                    onReporter={popoverInfo.distributionId ? () => {
+                        // Créer un objet DistributionChargeEnriched à partir des infos du popover
+                        const distribution = popoverInfo.tache.distributions_charge?.find(
+                            d => d.id === popoverInfo.distributionId
+                        );
+                        if (distribution) {
+                            setReporterModalDistribution({
+                                ...distribution,
+                                tache_id: popoverInfo.tache.id,
+                                tache_titre: popoverInfo.tache.type_tache_detail?.nom_tache,
+                                tache_type: popoverInfo.tache.type_tache_detail?.nom_tache,
+                                tache_statut: popoverInfo.tache.statut,
+                            } as any);
+                        }
+                    } : undefined}
+                    onAnnuler={popoverInfo.distributionId ? () => {
+                        const distribution = popoverInfo.tache.distributions_charge?.find(
+                            d => d.id === popoverInfo.distributionId
+                        );
+                        if (distribution) {
+                            setAnnulerModalDistribution({
+                                ...distribution,
+                                tache_id: popoverInfo.tache.id,
+                                tache_titre: popoverInfo.tache.type_tache_detail?.nom_tache,
+                                tache_type: popoverInfo.tache.type_tache_detail?.nom_tache,
+                                tache_statut: popoverInfo.tache.statut,
+                            } as any);
+                        }
+                    } : undefined}
+                    onRestaurer={popoverInfo.distributionId ? () => {
+                        handleDistributionRestaurer(popoverInfo.distributionId!);
+                    } : undefined}
+                    onHistorique={popoverInfo.distributionId ? () => {
+                        const distribution = popoverInfo.tache.distributions_charge?.find(
+                            d => d.id === popoverInfo.distributionId
+                        );
+                        if (distribution) {
+                            handleDistributionHistorique(popoverInfo.distributionId!, distribution.nombre_reports || 0);
+                        }
+                    } : undefined}
+                    isActionLoading={distributionActionLoading}
+                    nombreReports={
+                        popoverInfo.distributionId
+                            ? popoverInfo.tache.distributions_charge?.find(d => d.id === popoverInfo.distributionId)?.nombre_reports || 0
+                            : 0
+                    }
                     onUpdate={loadTaches}
                     isReadOnly={isReadOnly}
                 />
@@ -588,6 +686,37 @@ const Planning: FC = () => {
                 onConfirm={handleDeleteDistribution}
                 title="Supprimer cette distribution ?"
                 message="Cette action supprimera uniquement cette journée de distribution, pas la tâche entière."
+            />
+
+            {/* Reporter Distribution Modal */}
+            {reporterModalDistribution && (
+                <ReporterDistributionModal
+                    isOpen={true}
+                    distribution={reporterModalDistribution as unknown as DistributionCharge}
+                    onClose={() => setReporterModalDistribution(null)}
+                    onConfirm={handleDistributionReporter}
+                    isLoading={distributionActionLoading}
+                />
+            )}
+
+            {/* Annuler Distribution Modal */}
+            {annulerModalDistribution && (
+                <AnnulerDistributionModal
+                    isOpen={true}
+                    distribution={annulerModalDistribution as unknown as DistributionCharge}
+                    onClose={() => setAnnulerModalDistribution(null)}
+                    onConfirm={handleDistributionAnnuler}
+                    isLoading={distributionActionLoading}
+                />
+            )}
+
+            {/* Historique Distribution Modal */}
+            <HistoriqueDistributionModal
+                isOpen={historiqueModalData.isOpen}
+                historique={historiqueModalData.historique}
+                nombreReports={historiqueModalData.nombreReports}
+                onClose={() => setHistoriqueModalData({ isOpen: false, historique: null, nombreReports: 0, isLoading: false })}
+                isLoading={historiqueModalData.isLoading}
             />
         </div>
     );

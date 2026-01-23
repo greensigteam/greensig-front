@@ -636,7 +636,8 @@ const Reclamations: React.FC = () => {
     const paginatedTaches = filteredTaches.slice(startIndexTache, startIndexTache + itemsPerPageTache);
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="h-full flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
             {/* Toolbar */}
             <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
                 {/* Left: Tab Filters */}
@@ -1418,6 +1419,7 @@ const Reclamations: React.FC = () => {
                     )}
                 </div>
             )}
+            </div>
 
             {/* Modal Création Tâche (Intervention) - Utilise le même formulaire que Planning */}
             {

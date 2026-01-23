@@ -132,16 +132,53 @@ export interface ParticipationTache {
 // DISTRIBUTION DE CHARGE (Multi-Day Tasks)
 // ============================================================================
 
-export type StatusDistribution = 'NON_REALISEE' | 'REALISEE';
+// ✅ 6 statuts pour le workflow complet
+export type StatusDistribution =
+    | 'NON_REALISEE'
+    | 'EN_COURS'
+    | 'REALISEE'
+    | 'REPORTEE'
+    | 'ANNULEE'
+    | 'EN_RETARD';
 
 export const STATUS_DISTRIBUTION_LABELS: Record<StatusDistribution, string> = {
     NON_REALISEE: 'Non Réalisée',
-    REALISEE: 'Réalisée'
+    EN_COURS: 'En Cours',
+    REALISEE: 'Réalisée',
+    REPORTEE: 'Reportée',
+    ANNULEE: 'Annulée',
+    EN_RETARD: 'En Retard'
 };
 
-export const STATUS_DISTRIBUTION_COLORS: Record<StatusDistribution, { bg: string; text: string }> = {
-    NON_REALISEE: { bg: 'bg-blue-100', text: 'text-blue-800' },
-    REALISEE: { bg: 'bg-green-100', text: 'text-green-800' }
+export const STATUS_DISTRIBUTION_COLORS: Record<StatusDistribution, { bg: string; text: string; border?: string }> = {
+    NON_REALISEE: { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300' },
+    EN_COURS: { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300' },
+    REALISEE: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300' },
+    REPORTEE: { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-300' },
+    ANNULEE: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300' },
+    EN_RETARD: { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-300' }
+};
+
+// ✅ Motifs de report/annulation
+export type MotifDistribution = 'METEO' | 'ABSENCE' | 'EQUIPEMENT' | 'CLIENT' | 'URGENCE' | 'AUTRE';
+
+export const MOTIF_DISTRIBUTION_LABELS: Record<MotifDistribution, string> = {
+    METEO: 'Conditions météorologiques',
+    ABSENCE: 'Absence équipe',
+    EQUIPEMENT: 'Problème équipement',
+    CLIENT: 'Demande client',
+    URGENCE: 'Réaffectation urgente',
+    AUTRE: 'Autre motif'
+};
+
+// ✅ Transitions autorisées (pour validation côté frontend)
+export const ALLOWED_DISTRIBUTION_TRANSITIONS: Record<StatusDistribution, StatusDistribution[]> = {
+    NON_REALISEE: ['EN_COURS', 'REPORTEE', 'ANNULEE'],
+    EN_COURS: ['REALISEE', 'ANNULEE'],
+    REALISEE: [],  // État terminal
+    REPORTEE: [],  // État terminal
+    ANNULEE: ['NON_REALISEE'],  // Restauration possible
+    EN_RETARD: ['EN_COURS', 'REPORTEE', 'ANNULEE']
 };
 
 export interface DistributionCharge {
@@ -154,9 +191,64 @@ export interface DistributionCharge {
     heure_fin?: string | null;     // "HH:MM:SS"
     commentaire: string;
     status: StatusDistribution;
-    reference?: string; // ✅ NOUVEAU: Référence persistante
+    reference?: string;
+
+    // ✅ NOUVEAUX CHAMPS - Système de reports
+    motif_report_annulation?: MotifDistribution | null;
+    date_demarrage?: string | null;  // ISO datetime
+    date_completion?: string | null; // ISO datetime
+    distribution_origine?: number | null;      // ID de la distribution d'origine (si report)
+    distribution_remplacement?: number | null; // ID de la distribution de remplacement
+
+    // ✅ Champs calculés (retournés par le backend)
+    nombre_reports?: number;
+    est_report?: boolean;
+    a_remplacement?: boolean;
+
     created_at: string;
     updated_at: string;
+}
+
+// ✅ Interface enrichie pour la vue "Distributions par jour"
+export interface DistributionChargeEnriched extends DistributionCharge {
+    tache_id: number;
+    tache_titre?: string;
+    tache_type?: string;
+    tache_statut?: string;
+    tache_site_nom?: string;
+    tache_equipes?: string[];
+    tache_priorite?: string;
+}
+
+// ✅ Interface pour l'historique des reports
+export interface DistributionHistorique {
+    id: number;
+    date: string;
+    status: StatusDistribution;
+    motif: string;
+    commentaire: string;
+    heures_planifiees: number;
+    heures_reelles: number | null;
+}
+
+// ✅ Réponse de l'action reporter
+export interface ReporterDistributionResponse {
+    message: string;
+    distribution_originale: DistributionCharge;
+    nouvelle_distribution: DistributionCharge;
+    ancien_statut: StatusDistribution;
+    motif: MotifDistribution;
+    nombre_reports_chaine: number;
+    tache_etendue: boolean;
+}
+
+// ✅ Réponse de l'action historique
+export interface HistoriqueDistributionResponse {
+    distribution_id: number;
+    nombre_reports: number;
+    chaine_reports: DistributionHistorique[];
+    distribution_origine_id: number | null;
+    distribution_finale_id: number | null;
 }
 
 export interface DistributionChargeData {
@@ -168,6 +260,59 @@ export interface DistributionChargeData {
     commentaire?: string;
     status?: StatusDistribution;  // ✅ NOUVEAU: Statut optionnel (défaut: NON_REALISEE)
     reference?: string; // ✅ NOUVEAU: Référence persistante (pour tracking)
+}
+
+// ✅ Interface pour les filtres avancés des distributions
+export interface DistributionFilters {
+    // Filtres par tâche
+    tache?: number;
+    tache_reference?: string;
+
+    // Filtres par date
+    date?: string;              // Date exacte (YYYY-MM-DD)
+    date_debut?: string;        // Date >= (YYYY-MM-DD)
+    date_fin?: string;          // Date <= (YYYY-MM-DD)
+
+    // Filtres par date (relatifs)
+    aujourd_hui?: boolean;      // Distributions du jour
+    semaine_courante?: boolean; // Distributions de la semaine
+
+    // Filtres par statut
+    status?: StatusDistribution;       // Statut exact
+    status_in?: StatusDistribution[];  // Liste de statuts
+
+    // Raccourcis statut
+    actif?: boolean;            // NON_REALISEE, EN_COURS, EN_RETARD
+    termine?: boolean;          // REALISEE, REPORTEE, ANNULEE
+    en_retard?: boolean;        // Uniquement EN_RETARD
+
+    // Filtres par équipe/site/structure
+    equipe?: number;
+    site?: number;
+    site_nom?: string;
+    structure?: number;
+
+    // Filtres par type de tâche
+    type_tache?: number;
+    type_tache_nom?: string;
+
+    // Filtres par priorité
+    priorite?: number;          // Priorité exacte (1-5)
+    priorite_min?: number;      // Priorité >= (1-5)
+    urgent?: boolean;           // Priorité >= 4
+
+    // Filtres pour les reports
+    est_report?: boolean;       // Distributions issues d'un report
+    a_remplacement?: boolean;   // Distributions qui ont été reportées
+
+    // Filtres par motif
+    motif?: MotifDistribution;
+
+    // Recherche textuelle
+    search?: string;
+
+    // Tri
+    ordering?: string;          // Ex: '-date', 'status', 'priorite'
 }
 
 // ============================================================================

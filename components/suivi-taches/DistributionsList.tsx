@@ -1,17 +1,13 @@
-import React from 'react';
-import { Clock, CheckCircle, Plus, Pencil, Trash2 } from 'lucide-react';
-import { Tache, StatusDistribution, STATUS_DISTRIBUTION_LABELS, STATUS_DISTRIBUTION_COLORS } from '../../types/planning';
-
-interface DistributionCharge {
-    id: number;
-    date: string;
-    heure_debut: string | null;
-    heure_fin: string | null;
-    heures_planifiees: number | null;
-    heures_reelles: number | null;
-    status: StatusDistribution;
-    commentaire: string | null;
-}
+import React, { useState } from 'react';
+import {
+    Clock, CheckCircle, Plus, Pencil, Trash2, Play, Square, RotateCcw,
+    XCircle, ArrowRight, History, AlertTriangle, CalendarClock
+} from 'lucide-react';
+import {
+    Tache, StatusDistribution, DistributionCharge,
+    STATUS_DISTRIBUTION_LABELS, STATUS_DISTRIBUTION_COLORS,
+    ALLOWED_DISTRIBUTION_TRANSITIONS
+} from '../../types/planning';
 
 interface DistributionsListProps {
     tache: Tache;
@@ -20,6 +16,13 @@ interface DistributionsListProps {
     onEditDistribution: (distributionId: number) => void;
     onDeleteDistribution: (distributionId: number) => void;
     onAddDistributions: () => void;
+    // Nouvelles actions
+    onDemarrer?: (distributionId: number) => void;
+    onTerminer?: (distributionId: number) => void;
+    onReporter?: (distributionId: number) => void;
+    onAnnuler?: (distributionId: number) => void;
+    onRestaurer?: (distributionId: number) => void;
+    onHistorique?: (distributionId: number) => void;
 }
 
 export const DistributionsList: React.FC<DistributionsListProps> = ({
@@ -29,6 +32,12 @@ export const DistributionsList: React.FC<DistributionsListProps> = ({
     onEditDistribution,
     onDeleteDistribution,
     onAddDistributions,
+    onDemarrer,
+    onTerminer,
+    onReporter,
+    onAnnuler,
+    onRestaurer,
+    onHistorique,
 }) => {
     const distributions = tache.distributions_charge || [];
     const isTaskTerminee = tache.statut === 'TERMINEE';
@@ -41,6 +50,16 @@ export const DistributionsList: React.FC<DistributionsListProps> = ({
 
     const totalHours = tache.charge_totale_distributions ??
         distributions.reduce((sum, d) => sum + (d.heures_planifiees || 0), 0);
+
+    // Statistiques par statut
+    const stats = {
+        total: distributions.length,
+        realisees: distributions.filter(d => d.status === 'REALISEE').length,
+        enCours: distributions.filter(d => d.status === 'EN_COURS').length,
+        reportees: distributions.filter(d => d.status === 'REPORTEE').length,
+        annulees: distributions.filter(d => d.status === 'ANNULEE').length,
+        enRetard: distributions.filter(d => d.status === 'EN_RETARD').length,
+    };
 
     return (
         <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
@@ -60,6 +79,37 @@ export const DistributionsList: React.FC<DistributionsListProps> = ({
                 )}
             </div>
 
+            {/* Mini statistiques */}
+            {distributions.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                    {stats.realisees > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">
+                            <CheckCircle className="w-3 h-3" /> {stats.realisees} Réalisée{stats.realisees > 1 ? 's' : ''}
+                        </span>
+                    )}
+                    {stats.enCours > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full">
+                            <Play className="w-3 h-3" /> {stats.enCours} En cours
+                        </span>
+                    )}
+                    {stats.enRetard > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-amber-100 text-amber-700 rounded-full">
+                            <AlertTriangle className="w-3 h-3" /> {stats.enRetard} En retard
+                        </span>
+                    )}
+                    {stats.reportees > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full">
+                            <CalendarClock className="w-3 h-3" /> {stats.reportees} Reportée{stats.reportees > 1 ? 's' : ''}
+                        </span>
+                    )}
+                    {stats.annulees > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-red-100 text-red-700 rounded-full">
+                            <XCircle className="w-3 h-3" /> {stats.annulees} Annulée{stats.annulees > 1 ? 's' : ''}
+                        </span>
+                    )}
+                </div>
+            )}
+
             {distributions.length > 0 ? (
                 <>
                     <div className="space-y-2">
@@ -73,6 +123,12 @@ export const DistributionsList: React.FC<DistributionsListProps> = ({
                                 onToggle={() => onToggleDistribution(dist.id, dist.status)}
                                 onEdit={() => onEditDistribution(dist.id)}
                                 onDelete={() => onDeleteDistribution(dist.id)}
+                                onDemarrer={onDemarrer ? () => onDemarrer(dist.id) : undefined}
+                                onTerminer={onTerminer ? () => onTerminer(dist.id) : undefined}
+                                onReporter={onReporter ? () => onReporter(dist.id) : undefined}
+                                onAnnuler={onAnnuler ? () => onAnnuler(dist.id) : undefined}
+                                onRestaurer={onRestaurer ? () => onRestaurer(dist.id) : undefined}
+                                onHistorique={onHistorique ? () => onHistorique(dist.id) : undefined}
                             />
                         ))}
                     </div>
@@ -104,6 +160,12 @@ interface DistributionItemProps {
     onToggle: () => void;
     onEdit: () => void;
     onDelete: () => void;
+    onDemarrer?: () => void;
+    onTerminer?: () => void;
+    onReporter?: () => void;
+    onAnnuler?: () => void;
+    onRestaurer?: () => void;
+    onHistorique?: () => void;
 }
 
 const DistributionItem: React.FC<DistributionItemProps> = ({
@@ -114,61 +176,66 @@ const DistributionItem: React.FC<DistributionItemProps> = ({
     onToggle,
     onEdit,
     onDelete,
+    onDemarrer,
+    onTerminer,
+    onReporter,
+    onAnnuler,
+    onRestaurer,
+    onHistorique,
 }) => {
+    const [showActions, setShowActions] = useState(false);
     const date = new Date(dist.date);
     const dayOfWeek = date.getDay();
     const isSunday = dayOfWeek === 0;
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-    const isRealisee = dist.status === 'REALISEE';
+    const status = dist.status;
     const canModify = !isTaskTerminee && hasEquipe && !isClientView;
-    const canToggle = canModify;
 
-    const getTooltip = () => {
-        if (!hasEquipe) {
-            return '❌ Veuillez assigner une équipe avant de modifier les distributions';
+    // Déterminer les actions disponibles selon le statut
+    const allowedTransitions = ALLOWED_DISTRIBUTION_TRANSITIONS[status] || [];
+    const canDemarrer = allowedTransitions.includes('EN_COURS') && onDemarrer;
+    const canTerminer = status === 'EN_COURS' && onTerminer;
+    const canReporter = allowedTransitions.includes('REPORTEE') && onReporter;
+    const canAnnuler = allowedTransitions.includes('ANNULEE') && onAnnuler;
+    const canRestaurer = status === 'ANNULEE' && onRestaurer;
+    const hasReport = dist.est_report || dist.a_remplacement;
+
+    // Couleurs selon le statut
+    const statusColors = STATUS_DISTRIBUTION_COLORS[status];
+    const getBgColor = () => {
+        if (status === 'REALISEE') return 'bg-green-50 border-green-500 border-2';
+        if (status === 'EN_COURS') return 'bg-orange-50 border-orange-400 border-2';
+        if (status === 'REPORTEE') return 'bg-purple-50 border-purple-300';
+        if (status === 'ANNULEE') return 'bg-red-50 border-red-300';
+        if (status === 'EN_RETARD') return 'bg-amber-50 border-amber-400 border-2';
+        if (isSunday) return 'bg-red-50 border-red-200';
+        if (isWeekend) return 'bg-blue-50 border-blue-200';
+        return 'bg-white border-slate-200';
+    };
+
+    // Icône selon le statut
+    const StatusIcon = () => {
+        switch (status) {
+            case 'REALISEE': return <CheckCircle className="w-4 h-4 text-green-600" />;
+            case 'EN_COURS': return <Play className="w-4 h-4 text-orange-600" />;
+            case 'REPORTEE': return <CalendarClock className="w-4 h-4 text-purple-600" />;
+            case 'ANNULEE': return <XCircle className="w-4 h-4 text-red-600" />;
+            case 'EN_RETARD': return <AlertTriangle className="w-4 h-4 text-amber-600" />;
+            default: return <Clock className="w-4 h-4 text-blue-600" />;
         }
-        if (isTaskTerminee) {
-            return '🔒 Les distributions ne peuvent pas être modifiées pour une tâche terminée';
-        }
-        if (isRealisee) {
-            const heures = dist.heures_planifiees?.toFixed(2) || '0';
-            return `✓ Distribution réalisée (${heures}h) - Cliquer pour marquer comme non réalisée`;
-        }
-        const heures = dist.heures_planifiees?.toFixed(2) || '0';
-        return `○ Distribution non réalisée (${heures}h planifiées) - Cliquer pour marquer comme réalisée`;
     };
 
     return (
         <div
-            className={`
-                p-3 rounded-lg border text-sm transition-all
-                ${isRealisee
-                    ? 'bg-green-50 border-green-500 border-2'
-                    : isSunday
-                        ? 'bg-red-50 border-red-200'
-                        : isWeekend
-                            ? 'bg-blue-50 border-blue-200'
-                            : 'bg-white border-slate-200'
-                }
-            `}
+            className={`p-3 rounded-lg border text-sm transition-all ${getBgColor()}`}
+            onMouseEnter={() => setShowActions(true)}
+            onMouseLeave={() => setShowActions(false)}
         >
             <div className="flex items-start justify-between gap-3">
-                {/* Toggle checkbox */}
-                <button
-                    onClick={canToggle ? onToggle : undefined}
-                    disabled={!canToggle}
-                    title={getTooltip()}
-                    className={`
-                        mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0
-                        ${isRealisee
-                            ? 'bg-emerald-600 border-emerald-600 text-white'
-                            : 'bg-white border-gray-400 hover:border-emerald-500 hover:bg-emerald-50'
-                        }
-                        ${!canToggle ? 'cursor-not-allowed opacity-50' : ''}
-                    `}
-                >
-                    {isRealisee && <CheckCircle className="w-3 h-3" />}
-                </button>
+                {/* Icône de statut */}
+                <div className="mt-1 shrink-0">
+                    <StatusIcon />
+                </div>
 
                 <div className="flex-1">
                     <div className="font-medium text-slate-800 mb-1">
@@ -187,35 +254,118 @@ const DistributionItem: React.FC<DistributionItemProps> = ({
                         <span className="font-semibold text-emerald-600">
                             {dist.heures_planifiees?.toFixed(2) || '0.00'}h
                         </span>
+                        {dist.heures_reelles && (
+                            <span className="text-slate-500">
+                                (réel: {dist.heures_reelles.toFixed(2)}h)
+                            </span>
+                        )}
                     </div>
                     {dist.commentaire && (
                         <p className="mt-2 text-xs text-slate-500 italic">
                             {dist.commentaire}
                         </p>
                     )}
+                    {dist.motif_report_annulation && (
+                        <p className="mt-1 text-xs text-slate-600">
+                            <span className="font-medium">Motif:</span> {dist.motif_report_annulation}
+                        </p>
+                    )}
+                    {hasReport && onHistorique && (
+                        <button
+                            onClick={onHistorique}
+                            className="mt-1 text-xs text-purple-600 hover:text-purple-800 flex items-center gap-1"
+                        >
+                            <History className="w-3 h-3" />
+                            {dist.nombre_reports ? `${dist.nombre_reports} report(s)` : 'Voir historique'}
+                        </button>
+                    )}
                 </div>
 
-                {/* Status badge and action buttons */}
+                {/* Status badge et actions */}
                 <div className="flex flex-col items-end gap-1">
-                    <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${STATUS_DISTRIBUTION_COLORS[dist.status].bg} ${STATUS_DISTRIBUTION_COLORS[dist.status].text}`}>
-                        {STATUS_DISTRIBUTION_LABELS[dist.status]}
+                    <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${statusColors.bg} ${statusColors.text}`}>
+                        {STATUS_DISTRIBUTION_LABELS[status]}
                     </span>
-                    {canModify && !isRealisee && (
+
+                    {/* Actions selon le statut */}
+                    {canModify && (showActions || true) && (
                         <div className="flex items-center gap-1 mt-1">
-                            <button
-                                onClick={onEdit}
-                                className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                                title="Modifier la date et les heures"
-                            >
-                                <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                                onClick={onDelete}
-                                className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Supprimer cette distribution"
-                            >
-                                <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {/* Démarrer (NON_REALISEE/EN_RETARD → EN_COURS) */}
+                            {canDemarrer && (
+                                <button
+                                    onClick={onDemarrer}
+                                    className="p-1.5 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                                    title="Démarrer"
+                                >
+                                    <Play className="w-3.5 h-3.5" />
+                                </button>
+                            )}
+
+                            {/* Terminer (EN_COURS → REALISEE) */}
+                            {canTerminer && (
+                                <button
+                                    onClick={onTerminer}
+                                    className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                    title="Terminer"
+                                >
+                                    <CheckCircle className="w-3.5 h-3.5" />
+                                </button>
+                            )}
+
+                            {/* Reporter (NON_REALISEE/EN_RETARD → REPORTEE) */}
+                            {canReporter && (
+                                <button
+                                    onClick={onReporter}
+                                    className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                                    title="Reporter"
+                                >
+                                    <ArrowRight className="w-3.5 h-3.5" />
+                                </button>
+                            )}
+
+                            {/* Annuler */}
+                            {canAnnuler && (
+                                <button
+                                    onClick={onAnnuler}
+                                    className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                    title="Annuler"
+                                >
+                                    <XCircle className="w-3.5 h-3.5" />
+                                </button>
+                            )}
+
+                            {/* Restaurer (ANNULEE → NON_REALISEE) */}
+                            {canRestaurer && (
+                                <button
+                                    onClick={onRestaurer}
+                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                    title="Restaurer"
+                                >
+                                    <RotateCcw className="w-3.5 h-3.5" />
+                                </button>
+                            )}
+
+                            {/* Modifier (seulement si NON_REALISEE ou EN_RETARD) */}
+                            {(status === 'NON_REALISEE' || status === 'EN_RETARD') && (
+                                <button
+                                    onClick={onEdit}
+                                    className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                    title="Modifier la date et les heures"
+                                >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                            )}
+
+                            {/* Supprimer (seulement si NON_REALISEE ou EN_RETARD) */}
+                            {(status === 'NON_REALISEE' || status === 'EN_RETARD') && (
+                                <button
+                                    onClick={onDelete}
+                                    className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                    title="Supprimer cette distribution"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>

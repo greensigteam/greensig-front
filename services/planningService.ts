@@ -3,7 +3,10 @@ import { PaginatedResponse } from '../types/users';
 import {
     Tache, TacheCreate, TacheUpdate,
     TypeTache, ParticipationCreate, ParticipationTache,
-    RatioProductivite, RatioProductiviteCreate
+    RatioProductivite, RatioProductiviteCreate,
+    DistributionCharge, DistributionChargeEnriched, MotifDistribution,
+    ReporterDistributionResponse, HistoriqueDistributionResponse,
+    DistributionFilters
 } from '../types/planning';
 
 const BASE_URL = '/api/planification';
@@ -523,6 +526,287 @@ export const planningService = {
         if (!response.ok) {
             const error = await response.json();
             throw parseValidationError(error, 'Erreur lors de la création de la distribution');
+        }
+
+        return response.json();
+    },
+
+    // ============================================================================
+    // ACTIONS DE STATUT DES DISTRIBUTIONS (Nouveau système 6 statuts)
+    // ============================================================================
+
+    /**
+     * Récupère les distributions avec filtres avancés.
+     *
+     * Filtres disponibles :
+     * - Statut: status, status__in, actif, termine, en_retard
+     * - Date: date, date__gte, date__lte, date_debut, date_fin, aujourd_hui, semaine_courante
+     * - Relations: tache, equipe, site, structure, type_tache
+     * - Priorité: priorite, priorite__gte, urgent
+     * - Reports: est_report, a_remplacement
+     * - Texte: search
+     * - Tri: ordering
+     *
+     * @param params - Filtres optionnels
+     * @returns Liste des distributions
+     */
+    async getDistributions(params: DistributionFilters = {}): Promise<DistributionCharge[]> {
+        const query = new URLSearchParams();
+
+        // Filtres par tâche
+        if (params.tache) query.append('tache', params.tache.toString());
+        if (params.tache_reference) query.append('tache__reference', params.tache_reference);
+
+        // Filtres par date (exact)
+        if (params.date) query.append('date', params.date);
+
+        // Filtres par date (période)
+        if (params.date_debut) query.append('date__gte', params.date_debut);
+        if (params.date_fin) query.append('date__lte', params.date_fin);
+
+        // Filtres par date (relatifs)
+        if (params.aujourd_hui) query.append('aujourd_hui', 'true');
+        if (params.semaine_courante) query.append('semaine_courante', 'true');
+
+        // Filtres par statut
+        if (params.status) query.append('status', params.status);
+        if (params.status_in && params.status_in.length > 0) {
+            query.append('status__in', params.status_in.join(','));
+        }
+
+        // Raccourcis statut
+        if (params.actif !== undefined) query.append('actif', params.actif.toString());
+        if (params.termine !== undefined) query.append('termine', params.termine.toString());
+        if (params.en_retard !== undefined) query.append('en_retard', params.en_retard.toString());
+
+        // Filtres par équipe/site/structure
+        if (params.equipe) query.append('equipe', params.equipe.toString());
+        if (params.site) query.append('site', params.site.toString());
+        if (params.site_nom) query.append('site__nom', params.site_nom);
+        if (params.structure) query.append('structure', params.structure.toString());
+
+        // Filtres par type de tâche
+        if (params.type_tache) query.append('type_tache', params.type_tache.toString());
+        if (params.type_tache_nom) query.append('type_tache__nom', params.type_tache_nom);
+
+        // Filtres par priorité
+        if (params.priorite) query.append('priorite', params.priorite.toString());
+        if (params.priorite_min) query.append('priorite__gte', params.priorite_min.toString());
+        if (params.urgent !== undefined) query.append('urgent', params.urgent.toString());
+
+        // Filtres pour les reports
+        if (params.est_report !== undefined) query.append('est_report', params.est_report.toString());
+        if (params.a_remplacement !== undefined) query.append('a_remplacement', params.a_remplacement.toString());
+
+        // Filtres par motif
+        if (params.motif) query.append('motif', params.motif);
+
+        // Recherche textuelle
+        if (params.search) query.append('search', params.search);
+
+        // Tri
+        if (params.ordering) query.append('ordering', params.ordering);
+
+        const queryString = query.toString();
+        const url = queryString ? `${BASE_URL}/distributions/?${queryString}` : `${BASE_URL}/distributions/`;
+
+        const response = await apiFetch(url);
+        if (!response.ok) throw new Error('Erreur chargement distributions');
+
+        const data = await response.json();
+        return Array.isArray(data) ? data : (data.results || []);
+    },
+
+    /**
+     * Récupère les distributions pour une date donnée avec les détails des tâches.
+     * Endpoint optimisé pour la vue "Distributions par jour".
+     *
+     * @param date - Date au format YYYY-MM-DD
+     * @returns Distributions enrichies avec infos tâches + statistiques
+     */
+    async getDistributionsParJour(date: string): Promise<{
+        date: string;
+        distributions: DistributionChargeEnriched[];
+        statistiques: {
+            total: number;
+            par_statut: Record<string, number>;
+            heures_planifiees_total: number;
+        };
+    }> {
+        const response = await apiFetch(`${BASE_URL}/distributions/par-jour/?date=${date}`);
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erreur chargement distributions du jour');
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Démarre une distribution (NON_REALISEE/EN_RETARD → EN_COURS).
+     *
+     * @param distributionId - ID de la distribution
+     * @returns Distribution mise à jour avec infos de synchronisation tâche
+     */
+    async demarrerDistribution(distributionId: number): Promise<{
+        message: string;
+        distribution: DistributionCharge;
+        ancien_statut: string;
+        nouveau_statut: string;
+        tache_synchronisee: boolean;
+        tache_nouveau_statut: string | null;
+    }> {
+        const response = await apiFetch(`${BASE_URL}/distributions/${distributionId}/demarrer/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw parseValidationError(error, 'Erreur lors du démarrage de la distribution');
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Termine une distribution (EN_COURS → REALISEE).
+     *
+     * @param distributionId - ID de la distribution
+     * @param heuresReelles - Heures réellement travaillées (optionnel)
+     * @returns Distribution mise à jour avec infos de synchronisation tâche
+     */
+    async terminerDistribution(distributionId: number, heuresReelles?: number): Promise<{
+        message: string;
+        distribution: DistributionCharge;
+        ancien_statut: string;
+        nouveau_statut: string;
+        tache_synchronisee: boolean;
+        tache_nouveau_statut: string | null;
+    }> {
+        const response = await apiFetch(`${BASE_URL}/distributions/${distributionId}/terminer/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ heures_reelles: heuresReelles })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw parseValidationError(error, 'Erreur lors de la terminaison de la distribution');
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Reporte une distribution à une nouvelle date.
+     * Crée automatiquement une nouvelle distribution liée.
+     *
+     * @param distributionId - ID de la distribution à reporter
+     * @param nouvelleDate - Nouvelle date (YYYY-MM-DD)
+     * @param motif - Motif du report
+     * @param commentaire - Commentaire optionnel
+     * @returns Distribution originale + nouvelle distribution créée
+     */
+    async reporterDistribution(
+        distributionId: number,
+        nouvelleDate: string,
+        motif: MotifDistribution,
+        commentaire?: string
+    ): Promise<ReporterDistributionResponse> {
+        const response = await apiFetch(`${BASE_URL}/distributions/${distributionId}/reporter/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                nouvelle_date: nouvelleDate,
+                motif,
+                commentaire: commentaire || ''
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw parseValidationError(error, 'Erreur lors du report de la distribution');
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Annule une distribution.
+     *
+     * @param distributionId - ID de la distribution
+     * @param motif - Motif de l'annulation
+     * @param commentaire - Commentaire optionnel
+     * @returns Distribution mise à jour avec infos de synchronisation tâche
+     */
+    async annulerDistribution(
+        distributionId: number,
+        motif: MotifDistribution,
+        commentaire?: string
+    ): Promise<{
+        message: string;
+        distribution: DistributionCharge;
+        ancien_statut: string;
+        nouveau_statut: string;
+        motif: string;
+        tache_synchronisee: boolean;
+        tache_nouveau_statut: string | null;
+    }> {
+        const response = await apiFetch(`${BASE_URL}/distributions/${distributionId}/annuler/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ motif, commentaire: commentaire || '' })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw parseValidationError(error, 'Erreur lors de l\'annulation de la distribution');
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Restaure une distribution annulée (ANNULEE → NON_REALISEE).
+     *
+     * @param distributionId - ID de la distribution
+     * @returns Distribution mise à jour avec infos de synchronisation tâche
+     */
+    async restaurerDistribution(distributionId: number): Promise<{
+        message: string;
+        distribution: DistributionCharge;
+        ancien_statut: string;
+        nouveau_statut: string;
+        tache_synchronisee: boolean;
+        tache_nouveau_statut: string | null;
+    }> {
+        const response = await apiFetch(`${BASE_URL}/distributions/${distributionId}/restaurer/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw parseValidationError(error, 'Erreur lors de la restauration de la distribution');
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Récupère l'historique complet des reports pour une distribution.
+     *
+     * @param distributionId - ID de la distribution
+     * @returns Chaîne complète des reports
+     */
+    async getHistoriqueDistribution(distributionId: number): Promise<HistoriqueDistributionResponse> {
+        const response = await apiFetch(`${BASE_URL}/distributions/${distributionId}/historique/`);
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw parseValidationError(error, 'Erreur lors du chargement de l\'historique');
         }
 
         return response.json();

@@ -1,10 +1,23 @@
 import React, { useState } from 'react';
 import { Clock } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isValid, Locale } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { planningService } from '../../services/planningService';
 import { useToast } from '../../contexts/ToastContext';
 import { Edit } from 'lucide-react';
+
+/**
+ * Formate une date de manière sécurisée (retourne fallback si date invalide)
+ */
+const safeFormat = (date: Date | null | undefined, formatStr: string, options?: { locale?: Locale }): string => {
+    if (!date || !isValid(date)) {
+        // Valeurs par défaut selon le format demandé
+        if (formatStr === 'yyyy-MM-dd') return new Date().toISOString().split('T')[0];
+        if (formatStr === 'HH:mm') return '08:00';
+        return '-';
+    }
+    return format(date, formatStr, options);
+};
 
 interface DistributionEditFormProps {
     /** ID de la distribution à modifier */
@@ -78,10 +91,10 @@ export const DistributionEditForm: React.FC<DistributionEditFormProps> = ({
         }
     };
 
-    // États pour les champs édités
-    const [editedDate, setEditedDate] = useState(format(eventStart, 'yyyy-MM-dd'));
-    const [editedHeureDebut, setEditedHeureDebut] = useState(format(eventStart, 'HH:mm'));
-    const [editedHeureFin, setEditedHeureFin] = useState(format(eventEnd, 'HH:mm'));
+    // États pour les champs édités (avec gestion des dates invalides)
+    const [editedDate, setEditedDate] = useState(safeFormat(eventStart, 'yyyy-MM-dd'));
+    const [editedHeureDebut, setEditedHeureDebut] = useState(safeFormat(eventStart, 'HH:mm'));
+    const [editedHeureFin, setEditedHeureFin] = useState(safeFormat(eventEnd, 'HH:mm'));
 
     /**
      * Valide et sauvegarde les modifications de la distribution
@@ -149,10 +162,10 @@ export const DistributionEditForm: React.FC<DistributionEditFormProps> = ({
      * Annule les modifications et retourne en mode lecture
      */
     const handleCancel = () => {
-        // Réinitialiser les valeurs
-        setEditedDate(format(eventStart, 'yyyy-MM-dd'));
-        setEditedHeureDebut(format(eventStart, 'HH:mm'));
-        setEditedHeureFin(format(eventEnd, 'HH:mm'));
+        // Réinitialiser les valeurs (avec gestion des dates invalides)
+        setEditedDate(safeFormat(eventStart, 'yyyy-MM-dd'));
+        setEditedHeureDebut(safeFormat(eventStart, 'HH:mm'));
+        setEditedHeureFin(safeFormat(eventEnd, 'HH:mm'));
         toggleEditing(false);
         if (onClose) {
             onClose();
@@ -194,7 +207,7 @@ export const DistributionEditForm: React.FC<DistributionEditFormProps> = ({
                                 />
                                 <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-400 font-medium px-1">
                                     <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-                                    Période autorisée : {format(new Date(tacheDateDebut), 'd MMM', { locale: fr })} au {format(new Date(tacheDateFin), 'd MMM yyyy', { locale: fr })}
+                                    Période autorisée : {safeFormat(new Date(tacheDateDebut), 'd MMM', { locale: fr })} au {safeFormat(new Date(tacheDateFin), 'd MMM yyyy', { locale: fr })}
                                 </div>
                             </div>
                         </div>
@@ -257,9 +270,9 @@ export const DistributionEditForm: React.FC<DistributionEditFormProps> = ({
             <Clock className="w-5 h-5 text-gray-400" />
             <div className="flex-1 flex items-center justify-between">
                 <span>
-                    {format(eventStart, 'EEEE d MMMM', { locale: fr })}
+                    {safeFormat(eventStart, 'EEEE d MMMM', { locale: fr })}
                     <span className="mx-2 text-gray-300">|</span>
-                    {`${format(eventStart, 'HH:mm')} - ${format(eventEnd, 'HH:mm')}`}
+                    {`${safeFormat(eventStart, 'HH:mm')} - ${safeFormat(eventEnd, 'HH:mm')}`}
                 </span>
                 {!isReadOnly && !isCompleted && !onIsEditingChange && (
                     <button

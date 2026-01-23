@@ -3,7 +3,8 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
     X, Trash2, Edit, Clock, AlertTriangle,
-    CheckCircle2, MoreVertical, Users, Calendar, MapPin
+    CheckCircle, MoreVertical, Users, Calendar, MapPin,
+    Play, CalendarClock, XCircle, RotateCcw, History
 } from 'lucide-react';
 import { FloatingPortal } from '@floating-ui/react';
 import {
@@ -11,6 +12,7 @@ import {
     STATUT_TACHE_LABELS, STATUT_TACHE_COLORS,
     PRIORITE_LABELS,
     STATUS_DISTRIBUTION_LABELS, STATUS_DISTRIBUTION_COLORS,
+    ALLOWED_DISTRIBUTION_TRANSITIONS,
     type StatusDistribution
 } from '../../types/planning';
 import { StatusBadge } from '../StatusBadge';
@@ -29,7 +31,15 @@ interface TaskDetailPopoverProps {
     onClose: () => void;
     onEdit: () => void;
     onDelete: () => void;
-    onToggleDistribution?: () => void;
+    // Nouveau workflow distribution
+    onDemarrer?: () => void;
+    onTerminer?: () => void;
+    onReporter?: () => void;
+    onAnnuler?: () => void;
+    onRestaurer?: () => void;
+    onHistorique?: () => void;
+    isActionLoading?: boolean;
+    nombreReports?: number;
     onUpdate?: () => void;
     isReadOnly?: boolean;
 }
@@ -47,7 +57,14 @@ export const TaskDetailPopover: FC<TaskDetailPopoverProps> = ({
     onClose,
     onEdit,
     onDelete,
-    onToggleDistribution,
+    onDemarrer,
+    onTerminer,
+    onReporter,
+    onAnnuler,
+    onRestaurer,
+    onHistorique,
+    isActionLoading = false,
+    nombreReports = 0,
     onUpdate,
     isReadOnly
 }) => {
@@ -55,6 +72,14 @@ export const TaskDetailPopover: FC<TaskDetailPopoverProps> = ({
     const isCompleted = distributionStatus ? distributionStatus === 'REALISEE' : tache.statut === 'TERMINEE';
     const hasEquipe = (tache.equipes_detail && tache.equipes_detail.length > 0) || tache.equipe_detail;
     const isDistributionDisabled = isReadOnly || tache.statut === 'TERMINEE' || !hasEquipe;
+
+    // Vérifier les actions autorisées selon le statut actuel
+    const canDemarrer = distributionStatus && ALLOWED_DISTRIBUTION_TRANSITIONS[distributionStatus]?.includes('EN_COURS');
+    const canTerminer = distributionStatus === 'EN_COURS';
+    const canReporter = distributionStatus && ALLOWED_DISTRIBUTION_TRANSITIONS[distributionStatus]?.includes('REPORTEE');
+    const canAnnuler = distributionStatus && ALLOWED_DISTRIBUTION_TRANSITIONS[distributionStatus]?.includes('ANNULEE');
+    const canRestaurer = distributionStatus === 'ANNULEE';
+    const hasHistorique = nombreReports > 0;
 
     // Handle escape key to close popup
     useEffect(() => {
@@ -115,31 +140,30 @@ export const TaskDetailPopover: FC<TaskDetailPopoverProps> = ({
                     {/* Hero Content */}
                     <div className="p-8">
                         <div className="flex items-start gap-5">
-                            {/* Big Checkbox */}
-                            {onToggleDistribution && (
-                                <button
-                                    onClick={isDistributionDisabled ? undefined : onToggleDistribution}
-                                    disabled={isDistributionDisabled}
-                                    title={
-                                        !hasEquipe
-                                            ? 'Veuillez assigner une équipe avant de modifier les distributions'
-                                            : tache.statut === 'TERMINEE'
-                                                ? 'Les distributions ne peuvent pas être modifiées pour une tâche terminée'
-                                                : distributionStatus === 'REALISEE'
-                                                    ? 'Marquer cette journée comme non réalisée'
-                                                    : 'Marquer cette journée comme réalisée'
+                            {/* Status indicator */}
+                            {distributionId && (
+                                <div className={`
+                                    mt-1.5 w-8 h-8 rounded-full flex items-center justify-center shrink-0
+                                    ${isCompleted
+                                        ? 'bg-emerald-100 text-emerald-600'
+                                        : distributionStatus === 'EN_COURS'
+                                            ? 'bg-orange-100 text-orange-600'
+                                            : distributionStatus === 'ANNULEE'
+                                                ? 'bg-red-100 text-red-600'
+                                                : distributionStatus === 'REPORTEE'
+                                                    ? 'bg-purple-100 text-purple-600'
+                                                    : distributionStatus === 'EN_RETARD'
+                                                        ? 'bg-amber-100 text-amber-600'
+                                                        : 'bg-blue-100 text-blue-600'
                                     }
-                                    className={`
-                                        mt-1.5 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0
-                                        ${isCompleted
-                                            ? 'bg-emerald-600 border-emerald-600 text-white animate-check'
-                                            : 'bg-white border-gray-400 hover:border-emerald-500 hover:bg-emerald-50'
-                                        }
-                                        ${isDistributionDisabled ? 'cursor-not-allowed opacity-60' : ''}
-                                    `}
-                                >
-                                    {isCompleted && <CheckCircle2 className="w-5 h-5" />}
-                                </button>
+                                `}>
+                                    {isCompleted ? <CheckCircle className="w-5 h-5" /> :
+                                     distributionStatus === 'EN_COURS' ? <Clock className="w-5 h-5" /> :
+                                     distributionStatus === 'ANNULEE' ? <XCircle className="w-5 h-5" /> :
+                                     distributionStatus === 'REPORTEE' ? <CalendarClock className="w-5 h-5" /> :
+                                     distributionStatus === 'EN_RETARD' ? <AlertTriangle className="w-5 h-5" /> :
+                                     <Clock className="w-5 h-5" />}
+                                </div>
                             )}
 
                             <div className="flex-1">
@@ -233,6 +257,102 @@ export const TaskDetailPopover: FC<TaskDetailPopoverProps> = ({
                                         <span className="text-sm">
                                             Charge estimée: {tache.charge_estimee_heures}h
                                         </span>
+                                    </div>
+                                )}
+
+                                {/* Nombre de reports */}
+                                {hasHistorique && (
+                                    <div className="flex items-center gap-2 text-gray-600 mb-3">
+                                        <History className="w-4 h-4 text-purple-400" />
+                                        <span className="text-sm text-purple-600 font-medium">
+                                            {nombreReports} report{nombreReports > 1 ? 's' : ''}
+                                        </span>
+                                    </div>
+                                )}
+
+                                {/* Actions de distribution */}
+                                {distributionId && !isReadOnly && !isDistributionDisabled && (
+                                    <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100">
+                                        {/* Démarrer */}
+                                        {canDemarrer && onDemarrer && (
+                                            <button
+                                                onClick={onDemarrer}
+                                                disabled={isActionLoading}
+                                                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors disabled:opacity-50"
+                                            >
+                                                <Play className="w-4 h-4" />
+                                                Démarrer
+                                            </button>
+                                        )}
+
+                                        {/* Terminer */}
+                                        {canTerminer && onTerminer && (
+                                            <button
+                                                onClick={onTerminer}
+                                                disabled={isActionLoading}
+                                                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-green-500 hover:bg-green-600 rounded-lg transition-colors disabled:opacity-50"
+                                            >
+                                                <CheckCircle className="w-4 h-4" />
+                                                Terminer
+                                            </button>
+                                        )}
+
+                                        {/* Reporter */}
+                                        {canReporter && onReporter && (
+                                            <button
+                                                onClick={onReporter}
+                                                disabled={isActionLoading}
+                                                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors disabled:opacity-50"
+                                            >
+                                                <CalendarClock className="w-4 h-4" />
+                                                Reporter
+                                            </button>
+                                        )}
+
+                                        {/* Annuler */}
+                                        {canAnnuler && onAnnuler && (
+                                            <button
+                                                onClick={onAnnuler}
+                                                disabled={isActionLoading}
+                                                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-lg transition-colors disabled:opacity-50"
+                                            >
+                                                <XCircle className="w-4 h-4" />
+                                                Annuler
+                                            </button>
+                                        )}
+
+                                        {/* Restaurer */}
+                                        {canRestaurer && onRestaurer && (
+                                            <button
+                                                onClick={onRestaurer}
+                                                disabled={isActionLoading}
+                                                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-50"
+                                            >
+                                                <RotateCcw className="w-4 h-4" />
+                                                Restaurer
+                                            </button>
+                                        )}
+
+                                        {/* Historique */}
+                                        {hasHistorique && onHistorique && (
+                                            <button
+                                                onClick={onHistorique}
+                                                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                                            >
+                                                <History className="w-4 h-4" />
+                                                Historique
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Message si équipe manquante */}
+                                {distributionId && !hasEquipe && !isReadOnly && (
+                                    <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                        <p className="text-sm text-amber-700">
+                                            <AlertTriangle className="w-4 h-4 inline mr-1" />
+                                            Assignez une équipe à la tâche pour pouvoir modifier les distributions.
+                                        </p>
                                     </div>
                                 )}
 
