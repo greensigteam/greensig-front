@@ -386,9 +386,9 @@ export default function NotificationsPage({ user }: NotificationsPageProps) {
   const unreadCount = notifications.filter(n => !n.lu).length;
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
+    <div className="h-screen flex flex-col bg-slate-50 overflow-hidden">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 mb-6 rounded-xl shadow-sm">
+      <div className="bg-white border-b border-slate-200 px-6 py-4 mx-6 mt-6 mb-4 rounded-xl shadow-sm flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-emerald-100 rounded-lg">
@@ -666,6 +666,8 @@ export default function NotificationsPage({ user }: NotificationsPageProps) {
         </div>
       </div>
 
+      {/* Scrollable content area */}
+      <div className="flex-1 overflow-y-auto px-6 pb-6">
       {/* Liste des notifications */}
       <div className="w-full">
         {loading ? (
@@ -851,6 +853,7 @@ export default function NotificationsPage({ user }: NotificationsPageProps) {
             </div>
           </div>
         )}
+      </div>
       </div>
     </div >
   );

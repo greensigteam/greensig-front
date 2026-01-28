@@ -88,7 +88,7 @@ const Layout: React.FC<LayoutProps> = ({
             </div>
 
             {/* Panel Content */}
-            <div className="flex-1 overflow-hidden p-0 bg-slate-50/50">
+            <div className="flex-1 overflow-y-auto p-0 bg-slate-50/50">
               <Outlet />
             </div>
           </>

@@ -19,7 +19,9 @@ import LoadingScreen from '../components/LoadingScreen';
 import {
     ReporterDistributionModal,
     AnnulerDistributionModal,
-    HistoriqueDistributionModal
+    HistoriqueDistributionModal,
+    TerminerDistributionModal,
+    DemarrerDistributionModal
 } from '../components/suivi-taches';
 import { DistributionCharge, DistributionHistorique } from '../types/planning';
 
@@ -257,6 +259,10 @@ const Planning: FC = () => {
         setReporterModalDistribution,
         annulerModalDistribution,
         setAnnulerModalDistribution,
+        terminerModalDistribution,
+        setTerminerModalDistribution,
+        demarrerModalDistribution,
+        setDemarrerModalDistribution,
         distributionActionLoading,
 
         // Toast
@@ -273,7 +279,9 @@ const Planning: FC = () => {
 
         // Actions - Distribution Status (nouveau workflow)
         handleDistributionDemarrer,
+        handleDistributionDemarrerConfirm,
         handleDistributionTerminer,
+        handleDistributionTerminerConfirm,
         handleDistributionReporter,
         handleDistributionAnnuler,
         handleDistributionRestaurer,
@@ -706,6 +714,28 @@ const Planning: FC = () => {
                     distribution={annulerModalDistribution as unknown as DistributionCharge}
                     onClose={() => setAnnulerModalDistribution(null)}
                     onConfirm={handleDistributionAnnuler}
+                    isLoading={distributionActionLoading}
+                />
+            )}
+
+            {/* Terminer Distribution Modal */}
+            {terminerModalDistribution && (
+                <TerminerDistributionModal
+                    isOpen={true}
+                    distribution={terminerModalDistribution as unknown as DistributionCharge}
+                    onClose={() => setTerminerModalDistribution(null)}
+                    onConfirm={handleDistributionTerminerConfirm}
+                    isLoading={distributionActionLoading}
+                />
+            )}
+
+            {/* Demarrer Distribution Modal */}
+            {demarrerModalDistribution && (
+                <DemarrerDistributionModal
+                    isOpen={true}
+                    distribution={demarrerModalDistribution as unknown as DistributionCharge}
+                    onClose={() => setDemarrerModalDistribution(null)}
+                    onConfirm={handleDistributionDemarrerConfirm}
                     isLoading={distributionActionLoading}
                 />
             )}

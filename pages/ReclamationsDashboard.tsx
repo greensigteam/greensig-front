@@ -81,9 +81,9 @@ const ReclamationsDashboard: React.FC = () => {
     }));
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="h-screen flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center p-6 pb-4 flex-shrink-0">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Statistiques Réclamations</h1>
                     <p className="text-gray-500 mt-1">Analyse et indicateurs de performance</p>
@@ -106,6 +106,8 @@ const ReclamationsDashboard: React.FC = () => {
                 </div>
             </div>
 
+            {/* Scrollable content area */}
+            <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-6">
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Total */}
@@ -245,6 +247,7 @@ const ReclamationsDashboard: React.FC = () => {
                         </ResponsiveContainer>
                     </div>
                 )}
+            </div>
             </div>
         </div>
     );

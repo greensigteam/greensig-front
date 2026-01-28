@@ -152,16 +152,13 @@ export const TaskDetailPopover: FC<TaskDetailPopoverProps> = ({
                                                 ? 'bg-red-100 text-red-600'
                                                 : distributionStatus === 'REPORTEE'
                                                     ? 'bg-purple-100 text-purple-600'
-                                                    : distributionStatus === 'EN_RETARD'
-                                                        ? 'bg-amber-100 text-amber-600'
-                                                        : 'bg-blue-100 text-blue-600'
+                                                    : 'bg-blue-100 text-blue-600'
                                     }
                                 `}>
                                     {isCompleted ? <CheckCircle className="w-5 h-5" /> :
                                      distributionStatus === 'EN_COURS' ? <Clock className="w-5 h-5" /> :
                                      distributionStatus === 'ANNULEE' ? <XCircle className="w-5 h-5" /> :
                                      distributionStatus === 'REPORTEE' ? <CalendarClock className="w-5 h-5" /> :
-                                     distributionStatus === 'EN_RETARD' ? <AlertTriangle className="w-5 h-5" /> :
                                      <Clock className="w-5 h-5" />}
                                 </div>
                             )}

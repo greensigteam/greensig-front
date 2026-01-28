@@ -788,8 +788,8 @@ export interface Statistics {
   superviseur_stats?: {
     taches_today: number
     taches_en_cours: number
-    taches_a_faire: number
-    taches_retard: number
+    taches_planifiees: number
+    taches_terminees: number
     absences_today: number
     equipes_count: number
   }

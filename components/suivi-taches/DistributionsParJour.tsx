@@ -71,7 +71,6 @@ export const DistributionsParJour: React.FC<DistributionsParJourProps> = ({
             REALISEE: 0,
             REPORTEE: 0,
             ANNULEE: 0,
-            EN_RETARD: 0
         };
         distributions.forEach(d => {
             const status = d.status as StatusDistribution;
@@ -116,14 +115,13 @@ export const DistributionsParJour: React.FC<DistributionsParJourProps> = ({
     // Vérifier si c'est aujourd'hui
     const isToday = selectedDate === new Date().toISOString().split('T')[0];
 
-    // Icône selon le statut
+    // Icône selon le statut (✅ SIMPLIFIÉ: Plus de EN_RETARD)
     const getStatusIcon = (status: StatusDistribution) => {
         switch (status) {
             case 'REALISEE': return <CheckCircle className="w-4 h-4" />;
             case 'EN_COURS': return <Clock className="w-4 h-4" />;
             case 'REPORTEE': return <CalendarClock className="w-4 h-4" />;
             case 'ANNULEE': return <XCircle className="w-4 h-4" />;
-            case 'EN_RETARD': return <AlertTriangle className="w-4 h-4" />;
             default: return <Clock className="w-4 h-4" />;
         }
     };
@@ -202,7 +200,7 @@ export const DistributionsParJour: React.FC<DistributionsParJourProps> = ({
                                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full ${colors?.bg || 'bg-slate-100'} ${colors?.text || 'text-slate-700'}`}
                             >
                                 {getStatusIcon(status as StatusDistribution)}
-                                {STATUS_DISTRIBUTION_LABELS[status as StatusDistribution]}: {count}
+                                {STATUS_DISTRIBUTION_LABELS[status as StatusDistribution] || status}: {count}
                             </span>
                         );
                     })}
@@ -233,7 +231,7 @@ export const DistributionsParJour: React.FC<DistributionsParJourProps> = ({
                     <div className="space-y-3">
                         {sortedDistributions.map((distribution) => {
                             const status = distribution.status as StatusDistribution;
-                            const colors = STATUS_DISTRIBUTION_COLORS[status];
+                            const colors = STATUS_DISTRIBUTION_COLORS[status] || { bg: 'bg-slate-100', text: 'text-slate-700' };
                             const canDemarrer = isActionAllowed(status, 'EN_COURS');
                             const canTerminer = status === 'EN_COURS';
                             const canReporter = isActionAllowed(status, 'REPORTEE');
@@ -245,9 +243,7 @@ export const DistributionsParJour: React.FC<DistributionsParJourProps> = ({
                                 <div
                                     key={distribution.id}
                                     className={`p-4 rounded-xl border-2 transition-all hover:shadow-md ${
-                                        status === 'EN_RETARD'
-                                            ? 'border-amber-300 bg-amber-50'
-                                            : status === 'EN_COURS'
+                                        status === 'EN_COURS'
                                             ? 'border-orange-300 bg-orange-50'
                                             : status === 'REALISEE'
                                             ? 'border-green-300 bg-green-50'
@@ -262,9 +258,9 @@ export const DistributionsParJour: React.FC<DistributionsParJourProps> = ({
                                     <div className="flex items-start justify-between mb-3">
                                         <div className="flex items-center gap-3">
                                             {/* Badge statut */}
-                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full ${colors?.bg || 'bg-slate-100'} ${colors?.text || 'text-slate-700'}`}>
+                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full ${colors.bg} ${colors.text}`}>
                                                 {getStatusIcon(status)}
-                                                {STATUS_DISTRIBUTION_LABELS[status]}
+                                                {STATUS_DISTRIBUTION_LABELS[status] || status}
                                             </span>
 
                                             {/* Heures */}

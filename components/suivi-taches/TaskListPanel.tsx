@@ -136,8 +136,8 @@ const TaskCard: React.FC<TaskCardProps> = ({ tache, isSelected, onClick }) => {
                     )}
                 </div>
                 {tache.statut && (
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUT_TACHE_COLORS[tache.statut]?.bg} ${STATUT_TACHE_COLORS[tache.statut]?.text}`}>
-                        {STATUT_TACHE_LABELS[tache.statut]}
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUT_TACHE_COLORS[tache.statut]?.bg || 'bg-slate-100'} ${STATUT_TACHE_COLORS[tache.statut]?.text || 'text-slate-700'}`}>
+                        {STATUT_TACHE_LABELS[tache.statut] || tache.statut}
                     </span>
                 )}
             </div>

@@ -40,9 +40,9 @@ const Parametres: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="h-screen flex flex-col overflow-hidden">
       {/* Toolbar avec Tabs et Action Button */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+      <div className="bg-white p-4 m-6 mb-0 rounded-xl shadow-sm border border-slate-100 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg w-fit">
             <button
@@ -133,8 +133,8 @@ const Parametres: React.FC = () => {
         </div>
       </div>
 
-      {/* Content Area */}
-      <div className="min-h-0">
+      {/* Content Area - Scrollable */}
+      <div className="flex-1 overflow-y-auto p-6 pt-4">
         {activeTab === 'utilisateurs' && <Users triggerCreate={createTrigger} />}
         {activeTab === 'competences' && <CompetencesConfig triggerCreate={createTrigger} />}
         {activeTab === 'ratios' && <RatiosProductivite triggerCreate={createTrigger} />}

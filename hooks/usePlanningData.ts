@@ -79,6 +79,10 @@ export interface UsePlanningDataReturn {
     setReporterModalDistribution: React.Dispatch<React.SetStateAction<DistributionChargeEnriched | null>>;
     annulerModalDistribution: DistributionChargeEnriched | null;
     setAnnulerModalDistribution: React.Dispatch<React.SetStateAction<DistributionChargeEnriched | null>>;
+    terminerModalDistribution: DistributionChargeEnriched | null;
+    setTerminerModalDistribution: React.Dispatch<React.SetStateAction<DistributionChargeEnriched | null>>;
+    demarrerModalDistribution: DistributionChargeEnriched | null;
+    setDemarrerModalDistribution: React.Dispatch<React.SetStateAction<DistributionChargeEnriched | null>>;
     distributionActionLoading: boolean;
 
     // Quick Creator
@@ -110,8 +114,10 @@ export interface UsePlanningDataReturn {
     handleResetCharge: (tacheId: number) => Promise<void>;
 
     // Actions - Distribution Status (nouveau workflow)
-    handleDistributionDemarrer: (distributionId: number) => Promise<void>;
-    handleDistributionTerminer: (distributionId: number) => Promise<void>;
+    handleDistributionDemarrer: (distributionId: number) => void;
+    handleDistributionDemarrerConfirm: (data: { heure_debut_reelle?: string }) => Promise<void>;
+    handleDistributionTerminer: (distributionId: number) => void;
+    handleDistributionTerminerConfirm: (data: { heure_debut_reelle?: string; heure_fin_reelle?: string; heures_reelles?: number }) => Promise<void>;
     handleDistributionReporter: (nouvelleDate: string, motif: MotifDistribution, commentaire: string) => Promise<void>;
     handleDistributionAnnuler: (motif: MotifDistribution, commentaire: string) => Promise<void>;
     handleDistributionRestaurer: (distributionId: number) => Promise<void>;
@@ -163,6 +169,8 @@ export function usePlanningData(): UsePlanningDataReturn {
     // Distribution action modals
     const [reporterModalDistribution, setReporterModalDistribution] = useState<DistributionChargeEnriched | null>(null);
     const [annulerModalDistribution, setAnnulerModalDistribution] = useState<DistributionChargeEnriched | null>(null);
+    const [terminerModalDistribution, setTerminerModalDistribution] = useState<DistributionChargeEnriched | null>(null);
+    const [demarrerModalDistribution, setDemarrerModalDistribution] = useState<DistributionChargeEnriched | null>(null);
     const [distributionActionLoading, setDistributionActionLoading] = useState(false);
 
     // Quick Creator
@@ -387,9 +395,32 @@ export function usePlanningData(): UsePlanningDataReturn {
 
     const loadTaches = useCallback(async () => {
         try {
-            const tachesData = await planningService.getTaches();
-            const tachesArray = tachesData.results || tachesData;
-            setTaches(tachesArray);
+            const allTaches: Tache[] = [];
+            let page = 1;
+            let hasMore = true;
+
+            // Fetch all pages of tasks
+            while (hasMore) {
+                const tachesData = await planningService.getTaches({ page });
+                const tachesArray = tachesData.results || tachesData;
+
+                if (Array.isArray(tachesArray)) {
+                    allTaches.push(...tachesArray);
+                }
+
+                // Check if there are more pages
+                hasMore = tachesData.next !== null && tachesData.next !== undefined;
+                page++;
+
+                // Safety limit
+                if (page > 100) {
+                    console.warn('[loadTaches] Reached page limit (100), stopping pagination');
+                    break;
+                }
+            }
+
+            console.log(`[loadTaches] Loaded ${allTaches.length} tasks (${page - 1} pages)`);
+            setTaches(allTaches);
         } catch (err) {
             console.error('Erreur chargement tâches:', err);
         }
@@ -479,16 +510,37 @@ export function usePlanningData(): UsePlanningDataReturn {
         return ALLOWED_DISTRIBUTION_TRANSITIONS[currentStatus]?.includes(targetStatus) || false;
     }, []);
 
-    const handleDistributionDemarrer = useCallback(async (distributionId: number) => {
+    const handleDistributionDemarrer = useCallback((distributionId: number) => {
+        // Trouver la distribution pour ouvrir le modal
+        const tache = popoverInfo?.tache;
+        if (tache?.distributions_charge) {
+            const distribution = tache.distributions_charge.find(d => d.id === distributionId);
+            if (distribution) {
+                setDemarrerModalDistribution({
+                    ...distribution,
+                    tache_id: tache.id,
+                    tache_titre: tache.type_tache_detail?.nom_tache,
+                    tache_type: tache.type_tache_detail?.nom_tache,
+                    tache_statut: tache.statut,
+                    tache_site_nom: tache.site_nom || undefined,
+                    tache_equipes: tache.equipes_detail?.map(e => e.nom) || [],
+                    tache_priorite: String(tache.priorite),
+                });
+            }
+        }
+    }, [popoverInfo]);
+
+    const handleDistributionDemarrerConfirm = useCallback(async (data: {
+        heure_debut_reelle?: string;
+    }) => {
+        if (!demarrerModalDistribution) return;
+
         setDistributionActionLoading(true);
         try {
-            await planningService.demarrerDistribution(distributionId);
+            await planningService.demarrerDistribution(demarrerModalDistribution.id, data);
+            setDemarrerModalDistribution(null);
+            setPopoverInfo(null);
             await loadTaches();
-
-            // Update popover if open
-            if (popoverInfo && popoverInfo.distributionId === distributionId) {
-                setPopoverInfo({ ...popoverInfo, distributionStatus: 'EN_COURS' });
-            }
 
             showToast('Distribution démarrée');
         } catch (err: any) {
@@ -497,18 +549,41 @@ export function usePlanningData(): UsePlanningDataReturn {
         } finally {
             setDistributionActionLoading(false);
         }
-    }, [popoverInfo, loadTaches, showToast]);
+    }, [demarrerModalDistribution, loadTaches, showToast]);
 
-    const handleDistributionTerminer = useCallback(async (distributionId: number) => {
+    const handleDistributionTerminer = useCallback((distributionId: number) => {
+        // Trouver la distribution pour ouvrir le modal
+        const tache = popoverInfo?.tache;
+        if (tache?.distributions_charge) {
+            const distribution = tache.distributions_charge.find(d => d.id === distributionId);
+            if (distribution) {
+                setTerminerModalDistribution({
+                    ...distribution,
+                    tache_id: tache.id,
+                    tache_titre: tache.type_tache_detail?.nom_tache,
+                    tache_type: tache.type_tache_detail?.nom_tache,
+                    tache_statut: tache.statut,
+                    tache_site_nom: tache.site_nom || undefined,
+                    tache_equipes: tache.equipes_detail?.map(e => e.nom) || [],
+                    tache_priorite: String(tache.priorite),
+                });
+            }
+        }
+    }, [popoverInfo]);
+
+    const handleDistributionTerminerConfirm = useCallback(async (data: {
+        heure_debut_reelle?: string;
+        heure_fin_reelle?: string;
+        heures_reelles?: number;
+    }) => {
+        if (!terminerModalDistribution) return;
+
         setDistributionActionLoading(true);
         try {
-            await planningService.terminerDistribution(distributionId);
+            await planningService.terminerDistribution(terminerModalDistribution.id, data);
+            setTerminerModalDistribution(null);
+            setPopoverInfo(null);
             await loadTaches();
-
-            // Update popover if open
-            if (popoverInfo && popoverInfo.distributionId === distributionId) {
-                setPopoverInfo({ ...popoverInfo, distributionStatus: 'REALISEE' });
-            }
 
             showToast('Distribution terminée');
         } catch (err: any) {
@@ -517,7 +592,7 @@ export function usePlanningData(): UsePlanningDataReturn {
         } finally {
             setDistributionActionLoading(false);
         }
-    }, [popoverInfo, loadTaches, showToast]);
+    }, [terminerModalDistribution, loadTaches, showToast]);
 
     const handleDistributionReporter = useCallback(async (nouvelleDate: string, motif: MotifDistribution, commentaire: string) => {
         if (!reporterModalDistribution) return;
@@ -581,17 +656,41 @@ export function usePlanningData(): UsePlanningDataReturn {
 
     const handleLoadObjects = useCallback(async (siteId: number): Promise<InventoryObjectOption[]> => {
         try {
-            const response = await fetchInventory({ page_size: 200, site: siteId });
-            return response.results.map((item: any) => ({
-                id: item.id ?? item.properties?.id,
-                type: item.properties.object_type,
-                nom: item.properties.nom || item.properties.famille || `${item.properties.object_type} #${item.id}`,
-                site: item.properties.site_nom,
-                soussite: item.properties.sous_site_nom,
-                superficie: item.properties.superficie_calculee,
-                etat: item.properties.etat,
-                famille: item.properties.famille
-            }));
+            const allObjects: InventoryObjectOption[] = [];
+            let page = 1;
+            let hasMore = true;
+            const pageSize = 500; // Larger page size for efficiency
+
+            // Fetch all pages
+            while (hasMore) {
+                const response = await fetchInventory({ page_size: pageSize, page, site: siteId });
+
+                const pageObjects = response.results.map((item: any) => ({
+                    id: item.id ?? item.properties?.id,
+                    type: item.properties.object_type,
+                    nom: item.properties.nom || item.properties.famille || `${item.properties.object_type} #${item.id}`,
+                    site: item.properties.site_nom,
+                    soussite: item.properties.sous_site_nom,
+                    superficie: item.properties.superficie_calculee,
+                    etat: item.properties.etat,
+                    famille: item.properties.famille
+                }));
+
+                allObjects.push(...pageObjects);
+
+                // Check if there are more pages
+                hasMore = response.next !== null;
+                page++;
+
+                // Safety limit to prevent infinite loops
+                if (page > 50) {
+                    console.warn('[handleLoadObjects] Reached page limit (50), stopping pagination');
+                    break;
+                }
+            }
+
+            console.log(`[handleLoadObjects] Loaded ${allObjects.length} objects from site ${siteId} (${page - 1} pages)`);
+            return allObjects;
         } catch (err) {
             console.error('Erreur chargement objets:', err);
             return [];
@@ -656,6 +755,10 @@ export function usePlanningData(): UsePlanningDataReturn {
         setReporterModalDistribution,
         annulerModalDistribution,
         setAnnulerModalDistribution,
+        terminerModalDistribution,
+        setTerminerModalDistribution,
+        demarrerModalDistribution,
+        setDemarrerModalDistribution,
         distributionActionLoading,
 
         // Quick Creator
@@ -688,7 +791,9 @@ export function usePlanningData(): UsePlanningDataReturn {
 
         // Actions - Distribution Status (nouveau workflow)
         handleDistributionDemarrer,
+        handleDistributionDemarrerConfirm,
         handleDistributionTerminer,
+        handleDistributionTerminerConfirm,
         handleDistributionReporter,
         handleDistributionAnnuler,
         handleDistributionRestaurer,

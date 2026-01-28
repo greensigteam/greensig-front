@@ -39,7 +39,6 @@ const DistributionFiltersComponent: FC<DistributionFiltersProps> = ({
         if (filters.status_in && filters.status_in.length > 0) count++;
         if (filters.actif !== undefined) count++;
         if (filters.termine !== undefined) count++;
-        if (filters.en_retard !== undefined) count++;
         if (filters.equipe) count++;
         if (filters.urgent !== undefined) count++;
         if (filters.est_report !== undefined) count++;
@@ -49,9 +48,9 @@ const DistributionFiltersComponent: FC<DistributionFiltersProps> = ({
 
     const hasActiveFilters = activeCount > 0;
 
-    // Statuts disponibles
+    // Statuts disponibles (✅ SIMPLIFIÉ: Plus de EN_RETARD)
     const statutsOptions: StatusDistribution[] = [
-        'NON_REALISEE', 'EN_COURS', 'REALISEE', 'REPORTEE', 'ANNULEE', 'EN_RETARD'
+        'NON_REALISEE', 'EN_COURS', 'REALISEE', 'REPORTEE', 'ANNULEE'
     ];
 
     // Floating UI pour popover Statut
@@ -88,10 +87,9 @@ const DistributionFiltersComponent: FC<DistributionFiltersProps> = ({
         onFiltersChange({
             ...filters,
             status_in: newStatuts.length > 0 ? newStatuts : undefined,
-            // Clear actif/termine/en_retard shortcuts when using manual selection
+            // Clear actif/termine shortcuts when using manual selection
             actif: undefined,
-            termine: undefined,
-            en_retard: undefined
+            termine: undefined
         });
     };
 
@@ -103,12 +101,12 @@ const DistributionFiltersComponent: FC<DistributionFiltersProps> = ({
         onFiltersChange({ ...filters, search: search || undefined });
     };
 
-    const handleShortcutChange = (shortcut: 'actif' | 'termine' | 'en_retard' | 'urgent' | 'est_report', value: boolean | undefined) => {
+    const handleShortcutChange = (shortcut: 'actif' | 'termine' | 'urgent' | 'est_report', value: boolean | undefined) => {
         onFiltersChange({
             ...filters,
             [shortcut]: value,
             // Clear status_in when using shortcuts
-            ...(shortcut === 'actif' || shortcut === 'termine' || shortcut === 'en_retard'
+            ...(shortcut === 'actif' || shortcut === 'termine'
                 ? { status_in: undefined }
                 : {})
         });
@@ -221,24 +219,9 @@ const DistributionFiltersComponent: FC<DistributionFiltersProps> = ({
                             ? 'border-blue-500 bg-blue-50 text-blue-700'
                             : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}
                     `}
-                    title="NON_REALISEE, EN_COURS, EN_RETARD"
+                    title="NON_REALISEE, EN_COURS (distributions actives)"
                 >
                     Actif
-                </button>
-
-                <button
-                    onClick={() => handleShortcutChange('en_retard', filters.en_retard === true ? undefined : true)}
-                    disabled={disabled}
-                    className={`
-                        flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all border-2
-                        ${filters.en_retard === true
-                            ? 'border-amber-500 bg-amber-50 text-amber-700'
-                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}
-                    `}
-                    title="Uniquement EN_RETARD"
-                >
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    Retard
                 </button>
 
                 <button

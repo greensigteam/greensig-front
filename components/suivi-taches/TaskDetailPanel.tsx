@@ -110,8 +110,7 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     // Équipes disponibles (non encore assignées)
     const availableEquipes = equipesDisponibles.filter(e => !assignedEquipeIds.has(e.id));
 
-    const isLate = tache.statut === 'EN_RETARD';
-    const isExpired = tache.statut === 'EXPIREE';
+    // ✅ SIMPLIFIÉ: Plus de EN_RETARD ni EXPIREE
     const hasEquipe = (tache.equipes_detail?.length ?? 0) > 0 || !!tache.equipe_detail;
 
     return (
@@ -138,10 +137,10 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                                 {tache.reference || `#${tache.id}`}
                             </span>
                             <span
-                                className={`text-xs px-2 py-0.5 rounded font-medium ${STATUT_TACHE_COLORS[tache.statut]?.bg} ${STATUT_TACHE_COLORS[tache.statut]?.text}`}
-                                title={`Statut: ${STATUT_TACHE_LABELS[tache.statut]}`}
+                                className={`text-xs px-2 py-0.5 rounded font-medium ${STATUT_TACHE_COLORS[tache.statut]?.bg || 'bg-slate-100'} ${STATUT_TACHE_COLORS[tache.statut]?.text || 'text-slate-700'}`}
+                                title={`Statut: ${STATUT_TACHE_LABELS[tache.statut] || tache.statut}`}
                             >
-                                {tache.statut}
+                                {STATUT_TACHE_LABELS[tache.statut] || tache.statut}
                             </span>
                             {tache.statut === 'TERMINEE' && (
                                 <span
@@ -161,8 +160,6 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                             tache={tache}
                             isAdmin={isAdmin}
                             hasEquipe={hasEquipe}
-                            isLate={isLate}
-                            isExpired={isExpired}
                             changingStatut={changingStatut}
                             loadingTypesTaches={loadingTypesTaches}
                             onEdit={onEdit}
@@ -264,12 +261,11 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
 };
 
 // Action Buttons Sub-component
+// ✅ SIMPLIFIÉ: Plus de isLate ni isExpired
 interface ActionButtonsProps {
     tache: Tache;
     isAdmin: boolean;
     hasEquipe: boolean;
-    isLate: boolean;
-    isExpired: boolean;
     changingStatut: boolean;
     loadingTypesTaches: boolean;
     onEdit: () => void;
@@ -284,8 +280,6 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
     tache,
     isAdmin,
     hasEquipe,
-    isLate,
-    isExpired,
     changingStatut,
     loadingTypesTaches,
     onEdit,
@@ -297,13 +291,16 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 }) => {
     const nbEquipes = tache.equipes_detail?.length || (tache.equipe_detail ? 1 : 0);
     const nbObjets = tache.objets_detail?.length || 0;
-    const nbDistributions = tache.distributions_charge?.length || 0;
-    const distributionsRealisees = tache.distributions_charge?.filter(d => d.status === 'REALISEE').length || 0;
+    const distributions = tache.distributions_charge || [];
+    const nbDistributions = distributions.length;
+    const distributionsRealisees = distributions.filter(d => d.status === 'REALISEE').length;
+    const distributionsNonRealisees = distributions.filter(d => d.status === 'NON_REALISEE').length;
+    const distributionsEnCours = distributions.filter(d => d.status === 'EN_COURS').length;
 
-    // ✅ Vérifier si la tâche EN_COURS a du travail effectif (distributions réalisées)
+    // Vérifier si la tâche EN_COURS a du travail effectif (distributions réalisées)
     const hasWorkDone = distributionsRealisees > 0;
 
-    // ✅ Vérifier si la date de début est dans le futur (ne peut pas démarrer avant)
+    // Vérifier si la date de début est dans le futur (ne peut pas démarrer avant)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const dateDebut = new Date(tache.date_debut_planifiee);
@@ -314,27 +311,33 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
     const daysUntilStart = Math.ceil((dateDebut.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
     // ══════════════════════════════════════════════════════════════════════════
-    // MATRICE DES ACTIONS PAR STATUT (conventions standard)
+    // MATRICE DES ACTIONS PAR STATUT
     // ══════════════════════════════════════════════════════════════════════════
-    // PLANIFIEE    : Modifier, Supprimer, Démarrer*, Annuler  (*si date atteinte)
-    // EN_RETARD    : Modifier, Supprimer, Démarrer, Annuler
-    // EXPIREE      : Replanifier, Annuler
-    // ANNULEE      : Replanifier, Supprimer
-    // EN_COURS     : Terminer, Annuler + (Modifier/Replanifier si aucun travail)
-    // TERMINEE     : Valider/Rejeter (Admin)
-    // VALIDEE      : Aucune action
-    // REJETEE      : Replanifier
+    // PLANIFIEE : Modifier, Supprimer, Démarrer (si date atteinte), Annuler
+    // EN_COURS  : Démarrer prochaine (si NON_REALISEE restantes),
+    //             Terminer (si EN_COURS existe), Annuler,
+    //             Modifier/Replanifier (si aucun travail)
+    // ANNULEE   : Replanifier, Supprimer
+    // TERMINEE  : Valider/Rejeter (Admin)
+    // VALIDEE   : Aucune action
+    // REJETEE   : Replanifier
     // ══════════════════════════════════════════════════════════════════════════
 
-    const canEdit = ['PLANIFIEE', 'EN_RETARD'].includes(tache.statut) ||
+    const canEdit = tache.statut === 'PLANIFIEE' ||
                     (tache.statut === 'EN_COURS' && !hasWorkDone);
-    const canDelete = ['PLANIFIEE', 'EN_RETARD', 'ANNULEE'].includes(tache.statut);
-    const canStart = ['PLANIFIEE', 'EN_RETARD'].includes(tache.statut);
-    const canComplete = tache.statut === 'EN_COURS';
-    const canCancel = ['PLANIFIEE', 'EN_RETARD', 'EXPIREE', 'EN_COURS'].includes(tache.statut);
-    const canReschedule = ['EXPIREE', 'ANNULEE', 'REJETEE'].includes(tache.statut) ||
+    const canDelete = ['PLANIFIEE', 'ANNULEE'].includes(tache.statut);
+    // Démarrer: PLANIFIEE (première distribution) ou EN_COURS avec distributions NON_REALISEE restantes
+    const canStart = tache.statut === 'PLANIFIEE' ||
+                     (tache.statut === 'EN_COURS' && distributionsNonRealisees > 0 && distributionsEnCours === 0);
+    // Terminer: seulement s'il y a une distribution EN_COURS à terminer
+    const canComplete = tache.statut === 'EN_COURS' && distributionsEnCours > 0;
+    const canCancel = ['PLANIFIEE', 'EN_COURS'].includes(tache.statut);
+    const canReschedule = ['ANNULEE', 'REJETEE'].includes(tache.statut) ||
                           (tache.statut === 'EN_COURS' && !hasWorkDone);
     const canValidate = isAdmin && tache.statut === 'TERMINEE' && tache.etat_validation === 'EN_ATTENTE';
+
+    // Labels contextuels pour le bouton Démarrer
+    const isStartingNext = tache.statut === 'EN_COURS';
 
     // ✅ Raison du blocage du démarrage (priorité: équipe > date future)
     const startBlockedReason = !hasEquipe
@@ -346,7 +349,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
     return (
         <div className="flex gap-2 shrink-0 flex-wrap">
             {/* ══════════════════════════════════════════════════════════════════
-                MODIFIER - PLANIFIEE, EN_RETARD, EN_COURS (sans travail)
+                MODIFIER - PLANIFIEE, EN_COURS (sans travail)
             ══════════════════════════════════════════════════════════════════ */}
             {canEdit && (
                 <button
@@ -361,7 +364,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
             )}
 
             {/* ══════════════════════════════════════════════════════════════════
-                REPLANIFIER - EXPIREE, ANNULEE, REJETEE, EN_COURS (sans travail)
+                REPLANIFIER - ANNULEE, REJETEE, EN_COURS (sans travail)
             ══════════════════════════════════════════════════════════════════ */}
             {canReschedule && !canEdit && (
                 <button
@@ -380,7 +383,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
             )}
 
             {/* ══════════════════════════════════════════════════════════════════
-                DÉMARRER - PLANIFIEE, EN_RETARD
+                DÉMARRER - PLANIFIEE ou EN_COURS avec distributions NON_REALISEE
                 Bloqué si: pas d'équipe OU date de début dans le futur
             ══════════════════════════════════════════════════════════════════ */}
             {canStart && (
@@ -389,33 +392,30 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
                     disabled={changingStatut || !!startBlockedReason}
                     title={
                         startBlockedReason === 'no_team'
-                            ? '❌ Veuillez assigner une équipe avant de démarrer'
+                            ? 'Veuillez assigner une équipe avant de démarrer'
                             : startBlockedReason === 'future_date'
-                                ? `⏳ Démarrage possible à partir du ${new Date(tache.date_debut_planifiee).toLocaleDateString('fr-FR')}\n(dans ${daysUntilStart} jour${daysUntilStart > 1 ? 's' : ''})`
-                                : isLate
-                                    ? `⚠️ Démarrer en retard (sera tracé)\n${nbEquipes} équipe(s)`
-                                    : `▶ Démarrer la tâche\n${nbEquipes} équipe(s)${nbObjets > 0 ? ` • ${nbObjets} objet(s)` : ''}`
+                                ? `Démarrage possible à partir du ${new Date(tache.date_debut_planifiee).toLocaleDateString('fr-FR')} (dans ${daysUntilStart} jour${daysUntilStart > 1 ? 's' : ''})`
+                                : isStartingNext
+                                    ? `Démarrer la prochaine distribution (${distributionsNonRealisees} restante${distributionsNonRealisees > 1 ? 's' : ''})`
+                                    : `Démarrer la tâche - ${nbEquipes} équipe(s)${nbObjets > 0 ? ` - ${nbObjets} objet(s)` : ''}`
                     }
                     className={`flex items-center gap-1.5 px-3 py-1.5 text-white rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed ${
                         startBlockedReason === 'future_date'
                             ? 'bg-slate-400'
-                            : isLate
-                                ? 'bg-amber-600 hover:bg-amber-700'
-                                : 'bg-emerald-600 hover:bg-emerald-700'
+                            : 'bg-emerald-600 hover:bg-emerald-700'
                     }`}
                 >
                     {changingStatut ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
                     {startBlockedReason === 'future_date'
                         ? `Démarrage le ${new Date(tache.date_debut_planifiee).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`
-                        : isLate
-                            ? 'Démarrer (en retard)'
+                        : isStartingNext
+                            ? `Démarrer (${distributionsNonRealisees})`
                             : 'Démarrer'}
                 </button>
             )}
 
             {/* ══════════════════════════════════════════════════════════════════
-                TERMINER - EN_COURS
-                Bloqué si: pas d'équipe assignée
+                TERMINER - EN_COURS avec une distribution EN_COURS active
             ══════════════════════════════════════════════════════════════════ */}
             {canComplete && (
                 <button
@@ -423,10 +423,8 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
                     disabled={changingStatut || !hasEquipe}
                     title={
                         !hasEquipe
-                            ? '❌ Impossible de terminer sans équipe assignée'
-                            : nbDistributions > 0
-                                ? `✅ Terminer (${distributionsRealisees}/${nbDistributions} distribution(s) réalisée(s))`
-                                : '✅ Terminer la tâche'
+                            ? 'Impossible de terminer sans équipe assignée'
+                            : `Terminer la distribution en cours (${distributionsRealisees}/${nbDistributions} réalisée${distributionsRealisees > 1 ? 's' : ''})`
                     }
                     className={`flex items-center gap-1.5 px-3 py-1.5 text-white rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed ${
                         !hasEquipe ? 'bg-slate-400' : 'bg-blue-600 hover:bg-blue-700'
@@ -438,7 +436,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
             )}
 
             {/* ══════════════════════════════════════════════════════════════════
-                ANNULER - PLANIFIEE, EN_RETARD, EXPIREE, EN_COURS
+                ANNULER - PLANIFIEE, EN_COURS
             ══════════════════════════════════════════════════════════════════ */}
             {canCancel && (
                 <button
@@ -457,7 +455,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
             )}
 
             {/* ══════════════════════════════════════════════════════════════════
-                SUPPRIMER - PLANIFIEE, EN_RETARD, ANNULEE
+                SUPPRIMER - PLANIFIEE, ANNULEE
             ══════════════════════════════════════════════════════════════════ */}
             {canDelete && (
                 <button

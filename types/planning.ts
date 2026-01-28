@@ -10,7 +10,9 @@ import { Client, EquipeList, OperateurList } from './users';
 
 export type PrioriteTache = 1 | 2 | 3 | 4 | 5;
 
-export type StatutTache = 'PLANIFIEE' | 'EN_RETARD' | 'EXPIREE' | 'EN_COURS' | 'TERMINEE' | 'ANNULEE';
+// ✅ SIMPLIFIÉ: Plus de EN_RETARD ni EXPIREE
+// Une tâche reste PLANIFIEE jusqu'à démarrage explicite
+export type StatutTache = 'PLANIFIEE' | 'EN_COURS' | 'TERMINEE' | 'ANNULEE';
 
 export type EtatValidation = 'EN_ATTENTE' | 'VALIDEE' | 'REJETEE';
 
@@ -29,10 +31,9 @@ export const PRIORITE_LABELS: Record<PrioriteTache, string> = {
     5: 'Urgent'
 };
 
+// ✅ SIMPLIFIÉ: Plus de EN_RETARD ni EXPIREE
 export const STATUT_TACHE_LABELS: Record<StatutTache, string> = {
     PLANIFIEE: 'Planifiée',
-    EN_RETARD: 'En retard',
-    EXPIREE: 'Expirée',
     EN_COURS: 'En cours',
     TERMINEE: 'Terminée',
     ANNULEE: 'Annulée'
@@ -132,31 +133,30 @@ export interface ParticipationTache {
 // DISTRIBUTION DE CHARGE (Multi-Day Tasks)
 // ============================================================================
 
-// ✅ 6 statuts pour le workflow complet
+// ✅ SIMPLIFIÉ: 5 statuts (plus de EN_RETARD)
 export type StatusDistribution =
     | 'NON_REALISEE'
     | 'EN_COURS'
     | 'REALISEE'
     | 'REPORTEE'
-    | 'ANNULEE'
-    | 'EN_RETARD';
+    | 'ANNULEE';
 
+// ✅ SIMPLIFIÉ: Plus de EN_RETARD
 export const STATUS_DISTRIBUTION_LABELS: Record<StatusDistribution, string> = {
     NON_REALISEE: 'Non Réalisée',
     EN_COURS: 'En Cours',
     REALISEE: 'Réalisée',
     REPORTEE: 'Reportée',
-    ANNULEE: 'Annulée',
-    EN_RETARD: 'En Retard'
+    ANNULEE: 'Annulée'
 };
 
+// ✅ SIMPLIFIÉ: Plus de EN_RETARD
 export const STATUS_DISTRIBUTION_COLORS: Record<StatusDistribution, { bg: string; text: string; border?: string }> = {
     NON_REALISEE: { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300' },
     EN_COURS: { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300' },
     REALISEE: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300' },
     REPORTEE: { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-300' },
-    ANNULEE: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300' },
-    EN_RETARD: { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-300' }
+    ANNULEE: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300' }
 };
 
 // ✅ Motifs de report/annulation
@@ -171,14 +171,13 @@ export const MOTIF_DISTRIBUTION_LABELS: Record<MotifDistribution, string> = {
     AUTRE: 'Autre motif'
 };
 
-// ✅ Transitions autorisées (pour validation côté frontend)
+// ✅ SIMPLIFIÉ: Plus de EN_RETARD
 export const ALLOWED_DISTRIBUTION_TRANSITIONS: Record<StatusDistribution, StatusDistribution[]> = {
     NON_REALISEE: ['EN_COURS', 'REPORTEE', 'ANNULEE'],
     EN_COURS: ['REALISEE', 'ANNULEE'],
     REALISEE: [],  // État terminal
     REPORTEE: [],  // État terminal
     ANNULEE: ['NON_REALISEE'],  // Restauration possible
-    EN_RETARD: ['EN_COURS', 'REPORTEE', 'ANNULEE']
 };
 
 export interface DistributionCharge {
@@ -187,16 +186,21 @@ export interface DistributionCharge {
     date: string; // YYYY-MM-DD
     heures_planifiees: number;
     heures_reelles: number | null;
-    heure_debut?: string | null;  // "HH:MM:SS" (ISO time format)
-    heure_fin?: string | null;     // "HH:MM:SS"
+    heure_debut?: string | null;  // "HH:MM:SS" (ISO time format) - Planifié
+    heure_fin?: string | null;     // "HH:MM:SS" - Planifié
+
+    // ✅ Heures réelles (saisie à froid par le superviseur)
+    heure_debut_reelle?: string | null;  // "HH:MM:SS" - Réel terrain
+    heure_fin_reelle?: string | null;     // "HH:MM:SS" - Réel terrain
+
     commentaire: string;
     status: StatusDistribution;
     reference?: string;
 
-    // ✅ NOUVEAUX CHAMPS - Système de reports
+    // ✅ Système de reports
     motif_report_annulation?: MotifDistribution | null;
-    date_demarrage?: string | null;  // ISO datetime
-    date_completion?: string | null; // ISO datetime
+    date_demarrage?: string | null;  // ISO datetime (horodatage système)
+    date_completion?: string | null; // ISO datetime (horodatage système)
     distribution_origine?: number | null;      // ID de la distribution d'origine (si report)
     distribution_remplacement?: number | null; // ID de la distribution de remplacement
 
@@ -282,9 +286,8 @@ export interface DistributionFilters {
     status_in?: StatusDistribution[];  // Liste de statuts
 
     // Raccourcis statut
-    actif?: boolean;            // NON_REALISEE, EN_COURS, EN_RETARD
+    actif?: boolean;            // NON_REALISEE, EN_COURS
     termine?: boolean;          // REALISEE, REPORTEE, ANNULEE
-    en_retard?: boolean;        // Uniquement EN_RETARD
 
     // Filtres par équipe/site/structure
     equipe?: number;
@@ -373,6 +376,9 @@ export interface Tache {
     charge_totale_distributions?: number;
     nombre_jours_travail?: number;
     reference?: string;
+
+    // ✅ Flag de replanification - empêche l'expiration automatique
+    a_ete_replanifiee?: boolean;
 }
 
 export interface TacheCreate {
@@ -478,10 +484,9 @@ export function countActivePlanningFilters(filters: PlanningFilters): number {
 // COULEURS UI
 // ============================================================================
 
+// ✅ SIMPLIFIÉ: Plus de EN_RETARD ni EXPIREE
 export const STATUT_TACHE_COLORS: Record<StatutTache, { bg: string; text: string }> = {
     PLANIFIEE: { bg: 'bg-blue-100', text: 'text-blue-800' },
-    EN_RETARD: { bg: 'bg-amber-100', text: 'text-amber-800' },  // Jaune/Orange pour alerte
-    EXPIREE: { bg: 'bg-rose-100', text: 'text-rose-800' },      // Rose/Rouge pour expirée
     EN_COURS: { bg: 'bg-orange-100', text: 'text-orange-800' },
     TERMINEE: { bg: 'bg-green-100', text: 'text-green-800' },
     ANNULEE: { bg: 'bg-red-100', text: 'text-red-800' }

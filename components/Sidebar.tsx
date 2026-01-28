@@ -101,6 +101,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'CLIENT_INTERVENTIONS', label: 'Suivi des Tâches', icon: ClipboardList, roles: ['CLIENT'] },
     { id: 'CLIENT_PLANNING', label: 'Planning', icon: Calendar, roles: ['CLIENT'] },
     { id: 'CLIENT_TEAMS', label: 'Équipes', icon: Users, roles: ['CLIENT'] },
+    { id: 'REPORTING', label: 'Rapports', icon: BarChart3, roles: ['CLIENT'] },
   ];
 
   // Filter entries based on role

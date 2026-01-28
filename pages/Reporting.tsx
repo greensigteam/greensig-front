@@ -540,11 +540,11 @@ const Reporting: React.FC = () => {
                                     <PieChart>
                                         <Pie
                                             data={reclamationsParTypeData}
-                                            cx="50%"
+                                            cx="30%"
                                             cy="50%"
                                             labelLine={false}
                                             label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
-                                            outerRadius={70}
+                                            outerRadius={65}
                                             dataKey="value"
                                         >
                                             {reclamationsParTypeData.map((_, index) => (
@@ -552,7 +552,12 @@ const Reporting: React.FC = () => {
                                             ))}
                                         </Pie>
                                         <Tooltip />
-                                        <Legend />
+                                        <Legend
+                                            layout="vertical"
+                                            verticalAlign="middle"
+                                            align="right"
+                                            wrapperStyle={{ fontSize: '11px', paddingLeft: '10px' }}
+                                        />
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>
@@ -599,16 +604,16 @@ const Reporting: React.FC = () => {
                         <BarChart3 className="w-5 h-5 text-emerald-600" />
                         Répartition de l'Inventaire
                     </h2>
-                    <div className="h-64 w-full">
-                        <ResponsiveContainer width="100%" height={256} minWidth={0}>
+                    <div className="h-48 w-full">
+                        <ResponsiveContainer width="100%" height={192} minWidth={0}>
                             <PieChart>
                                 <Pie
                                     data={inventaireData}
-                                    cx="50%"
+                                    cx="30%"
                                     cy="50%"
-                                    labelLine={true}
-                                    label={({ name, value, percent }) => `${name}: ${value} (${((percent ?? 0) * 100).toFixed(0)}%)`}
-                                    outerRadius={80}
+                                    labelLine={false}
+                                    label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
+                                    outerRadius={65}
                                     dataKey="value"
                                 >
                                     {inventaireData.map((entry, index) => (
@@ -616,7 +621,12 @@ const Reporting: React.FC = () => {
                                     ))}
                                 </Pie>
                                 <Tooltip />
-                                <Legend />
+                                <Legend
+                                    layout="vertical"
+                                    verticalAlign="middle"
+                                    align="right"
+                                    wrapperStyle={{ fontSize: '11px', paddingLeft: '10px' }}
+                                />
                             </PieChart>
                         </ResponsiveContainer>
                     </div>
@@ -643,16 +653,16 @@ const Reporting: React.FC = () => {
                     <h2 className="text-lg font-bold text-slate-800 mb-4">Distribution par État</h2>
                     {etatData.length > 0 ? (
                         <>
-                            <div className="h-64 w-full">
-                                <ResponsiveContainer width="100%" height={256} minWidth={0}>
+                            <div className="h-48 w-full">
+                                <ResponsiveContainer width="100%" height={192} minWidth={0}>
                                     <PieChart>
                                         <Pie
                                             data={etatData}
-                                            cx="50%"
+                                            cx="30%"
                                             cy="50%"
                                             labelLine={false}
-                                            label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
-                                            outerRadius={80}
+                                            label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
+                                            outerRadius={65}
                                             dataKey="value"
                                         >
                                             {etatData.map((entry) => (
@@ -660,7 +670,12 @@ const Reporting: React.FC = () => {
                                             ))}
                                         </Pie>
                                         <Tooltip />
-                                        <Legend />
+                                        <Legend
+                                            layout="vertical"
+                                            verticalAlign="middle"
+                                            align="right"
+                                            wrapperStyle={{ fontSize: '11px', paddingLeft: '10px' }}
+                                        />
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>

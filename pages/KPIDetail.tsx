@@ -82,7 +82,7 @@ const KPI_FORMULAS: Record<string, string> = {
     respect_planning: '(Tâches terminées dans les délais / Total tâches terminées) × 100',
     taux_realisation_reclamations: '(Réclamations ouvertes et clôturées dans M / Total réclamations ouvertes dans M) × 100',
     temps_moyen_traitement_reclamations: 'Σ(date_cloture - date_creation) / Nombre de réclamations clôturées',
-    temps_realisation_taches: 'Σ(heures travaillées) / Nombre de tâches terminées',
+    temps_realisation_taches: 'Σ(heures) / Σ(quantité) — normalisé par m², ml ou unité selon le type',
     temps_travail_par_site: 'Σ(heures travaillées par tous les opérateurs sur le site)',
 };
 
@@ -93,6 +93,22 @@ const ALL_KPI_KEYS = [
     'temps_realisation_taches',
     'temps_travail_par_site'
 ] as const;
+
+// Helper pour formater le ratio d'efficacité normalisé
+function formatRatio(ratio: number | null | undefined, unite: string): string {
+    if (ratio == null) return '—';
+    if (unite === 'm2') return `${ratio.toFixed(4)} h/m\u00B2`;
+    if (unite === 'ml') return `${ratio.toFixed(4)} h/ml`;
+    return `${ratio.toFixed(1)} h/unit\u00E9`;
+}
+
+function formatUniteLabel(unite: string): string {
+    if (unite === 'm2') return 'm\u00B2';
+    if (unite === 'ml') return 'ml';
+    if (unite === 'arbres') return 'arbres';
+    if (unite === 'cuvettes') return 'cuvettes';
+    return 'unit\u00E9s';
+}
 
 // Composant TrendIcon
 const TrendIcon: React.FC<{ tendance: 'hausse' | 'baisse' | 'stable'; isGoodWhenUp?: boolean; size?: 'sm' | 'md' | 'lg' }> =
@@ -200,7 +216,7 @@ const KPIDetail: React.FC = () => {
     // Vérifier que le KPI existe
     if (!kpiKey || !ALL_KPI_KEYS.includes(kpiKey as typeof ALL_KPI_KEYS[number])) {
         return (
-            <div className="flex-1 p-6">
+            <div className="h-screen flex items-center justify-center p-6 bg-slate-50">
                 <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
                     <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-3" />
                     <h3 className="text-lg font-semibold text-red-800 mb-2">KPI non trouvé</h3>
@@ -219,7 +235,7 @@ const KPIDetail: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="flex-1 flex items-center justify-center">
+            <div className="h-screen flex items-center justify-center bg-slate-50">
                 <LoadingScreen isLoading={true} loop={true} minDuration={0} />
             </div>
         );
@@ -227,7 +243,7 @@ const KPIDetail: React.FC = () => {
 
     if (error) {
         return (
-            <div className="flex-1 p-6">
+            <div className="h-screen flex items-center justify-center p-6 bg-slate-50">
                 <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
                     <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-3" />
                     <h3 className="text-lg font-semibold text-red-800 mb-2">Erreur de chargement</h3>
@@ -255,9 +271,9 @@ const KPIDetail: React.FC = () => {
     const selectedSiteName = data.sites_disponibles.find(s => s.id.toString() === selectedSite)?.nom;
 
     return (
-        <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50">
+        <div className="h-screen flex flex-col overflow-hidden bg-slate-50">
             {/* Header avec navigation */}
-            <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
+            <div className="bg-white border-b border-slate-200 flex-shrink-0 z-10">
                 <div className="max-w-7xl mx-auto px-6 py-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
@@ -306,7 +322,8 @@ const KPIDetail: React.FC = () => {
                 </div>
             </div>
 
-            {/* Contenu principal */}
+            {/* Contenu principal - Scrollable */}
+            <div className="flex-1 overflow-y-auto">
             <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
                 {/* En-tête du KPI */}
                 <div
@@ -592,32 +609,32 @@ const KPIDetail: React.FC = () => {
                                 <div className="grid grid-cols-3 gap-4">
                                     <div className="text-center p-4 bg-emerald-50 rounded-lg">
                                         <div className="text-3xl font-bold text-emerald-600">
-                                            {kpi.details.terminees_dans_delais ?? 0}
+                                            {kpi.details.taches_conformes ?? 0}
                                         </div>
                                         <div className="text-sm text-emerald-700">Tâches dans les délais</div>
                                     </div>
                                     <div className="text-center p-4 bg-orange-50 rounded-lg">
                                         <div className="text-3xl font-bold text-orange-600">
-                                            {kpi.details.terminees_en_retard ?? 0}
+                                            {kpi.details.taches_retard_1_7j ?? 0}
                                         </div>
                                         <div className="text-sm text-orange-700">Tâches en retard</div>
                                     </div>
                                     <div className="text-center p-4 bg-red-50 rounded-lg">
                                         <div className="text-3xl font-bold text-red-600">
-                                            {kpi.details.retards_critiques ?? 0}
+                                            {kpi.details.taches_retard_critique ?? 0}
                                         </div>
                                         <div className="text-sm text-red-700">Retards &gt; 7 jours</div>
                                     </div>
                                 </div>
 
-                                {kpi.details.taches_retard_critique?.length > 0 && (
+                                {kpi.details.details_retards_critiques?.length > 0 && (
                                     <div className="mt-4">
                                         <h4 className="text-sm font-medium text-slate-700 mb-2">Tâches avec retard critique</h4>
                                         <div className="space-y-2">
-                                            {kpi.details.taches_retard_critique.map((tache: any) => (
+                                            {kpi.details.details_retards_critiques.map((tache: any) => (
                                                 <div key={tache.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
                                                     <span className="text-sm text-red-800">{tache.titre}</span>
-                                                    <span className="text-sm text-red-600 font-medium">+{tache.retard_jours} jours</span>
+                                                    <span className="text-sm text-red-600 font-medium">+{tache.retard_max_jours} jours</span>
                                                 </div>
                                             ))}
                                         </div>
@@ -670,6 +687,49 @@ const KPIDetail: React.FC = () => {
                             </div>
                         )}
 
+                        {kpiKey === 'temps_realisation_taches' && kpi.details?.par_type && (
+                            <div className="space-y-2">
+                                <h4 className="text-sm font-medium text-slate-700 mb-3">Par type de tâche</h4>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b border-slate-200">
+                                                <th className="text-left py-2 px-3 text-slate-600 font-medium">Type de tâche</th>
+                                                <th className="text-right py-2 px-3 text-slate-600 font-medium">Tâches</th>
+                                                <th className="text-right py-2 px-3 text-slate-600 font-medium">Ratio d'efficacité</th>
+                                                <th className="text-right py-2 px-3 text-slate-600 font-medium">Total heures</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {kpi.details.par_type.map((item: any, index: number) => (
+                                                <tr key={index} className="border-b border-slate-100 hover:bg-slate-50">
+                                                    <td className="py-2 px-3">
+                                                        <span className="font-medium text-slate-800">{item.type_tache}</span>
+                                                        {item.taches_sans_quantite > 0 && (
+                                                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-700">
+                                                                {item.taches_sans_quantite} sans objets
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2 px-3 text-right text-slate-700">{item.count}</td>
+                                                    <td className="py-2 px-3 text-right">
+                                                        {item.ratio_efficacite != null ? (
+                                                            <span className="font-medium text-slate-800">
+                                                                {formatRatio(item.ratio_efficacite, item.unite_productivite)}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-slate-500">{item.moyenne_heures}h/tâche</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2 px-3 text-right text-slate-700">{item.total_heures}h</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
                         {kpiKey === 'temps_realisation_taches' && kpi.details?.par_site_et_type && (
                             <div className="space-y-2">
                                 <h4 className="text-sm font-medium text-slate-700 mb-3">Par site et type de tâche</h4>
@@ -679,7 +739,16 @@ const KPIDetail: React.FC = () => {
                                             <span className="text-sm font-medium text-slate-800">{item.site_nom}</span>
                                             <span className="text-xs text-slate-500 ml-2">({item.type_tache})</span>
                                         </div>
-                                        <span className="text-sm font-medium text-slate-800">{item.moyenne_heures}h</span>
+                                        <div className="text-right">
+                                            {item.ratio_efficacite != null ? (
+                                                <span className="text-sm font-medium text-slate-800">
+                                                    {formatRatio(item.ratio_efficacite, item.unite_productivite)}
+                                                </span>
+                                            ) : (
+                                                <span className="text-sm font-medium text-slate-800">{item.moyenne_heures}h/tâche</span>
+                                            )}
+                                            <span className="text-xs text-slate-400 ml-2">({item.count} tâches)</span>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -740,6 +809,7 @@ const KPIDetail: React.FC = () => {
                         })}
                     </div>
                 </div>
+            </div>
             </div>
         </div>
     );

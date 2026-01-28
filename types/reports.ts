@@ -57,6 +57,8 @@ export interface MonthlyReportStatistiques {
   reclamations_creees: number;
   reclamations_resolues: number;
   heures_travaillees: number;
+  heures_theoriques?: number;
+  ratio_productivite?: number | null;
 }
 
 export interface MonthlyReportOperateur {

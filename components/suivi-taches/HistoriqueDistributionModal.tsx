@@ -31,7 +31,6 @@ export const HistoriqueDistributionModal: React.FC<HistoriqueDistributionModalPr
             case 'EN_COURS': return <Clock className="w-4 h-4 text-orange-600" />;
             case 'REPORTEE': return <CalendarClock className="w-4 h-4 text-purple-600" />;
             case 'ANNULEE': return <XCircle className="w-4 h-4 text-red-600" />;
-            case 'EN_RETARD': return <AlertTriangle className="w-4 h-4 text-amber-600" />;
             default: return <Clock className="w-4 h-4 text-blue-600" />;
         }
     };
@@ -83,7 +82,7 @@ export const HistoriqueDistributionModal: React.FC<HistoriqueDistributionModalPr
                                     const date = new Date(item.date);
                                     const isFirst = index === 0;
                                     const isLast = index === historique.length - 1;
-                                    const statusColors = STATUS_DISTRIBUTION_COLORS[item.status as StatusDistribution];
+                                    const statusColors = STATUS_DISTRIBUTION_COLORS[item.status as StatusDistribution] || { bg: 'bg-slate-100', text: 'text-slate-700' };
 
                                     return (
                                         <div key={item.id} className="relative pl-10">

@@ -332,14 +332,17 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
 
     // ✅ NOUVEAU: Réinitialiser les distributions quand les dates de la tâche changent
     // Si les distributions existantes sont TOUTES hors de la nouvelle plage de dates,
-    // les supprimer pour permettre une replanification propre
+    // les régénérer automatiquement pour permettre une replanification propre
     useEffect(() => {
-        // Seulement en mode édition et si des distributions existent
-        if (!tache || distributionsCharge.length === 0) return;
+        // Seulement en mode édition
+        if (!tache) return;
         if (!formData.date_debut_planifiee || !formData.date_fin_planifiee) return;
 
         const newStart = new Date(formData.date_debut_planifiee);
         const newEnd = new Date(formData.date_fin_planifiee);
+
+        // Si pas de distributions existantes, pas besoin de vérifier
+        if (distributionsCharge.length === 0) return;
 
         // Vérifier si TOUTES les distributions sont hors de la nouvelle plage
         const allOutOfRange = distributionsCharge.every(dist => {
@@ -348,8 +351,30 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         });
 
         if (allOutOfRange) {
-            console.log('📅 Dates changed - clearing out-of-range distributions for reschedule');
-            setDistributionsCharge([]);
+            console.log('📅 Dates changed - regenerating distributions for new date range');
+
+            // Régénérer une distribution pour la date de début avec les horaires existants
+            const existingStartTime = distributionsCharge[0]?.heure_debut || startTime;
+            const existingEndTime = distributionsCharge[0]?.heure_fin || endTime;
+
+            // Si c'est une tâche d'un seul jour, créer une seule distribution
+            if (formData.date_debut_planifiee === formData.date_fin_planifiee) {
+                setDistributionsCharge([{
+                    date: formData.date_debut_planifiee,
+                    heure_debut: existingStartTime,
+                    heure_fin: existingEndTime,
+                    commentaire: ''
+                }]);
+            } else {
+                // Pour les tâches multi-jours, créer une distribution pour le premier jour
+                // L'utilisateur pourra ajouter d'autres jours via l'interface
+                setDistributionsCharge([{
+                    date: formData.date_debut_planifiee,
+                    heure_debut: existingStartTime,
+                    heure_fin: existingEndTime,
+                    commentaire: ''
+                }]);
+            }
         }
     }, [formData.date_debut_planifiee, formData.date_fin_planifiee]);
 
@@ -595,8 +620,9 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
         console.log('🔍 DEBUG - recurrenceConfig:', recurrenceConfig);
         console.log('🔍 DEBUG - recurrenceConfig.enabled:', recurrenceConfig.enabled);
 
-        // ✅ REPLANIFICATION: Si la tâche était ANNULEE, EXPIREE ou REJETEE, forcer le statut à PLANIFIEE
-        const statutsAReplanifier = ['ANNULEE', 'EXPIREE', 'REJETEE'];
+        // ✅ REPLANIFICATION: Si la tâche était ANNULEE ou REJETEE, forcer le statut à PLANIFIEE
+        // (Plus de EXPIREE dans le nouveau système simplifié)
+        const statutsAReplanifier = ['ANNULEE', 'REJETEE'];
         const doitReplanifier = tache && statutsAReplanifier.includes(tache.statut);
 
         const payload: any = {

@@ -39,8 +39,8 @@ const PlanningFiltersComponent: FC<PlanningFiltersProps> = ({
 
     const hasActiveFilters = activeCount > 0;
 
-    // Statuts disponibles
-    const statutsOptions: StatutTache[] = ['PLANIFIEE', 'EN_RETARD', 'EXPIREE', 'EN_COURS', 'TERMINEE', 'ANNULEE'];
+    // Statuts disponibles (✅ SIMPLIFIÉ: Plus de EN_RETARD ni EXPIREE)
+    const statutsOptions: StatutTache[] = ['PLANIFIEE', 'EN_COURS', 'TERMINEE', 'ANNULEE'];
 
     // Floating UI pour popover Statut
     const { refs, floatingStyles, context } = useFloating({

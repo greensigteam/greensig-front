@@ -11,3 +11,5 @@ export { default as DistributionFilters } from './DistributionFilters';
 export { ReporterDistributionModal } from './ReporterDistributionModal';
 export { AnnulerDistributionModal } from './AnnulerDistributionModal';
 export { HistoriqueDistributionModal } from './HistoriqueDistributionModal';
+export { TerminerDistributionModal } from './TerminerDistributionModal';
+export { DemarrerDistributionModal } from './DemarrerDistributionModal';

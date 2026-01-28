@@ -67,7 +67,6 @@ export const SuiviTachesToolbar: React.FC<SuiviTachesToolbarProps> = ({
         if (distributionFilters.status_in && distributionFilters.status_in.length > 0) count++;
         if (distributionFilters.actif !== undefined) count++;
         if (distributionFilters.termine !== undefined) count++;
-        if (distributionFilters.en_retard !== undefined) count++;
         if (distributionFilters.equipe) count++;
         if (distributionFilters.structure) count++;
         if (distributionFilters.site) count++;
@@ -103,7 +102,7 @@ export const SuiviTachesToolbar: React.FC<SuiviTachesToolbarProps> = ({
     };
 
     const handleDistributionShortcut = (
-        shortcut: 'actif' | 'termine' | 'en_retard' | 'urgent' | 'est_report',
+        shortcut: 'actif' | 'termine' | 'urgent' | 'est_report',
         currentValue: boolean | undefined
     ) => {
         if (onDistributionFiltersChange) {
@@ -111,7 +110,7 @@ export const SuiviTachesToolbar: React.FC<SuiviTachesToolbarProps> = ({
             const updates: Partial<DistributionFilters> = { [shortcut]: newValue };
 
             // Clear status_in when using status shortcuts
-            if (shortcut === 'actif' || shortcut === 'termine' || shortcut === 'en_retard') {
+            if (shortcut === 'actif' || shortcut === 'termine') {
                 updates.status_in = undefined;
             }
 
@@ -246,8 +245,6 @@ export const SuiviTachesToolbar: React.FC<SuiviTachesToolbarProps> = ({
                         >
                             <option value="">Statut</option>
                             <option value="PLANIFIEE">Planifiée</option>
-                            <option value="EN_RETARD">En retard</option>
-                            <option value="EXPIREE">Expirée</option>
                             <option value="EN_COURS">En cours</option>
                             <option value="TERMINEE">Terminée</option>
                             <option value="ANNULEE">Annulée</option>
@@ -335,8 +332,7 @@ export const SuiviTachesToolbar: React.FC<SuiviTachesToolbarProps> = ({
                                 status: e.target.value as StatusDistribution || undefined,
                                 status_in: undefined,
                                 actif: undefined,
-                                termine: undefined,
-                                en_retard: undefined
+                                termine: undefined
                             })}
                             className="appearance-none pl-9 pr-8 py-2 border-2 border-slate-200 rounded-lg text-sm font-medium text-slate-700 bg-white hover:border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer min-w-[130px]"
                             disabled={loadingTasks}
@@ -379,24 +375,9 @@ export const SuiviTachesToolbar: React.FC<SuiviTachesToolbarProps> = ({
                                     ? 'border-blue-500 bg-blue-50 text-blue-700'
                                     : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}
                             `}
-                            title="NON_REALISEE, EN_COURS, EN_RETARD"
+                            title="NON_REALISEE, EN_COURS (distributions actives)"
                         >
                             Actif
-                        </button>
-
-                        <button
-                            onClick={() => handleDistributionShortcut('en_retard', distributionFilters.en_retard)}
-                            disabled={loadingTasks}
-                            className={`
-                                flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all border-2
-                                ${distributionFilters.en_retard === true
-                                    ? 'border-amber-500 bg-amber-50 text-amber-700'
-                                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}
-                            `}
-                            title="Uniquement EN_RETARD"
-                        >
-                            <AlertTriangle className="w-3.5 h-3.5" />
-                            Retard
                         </button>
 
                         <button

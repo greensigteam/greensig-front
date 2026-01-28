@@ -483,6 +483,7 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                 console.log(`[QuickTaskCreator] Type de tâche: ${selectedType.nom_tache}`);
                 console.log(`[QuickTaskCreator] Types d'objets compatibles:`, compatibleTypes);
                 console.log(`[QuickTaskCreator] Objets avant filtrage: ${objects.length}`);
+                console.log(`[QuickTaskCreator] Types d'objets dans le site:`, [...new Set(objects.map(o => o.type))]);
 
                 // Filter objects to only show compatible ones
                 const filteredObjects = objects.filter(obj => compatibleTypes.includes(obj.type));

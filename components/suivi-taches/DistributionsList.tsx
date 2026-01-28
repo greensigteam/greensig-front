@@ -58,7 +58,6 @@ export const DistributionsList: React.FC<DistributionsListProps> = ({
         enCours: distributions.filter(d => d.status === 'EN_COURS').length,
         reportees: distributions.filter(d => d.status === 'REPORTEE').length,
         annulees: distributions.filter(d => d.status === 'ANNULEE').length,
-        enRetard: distributions.filter(d => d.status === 'EN_RETARD').length,
     };
 
     return (
@@ -90,11 +89,6 @@ export const DistributionsList: React.FC<DistributionsListProps> = ({
                     {stats.enCours > 0 && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full">
                             <Play className="w-3 h-3" /> {stats.enCours} En cours
-                        </span>
-                    )}
-                    {stats.enRetard > 0 && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-amber-100 text-amber-700 rounded-full">
-                            <AlertTriangle className="w-3 h-3" /> {stats.enRetard} En retard
                         </span>
                     )}
                     {stats.reportees > 0 && (
@@ -200,27 +194,26 @@ const DistributionItem: React.FC<DistributionItemProps> = ({
     const canRestaurer = status === 'ANNULEE' && onRestaurer;
     const hasReport = dist.est_report || dist.a_remplacement;
 
-    // Couleurs selon le statut
-    const statusColors = STATUS_DISTRIBUTION_COLORS[status];
+    // Couleurs selon le statut (avec fallback pour statuts legacy comme EN_RETARD)
+    const statusColors = STATUS_DISTRIBUTION_COLORS[status] || { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-300' };
     const getBgColor = () => {
+        // ✅ SIMPLIFIÉ: Plus de EN_RETARD
         if (status === 'REALISEE') return 'bg-green-50 border-green-500 border-2';
         if (status === 'EN_COURS') return 'bg-orange-50 border-orange-400 border-2';
         if (status === 'REPORTEE') return 'bg-purple-50 border-purple-300';
         if (status === 'ANNULEE') return 'bg-red-50 border-red-300';
-        if (status === 'EN_RETARD') return 'bg-amber-50 border-amber-400 border-2';
         if (isSunday) return 'bg-red-50 border-red-200';
         if (isWeekend) return 'bg-blue-50 border-blue-200';
         return 'bg-white border-slate-200';
     };
 
-    // Icône selon le statut
+    // Icône selon le statut (✅ SIMPLIFIÉ: Plus de EN_RETARD)
     const StatusIcon = () => {
         switch (status) {
             case 'REALISEE': return <CheckCircle className="w-4 h-4 text-green-600" />;
             case 'EN_COURS': return <Play className="w-4 h-4 text-orange-600" />;
             case 'REPORTEE': return <CalendarClock className="w-4 h-4 text-purple-600" />;
             case 'ANNULEE': return <XCircle className="w-4 h-4 text-red-600" />;
-            case 'EN_RETARD': return <AlertTriangle className="w-4 h-4 text-amber-600" />;
             default: return <Clock className="w-4 h-4 text-blue-600" />;
         }
     };
@@ -284,13 +277,13 @@ const DistributionItem: React.FC<DistributionItemProps> = ({
                 {/* Status badge et actions */}
                 <div className="flex flex-col items-end gap-1">
                     <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${statusColors.bg} ${statusColors.text}`}>
-                        {STATUS_DISTRIBUTION_LABELS[status]}
+                        {STATUS_DISTRIBUTION_LABELS[status] || status}
                     </span>
 
                     {/* Actions selon le statut */}
                     {canModify && (showActions || true) && (
                         <div className="flex items-center gap-1 mt-1">
-                            {/* Démarrer (NON_REALISEE/EN_RETARD → EN_COURS) */}
+                            {/* Démarrer (NON_REALISEE → EN_COURS) */}
                             {canDemarrer && (
                                 <button
                                     onClick={onDemarrer}
@@ -312,7 +305,7 @@ const DistributionItem: React.FC<DistributionItemProps> = ({
                                 </button>
                             )}
 
-                            {/* Reporter (NON_REALISEE/EN_RETARD → REPORTEE) */}
+                            {/* Reporter (NON_REALISEE → REPORTEE) */}
                             {canReporter && (
                                 <button
                                     onClick={onReporter}
@@ -345,8 +338,8 @@ const DistributionItem: React.FC<DistributionItemProps> = ({
                                 </button>
                             )}
 
-                            {/* Modifier (seulement si NON_REALISEE ou EN_RETARD) */}
-                            {(status === 'NON_REALISEE' || status === 'EN_RETARD') && (
+                            {/* Modifier (seulement si NON_REALISEE) */}
+                            {status === 'NON_REALISEE' && (
                                 <button
                                     onClick={onEdit}
                                     className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
@@ -356,8 +349,8 @@ const DistributionItem: React.FC<DistributionItemProps> = ({
                                 </button>
                             )}
 
-                            {/* Supprimer (seulement si NON_REALISEE ou EN_RETARD) */}
-                            {(status === 'NON_REALISEE' || status === 'EN_RETARD') && (
+                            {/* Supprimer (seulement si NON_REALISEE) */}
+                            {status === 'NON_REALISEE' && (
                                 <button
                                     onClick={onDelete}
                                     className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"

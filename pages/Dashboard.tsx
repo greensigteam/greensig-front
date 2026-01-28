@@ -296,11 +296,11 @@ const Dashboard: React.FC = () => {
           icon: <AlertCircle className="w-5 h-5 text-orange-500" />
         },
         {
-          label: "En Retard",
-          value: stats.taches_retard.toString(),
+          label: "Tâches Planifiées",
+          value: stats.taches_planifiees.toString(),
           change: 0,
-          trend: stats.taches_retard > 0 ? 'down' as const : 'neutral' as const,
-          icon: <AlertTriangle className="w-5 h-5 text-red-500" />
+          trend: 'neutral' as const,
+          icon: <Calendar className="w-5 h-5 text-indigo-500" />
         }
       ];
     }

@@ -91,26 +91,33 @@ const ExpandedDayModal: FC<ExpandedDayModalProps> = ({
 
     // Calculate position
     const modalStyle = useMemo(() => {
-        if (!anchorEl) return { opacity: 0 };
-
-        const rect = anchorEl.getBoundingClientRect();
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
         const modalWidth = 400;
         const modalMaxHeight = 480;
 
-        let left = rect.left;
-        let top = rect.bottom + 8;
+        let left: number;
+        let top: number;
 
-        // Adjust if overflowing right
-        if (left + modalWidth > viewportWidth - 20) {
-            left = viewportWidth - modalWidth - 20;
-        }
+        if (anchorEl) {
+            const rect = anchorEl.getBoundingClientRect();
+            left = rect.left;
+            top = rect.bottom + 8;
 
-        // Adjust if overflowing bottom - show above instead
-        if (top + modalMaxHeight > viewportHeight - 20) {
-            top = rect.top - modalMaxHeight - 8;
-            if (top < 20) top = 20;
+            // Adjust if overflowing right
+            if (left + modalWidth > viewportWidth - 20) {
+                left = viewportWidth - modalWidth - 20;
+            }
+
+            // Adjust if overflowing bottom - show above instead
+            if (top + modalMaxHeight > viewportHeight - 20) {
+                top = rect.top - modalMaxHeight - 8;
+                if (top < 20) top = 20;
+            }
+        } else {
+            // Center the modal when no anchor
+            left = (viewportWidth - modalWidth) / 2;
+            top = (viewportHeight - modalMaxHeight) / 2;
         }
 
         // Ensure not too far left
@@ -350,10 +357,11 @@ export const PlanningCalendar: FC<PlanningCalendarProps> = ({
     }, [events, expandedDate]);
 
     // Handle "show more" click - open our custom modal instead of RBC popup
-    const handleShowMore = useCallback((events: CalendarEvent[], date: Date, e: React.SyntheticEvent) => {
-        e.stopPropagation();
-        const target = e.currentTarget as HTMLElement;
-        setExpandAnchorEl(target);
+    const handleShowMore = useCallback((_events: CalendarEvent[], date: Date) => {
+        console.log('[PlanningCalendar] handleShowMore called for date:', date);
+        // Simply open the modal - it will be centered if no anchor
+        // The date is what matters most
+        setExpandAnchorEl(null);
         setExpandedDate(date);
     }, []);
 

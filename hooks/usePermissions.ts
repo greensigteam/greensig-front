@@ -173,7 +173,7 @@ export function usePermissions(
 
       // General action permissions
       canImport: isAdmin, // Seul ADMIN peut importer des données GIS
-      canExport: isAdmin || isSuperviseur, // ADMIN et SUPERVISEUR peuvent exporter
+      canExport: isAdmin || isSuperviseur || isClient, // Tous les rôles peuvent exporter (données filtrées par structure pour CLIENT)
       canEditGeometry: isAdmin || isSuperviseur, // Opérations géométriques
       canAccessAdmin: isAdmin,
       canManageUsers: isAdmin,

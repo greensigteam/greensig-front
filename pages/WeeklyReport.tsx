@@ -20,7 +20,8 @@ import {
   ChevronLeft,
   ChevronRight,
   RefreshCw,
-  UserCheck
+  UserCheck,
+  TrendingUp
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -175,6 +176,12 @@ export default function WeeklyReport() {
   // Calculer les statistiques globales pour multi-sites
   const getGlobalStats = () => {
     if (multiSiteReports.length === 0) return null;
+    const heures_travaillees = multiSiteReports.reduce((sum, r) => sum + (r.statistiques?.heures_travaillees || 0), 0);
+    const heures_theoriques = multiSiteReports.reduce((sum, r) => sum + (r.statistiques?.heures_theoriques || 0), 0);
+    // Ratio de productivité global: heures réelles / heures théoriques * 100
+    const ratio_productivite = heures_theoriques > 0 && heures_travaillees > 0
+      ? Math.round((heures_travaillees / heures_theoriques) * 100 * 10) / 10
+      : null;
     return {
       taches_terminees: multiSiteReports.reduce((sum, r) => sum + (r.statistiques?.taches_terminees || 0), 0),
       taches_planifiees: multiSiteReports.reduce((sum, r) => sum + (r.statistiques?.taches_planifiees || 0), 0),
@@ -183,7 +190,9 @@ export default function WeeklyReport() {
       ),
       reclamations_creees: multiSiteReports.reduce((sum, r) => sum + (r.statistiques?.reclamations_creees || 0), 0),
       reclamations_resolues: multiSiteReports.reduce((sum, r) => sum + (r.statistiques?.reclamations_resolues || 0), 0),
-      heures_travaillees: multiSiteReports.reduce((sum, r) => sum + (r.statistiques?.heures_travaillees || 0), 0),
+      heures_travaillees,
+      heures_theoriques,
+      ratio_productivite,
     };
   };
 
@@ -580,7 +589,9 @@ export default function WeeklyReport() {
         ['Taux de réalisation', `${stats.taux_realisation ?? 0}%`],
         ['Réclamations créées', String(stats.reclamations_creees ?? 0)],
         ['Réclamations résolues', String(stats.reclamations_resolues ?? 0)],
-        ['Total heures travaillées', `${stats.heures_travaillees ?? 0}h`]
+        ['Total heures travaillées', `${stats.heures_travaillees ?? 0}h`],
+        ['Heures théoriques', `${stats.heures_theoriques ?? 0}h`],
+        ['Ratio de productivité', stats.ratio_productivite != null ? `${stats.ratio_productivite}%` : 'N/A']
       ];
 
       autoTable(doc, {
@@ -731,7 +742,9 @@ export default function WeeklyReport() {
           ['Taux de réalisation moyen', `${globalStats.taux_realisation}%`],
           ['Total réclamations créées', String(globalStats.reclamations_creees)],
           ['Total réclamations résolues', String(globalStats.reclamations_resolues)],
-          ['Total heures travaillées', `${globalStats.heures_travaillees}h`]
+          ['Total heures travaillées', `${globalStats.heures_travaillees}h`],
+          ['Heures théoriques', `${globalStats.heures_theoriques}h`],
+          ['Ratio de productivité', globalStats.ratio_productivite != null ? `${globalStats.ratio_productivite}%` : 'N/A']
         ];
 
         autoTable(doc, {
@@ -1014,13 +1027,14 @@ export default function WeeklyReport() {
             {(() => {
               const globalStats = getGlobalStats();
               return globalStats && (
-                <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
                   <StatCard icon={<CheckCircle2 className="w-5 h-5" />} label="Tâches terminées" value={globalStats.taches_terminees} color="emerald" />
                   <StatCard icon={<ClipboardList className="w-5 h-5" />} label="Tâches planifiées" value={globalStats.taches_planifiees} color="emerald" />
                   <StatCard icon={<CheckCircle2 className="w-5 h-5" />} label="Taux réalisation" value={`${globalStats.taux_realisation}%`} color="teal" />
                   <StatCard icon={<AlertTriangle className="w-5 h-5" />} label="Réclamations" value={globalStats.reclamations_creees} color="amber" />
                   <StatCard icon={<CheckCircle2 className="w-5 h-5" />} label="Résolues" value={globalStats.reclamations_resolues} color="green" />
                   <StatCard icon={<Users className="w-5 h-5" />} label="Heures travail" value={`${globalStats.heures_travaillees}h`} color="emerald" />
+                  <StatCard icon={<TrendingUp className="w-5 h-5" />} label="Productivité" value={globalStats.ratio_productivite != null ? `${globalStats.ratio_productivite}%` : 'N/A'} color={globalStats.ratio_productivite != null && globalStats.ratio_productivite <= 100 ? 'emerald' : 'amber'} />
                 </div>
               );
             })()}

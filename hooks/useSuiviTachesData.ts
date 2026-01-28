@@ -1,17 +1,39 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { planningService } from '../services/planningService';
-import { fetchCurrentUser, fetchAllSites, SiteFrontend } from '../services/api';
-import { fetchEquipes, fetchStructures } from '../services/usersApi';
+import { useQueryClient } from '@tanstack/react-query';
+
+// React Query hooks
 import {
-    fetchPhotosParTache, createPhoto, deletePhoto,
-    fetchConsommationsParTache, createConsommation, deleteConsommation,
-    fetchProduitsActifs
-} from '../services/suiviTachesApi';
+    useTaches,
+    useTaskDetails,
+    useFilterReferenceData,
+    useTypesTaches,
+    useProduits,
+    useUserRole,
+} from './queries';
+import {
+    useUpdateTask,
+    useDeleteTask,
+    useValidateTask,
+    useAssignEquipe,
+    useUploadPhoto,
+    useDeletePhoto,
+    useAddConsommation,
+    useDeleteConsommation,
+} from './mutations';
+
+// Services
+import { planningService } from '../services/planningService';
+import { SiteFrontend } from '../services/api';
 import { cloturerReclamation } from '../services/reclamationsApi';
-import { Tache, TacheCreate, TypeTache, PlanningFilters, EMPTY_PLANNING_FILTERS, StatusDistribution } from '../types/planning';
+import { queryKeys } from '../lib/queryKeys';
+
+// Types
+import { Tache, TacheCreate, PlanningFilters, EMPTY_PLANNING_FILTERS, StatusDistribution } from '../types/planning';
 import { PhotoList, ConsommationProduit, ProduitList } from '../types/suiviTaches';
 import { StructureClient, EquipeList } from '../types/users';
+
+// Contexts
 import { useSearch } from '../contexts/SearchContext';
 import { useToast } from '../contexts/ToastContext';
 
@@ -22,7 +44,7 @@ export interface UseSuiviTachesDataReturn {
     photos: PhotoList[];
     consommations: ConsommationProduit[];
     produitsOptions: ProduitList[];
-    typesTaches: TypeTache[];
+    typesTaches: import('../types/planning').TypeTache[];
     structures: StructureClient[];
     equipes: EquipeList[];
     sites: SiteFrontend[];
@@ -106,51 +128,78 @@ export interface UseSuiviTachesDataReturn {
 }
 
 export function useSuiviTachesData(): UseSuiviTachesDataReturn {
+    const queryClient = useQueryClient();
     const { searchQuery, setSearchQuery, setPlaceholder } = useSearch();
     const { showToast } = useToast();
     const [searchParams, setSearchParams] = useSearchParams();
 
-    // State UI
-    const [loadingTasks, setLoadingTasks] = useState(true);
-    const [taches, setTaches] = useState<Tache[]>([]);
+    // ========================================================================
+    // LOCAL STATE (UI state that doesn't need to be cached)
+    // ========================================================================
+
     const [selectedTache, setSelectedTache] = useState<Tache | null>(null);
     const [detailKey, setDetailKey] = useState(0);
     const [pendingTaskId, setPendingTaskId] = useState<number | null>(null);
-
-    // State Pagination
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(20);
-
-    // State Filtres
     const [filters, setFilters] = useState<PlanningFilters>(EMPTY_PLANNING_FILTERS);
-    const [structures, setStructures] = useState<StructureClient[]>([]);
-    const [equipes, setEquipes] = useState<EquipeList[]>([]);
-    const [sites, setSites] = useState<SiteFrontend[]>([]);
-    const [loadingFilters, setLoadingFilters] = useState(true);
     const [showFilters, setShowFilters] = useState(false);
-
-    // State Detéil Tache
-    const [photos, setPhotos] = useState<PhotoList[]>([]);
-    const [consommations, setConsommations] = useState<ConsommationProduit[]>([]);
-    const [produitsOptions, setProduitsOptions] = useState<ProduitList[]>([]);
-
-    // Loading States
-    const [loadingPhotos, setLoadingPhotos] = useState(false);
-    const [uploadingPhoto, setUploadingPhoto] = useState(false);
-    const [loadingConsommations, setLoadingConsommations] = useState(false);
     const [changingStatut, setChangingStatut] = useState(false);
-    const [validating, setValidating] = useState(false);
     const [processingCloture, setProcessingCloture] = useState(false);
 
-    // Types taches
-    const [typesTaches, setTypesTaches] = useState<TypeTache[]>([]);
-    const [loadingTypesTaches, setLoadingTypesTaches] = useState(false);
-    const [updatingTask, setUpdatingTask] = useState(false);
-    const [assigningEquipe, setAssigningEquipe] = useState(false);
+    // ========================================================================
+    // REACT QUERY HOOKS
+    // ========================================================================
+
+    // Tâches list
+    const tachesQuery = useTaches();
+
+    // Selected task details (photos + consommations)
+    const taskDetailsQuery = useTaskDetails(selectedTache?.id ?? null, {
+        enabled: selectedTache !== null,
+    });
+
+    // Reference data for filters
+    const filterDataQuery = useFilterReferenceData();
+
+    // Types de tâches (loaded on demand)
+    const typesTachesQuery = useTypesTaches();
+
+    // Produits actifs
+    const produitsQuery = useProduits();
 
     // User role
-    const [isAdmin, setIsAdmin] = useState(false);
-    const [isClientView, setIsClientView] = useState(false);
+    const { isAdmin, isClientView } = useUserRole();
+
+    // ========================================================================
+    // MUTATIONS
+    // ========================================================================
+
+    const updateTaskMutation = useUpdateTask();
+    const deleteTaskMutation = useDeleteTask();
+    const validateTaskMutation = useValidateTask();
+    const assignEquipeMutation = useAssignEquipe();
+    const uploadPhotoMutation = useUploadPhoto();
+    const deletePhotoMutation = useDeletePhoto();
+    const addConsommationMutation = useAddConsommation();
+    const deleteConsommationMutation = useDeleteConsommation();
+
+    // ========================================================================
+    // DERIVED DATA
+    // ========================================================================
+
+    const taches = tachesQuery.data ?? [];
+    const photos = taskDetailsQuery.photos;
+    const consommations = taskDetailsQuery.consommations;
+    const produitsOptions = produitsQuery.data ?? [];
+    const typesTaches = typesTachesQuery.data ?? [];
+    const structures = filterDataQuery.structures;
+    const equipes = filterDataQuery.equipes;
+    const sites = filterDataQuery.sites;
+
+    // ========================================================================
+    // EFFECTS
+    // ========================================================================
 
     // Set search placeholder
     useEffect(() => {
@@ -166,7 +215,7 @@ export function useSuiviTachesData(): UseSuiviTachesDataReturn {
         setCurrentPage(1);
     }, [searchQuery, filters]);
 
-    // Initial load
+    // Handle task_id URL param
     useEffect(() => {
         const taskIdParam = searchParams.get('task_id');
         if (taskIdParam) {
@@ -176,16 +225,11 @@ export function useSuiviTachesData(): UseSuiviTachesDataReturn {
             }
             setSearchParams({}, { replace: true });
         }
-
-        loadTaches();
-        loadProduitsOptions();
-        loadUserRole();
-        loadFilterData();
-    }, []);
+    }, [searchParams, setSearchParams]);
 
     // Auto-select task from URL
     useEffect(() => {
-        if (pendingTaskId && taches.length > 0 && !loadingTasks) {
+        if (pendingTaskId && taches.length > 0 && !tachesQuery.isLoading) {
             const taskToSelect = taches.find(t => t.id === pendingTaskId);
             if (taskToSelect) {
                 setSelectedTache(taskToSelect);
@@ -204,142 +248,62 @@ export function useSuiviTachesData(): UseSuiviTachesDataReturn {
             }
             setPendingTaskId(null);
         }
-    }, [pendingTaskId, taches, loadingTasks]);
+    }, [pendingTaskId, taches, tachesQuery.isLoading, showToast]);
 
-    // Load task details when selected
-    useEffect(() => {
-        if (selectedTache) {
-            loadTaskDetails(selectedTache.id);
-        }
-    }, [selectedTache?.id]);
+    // ========================================================================
+    // HANDLERS
+    // ========================================================================
 
-    // --- LOAD FUNCTIONS ---
-    const loadFilterData = async () => {
-        setLoadingFilters(true);
-        try {
-            const [structuresRes, equipesRes, sitesArray] = await Promise.all([
-                fetchStructures(),
-                fetchEquipes(),
-                fetchAllSites()
-            ]);
-            setStructures(Array.isArray(structuresRes) ? structuresRes : (structuresRes.results || []));
-            setEquipes(Array.isArray(equipesRes) ? equipesRes : (equipesRes.results || []));
-            setSites(sitesArray.filter(s => s.actif));
-        } catch (error) {
-            console.error("Erreur chargement données filtres", error);
-        } finally {
-            setLoadingFilters(false);
-        }
-    };
-
-    const loadUserRole = async () => {
-        try {
-            const userData = await fetchCurrentUser();
-            const roles = userData.roles || [];
-            setIsAdmin(roles.includes('ADMIN'));
-            setIsClientView(roles.includes('CLIENT'));
-        } catch (error) {
-            console.error("Erreur chargement rôle utilisateur", error);
-        }
-    };
-
+    // Load tâches (force refetch)
     const loadTaches = useCallback(async () => {
-        setLoadingTasks(true);
-        try {
-            // ⚡ OPTIMISATION: Le rafraîchissement des statuts est maintenant géré par Celery Beat
-            // (toutes les 5 minutes en arrière-plan). Plus besoin de l'appeler ici.
-            // La liste des tâches est aussi mise en cache Redis (1 minute).
+        await tachesQuery.refetch();
+    }, [tachesQuery]);
 
-            const response = await planningService.getTaches();
-            const tachesData = Array.isArray(response) ? response : (response.results || []);
-            setTaches(tachesData);
-        } catch (error) {
-            console.error("Erreur chargement tâches", error);
-        } finally {
-            setLoadingTasks(false);
-        }
-    }, []);
-
-    const loadProduitsOptions = async () => {
-        try {
-            const data = await fetchProduitsActifs();
-            setProduitsOptions(data);
-        } catch (error) {
-            console.error("Erreur chargement produits", error);
-        }
-    };
-
+    // Load types de tâches
     const loadTypesTaches = useCallback(async () => {
-        if (typesTaches.length > 0) return;
-        setLoadingTypesTaches(true);
-        try {
-            const response = await planningService.getTypesTaches();
-            setTypesTaches((response as any).results || response);
-        } catch (error) {
-            console.error("Erreur chargement types de tâches", error);
-        } finally {
-            setLoadingTypesTaches(false);
+        if (typesTaches.length === 0) {
+            await typesTachesQuery.refetch();
         }
-    }, [typesTaches.length]);
+    }, [typesTaches.length, typesTachesQuery]);
 
-    const loadTaskDetails = async (tacheId: number) => {
-        setLoadingPhotos(true);
-        setLoadingConsommations(true);
-        try {
-            const [photosData, consosData] = await Promise.all([
-                fetchPhotosParTache(tacheId),
-                fetchConsommationsParTache(tacheId)
-            ]);
-            setPhotos(photosData);
-            setConsommations(consosData);
-        } catch (error) {
-            console.error("Erreur chargement détails tâche", error);
-        } finally {
-            setLoadingPhotos(false);
-            setLoadingConsommations(false);
-        }
-    };
-
+    // Reload selected task with fresh data
     const reloadSelectedTask = useCallback(async (tacheId: number) => {
         try {
-            const response = await planningService.getTaches();
-            const tachesData = Array.isArray(response) ? response : (response.results || []);
-            const updatedTache = tachesData.find((t: Tache) => t.id === tacheId);
-            if (updatedTache) {
-                setSelectedTache(updatedTache);
-                setTaches(prev => prev.map(t => t.id === tacheId ? updatedTache : t));
-            }
+            // Invalidate queries
+            await queryClient.invalidateQueries({ queryKey: queryKeys.taches.detail(tacheId) });
+            await queryClient.invalidateQueries({ queryKey: queryKeys.taches.lists() });
+
+            // ALWAYS fetch the task detail directly to get fresh distribution data
+            // The list endpoint may not include updated distributions after a task update
+            const task = await planningService.getTache(tacheId);
+            setSelectedTache(task);
+
+            // Also refetch the list in background (don't await to avoid blocking)
+            tachesQuery.refetch();
         } catch (error) {
             console.error("Erreur rechargement tâche", error);
         }
-    }, []);
+    }, [queryClient, tachesQuery]);
 
-    // --- TASK ACTIONS ---
+    // Task update
     const handleTaskUpdate = useCallback(async (data: TacheCreate) => {
         if (!selectedTache) return;
-        setUpdatingTask(true);
         try {
-            await planningService.updateTache(selectedTache.id, data);
-            await loadTaches();
-            setTaches(prev => {
-                const updatedTache = prev.find(t => t.id === selectedTache.id);
-                if (updatedTache) {
-                    setSelectedTache(updatedTache);
-                }
-                return prev;
+            await updateTaskMutation.mutateAsync({
+                taskId: selectedTache.id,
+                data: data as any,
             });
+            await reloadSelectedTask(selectedTache.id);
         } catch (error) {
             console.error("Erreur mise à jour tâche", error);
             throw error;
-        } finally {
-            setUpdatingTask(false);
         }
-    }, [selectedTache, loadTaches]);
+    }, [selectedTache, updateTaskMutation, reloadSelectedTask]);
 
+    // Task delete
     const handleDeleteTache = useCallback(async (tacheId: number) => {
         try {
-            await planningService.deleteTache(tacheId);
-            setTaches(prev => prev.filter(t => t.id !== tacheId));
+            await deleteTaskMutation.mutateAsync({ taskId: tacheId });
             setSelectedTache(null);
             showToast("Tâche supprimée avec succès", 'success');
         } catch (error) {
@@ -347,60 +311,47 @@ export function useSuiviTachesData(): UseSuiviTachesDataReturn {
             showToast("Erreur lors de la suppression de la tâche", 'error');
             throw error;
         }
-    }, [showToast]);
+    }, [deleteTaskMutation, showToast]);
 
-    // --- ÉQUIPES ACTIONS ---
+    // Assign équipe
     const handleAssignEquipe = useCallback(async (equipeId: number) => {
         if (!selectedTache) return;
-        setAssigningEquipe(true);
         try {
-            // Récupérer les équipes actuelles
             const currentEquipeIds = selectedTache.equipes_detail?.map((e: any) => e.id) || [];
-            // Ajouter la nouvelle équipe
             const newEquipeIds = [...currentEquipeIds, equipeId];
 
-            await planningService.updateTache(selectedTache.id, {
-                equipes: newEquipeIds,
-            } as any);
-
-            // Recharger la tâche pour avoir les données à jour
-            const refreshedTache = await planningService.getTache(selectedTache.id);
-            setSelectedTache(refreshedTache);
-            setTaches(prev => prev.map(t => t.id === refreshedTache.id ? refreshedTache : t));
+            await assignEquipeMutation.mutateAsync({
+                taskId: selectedTache.id,
+                equipeIds: newEquipeIds,
+            });
+            await reloadSelectedTask(selectedTache.id);
             showToast("Équipe assignée avec succès", 'success');
         } catch (error) {
             console.error("Erreur assignation équipe", error);
             showToast("Erreur lors de l'assignation de l'équipe", 'error');
-        } finally {
-            setAssigningEquipe(false);
         }
-    }, [selectedTache, showToast]);
+    }, [selectedTache, assignEquipeMutation, reloadSelectedTask, showToast]);
 
+    // Remove équipe
     const handleRemoveEquipe = useCallback(async (equipeId: number) => {
         if (!selectedTache) return;
-        setAssigningEquipe(true);
         try {
-            // Récupérer les équipes actuelles et retirer celle-ci
             const currentEquipeIds = selectedTache.equipes_detail?.map((e: any) => e.id) || [];
             const newEquipeIds = currentEquipeIds.filter((id: number) => id !== equipeId);
 
-            await planningService.updateTache(selectedTache.id, {
-                equipes: newEquipeIds,
-            } as any);
-
-            // Recharger la tâche pour avoir les données à jour
-            const refreshedTache = await planningService.getTache(selectedTache.id);
-            setSelectedTache(refreshedTache);
-            setTaches(prev => prev.map(t => t.id === refreshedTache.id ? refreshedTache : t));
+            await assignEquipeMutation.mutateAsync({
+                taskId: selectedTache.id,
+                equipeIds: newEquipeIds,
+            });
+            await reloadSelectedTask(selectedTache.id);
             showToast("Équipe retirée avec succès", 'success');
         } catch (error) {
             console.error("Erreur retrait équipe", error);
             showToast("Erreur lors du retrait de l'équipe", 'error');
-        } finally {
-            setAssigningEquipe(false);
         }
-    }, [selectedTache, showToast]);
+    }, [selectedTache, assignEquipeMutation, reloadSelectedTask, showToast]);
 
+    // Change status
     const handleChangeStatut = useCallback(async (type: 'start' | 'complete' | 'cancel') => {
         if (!selectedTache) return;
 
@@ -416,40 +367,40 @@ export function useSuiviTachesData(): UseSuiviTachesDataReturn {
             }
 
             await planningService.changeStatut(tacheId, nouveauStatut);
-            await loadTaches();
-            const refreshedTache = await planningService.getTache(tacheId);
-            setSelectedTache(refreshedTache);
-            await loadTaskDetails(tacheId);
+
+            // Invalidate and refetch
+            await queryClient.invalidateQueries({ queryKey: queryKeys.taches.all });
+            await tachesQuery.refetch();
+            await reloadSelectedTask(tacheId);
         } catch (error) {
             console.error("Erreur changement statut", error);
             showToast("Erreur lors du changement de statut", 'error');
         } finally {
             setChangingStatut(false);
         }
-    }, [selectedTache, loadTaches, showToast]);
+    }, [selectedTache, queryClient, tachesQuery, reloadSelectedTask, showToast]);
 
-    // --- VALIDATION ---
+    // Validation
     const handleValidation = useCallback(async (type: 'VALIDEE' | 'REJETEE', comment: string) => {
         if (!selectedTache) return {};
 
         const tacheId = selectedTache.id;
-        setValidating(true);
         try {
-            const response = await planningService.validerTache(tacheId, type, comment);
-            await loadTaches();
-            const refreshedTache = await planningService.getTache(tacheId);
-            setSelectedTache(refreshedTache);
-            await loadTaskDetails(tacheId);
+            const response = await validateTaskMutation.mutateAsync({
+                taskId: tacheId,
+                etat: type,
+                commentaire: comment,
+            });
+            await reloadSelectedTask(tacheId);
             return response;
         } catch (error) {
             console.error("Erreur validation", error);
             showToast("Erreur lors de la validation", 'error');
             throw error;
-        } finally {
-            setValidating(false);
         }
-    }, [selectedTache, loadTaches, showToast]);
+    }, [selectedTache, validateTaskMutation, reloadSelectedTask, showToast]);
 
+    // Proposer clôture réclamation
     const handleProposerCloture = useCallback(async (reclamationId: number) => {
         setProcessingCloture(true);
         try {
@@ -464,7 +415,7 @@ export function useSuiviTachesData(): UseSuiviTachesDataReturn {
         }
     }, [showToast]);
 
-    // --- DISTRIBUTIONS ---
+    // Toggle distribution status
     const handleToggleDistribution = useCallback(async (distributionId: number, currentStatus: StatusDistribution) => {
         if (!selectedTache || isClientView) return;
 
@@ -475,11 +426,7 @@ export function useSuiviTachesData(): UseSuiviTachesDataReturn {
         const updatedDistributions = selectedTache.distributions_charge?.map(d =>
             d.id === distributionId ? { ...d, status: newStatus } : d
         );
-
         setSelectedTache({ ...selectedTache, distributions_charge: updatedDistributions });
-        setTaches(prev => prev.map(t =>
-            t.id === tacheId ? { ...t, distributions_charge: updatedDistributions } : t
-        ));
 
         try {
             if (newStatus === 'REALISEE') {
@@ -487,26 +434,23 @@ export function useSuiviTachesData(): UseSuiviTachesDataReturn {
             } else {
                 await planningService.marquerDistributionNonRealisee(distributionId);
             }
+
             await reloadSelectedTask(tacheId);
-            await loadTaskDetails(tacheId);
             setDetailKey(prev => prev + 1);
         } catch (err) {
             // Rollback
-            setSelectedTache({ ...selectedTache, distributions_charge: selectedTache.distributions_charge });
-            setTaches(prev => prev.map(t =>
-                t.id === tacheId ? { ...t, distributions_charge: selectedTache.distributions_charge } : t
-            ));
+            setSelectedTache(selectedTache);
             showToast('Erreur lors de la mise à jour de la distribution', 'error');
         }
     }, [selectedTache, isClientView, reloadSelectedTask, showToast]);
 
+    // Delete distribution
     const handleDeleteDistribution = useCallback(async (distributionId: number) => {
         if (!selectedTache) return;
 
         try {
             await planningService.deleteDistribution(distributionId);
             await reloadSelectedTask(selectedTache.id);
-            await loadTaskDetails(selectedTache.id);
             setDetailKey(prev => prev + 1);
             showToast('Distribution supprimée avec succès', 'success');
         } catch (err: any) {
@@ -515,6 +459,7 @@ export function useSuiviTachesData(): UseSuiviTachesDataReturn {
         }
     }, [selectedTache, reloadSelectedTask, showToast]);
 
+    // Add distributions
     const handleAddDistributions = useCallback(async (selectedDays: any[]) => {
         if (!selectedTache) return;
 
@@ -539,7 +484,6 @@ export function useSuiviTachesData(): UseSuiviTachesDataReturn {
 
             await Promise.all(promises);
             await reloadSelectedTask(selectedTache.id);
-            await loadTaskDetails(selectedTache.id);
             setDetailKey(prev => prev + 1);
             showToast(`${newDays.length} distribution(s) ajoutée(s)`, 'success');
         } catch (err: any) {
@@ -548,71 +492,71 @@ export function useSuiviTachesData(): UseSuiviTachesDataReturn {
         }
     }, [selectedTache, reloadSelectedTask, showToast]);
 
-    // --- PHOTOS ---
+    // Photo upload
     const handlePhotoUpload = useCallback(async (files: FileList, photoType: 'AVANT' | 'APRES') => {
         if (!selectedTache) return;
 
-        setUploadingPhoto(true);
         try {
             for (const file of Array.from(files)) {
-                await createPhoto({
-                    fichier: file,
+                await uploadPhotoMutation.mutateAsync({
+                    taskId: selectedTache.id,
+                    file,
                     type_photo: photoType,
-                    tache: selectedTache.id,
-                    legende: file.name
                 });
             }
-            const updatedPhotos = await fetchPhotosParTache(selectedTache.id);
-            setPhotos(updatedPhotos);
         } catch (error) {
             console.error("Erreur upload photo", error);
             showToast("Erreur lors de l'upload des photos", 'error');
-        } finally {
-            setUploadingPhoto(false);
         }
-    }, [selectedTache, showToast]);
+    }, [selectedTache, uploadPhotoMutation, showToast]);
 
+    // Delete photo
     const handleDeletePhoto = useCallback(async (photoId: number) => {
+        if (!selectedTache) return;
         try {
-            await deletePhoto(photoId);
-            setPhotos(prev => prev.filter(p => p.id !== photoId));
+            await deletePhotoMutation.mutateAsync({
+                photoId,
+                taskId: selectedTache.id,
+            });
         } catch (error) {
             console.error("Erreur suppression photo", error);
             throw error;
         }
-    }, []);
+    }, [selectedTache, deletePhotoMutation]);
 
-    // --- CONSOMMATIONS ---
+    // Add consommation
     const handleAddConsommation = useCallback(async (data: { produit: number; quantite: number; unite: string; commentaire: string }) => {
         if (!selectedTache) return;
 
         try {
-            await createConsommation({
-                tache: selectedTache.id,
-                produit: data.produit,
-                quantite_utilisee: data.quantite,
-                unite: data.unite,
-                commentaire: data.commentaire
+            await addConsommationMutation.mutateAsync({
+                taskId: selectedTache.id,
+                data,
             });
-            const updatedConsos = await fetchConsommationsParTache(selectedTache.id);
-            setConsommations(updatedConsos);
         } catch (error) {
             console.error("Erreur ajout consommation", error);
             showToast("Erreur lors de l'ajout de la consommation", 'error');
         }
-    }, [selectedTache, showToast]);
+    }, [selectedTache, addConsommationMutation, showToast]);
 
+    // Delete consommation
     const handleDeleteConsommation = useCallback(async (consoId: number) => {
+        if (!selectedTache) return;
         try {
-            await deleteConsommation(consoId);
-            setConsommations(prev => prev.filter(c => c.id !== consoId));
+            await deleteConsommationMutation.mutateAsync({
+                consommationId: consoId,
+                taskId: selectedTache.id,
+            });
         } catch (error) {
             console.error("Erreur suppression consommation", error);
             throw error;
         }
-    }, []);
+    }, [selectedTache, deleteConsommationMutation]);
 
-    // --- FILTERS & PAGINATION ---
+    // ========================================================================
+    // FILTERING & PAGINATION (using useMemo)
+    // ========================================================================
+
     const filteredSites = useMemo(() => {
         if (filters.clientId === null) return sites;
         return sites.filter(s => s.structure_client === filters.clientId);
@@ -657,7 +601,6 @@ export function useSuiviTachesData(): UseSuiviTachesDataReturn {
                 if (!filters.statuts.includes(t.statut)) return false;
             }
 
-            // Filtre par plage de dates (date_debut_planifiee)
             if (filters.dateDebut !== null || filters.dateFin !== null) {
                 const tacheDate = t.date_debut_planifiee;
                 if (filters.dateDebut !== null && tacheDate < filters.dateDebut) return false;
@@ -689,6 +632,10 @@ export function useSuiviTachesData(): UseSuiviTachesDataReturn {
         setFilters(EMPTY_PLANNING_FILTERS);
     }, []);
 
+    // ========================================================================
+    // RETURN
+    // ========================================================================
+
     return {
         // Data
         taches,
@@ -718,18 +665,18 @@ export function useSuiviTachesData(): UseSuiviTachesDataReturn {
         showFilters,
         setShowFilters,
 
-        // Loading states
-        loadingTasks,
-        loadingFilters,
-        loadingPhotos,
-        loadingConsommations,
-        loadingTypesTaches,
-        uploadingPhoto,
+        // Loading states - using React Query states
+        loadingTasks: tachesQuery.isLoading || tachesQuery.isFetching,
+        loadingFilters: filterDataQuery.isLoading,
+        loadingPhotos: taskDetailsQuery.isLoadingPhotos,
+        loadingConsommations: taskDetailsQuery.isLoadingConsommations,
+        loadingTypesTaches: typesTachesQuery.isLoading,
+        uploadingPhoto: uploadPhotoMutation.isPending,
         changingStatut,
-        validating,
+        validating: validateTaskMutation.isPending,
         processingCloture,
-        updatingTask,
-        assigningEquipe,
+        updatingTask: updateTaskMutation.isPending,
+        assigningEquipe: assignEquipeMutation.isPending,
 
         // User info
         isAdmin,

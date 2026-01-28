@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './lib/queryClient';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import LoadingScreen from './components/LoadingScreen';
@@ -252,10 +254,11 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
-      <ErrorBoundary>
-        <ToastProvider>
-          <ApiErrorListener />
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <ErrorBoundary>
+          <ToastProvider>
+            <ApiErrorListener />
           <SelectionProvider maxSelections={100}>
             <DrawingProvider>
               <SearchProvider>
@@ -386,17 +389,17 @@ function App() {
                       <Route path="suivi-taches" element={<Suspense fallback={<PageLoadingFallback />}><SuiviTaches /></Suspense>} />
                       <Route path="products" element={<Suspense fallback={<PageLoadingFallback />}><Produits /></Suspense>} />
                       <Route path="reporting" element={
-                        <RequireRole user={user} roles={['ADMIN', 'SUPERVISEUR']}>
+                        <RequireRole user={user} roles={['ADMIN', 'SUPERVISEUR', 'CLIENT']}>
                           <Suspense fallback={<PageLoadingFallback />}><Reporting /></Suspense>
                         </RequireRole>
                       } />
                       <Route path="reporting/kpi/:kpiKey" element={
-                        <RequireRole user={user} roles={['ADMIN', 'SUPERVISEUR']}>
+                        <RequireRole user={user} roles={['ADMIN', 'SUPERVISEUR', 'CLIENT']}>
                           <Suspense fallback={<PageLoadingFallback />}><KPIDetail /></Suspense>
                         </RequireRole>
                       } />
                       <Route path="reporting/kpis/historique" element={
-                        <RequireRole user={user} roles={['ADMIN', 'SUPERVISEUR']}>
+                        <RequireRole user={user} roles={['ADMIN', 'SUPERVISEUR', 'CLIENT']}>
                           <Suspense fallback={<PageLoadingFallback />}><KPIHistorique /></Suspense>
                         </RequireRole>
                       } />
@@ -438,8 +441,9 @@ function App() {
             cancelText="Annuler"
           />
         )}
-      </ErrorBoundary>
-    </BrowserRouter >
+        </ErrorBoundary>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
 export default App;

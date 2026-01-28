@@ -539,7 +539,7 @@ export const planningService = {
      * Récupère les distributions avec filtres avancés.
      *
      * Filtres disponibles :
-     * - Statut: status, status__in, actif, termine, en_retard
+     * - Statut: status, status__in, actif, termine (✅ SIMPLIFIÉ: Plus de en_retard)
      * - Date: date, date__gte, date__lte, date_debut, date_fin, aujourd_hui, semaine_courante
      * - Relations: tache, equipe, site, structure, type_tache
      * - Priorité: priorite, priorite__gte, urgent
@@ -574,10 +574,9 @@ export const planningService = {
             query.append('status__in', params.status_in.join(','));
         }
 
-        // Raccourcis statut
+        // Raccourcis statut (✅ SIMPLIFIÉ: Plus de en_retard)
         if (params.actif !== undefined) query.append('actif', params.actif.toString());
         if (params.termine !== undefined) query.append('termine', params.termine.toString());
-        if (params.en_retard !== undefined) query.append('en_retard', params.en_retard.toString());
 
         // Filtres par équipe/site/structure
         if (params.equipe) query.append('equipe', params.equipe.toString());
@@ -644,12 +643,20 @@ export const planningService = {
     },
 
     /**
-     * Démarre une distribution (NON_REALISEE/EN_RETARD → EN_COURS).
+     * Démarre une distribution (NON_REALISEE → EN_COURS).
+     * ✅ SIMPLIFIÉ: Plus de EN_RETARD
      *
      * @param distributionId - ID de la distribution
+     * @param data - Données optionnelles (heure réelle de début)
      * @returns Distribution mise à jour avec infos de synchronisation tâche
      */
-    async demarrerDistribution(distributionId: number): Promise<{
+    async demarrerDistribution(
+        distributionId: number,
+        data?: {
+            heure_debut_reelle?: string;  // "HH:MM"
+            date_debut_reelle?: string;   // "YYYY-MM-DD" - Date réelle de début de la tâche
+        }
+    ): Promise<{
         message: string;
         distribution: DistributionCharge;
         ancien_statut: string;
@@ -659,7 +666,8 @@ export const planningService = {
     }> {
         const response = await apiFetch(`${BASE_URL}/distributions/${distributionId}/demarrer/`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data || {})
         });
 
         if (!response.ok) {
@@ -674,10 +682,18 @@ export const planningService = {
      * Termine une distribution (EN_COURS → REALISEE).
      *
      * @param distributionId - ID de la distribution
-     * @param heuresReelles - Heures réellement travaillées (optionnel)
+     * @param data - Données optionnelles (heures réelles terrain)
      * @returns Distribution mise à jour avec infos de synchronisation tâche
      */
-    async terminerDistribution(distributionId: number, heuresReelles?: number): Promise<{
+    async terminerDistribution(
+        distributionId: number,
+        data?: {
+            heure_debut_reelle?: string;  // "HH:MM"
+            heure_fin_reelle?: string;    // "HH:MM"
+            heures_reelles?: number;      // Override manuel
+            date_fin_reelle?: string;     // "YYYY-MM-DD" - Date réelle de fin de la tâche
+        }
+    ): Promise<{
         message: string;
         distribution: DistributionCharge;
         ancien_statut: string;
@@ -688,7 +704,7 @@ export const planningService = {
         const response = await apiFetch(`${BASE_URL}/distributions/${distributionId}/terminer/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ heures_reelles: heuresReelles })
+            body: JSON.stringify(data || {})
         });
 
         if (!response.ok) {
@@ -919,14 +935,14 @@ export const planningService = {
         return result;
     },
 
-    // --- GESTION DES RETARDS ET EXPIRATIONS ---
+    // --- GESTION DES RETARDS ET EXPIRATIONS (DÉSACTIVÉ) ---
 
     /**
-     * Rafraîchit les statuts des tâches en retard et expirées.
-     * - PLANIFIEE → EN_RETARD si heure de début passée
-     * - PLANIFIEE/EN_RETARD → EXPIREE si heure de fin passée
+     * ✅ SIMPLIFIÉ: Cette fonction n'est plus utilisée car le système de EN_RETARD/EXPIREE a été supprimé.
+     * Les tâches restent PLANIFIEE jusqu'à démarrage explicite.
      *
-     * @returns Résultat avec le nombre de tâches mises à jour
+     * @deprecated Plus de calcul automatique de retard/expiration
+     * @returns Résultat avec le nombre de tâches mises à jour (toujours 0)
      */
     async refreshTaskStatuses(): Promise<{
         message: string;
