@@ -132,7 +132,7 @@ const EditOperateurModal: React.FC<EditOperateurModalProps> = ({
                         )}
 
                         {/* Nom et Prenom */}
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <PremiumInput
                                 type="text"
                                 value={formData.nom}
@@ -168,7 +168,7 @@ const EditOperateurModal: React.FC<EditOperateurModalProps> = ({
                         />
 
                         {/* Email et Telephone */}
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <PremiumInput
                                 type="email"
                                 value={formData.email || ''}

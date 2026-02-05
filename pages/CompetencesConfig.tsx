@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Edit2, Trash2, Award, X, Filter, RotateCcw, Download, FileDown, Layers, CheckCircle2 } from 'lucide-react';
+import { Search, Edit2, Trash2, Award, RefreshCw, Download } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { useSearch } from '../contexts/SearchContext';
 import { useToast } from '../contexts/ToastContext';
@@ -24,10 +24,10 @@ import {
   fetchCurrentUser
 } from '../services/usersApi';
 
-/**
- * Page de configuration des compétences (Admin only)
- * Gère le CRUD complet des compétences : création, édition, suppression, ordre d'affichage
- */
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
 interface CompetencesConfigProps {
   triggerCreate?: number;
 }
@@ -40,14 +40,12 @@ const CompetencesConfig: React.FC<CompetencesConfigProps> = ({ triggerCreate }) 
   const [loading, setLoading] = useState(true);
   const [competences, setCompetences] = useState<Competence[]>([]);
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-  const [competenceFilter, setCompetenceFilter] = useState<string>('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
   // Modals
   const [showCompetenceModal, setShowCompetenceModal] = useState(false);
   const [editingCompetence, setEditingCompetence] = useState<Competence | null>(null);
   const [deleteCompetenceId, setDeleteCompetenceId] = useState<number | null>(null);
-
-  const [currentUser, setCurrentUser] = useState<Utilisateur | null>(null);
 
   // Debounce search query (300ms delay)
   useEffect(() => {
@@ -69,7 +67,6 @@ const CompetencesConfig: React.FC<CompetencesConfigProps> = ({ triggerCreate }) 
   // Load data on mount
   useEffect(() => {
     loadData();
-    loadCurrentUser();
   }, []);
 
   // Handle external trigger to open create modal
@@ -79,15 +76,6 @@ const CompetencesConfig: React.FC<CompetencesConfigProps> = ({ triggerCreate }) 
       setShowCompetenceModal(true);
     }
   }, [triggerCreate]);
-
-  const loadCurrentUser = async () => {
-    try {
-      const user = await fetchCurrentUser();
-      setCurrentUser(user);
-    } catch (error) {
-      console.error('Erreur chargement utilisateur:', error);
-    }
-  };
 
   const loadData = async () => {
     setLoading(true);
@@ -116,12 +104,21 @@ const CompetencesConfig: React.FC<CompetencesConfigProps> = ({ triggerCreate }) 
         }
       }
       // Filtre par categorie
-      if (competenceFilter && c.categorie !== competenceFilter) {
+      if (categoryFilter !== 'all' && c.categorie !== categoryFilter) {
         return false;
       }
       return true;
     }).sort((a, b) => (a.ordreAffichage || 0) - (b.ordreAffichage || 0));
-  }, [competences, debouncedSearchQuery, competenceFilter]);
+  }, [competences, debouncedSearchQuery, categoryFilter]);
+
+  // Count by category
+  const countByCategory = useMemo(() => {
+    const counts: Record<string, number> = { all: competences.length };
+    for (const c of competences) {
+      counts[c.categorie] = (counts[c.categorie] || 0) + 1;
+    }
+    return counts;
+  }, [competences]);
 
   // Columns
   const competencesColumns: Column<Competence>[] = [
@@ -139,7 +136,7 @@ const CompetencesConfig: React.FC<CompetencesConfigProps> = ({ triggerCreate }) 
       key: 'description',
       label: 'Description',
       render: (c: Competence) => (
-        <span className="text-sm text-gray-600">
+        <span className="text-sm text-gray-600 truncate max-w-xs block">
           {c.description || '-'}
         </span>
       )
@@ -189,12 +186,6 @@ const CompetencesConfig: React.FC<CompetencesConfigProps> = ({ triggerCreate }) 
     }
   };
 
-  const handleResetFilters = () => {
-    setCompetenceFilter('');
-  };
-
-  const hasActiveFilters = competenceFilter !== '' || (debouncedSearchQuery && debouncedSearchQuery.trim());
-
   const handleExportCSV = () => {
     const csvContent = [
       ['Compétence', 'Catégorie', 'Description'].join(','),
@@ -222,116 +213,90 @@ const CompetencesConfig: React.FC<CompetencesConfigProps> = ({ triggerCreate }) 
   }
 
   return (
-    <div className="p-4 sm:p-6 h-full flex flex-col overflow-hidden">
-      {/* Modern Filters & Actions Bar */}
-      <div className="mb-6 flex-shrink-0">
-        {/* Search Badge */}
-        {debouncedSearchQuery && debouncedSearchQuery.trim() && (
-          <div className="mb-3 bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-sm border border-blue-200 inline-flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
-            <Search className="w-4 h-4" />
-            Recherche : <span className="font-bold">"{debouncedSearchQuery}"</span>
-          </div>
-        )}
-
-        {/* Filters Card */}
-        <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          {/* Header */}
-          <div className="px-4 py-3 border-b border-slate-200 bg-white/50 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-slate-600" />
-              <h3 className="text-sm font-semibold text-slate-700">Filtres et Actions</h3>
-              {hasActiveFilters && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">
-                  <CheckCircle2 className="w-3 h-3" />
-                  Actifs
-                </span>
-              )}
-            </div>
-            {hasActiveFilters && (
+    <div className="flex flex-col gap-4">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+        <div className="flex items-center gap-3">
+          {/* Category Filter Pills */}
+          <div className="flex items-center bg-slate-100 p-1 rounded-lg">
+            <button
+              onClick={() => setCategoryFilter('all')}
+              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                categoryFilter === 'all'
+                  ? 'bg-white shadow-sm text-slate-900 font-medium'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Toutes ({countByCategory['all'] || 0})
+            </button>
+            {Object.entries(CATEGORIE_COMPETENCE_LABELS).map(([key, label]) => (
               <button
-                onClick={handleResetFilters}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-all duration-200 hover:shadow-sm"
+                key={key}
+                onClick={() => setCategoryFilter(key)}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  categoryFilter === key
+                    ? 'bg-white shadow-sm text-slate-900 font-medium'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
               >
-                <RotateCcw className="w-3.5 h-3.5" />
-                Réinitialiser
+                {label} ({countByCategory[key] || 0})
               </button>
-            )}
+            ))}
           </div>
 
-          {/* Content */}
-          <div className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Category Filter */}
-              <div>
-                <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 mb-2 uppercase tracking-wide">
-                  <Layers className="w-3.5 h-3.5" />
-                  Catégorie
-                </label>
-                <div className="relative">
-                  <select
-                    value={competenceFilter}
-                    onChange={(e) => setCompetenceFilter(e.target.value)}
-                    className="w-full px-4 py-2.5 pr-10 border border-slate-300 rounded-lg text-sm bg-white text-slate-700 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all duration-200 appearance-none cursor-pointer hover:border-slate-400"
-                  >
-                    <option value="">Toutes les catégories</option>
-                    {Object.entries(CATEGORIE_COMPETENCE_LABELS).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
-                  <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
+          {/* Results count */}
+          <span className="text-sm text-slate-500">
+            {filteredCompetences.length} résultat{filteredCompetences.length > 1 ? 's' : ''}
+          </span>
+        </div>
 
-              {/* Export Button */}
-              <div>
-                <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 mb-2 uppercase tracking-wide">
-                  <FileDown className="w-3.5 h-3.5" />
-                  Export
-                </label>
-                <button
-                  onClick={handleExportCSV}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
-                >
-                  <Download className="w-4 h-4" />
-                  Exporter en CSV
-                </button>
-              </div>
-            </div>
-
-            {/* Stats Row */}
-            <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                  <span className="text-sm text-slate-600">
-                    <span className="font-bold text-slate-800">{filteredCompetences.length}</span> compétence{filteredCompetences.length > 1 ? 's' : ''}
-                  </span>
-                </div>
-                {(debouncedSearchQuery || competenceFilter) && (
-                  <div className="flex items-center gap-2 px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
-                    <Filter className="w-3 h-3" />
-                    Filtré{filteredCompetences.length > 1 ? 's' : ''}
-                  </div>
-                )}
-              </div>
-              <div className="text-xs text-slate-500">
-                Total : <span className="font-semibold text-slate-700">{competences.length}</span> compétences
-              </div>
-            </div>
-          </div>
+        {/* Actions */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadData}
+            className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+            title="Actualiser"
+          >
+            <RefreshCw className="w-5 h-5" />
+          </button>
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 px-3 py-2 text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Export CSV
+          </button>
         </div>
       </div>
 
+      {/* Search indicator */}
+      {debouncedSearchQuery && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm border border-blue-200">
+          <Search className="w-4 h-4" />
+          Recherche : <span className="font-medium">"{debouncedSearchQuery}"</span>
+        </div>
+      )}
+
       {/* Table */}
-      <div className="flex-1 min-h-0 bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-        <DataTable
-          data={filteredCompetences}
-          columns={competencesColumns}
-          itemsPerPage={15}
-          showExport={false}
-        />
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        {filteredCompetences.length === 0 ? (
+          <div className="p-12 text-center text-slate-500">
+            <Award className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+            <p className="text-lg font-medium">Aucune compétence trouvée</p>
+            {(debouncedSearchQuery || categoryFilter !== 'all') && (
+              <p className="text-sm mt-1">
+                Essayez d'ajuster votre recherche ou vos filtres
+              </p>
+            )}
+          </div>
+        ) : (
+          <DataTable
+            data={filteredCompetences}
+            columns={competencesColumns}
+            itemsPerPage={15}
+            showExport={false}
+          />
+        )}
       </div>
 
       {/* Modals */}

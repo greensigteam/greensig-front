@@ -1,28 +1,116 @@
 import React, { useState, useEffect } from 'react';
-import { Users as UsersIcon, Award, Gauge, UserPlus, Plus, Clock, Calendar } from 'lucide-react';
+import { Users as UsersIcon, Award, Gauge, UserPlus, Plus, Clock, Calendar, FileText } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 
 // Import des composants de configuration
 import CompetencesConfig from './CompetencesConfig';
 import Users from './Users';
 import RatiosProductivite from './RatiosProductivite';
+import TypesTachesConfig from './TypesTachesConfig';
 import HorairesConfig from './HorairesConfig';
 import JoursFeriesConfig from './JoursFeriesConfig';
 
-/**
- * Page centralisée des paramètres et configurations système
- * Accessible uniquement aux administrateurs
- * Organisée en sections : Utilisateurs, Compétences, Ratios de productivité, Horaires de travail
- */
+// ============================================================================
+// TYPES
+// ============================================================================
 
-type ParametresTab = 'utilisateurs' | 'competences' | 'ratios' | 'horaires' | 'jours-feries';
+type ParametresTab = 'utilisateurs' | 'competences' | 'types-taches' | 'ratios' | 'horaires' | 'jours-feries';
+
+interface TabConfig {
+  id: ParametresTab;
+  label: string;
+  description: string;
+  icon: React.ElementType;
+  createLabel?: string;
+  createIcon?: React.ElementType;
+}
+
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+
+const TABS: TabConfig[] = [
+  {
+    id: 'utilisateurs',
+    label: 'Utilisateurs',
+    description: 'Gestion des comptes utilisateurs et de leurs accès',
+    icon: UsersIcon,
+    createLabel: 'Nouvel utilisateur',
+    createIcon: UserPlus
+  },
+  {
+    id: 'competences',
+    label: 'Compétences',
+    description: 'Définition des compétences assignables aux opérateurs',
+    icon: Award,
+    createLabel: 'Nouvelle compétence',
+    createIcon: Plus
+  },
+  {
+    id: 'types-taches',
+    label: 'Types de tâches',
+    description: 'Configuration des types de tâches et objets compatibles',
+    icon: FileText,
+    createLabel: 'Nouveau type',
+    createIcon: Plus
+  },
+  {
+    id: 'ratios',
+    label: 'Ratios de productivité',
+    description: 'Ratios de productivité par type de tâche et objet',
+    icon: Gauge,
+    createLabel: 'Nouveau ratio',
+    createIcon: Plus
+  },
+  {
+    id: 'horaires',
+    label: 'Horaires de travail',
+    description: 'Configuration des plages horaires de travail',
+    icon: Clock
+  },
+  {
+    id: 'jours-feries',
+    label: 'Jours fériés',
+    description: 'Gestion du calendrier des jours fériés',
+    icon: Calendar
+  }
+];
+
+// ============================================================================
+// HELPER COMPONENTS
+// ============================================================================
+
+const TabButton: React.FC<{
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}> = ({ active, onClick, icon, label }) => (
+  <button
+    onClick={onClick}
+    className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
+      active
+        ? 'border-emerald-600 text-emerald-600'
+        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+    }`}
+  >
+    {icon}
+    <span className="font-medium text-sm">{label}</span>
+  </button>
+);
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 
 const Parametres: React.FC = () => {
   const [searchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab') as ParametresTab | null;
 
+  const validTabs = TABS.map(t => t.id);
+
   const [activeTab, setActiveTab] = useState<ParametresTab>(
-    tabFromUrl && ['utilisateurs', 'competences', 'ratios', 'horaires', 'jours-feries'].includes(tabFromUrl)
+    tabFromUrl && validTabs.includes(tabFromUrl)
       ? tabFromUrl
       : 'utilisateurs'
   );
@@ -30,7 +118,7 @@ const Parametres: React.FC = () => {
 
   // Mettre à jour l'onglet actif si le paramètre URL change
   useEffect(() => {
-    if (tabFromUrl && ['utilisateurs', 'competences', 'ratios', 'horaires', 'jours-feries'].includes(tabFromUrl)) {
+    if (tabFromUrl && validTabs.includes(tabFromUrl)) {
       setActiveTab(tabFromUrl);
     }
   }, [tabFromUrl]);
@@ -39,108 +127,64 @@ const Parametres: React.FC = () => {
     setCreateTrigger(prev => prev + 1);
   };
 
-  return (
-    <div className="h-screen flex flex-col overflow-hidden">
-      {/* Toolbar avec Tabs et Action Button */}
-      <div className="bg-white p-4 m-6 mb-0 rounded-xl shadow-sm border border-slate-100 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg w-fit">
-            <button
-              onClick={() => setActiveTab('utilisateurs')}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${
-                activeTab === 'utilisateurs'
-                  ? 'bg-white text-slate-800 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-800'
-              }`}
-            >
-              <UsersIcon className="w-4 h-4" />
-              Utilisateurs
-            </button>
-            <button
-              onClick={() => setActiveTab('competences')}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${
-                activeTab === 'competences'
-                  ? 'bg-white text-slate-800 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-800'
-              }`}
-            >
-              <Award className="w-4 h-4" />
-              Compétences
-            </button>
-            <button
-              onClick={() => setActiveTab('ratios')}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${
-                activeTab === 'ratios'
-                  ? 'bg-white text-slate-800 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-800'
-              }`}
-            >
-              <Gauge className="w-4 h-4" />
-              Ratios de productivité
-            </button>
-            <button
-              onClick={() => setActiveTab('horaires')}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${
-                activeTab === 'horaires'
-                  ? 'bg-white text-slate-800 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-800'
-              }`}
-            >
-              <Clock className="w-4 h-4" />
-              Horaires de travail
-            </button>
-            <button
-              onClick={() => setActiveTab('jours-feries')}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${
-                activeTab === 'jours-feries'
-                  ? 'bg-white text-slate-800 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-800'
-              }`}
-            >
-              <Calendar className="w-4 h-4" />
-              Jours fériés
-            </button>
-          </div>
+  // Configuration de l'onglet actif
+  const activeTabConfig = TABS.find(t => t.id === activeTab)!;
+  const ActiveIcon = activeTabConfig.icon;
+  const CreateIcon = activeTabConfig.createIcon;
 
-          {/* Action Buttons */}
-          {activeTab === 'utilisateurs' && (
-            <button
-              onClick={handleCreate}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
-            >
-              <UserPlus className="w-4 h-4" />
-              Nouvel utilisateur
-            </button>
-          )}
-          {activeTab === 'competences' && (
-            <button
-              onClick={handleCreate}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
-            >
-              <Plus className="w-4 h-4" />
-              Nouvelle compétence
-            </button>
-          )}
-          {activeTab === 'ratios' && (
-            <button
-              onClick={handleCreate}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
-            >
-              <Plus className="w-4 h-4" />
-              Nouveau ratio
-            </button>
-          )}
+  return (
+    <div className="bg-slate-50 flex flex-col h-full">
+      {/* Header */}
+      <header className="flex-shrink-0 bg-white border-b border-slate-200 p-4 flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-lg bg-emerald-100 flex items-center justify-center">
+            <ActiveIcon className="w-6 h-6 text-emerald-600" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-800">{activeTabConfig.label}</h1>
+            <p className="text-sm text-slate-500">{activeTabConfig.description}</p>
+          </div>
+        </div>
+
+        {/* Action Button */}
+        {activeTabConfig.createLabel && CreateIcon && (
+          <button
+            onClick={handleCreate}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+          >
+            <CreateIcon className="w-4 h-4" />
+            {activeTabConfig.createLabel}
+          </button>
+        )}
+      </header>
+
+      {/* Tabs */}
+      <div className="flex-shrink-0 bg-white border-b border-slate-100 px-6">
+        <div className="flex gap-1 overflow-x-auto">
+          {TABS.map(tab => {
+            const Icon = tab.icon;
+            return (
+              <TabButton
+                key={tab.id}
+                active={activeTab === tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                icon={<Icon className="w-4 h-4" />}
+                label={tab.label}
+              />
+            );
+          })}
         </div>
       </div>
 
-      {/* Content Area - Scrollable */}
-      <div className="flex-1 overflow-y-auto p-6 pt-4">
+      {/* Content Area */}
+      <main className="flex-1 overflow-y-auto p-6">
         {activeTab === 'utilisateurs' && <Users triggerCreate={createTrigger} />}
         {activeTab === 'competences' && <CompetencesConfig triggerCreate={createTrigger} />}
+        {activeTab === 'types-taches' && <TypesTachesConfig triggerCreate={createTrigger} />}
         {activeTab === 'ratios' && <RatiosProductivite triggerCreate={createTrigger} />}
         {activeTab === 'horaires' && <HorairesConfig triggerCreate={createTrigger} />}
         {activeTab === 'jours-feries' && <JoursFeriesConfig triggerCreate={createTrigger} />}
-      </div>
+      </main>
     </div>
   );
 };

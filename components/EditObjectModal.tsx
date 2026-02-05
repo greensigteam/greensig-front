@@ -421,7 +421,7 @@ export const EditObjectModal: React.FC<EditObjectModalProps> = ({
             submitLabel={isSubmitting ? 'Enregistrement...' : 'Enregistrer'}
             cancelLabel="Annuler"
         >
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {renderFields()}
             </div>
         </FormModal>

@@ -183,7 +183,8 @@ const DistributionItem: React.FC<DistributionItemProps> = ({
     const isSunday = dayOfWeek === 0;
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
     const status = dist.status;
-    const canModify = !isTaskTerminee && hasEquipe && !isClientView;
+    const canModify = !isTaskTerminee && !isClientView;
+    const canModifyWithEquipe = canModify && hasEquipe;
 
     // Déterminer les actions disponibles selon le statut
     const allowedTransitions = ALLOWED_DISTRIBUTION_TRANSITIONS[status] || [];
@@ -192,6 +193,9 @@ const DistributionItem: React.FC<DistributionItemProps> = ({
     const canReporter = allowedTransitions.includes('REPORTEE') && onReporter;
     const canAnnuler = allowedTransitions.includes('ANNULEE') && onAnnuler;
     const canRestaurer = status === 'ANNULEE' && onRestaurer;
+
+    // Bloquer les actions si pas d'équipe
+    const isBlockedByNoEquipe = !hasEquipe && canModify;
     const hasReport = dist.est_report || dist.a_remplacement;
 
     // Couleurs selon le statut (avec fallback pour statuts legacy comme EN_RETARD)
@@ -280,15 +284,28 @@ const DistributionItem: React.FC<DistributionItemProps> = ({
                         {STATUS_DISTRIBUTION_LABELS[status] || status}
                     </span>
 
+                    {/* Indicateur "Sans équipe" */}
+                    {isBlockedByNoEquipe && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-700 border border-yellow-300">
+                            <AlertTriangle className="w-3 h-3" />
+                            Sans équipe
+                        </span>
+                    )}
+
                     {/* Actions selon le statut */}
                     {canModify && (showActions || true) && (
                         <div className="flex items-center gap-1 mt-1">
                             {/* Démarrer (NON_REALISEE → EN_COURS) */}
                             {canDemarrer && (
                                 <button
-                                    onClick={onDemarrer}
-                                    className="p-1.5 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-                                    title="Démarrer"
+                                    onClick={isBlockedByNoEquipe ? undefined : onDemarrer}
+                                    disabled={isBlockedByNoEquipe}
+                                    className={`p-1.5 rounded-lg transition-colors ${
+                                        isBlockedByNoEquipe
+                                            ? 'text-slate-400 cursor-not-allowed'
+                                            : 'text-orange-600 hover:bg-orange-50'
+                                    }`}
+                                    title={isBlockedByNoEquipe ? "Assignez d'abord une équipe à la tâche" : "Démarrer"}
                                 >
                                     <Play className="w-3.5 h-3.5" />
                                 </button>
@@ -297,9 +314,14 @@ const DistributionItem: React.FC<DistributionItemProps> = ({
                             {/* Terminer (EN_COURS → REALISEE) */}
                             {canTerminer && (
                                 <button
-                                    onClick={onTerminer}
-                                    className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                    title="Terminer"
+                                    onClick={isBlockedByNoEquipe ? undefined : onTerminer}
+                                    disabled={isBlockedByNoEquipe}
+                                    className={`p-1.5 rounded-lg transition-colors ${
+                                        isBlockedByNoEquipe
+                                            ? 'text-slate-400 cursor-not-allowed'
+                                            : 'text-green-600 hover:bg-green-50'
+                                    }`}
+                                    title={isBlockedByNoEquipe ? "Assignez d'abord une équipe à la tâche" : "Terminer"}
                                 >
                                     <CheckCircle className="w-3.5 h-3.5" />
                                 </button>
@@ -308,9 +330,14 @@ const DistributionItem: React.FC<DistributionItemProps> = ({
                             {/* Reporter (NON_REALISEE → REPORTEE) */}
                             {canReporter && (
                                 <button
-                                    onClick={onReporter}
-                                    className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                                    title="Reporter"
+                                    onClick={isBlockedByNoEquipe ? undefined : onReporter}
+                                    disabled={isBlockedByNoEquipe}
+                                    className={`p-1.5 rounded-lg transition-colors ${
+                                        isBlockedByNoEquipe
+                                            ? 'text-slate-400 cursor-not-allowed'
+                                            : 'text-purple-600 hover:bg-purple-50'
+                                    }`}
+                                    title={isBlockedByNoEquipe ? "Assignez d'abord une équipe à la tâche" : "Reporter"}
                                 >
                                     <ArrowRight className="w-3.5 h-3.5" />
                                 </button>
@@ -319,9 +346,14 @@ const DistributionItem: React.FC<DistributionItemProps> = ({
                             {/* Annuler */}
                             {canAnnuler && (
                                 <button
-                                    onClick={onAnnuler}
-                                    className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                    title="Annuler"
+                                    onClick={isBlockedByNoEquipe ? undefined : onAnnuler}
+                                    disabled={isBlockedByNoEquipe}
+                                    className={`p-1.5 rounded-lg transition-colors ${
+                                        isBlockedByNoEquipe
+                                            ? 'text-slate-400 cursor-not-allowed'
+                                            : 'text-red-600 hover:bg-red-50'
+                                    }`}
+                                    title={isBlockedByNoEquipe ? "Assignez d'abord une équipe à la tâche" : "Annuler"}
                                 >
                                     <XCircle className="w-3.5 h-3.5" />
                                 </button>
@@ -330,9 +362,14 @@ const DistributionItem: React.FC<DistributionItemProps> = ({
                             {/* Restaurer (ANNULEE → NON_REALISEE) */}
                             {canRestaurer && (
                                 <button
-                                    onClick={onRestaurer}
-                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                    title="Restaurer"
+                                    onClick={isBlockedByNoEquipe ? undefined : onRestaurer}
+                                    disabled={isBlockedByNoEquipe}
+                                    className={`p-1.5 rounded-lg transition-colors ${
+                                        isBlockedByNoEquipe
+                                            ? 'text-slate-400 cursor-not-allowed'
+                                            : 'text-blue-600 hover:bg-blue-50'
+                                    }`}
+                                    title={isBlockedByNoEquipe ? "Assignez d'abord une équipe à la tâche" : "Restaurer"}
                                 >
                                     <RotateCcw className="w-3.5 h-3.5" />
                                 </button>

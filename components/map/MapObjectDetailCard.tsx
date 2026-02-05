@@ -145,7 +145,7 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
   };
 
   return (
-    <div className="absolute top-20 right-4 w-80 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-white/40 animate-slide-in pointer-events-auto ring-1 ring-black/5 z-50 overflow-hidden">
+    <div className="absolute top-16 md:top-20 right-2 md:right-4 w-[calc(100vw-32px)] sm:w-80 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-white/40 animate-slide-in pointer-events-auto ring-1 ring-black/5 z-50 overflow-hidden">
       <div
         className={`h-28 relative p-4 flex flex-col justify-end ${getHeaderClass()}`}
         style={getHeaderStyle()}
@@ -175,7 +175,7 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
       <div className="p-4 space-y-4">
         <p className="text-sm text-slate-500 font-medium">{selectedObject.subtitle}</p>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {Object.entries(selectedObject.attributes).map(([key, value]) => {
             // Ignorer les champs géométriques, objets complexes, IDs et champs techniques
             if (

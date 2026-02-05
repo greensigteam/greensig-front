@@ -45,7 +45,7 @@ const EquipeDetailModal: React.FC<EquipeDetailModalProps> = ({ equipe, onClose }
           </div>
 
           {/* Superviseur et Site */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium text-gray-500 mb-2 block">Superviseur</label>
               <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">

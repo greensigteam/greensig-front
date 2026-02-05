@@ -316,14 +316,24 @@ const TaskFormModal: FC<TaskFormModalProps> = ({ tache, initialValues, equipes, 
     // Remplacé par système de distribution de charge qui permet contrôle manuel précis
     // Les tâches avec charge élevée utilisent maintenant l'éditeur de distribution
 
-    // Fetch ratios on mount for charge preview
+    // Fetch ratios when task type changes (not on mount)
+    // We need ratios specific to the selected task type for accurate charge calculation
     useEffect(() => {
+        if (!formData.id_type_tache) {
+            setRatios([]);
+            return;
+        }
+
         setLoadingRatios(true);
-        planningService.getRatios({ actif: true })
-            .then(setRatios)
+        // Fetch ratios for this specific task type to avoid pagination issues
+        planningService.getRatios({ type_tache_id: formData.id_type_tache, actif: true })
+            .then(loadedRatios => {
+                console.log(`✅ Loaded ${loadedRatios.length} ratios for task type ${formData.id_type_tache}`);
+                setRatios(loadedRatios);
+            })
             .catch(err => console.error('Erreur chargement ratios:', err))
             .finally(() => setLoadingRatios(false));
-    }, []);
+    }, [formData.id_type_tache]);
 
     // ✅ SUPPRIMÉ: Auto-update task dates when distributions change
     // Les dates de début et fin de la tâche sont INDÉPENDANTES des distributions

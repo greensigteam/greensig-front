@@ -19,7 +19,9 @@ import {
   ChevronUp,
   RefreshCw,
   UserCheck,
-  TrendingUp
+  TrendingUp,
+  Clock,
+  CalendarDays
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -35,6 +37,17 @@ declare module 'jspdf' {
     lastAutoTable: { finalY: number };
   }
 }
+
+// URL du backend pour les images (media files)
+const getBackendUrl = () => {
+  const apiUrl = import.meta.env.VITE_API_BASE_URL || '';
+  // Si l'API est /api, on utilise la même origine
+  if (apiUrl === '/api' || apiUrl === '') {
+    return window.location.origin;
+  }
+  // Sinon on extrait le host de l'URL de l'API
+  return apiUrl.replace('/api', '');
+};
 
 export default function MonthlyReport() {
   // State
@@ -57,6 +70,7 @@ export default function MonthlyReport() {
   // Sections ouvertes/fermées
   const [openSections, setOpenSections] = useState({
     travaux: true,
+    planifies: true,
     equipes: true,
     photos: false,
     reclamations: false,
@@ -211,7 +225,12 @@ export default function MonthlyReport() {
         }
       };
       img.onerror = () => resolve(null);
-      img.src = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
+      // Construire l'URL complète si c'est une URL relative (ex: /media/...)
+      let fullUrl = url;
+      if (url && url.startsWith('/')) {
+        fullUrl = getBackendUrl() + url;
+      }
+      img.src = fullUrl + (fullUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
     });
   };
 
@@ -357,21 +376,19 @@ export default function MonthlyReport() {
         doc.setFont('helvetica', 'bold');
         doc.text('Superficie :', 35, y);
         doc.setFont('helvetica', 'normal');
-        doc.text(`${reportData.site.superficie.toLocaleString()} m²`, 65, y);
+        // Formater avec des espaces normaux pour éviter les problèmes d'affichage PDF
+        const superficieFormatted = reportData.site.superficie.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        doc.text(`${superficieFormatted} m²`, 65, y);
       }
 
       const stats = reportData.statistiques || {};
 
-      // Pied de page couverture (bien espacé du contenu)
-      doc.setFontSize(8);
-      doc.setTextColor(...grayColor);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Document généré le ${format(new Date(), 'dd MMMM yyyy à HH:mm', { locale: fr })}`, pageWidth / 2, pageHeight - 20, { align: 'center' });
-
-      doc.setFontSize(9);
-      doc.setTextColor(...darkColor);
-      doc.setFont('helvetica', 'bold');
-      doc.text('GreenSIG - Système de Gestion des Espaces Verts', pageWidth / 2, pageHeight - 12, { align: 'center' });
+      // Pied de page couverture - Logo centré
+      if (logoBase64) {
+        const footerLogoWidth = 30;
+        const footerLogoHeight = 10;
+        doc.addImage(logoBase64, 'PNG', (pageWidth - footerLogoWidth) / 2, pageHeight - 18, footerLogoWidth, footerLogoHeight);
+      }
 
       // ========== PAGE 2: SOMMAIRE & TRAVAUX ==========
       doc.addPage();
@@ -401,22 +418,65 @@ export default function MonthlyReport() {
       doc.text('Opérations validées sur la période', margin, y);
       y += 10;
 
-      if (!reportData.travaux_effectues || reportData.travaux_effectues.length === 0) {
+      const travauxEffectues = reportData.travaux_effectues;
+      if (!travauxEffectues || travauxEffectues.total === 0) {
         doc.setTextColor(...darkColor);
         doc.text('Aucun travail validé sur cette période.', margin, y);
         y += 15;
       } else {
+        // Tableau récapitulatif par type
+        doc.setFontSize(9);
+        doc.setTextColor(...darkColor);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Récapitulatif par type', margin, y);
+        doc.setFont('helvetica', 'normal');
+        y += 6;
+
         autoTable(doc, {
           startY: y,
           head: [['Type d\'intervention', 'Nombre']],
-          body: reportData.travaux_effectues.map(t => [t.type || 'N/A', String(t.count || 0)]),
+          body: (travauxEffectues.par_type || []).map(t => [t.type || 'N/A', String(t.count || 0)]),
           theme: 'striped',
-          styles: { fontSize: 10, cellPadding: 4 },
+          styles: { fontSize: 9, cellPadding: 3 },
           headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold' },
           alternateRowStyles: { fillColor: [249, 250, 251] },
           margin: { left: margin, right: margin }
         });
-        y = (doc as any).lastAutoTable.finalY + 15;
+        y = (doc as any).lastAutoTable.finalY + 8;
+
+        // Tableau chronologique détaillé
+        if ((travauxEffectues.details || []).length > 0) {
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Chronologie des interventions', margin, y);
+          doc.setFont('helvetica', 'normal');
+          y += 6;
+
+          autoTable(doc, {
+            startY: y,
+            head: [['Date', 'Type', 'Équipe', 'Heures']],
+            body: (travauxEffectues.details || []).map(t => [
+              t.date ? format(new Date(t.date), 'dd/MM/yyyy') : '-',
+              t.type || 'N/A',
+              t.equipes || '-',
+              t.heures ? `${t.heures}h` : '-'
+            ]),
+            theme: 'striped',
+            styles: { fontSize: 8, cellPadding: 2 },
+            headStyles: { fillColor: [75, 85, 99], textColor: [255, 255, 255], fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [249, 250, 251] },
+            columnStyles: {
+              0: { cellWidth: 25 },
+              1: { cellWidth: 50 },
+              2: { cellWidth: 60 },
+              3: { cellWidth: 20 }
+            },
+            margin: { left: margin, right: margin }
+          });
+          y = (doc as any).lastAutoTable.finalY + 15;
+        } else {
+          y += 10;
+        }
       }
 
       // Section 2: Travaux planifiés
@@ -427,22 +487,67 @@ export default function MonthlyReport() {
       doc.text('Interventions prévues pour les 30 prochains jours', margin, y);
       y += 10;
 
-      if (!reportData.travaux_planifies || reportData.travaux_planifies.length === 0) {
+      const travauxPlanifies = reportData.travaux_planifies;
+      if (!travauxPlanifies || travauxPlanifies.total === 0) {
         doc.setTextColor(...darkColor);
         doc.text('Aucun travail planifié.', margin, y);
         y += 15;
       } else {
+        // Tableau récapitulatif par type
+        doc.setFontSize(9);
+        doc.setTextColor(...darkColor);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Récapitulatif par type', margin, y);
+        doc.setFont('helvetica', 'normal');
+        y += 6;
+
         autoTable(doc, {
           startY: y,
           head: [['Type d\'intervention', 'Nombre prévu']],
-          body: reportData.travaux_planifies.map(t => [t.type || 'N/A', String(t.count || 0)]),
+          body: (travauxPlanifies.par_type || []).map(t => [t.type || 'N/A', String(t.count || 0)]),
           theme: 'striped',
-          styles: { fontSize: 10, cellPadding: 4 },
+          styles: { fontSize: 9, cellPadding: 3 },
           headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255], fontStyle: 'bold' },
           alternateRowStyles: { fillColor: [249, 250, 251] },
           margin: { left: margin, right: margin }
         });
-        y = (doc as any).lastAutoTable.finalY + 15;
+        y = (doc as any).lastAutoTable.finalY + 8;
+
+        // Tableau chronologique détaillé
+        if ((travauxPlanifies.details || []).length > 0) {
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Planning des interventions', margin, y);
+          doc.setFont('helvetica', 'normal');
+          y += 6;
+
+          autoTable(doc, {
+            startY: y,
+            head: [['Date début', 'Date fin', 'Type', 'Équipe', 'Heures']],
+            body: (travauxPlanifies.details || []).map(t => [
+              t.date_debut ? format(new Date(t.date_debut), 'dd/MM/yyyy') : '-',
+              t.date_fin ? format(new Date(t.date_fin), 'dd/MM/yyyy') : '-',
+              t.type || 'N/A',
+              t.equipes || '-',
+              t.heures ? `${t.heures}h` : '-'
+            ]),
+            theme: 'striped',
+            styles: { fontSize: 8, cellPadding: 2 },
+            headStyles: { fillColor: [75, 85, 99], textColor: [255, 255, 255], fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [249, 250, 251] },
+            columnStyles: {
+              0: { cellWidth: 22 },
+              1: { cellWidth: 22 },
+              2: { cellWidth: 45 },
+              3: { cellWidth: 50 },
+              4: { cellWidth: 18 }
+            },
+            margin: { left: margin, right: margin }
+          });
+          y = (doc as any).lastAutoTable.finalY + 15;
+        } else {
+          y += 10;
+        }
       }
 
       // Section 3: Équipes intervenantes
@@ -511,7 +616,6 @@ export default function MonthlyReport() {
 
         doc.setFontSize(10);
         doc.setTextColor(...grayColor);
-        doc.text(`${photos.length} groupe(s) de photos documentés`, margin, y);
         y += 10;
 
         const imgWidth = 75;
@@ -853,10 +957,12 @@ export default function MonthlyReport() {
       doc.setFontSize(8);
       doc.setTextColor(...grayColor);
       doc.text(`Document généré le ${format(new Date(), 'dd MMMM yyyy à HH:mm', { locale: fr })}`, pageWidth / 2, pageHeight - 20, { align: 'center' });
-      doc.setFontSize(9);
-      doc.setTextColor(...darkColor);
-      doc.setFont('helvetica', 'bold');
-      doc.text('GreenSIG - Système de Gestion des Espaces Verts', pageWidth / 2, pageHeight - 12, { align: 'center' });
+      // Logo centré
+      if (logoBase64) {
+        const footerLogoWidth = 30;
+        const footerLogoHeight = 10;
+        doc.addImage(logoBase64, 'PNG', (pageWidth - footerLogoWidth) / 2, pageHeight - 15, footerLogoWidth, footerLogoHeight);
+      }
 
       // ========== PAGE SYNTHÈSE GLOBALE ==========
       doc.addPage();
@@ -1002,7 +1108,7 @@ export default function MonthlyReport() {
         y += 15;
 
         // Travaux effectués
-        if (report.travaux_effectues && report.travaux_effectues.length > 0) {
+        if (report.travaux_effectues && report.travaux_effectues.total > 0) {
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(11);
           doc.text('Travaux effectués', margin, y);
@@ -1011,7 +1117,7 @@ export default function MonthlyReport() {
           autoTable(doc, {
             startY: y,
             head: [['Type', 'Nombre']],
-            body: report.travaux_effectues.map(t => [t.type || 'N/A', String(t.count || 0)]),
+            body: (report.travaux_effectues.par_type || []).map(t => [t.type || 'N/A', String(t.count || 0)]),
             theme: 'striped',
             styles: { fontSize: 9, cellPadding: 3 },
             headStyles: { fillColor: emeraldColor, textColor: [255, 255, 255] },
@@ -1457,29 +1563,138 @@ export default function MonthlyReport() {
               <StatCard icon={<Users className="w-5 h-5" />} label="Heures travail" value={`${reportData.statistiques?.heures_travaillees ?? 0}h`} color="blue" />
             </div>
 
-            {/* Travaux effectués */}
+            {/* Travaux effectués - Vue hybride */}
             <CollapsibleSection
               title="Travaux effectués (validés)"
               icon={<ClipboardList className="w-5 h-5" />}
-              count={(reportData.travaux_effectues || []).length}
+              count={reportData.travaux_effectues?.total || 0}
               isOpen={openSections.travaux}
               onToggle={() => toggleSection('travaux')}
             >
-              {!reportData.travaux_effectues || reportData.travaux_effectues.length === 0 ? (
+              {!reportData.travaux_effectues || reportData.travaux_effectues.total === 0 ? (
                 <p className="text-gray-500 text-center py-4">Aucun travail validé sur cette période</p>
               ) : (
-                <div className="space-y-2">
-                  {reportData.travaux_effectues.map((travail, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                      <div>
-                        <p className="font-semibold text-gray-900">{travail.type || 'Type inconnu'}</p>
-                        {travail.description && <p className="text-sm text-gray-500">{travail.description}</p>}
-                      </div>
-                      <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold">
-                        {travail.count || 0}
-                      </span>
+                <div className="space-y-4">
+                  {/* Récapitulatif par type */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4" />
+                      Récapitulatif par type
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {(reportData.travaux_effectues.par_type || []).map((travail, index) => (
+                        <div key={index} className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                          <span className="text-sm font-medium text-gray-700">{travail.type || 'Type inconnu'}</span>
+                          <span className="px-2 py-0.5 bg-emerald-500 text-white rounded-full text-xs font-bold">
+                            {travail.count || 0}
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
+
+                  {/* Timeline chronologique */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
+                      <CalendarDays className="w-4 h-4" />
+                      Chronologie des interventions
+                    </h4>
+                    <div className="space-y-2 max-h-80 overflow-y-auto">
+                      {(reportData.travaux_effectues.details || []).map((tache, index) => (
+                        <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border-l-4 border-emerald-500">
+                          <div className="flex-shrink-0 text-center min-w-[60px]">
+                            <div className="text-xs text-gray-500">
+                              {tache.date ? format(new Date(tache.date), 'dd MMM', { locale: fr }) : '-'}
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-gray-900 truncate">{tache.type}</p>
+                            <p className="text-xs text-gray-500 truncate">{tache.equipes}</p>
+                          </div>
+                          <div className="flex-shrink-0 flex items-center gap-1 text-sm text-gray-600">
+                            <Clock className="w-3.5 h-3.5" />
+                            {tache.heures}h
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CollapsibleSection>
+
+            {/* Travaux planifiés - Vue hybride */}
+            <CollapsibleSection
+              title="Travaux planifiés (30 prochains jours)"
+              icon={<Calendar className="w-5 h-5" />}
+              count={reportData.travaux_planifies?.total || 0}
+              isOpen={openSections.planifies}
+              onToggle={() => toggleSection('planifies')}
+            >
+              {!reportData.travaux_planifies || reportData.travaux_planifies.total === 0 ? (
+                <p className="text-gray-500 text-center py-4">Aucun travail planifié pour les 30 prochains jours</p>
+              ) : (
+                <div className="space-y-4">
+                  {/* Récapitulatif par type */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4" />
+                      Récapitulatif par type
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {(reportData.travaux_planifies.par_type || []).map((travail, index) => (
+                        <div key={index} className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                          <span className="text-sm font-medium text-gray-700">{travail.type || 'Type inconnu'}</span>
+                          <span className="px-2 py-0.5 bg-blue-500 text-white rounded-full text-xs font-bold">
+                            {travail.count || 0}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Timeline chronologique */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
+                      <CalendarDays className="w-4 h-4" />
+                      Planning des interventions
+                    </h4>
+                    <div className="space-y-2 max-h-80 overflow-y-auto">
+                      {(reportData.travaux_planifies.details || []).map((tache, index) => (
+                        <div key={index} className={`flex items-center gap-3 p-3 bg-gray-50 rounded-xl border-l-4 ${
+                          tache.priorite >= 4 ? 'border-red-500' : 'border-blue-500'
+                        }`}>
+                          <div className="flex-shrink-0 text-center min-w-[70px]">
+                            <div className="text-xs text-gray-500">
+                              {tache.date_debut ? format(new Date(tache.date_debut), 'dd MMM', { locale: fr }) : '-'}
+                            </div>
+                            {tache.date_fin && tache.date_fin !== tache.date_debut && (
+                              <div className="text-xs text-gray-400">
+                                → {format(new Date(tache.date_fin), 'dd MMM', { locale: fr })}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-gray-900 truncate">{tache.type}</p>
+                            <p className="text-xs text-gray-500 truncate">{tache.equipes}</p>
+                          </div>
+                          <div className="flex-shrink-0 flex items-center gap-2">
+                            {tache.heures && (
+                              <span className="flex items-center gap-1 text-sm text-gray-600">
+                                <Clock className="w-3.5 h-3.5" />
+                                {tache.heures}h
+                              </span>
+                            )}
+                            {tache.priorite >= 4 && (
+                              <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium">
+                                Urgent
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
             </CollapsibleSection>

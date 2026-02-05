@@ -64,7 +64,7 @@ const AbsenceDetailModal: React.FC<AbsenceDetailModalProps> = ({ absence, onClos
       )}
 
       {/* Dates */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <DetailRow
           label="Date de debut"
           value={new Date(absence.dateDebut).toLocaleDateString('fr-FR', {

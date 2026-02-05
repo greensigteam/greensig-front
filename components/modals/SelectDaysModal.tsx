@@ -255,7 +255,7 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-7xl max-h-[95vh] flex flex-col">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-7xl max-h-[95vh] flex flex-col mx-2 sm:mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -279,9 +279,9 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
         </div>
 
         {/* Stats & Config */}
-        <div className="px-6 py-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6 text-sm">
+        <div className="px-4 sm:px-6 py-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-sm">
               <span className="flex items-center gap-2">
                 <CheckSquare className="w-4 h-4 text-emerald-600" />
                 <strong className="text-emerald-900">{stats.count}</strong>
@@ -298,7 +298,7 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
             </div>
 
             {/* Config horaires par défaut */}
-            <div className="flex items-center gap-3 text-sm">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-sm">
               <Settings2 className="w-4 h-4 text-slate-500" />
               <span className="text-slate-600 font-medium">Horaires par défaut:</span>
               <input
@@ -367,16 +367,28 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 overflow-hidden flex">
-          <div className={`flex-1 p-8 overflow-y-auto flex items-center justify-center ${isSubmitting ? 'pointer-events-none opacity-60' : ''}`}>
+        <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+          <div className={`flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto flex items-center justify-center ${isSubmitting ? 'pointer-events-none opacity-60' : ''}`}>
             <style>{`
               .rdp {
-                --rdp-cell-size: 75px;
+                --rdp-cell-size: 40px;
                 --rdp-accent-color: #059669;
                 --rdp-background-color: #ecfdf5;
                 margin: 0;
                 width: 100%;
                 max-width: 650px;
+              }
+
+              @media (min-width: 640px) {
+                .rdp {
+                  --rdp-cell-size: 55px;
+                }
+              }
+
+              @media (min-width: 1024px) {
+                .rdp {
+                  --rdp-cell-size: 75px;
+                }
               }
 
               .rdp-selected,
@@ -535,7 +547,7 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
           </div>
 
           {/* PANNEAU LATÉRAL - Jours sélectionnés */}
-          <div className={`w-96 border-l border-slate-200 bg-slate-50 flex flex-col ${isSubmitting ? 'pointer-events-none opacity-60' : ''}`}>
+          <div className={`w-full md:w-96 border-t md:border-t-0 md:border-l border-slate-200 bg-slate-50 flex flex-col max-h-[40vh] md:max-h-none ${isSubmitting ? 'pointer-events-none opacity-60' : ''}`}>
             <div className="p-5 border-b border-slate-200 bg-white">
               <h3 className="font-bold text-slate-800 flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
@@ -613,7 +625,7 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-slate-200 bg-white">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 sm:p-6 border-t border-slate-200 bg-white">
           <div className="text-sm">
             {stats.count === 0 ? (
               <span className="text-amber-600 font-bold flex items-center gap-2 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100">

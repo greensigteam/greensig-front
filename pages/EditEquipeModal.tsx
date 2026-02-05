@@ -182,7 +182,7 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
         hint="Tout membre actif de l'équipe peut être nommé chef"
       />
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Site principal */}
         {loadingSites ? (
           <div className="flex items-center gap-2 text-sm text-gray-500 py-2">

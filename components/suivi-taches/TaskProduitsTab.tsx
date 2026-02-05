@@ -61,7 +61,7 @@ export const TaskProduitsTab: React.FC<TaskProduitsTabProps> = ({
         <div className="space-y-4">
             {/* Add Form */}
             {canModify && (
-                <form onSubmit={handleSubmit} className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                <form onSubmit={handleSubmit} className="bg-slate-50 rounded-xl p-4 border border-slate-100 hover:border-slate-200 transition-colors">
                     <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
                         <Plus className="w-4 h-4" />
                         Ajouter un produit
@@ -75,7 +75,7 @@ export const TaskProduitsTab: React.FC<TaskProduitsTabProps> = ({
                         >
                             <option value="">Sélectionner un produit</option>
                             {produitsOptions.map(p => (
-                                <option key={p.id} value={p.id}>{p.nom}</option>
+                                <option key={p.id} value={p.id}>{p.nom_produit}</option>
                             ))}
                         </select>
                         <div className="grid grid-cols-2 gap-3">

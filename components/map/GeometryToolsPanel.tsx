@@ -112,7 +112,7 @@ export default function GeometryToolsPanel({
     if (!isOpen) return null;
 
     return (
-        <div className="absolute right-4 top-20 w-80 bg-white rounded-xl shadow-2xl z-40 overflow-hidden">
+        <div className="absolute right-2 md:right-4 top-20 w-[calc(100vw-32px)] sm:w-80 bg-white rounded-xl shadow-2xl z-40 overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b">
                 <h3 className="font-semibold text-gray-900">Outils géométrie</h3>

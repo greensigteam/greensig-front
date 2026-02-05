@@ -270,51 +270,45 @@ const HorairesConfig: React.FC<{ triggerCreate?: number }> = ({ triggerCreate })
   );
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
-      {/* Header avec onglets */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="border-b border-slate-200">
-          <div className="flex items-center justify-between p-6 pb-0">
-            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-emerald-600" />
-              Horaires de Travail
-            </h2>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex gap-1 px-6 mt-4">
+    <div className="flex flex-col gap-4">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+        <div className="flex items-center gap-3">
+          {/* Mode Filter Pills */}
+          <div className="flex items-center bg-slate-100 p-1 rounded-lg">
             <button
               onClick={() => setActiveTab('global')}
-              className={`flex items-center gap-2 px-4 py-3 font-medium text-sm transition-all duration-200 border-b-2 ${
+              className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors ${
                 activeTab === 'global'
-                  ? 'text-emerald-600 border-emerald-600 bg-emerald-50/50'
-                  : 'text-slate-600 border-transparent hover:text-slate-800 hover:bg-slate-50'
+                  ? 'bg-white shadow-sm text-slate-900 font-medium'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Globe className="w-4 h-4" />
-              Configuration Globale
+              Globale
             </button>
             <button
               onClick={() => setActiveTab('par-equipe')}
-              className={`flex items-center gap-2 px-4 py-3 font-medium text-sm transition-all duration-200 border-b-2 ${
+              className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors ${
                 activeTab === 'par-equipe'
-                  ? 'text-blue-600 border-blue-600 bg-blue-50/50'
-                  : 'text-slate-600 border-transparent hover:text-slate-800 hover:bg-slate-50'
+                  ? 'bg-white shadow-sm text-slate-900 font-medium'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Users className="w-4 h-4" />
-              Par Équipe
+              Par équipe
               {horairesEquipes.length > 0 && (
-                <span className="ml-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">
+                <span className="ml-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">
                   {new Set(horairesEquipes.map(h => h.equipe)).size}
                 </span>
               )}
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Tab Content */}
-        <div className="p-6">
+      {/* Content */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-6">
           {activeTab === 'global' && (
             <div className="space-y-4">
               {/* Info */}
@@ -465,7 +459,6 @@ const HorairesConfig: React.FC<{ triggerCreate?: number }> = ({ triggerCreate })
               </div>
             </div>
           )}
-        </div>
       </div>
 
       {/* Modal Édition */}

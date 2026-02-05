@@ -2,11 +2,12 @@ import { apiFetch } from './apiFetch';
 import { PaginatedResponse } from '../types/users';
 import {
     Tache, TacheCreate, TacheUpdate,
-    TypeTache, ParticipationCreate, ParticipationTache,
-    RatioProductivite, RatioProductiviteCreate,
+    TypeTache, TypeTacheCreate, TypeTacheWithRatios,
+    ParticipationCreate, ParticipationTache,
+    RatioProductivite, RatioProductiviteCreate, UniteMesure,
     DistributionCharge, DistributionChargeEnriched, MotifDistribution,
     ReporterDistributionResponse, HistoriqueDistributionResponse,
-    DistributionFilters
+    DistributionFilters, MotifAnnulationTache
 } from '../types/planning';
 
 const BASE_URL = '/api/planification';
@@ -18,6 +19,15 @@ const BASE_URL = '/api/planification';
  * @returns Error avec propriétés validationErrors et fieldErrors
  */
 function parseValidationError(error: any, defaultMessage: string = 'Erreur de validation'): Error {
+    // Cas spécial: erreur structurée avec message (ex: protected_foreign_key)
+    if (error && typeof error === 'object' && error.message) {
+        const structuredError: any = new Error(error.message);
+        structuredError.errorCode = error.error;
+        structuredError.detail = error.detail;
+        structuredError.data = error;
+        return structuredError;
+    }
+
     // Si c'est une erreur de validation DRF (format: { field: [errors] })
     if (error && typeof error === 'object' && !error.error && !error.detail) {
         // Collecter tous les messages d'erreur
@@ -154,10 +164,14 @@ export const planningService = {
     // --- TYPES DE TACHES ---
 
     async getTypesTaches(): Promise<TypeTache[]> {
-        const response = await apiFetch(`${BASE_URL}/types-taches/?page_size=100`);
+        // page_size=500 pour s'assurer de récupérer TOUS les types de tâches
+        const url = `${BASE_URL}/types-taches/?page_size=500`;
+        console.log('[planningService.getTypesTaches] Fetching:', url);
+        const response = await apiFetch(url);
         if (!response.ok) throw new Error('Erreur chargement types tâches');
 
         const data = await response.json();
+        console.log('[planningService.getTypesTaches] Response count:', data.count, 'results:', data.results?.length);
         // Gestion souple : si array direct ou si format paginé
         return Array.isArray(data) ? data : (data.results || []);
     },
@@ -221,7 +235,7 @@ export const planningService = {
         return response.json();
     },
 
-    async createTypeTache(data: { nom_tache: string; description?: string }): Promise<TypeTache> {
+    async createTypeTache(data: TypeTacheCreate): Promise<TypeTache> {
         const response = await apiFetch(`${BASE_URL}/types-taches/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -232,6 +246,97 @@ export const planningService = {
             throw parseValidationError(error, 'Erreur lors de la création du type de tâche');
         }
         return response.json();
+    },
+
+    async updateTypeTache(id: number, data: Partial<TypeTacheCreate>): Promise<TypeTache> {
+        const response = await apiFetch(`${BASE_URL}/types-taches/${id}/`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw parseValidationError(error, 'Erreur lors de la modification du type de tâche');
+        }
+        return response.json();
+    },
+
+    async deleteTypeTache(id: number): Promise<void> {
+        const response = await apiFetch(`${BASE_URL}/types-taches/${id}/`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw parseValidationError(error, 'Erreur lors de la suppression du type de tâche');
+        }
+    },
+
+    /**
+     * Récupère un type de tâche avec tous ses ratios de productivité associés
+     */
+    async getTypeTacheWithRatios(id: number): Promise<TypeTacheWithRatios> {
+        const [typeTache, ratios] = await Promise.all([
+            apiFetch(`${BASE_URL}/types-taches/${id}/`).then(r => {
+                if (!r.ok) throw new Error('Type de tâche non trouvé');
+                return r.json();
+            }),
+            this.getRatios({ type_tache_id: id })
+        ]);
+        return { ...typeTache, ratios };
+    },
+
+    /**
+     * Sauvegarde un type de tâche avec ses ratios de productivité.
+     * Crée/met à jour/supprime les ratios selon la configuration fournie.
+     */
+    async saveTypeTacheWithRatios(
+        typeTacheData: TypeTacheCreate,
+        ratiosConfig: Array<{ type_objet: string; ratio: number; unite_mesure: UniteMesure; actif: boolean }>,
+        typeTacheId?: number
+    ): Promise<TypeTache> {
+        // 1. Créer ou mettre à jour le TypeTache
+        let typeTache: TypeTache;
+        if (typeTacheId) {
+            typeTache = await this.updateTypeTache(typeTacheId, typeTacheData);
+        } else {
+            typeTache = await this.createTypeTache(typeTacheData);
+        }
+
+        // 2. Récupérer les ratios existants pour ce type de tâche
+        const existingRatios = await this.getRatios({ type_tache_id: typeTache.id });
+
+        // 3. Traiter chaque configuration de ratio
+        for (const config of ratiosConfig) {
+            const existingRatio = existingRatios.find(r => r.type_objet === config.type_objet);
+
+            if (existingRatio) {
+                // Mettre à jour le ratio existant
+                await this.updateRatio(existingRatio.id, {
+                    ratio: config.ratio,
+                    unite_mesure: config.unite_mesure,
+                    actif: config.actif
+                });
+            } else if (config.actif) {
+                // Créer un nouveau ratio seulement si actif
+                await this.createRatio({
+                    id_type_tache: typeTache.id,
+                    type_objet: config.type_objet,
+                    ratio: config.ratio,
+                    unite_mesure: config.unite_mesure,
+                    actif: true
+                });
+            }
+        }
+
+        // 4. Supprimer les ratios qui ne sont plus dans la config
+        const configTypeObjets = new Set(ratiosConfig.filter(c => c.actif).map(c => c.type_objet));
+        for (const existingRatio of existingRatios) {
+            if (!configTypeObjets.has(existingRatio.type_objet)) {
+                await this.deleteRatio(existingRatio.id);
+            }
+        }
+
+        return typeTache;
     },
 
     // --- PARTICIPATION ---
@@ -252,8 +357,16 @@ export const planningService = {
      * Change le statut d'une tâche avec gestion automatique des dates réelles.
      * - Démarrer (EN_COURS): définit date_debut_reelle à maintenant
      * - Terminer (TERMINEE): définit date_fin_reelle à maintenant
+     * - Annuler (ANNULEE): requiert motif_annulation obligatoire
      */
-    async changeStatut(tacheId: number, nouveauStatut: 'EN_COURS' | 'TERMINEE' | 'ANNULEE' | 'PLANIFIEE'): Promise<Tache> {
+    async changeStatut(
+        tacheId: number,
+        nouveauStatut: 'EN_COURS' | 'TERMINEE' | 'ANNULEE' | 'PLANIFIEE',
+        options?: {
+            motif_annulation?: MotifAnnulationTache;
+            commentaire_annulation?: string;
+        }
+    ): Promise<Tache> {
         const updateData: TacheUpdate = { statut: nouveauStatut };
 
         // Gestion automatique des dates réelles (format YYYY-MM-DD uniquement)
@@ -261,6 +374,14 @@ export const planningService = {
             updateData.date_debut_reelle = new Date().toISOString().split('T')[0];
         } else if (nouveauStatut === 'TERMINEE') {
             updateData.date_fin_reelle = new Date().toISOString().split('T')[0];
+        } else if (nouveauStatut === 'ANNULEE') {
+            // Justification obligatoire pour l'annulation
+            if (options?.motif_annulation) {
+                updateData.motif_annulation = options.motif_annulation;
+            }
+            if (options?.commentaire_annulation) {
+                updateData.commentaire_annulation = options.commentaire_annulation;
+            }
         }
 
         const response = await apiFetch(`${BASE_URL}/taches/${tacheId}/`, {
@@ -960,6 +1081,86 @@ export const planningService = {
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || 'Erreur lors du rafraîchissement des statuts');
+        }
+
+        return response.json();
+    },
+
+    // ============================================================================
+    // EXPORT PDF DU PLANNING
+    // ============================================================================
+
+    /**
+     * Lance l'export PDF du planning pour une période donnée.
+     * L'export est généré de manière asynchrone via Celery.
+     *
+     * @param params - Paramètres de l'export
+     * @param sync - Mode synchrone (fallback si Celery non disponible)
+     * @returns {task_id, status} pour le polling ou résultat direct en mode sync
+     */
+    async exportPDF(params: {
+        startDate: string;
+        endDate: string;
+        structureClientId?: number;
+        equipeId?: number;
+        sync?: boolean;
+    }): Promise<{
+        task_id: string;
+        status: string;
+        message?: string;
+        ready?: boolean;
+        result?: {
+            download_url: string;
+            filename: string;
+            record_count: number;
+        };
+    }> {
+        const query = new URLSearchParams();
+        query.append('start_date', params.startDate);
+        query.append('end_date', params.endDate);
+
+        if (params.structureClientId) {
+            query.append('structure_client_id', params.structureClientId.toString());
+        }
+        if (params.equipeId) {
+            query.append('equipe_id', params.equipeId.toString());
+        }
+        if (params.sync) {
+            query.append('sync', 'true');
+        }
+
+        const response = await apiFetch(`${BASE_URL}/export/pdf/?${query.toString()}`);
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erreur lors du lancement de l\'export PDF');
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Vérifie le statut d'un export PDF en cours.
+     *
+     * @param taskId - ID de la tâche Celery
+     * @returns Statut de l'export avec URL de téléchargement si terminé
+     */
+    async getExportStatus(taskId: string): Promise<{
+        task_id: string;
+        status: 'PENDING' | 'SUCCESS' | 'FAILURE' | 'STARTED';
+        ready: boolean;
+        result?: {
+            download_url: string;
+            filename: string;
+            record_count: number;
+        };
+        error?: string;
+    }> {
+        const response = await apiFetch(`${BASE_URL}/export/status/${taskId}/`);
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erreur lors de la vérification du statut de l\'export');
         }
 
         return response.json();

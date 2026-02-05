@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, type FC } from 'react';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfDay, endOfDay, addMonths as addMonthsFn } from 'date-fns';
 import { addMonths, subMonths, addWeeks, subWeeks, addDays, subDays } from 'date-fns';
 import { EventInteractionArgs } from 'react-big-calendar/lib/addons/dragAndDrop';
 
@@ -67,10 +67,71 @@ const customCalendarStyles = `
     .rbc-now .rbc-button-link { background-color: #10b981; color: white; border-radius: 50%; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; margin-top: -4px; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35); font-weight: 600; }
 
     /* Vue Mois - Ajustements améliorés */
-    .rbc-month-view .rbc-row-content { overflow: visible; }
-    .rbc-month-row { min-height: 120px !important; }
-    .rbc-event { margin-bottom: 3px !important; }
-    .rbc-row-segment { padding: 0 4px; }
+    .rbc-month-view .rbc-row-content {
+        overflow: visible !important;
+        position: relative;
+    }
+    .rbc-month-row {
+        min-height: 140px !important;
+        overflow: visible !important;
+    }
+    .rbc-month-view .rbc-row-segment {
+        padding: 1px 4px !important;
+    }
+    .rbc-month-view .rbc-event {
+        margin-bottom: 2px !important;
+        height: auto !important;
+        max-height: none !important;
+        min-height: 28px !important;
+        line-height: normal !important;
+    }
+    .rbc-month-view .rbc-event-content {
+        height: auto !important;
+        overflow: visible !important;
+        white-space: normal !important;
+    }
+    .rbc-month-view .rbc-row-content .rbc-row {
+        min-height: 32px !important;
+    }
+
+    /* TaskEvent compact en vue mois */
+    .rbc-month-view .task-event-root {
+        padding: 2px 6px !important;
+        gap: 4px !important;
+        min-height: 24px !important;
+        height: auto !important;
+    }
+    .rbc-month-view .task-event-root > div:first-child {
+        /* Checkbox plus petite */
+        width: 12px !important;
+        height: 12px !important;
+        min-width: 12px !important;
+        margin-top: 2px !important;
+    }
+    .rbc-month-view .task-event-root > div:first-child svg {
+        width: 8px !important;
+        height: 8px !important;
+    }
+    .rbc-month-view .task-event-content {
+        gap: 0 !important;
+    }
+    .rbc-month-view .task-event-content > div:first-child {
+        /* Ligne titre */
+        gap: 4px !important;
+    }
+    .rbc-month-view .task-event-content > div:first-child svg {
+        width: 10px !important;
+        height: 10px !important;
+    }
+    .rbc-month-view .task-event-content > div:first-child > span:first-of-type {
+        /* Titre */
+        font-size: 11px !important;
+        line-height: 1.2 !important;
+    }
+    .rbc-month-view .task-event-content > div:last-child {
+        /* Métadonnées - masquer en vue mois pour gagner de l'espace */
+        display: none !important;
+    }
 
     /* Le bouton "Show More" - Design moderne */
     .rbc-show-more {
@@ -102,9 +163,21 @@ const customCalendarStyles = `
     }
 
     /* Événements Transparents */
-    .rbc-event { background-color: transparent !important; padding: 0 !important; border-radius: 0 !important; outline: none !important; box-shadow: none !important; overflow: visible !important; }
+    .rbc-event {
+        background-color: transparent !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+        outline: none !important;
+        box-shadow: none !important;
+        overflow: visible !important;
+        border: none !important;
+    }
     .rbc-event:focus { outline: none !important; }
     .rbc-event-label { display: none !important; }
+    .rbc-event-content {
+        overflow: visible !important;
+        height: auto !important;
+    }
 
     /* Time View */
     .rbc-time-header { border-bottom: 1px solid #dadce0 !important; }
@@ -134,7 +207,7 @@ const customCalendarStyles = `
             font-size: 9px;
         }
         .rbc-month-row {
-            min-height: 80px !important;
+            min-height: 100px !important;
         }
         .rbc-date-cell {
             padding: 4px !important;
@@ -145,19 +218,25 @@ const customCalendarStyles = `
             height: 22px;
             font-size: 11px;
         }
-        .rbc-event {
-            margin-bottom: 2px !important;
+        .rbc-month-view .rbc-event {
+            margin-bottom: 1px !important;
+            min-height: 22px !important;
         }
         .rbc-row-segment {
-            padding: 0 2px;
+            padding: 0 2px !important;
         }
         .rbc-show-more {
             font-size: 9px !important;
             padding: 3px 6px !important;
         }
-        /* Hide day names on very small screens */
-        .rbc-header span {
-            display: inline;
+        /* TaskEvent encore plus compact sur mobile */
+        .rbc-month-view .task-event-root {
+            padding: 1px 4px !important;
+            gap: 3px !important;
+            min-height: 20px !important;
+        }
+        .rbc-month-view .task-event-content > div:first-child > span:first-of-type {
+            font-size: 10px !important;
         }
     }
 
@@ -172,7 +251,7 @@ const customCalendarStyles = `
             font-size: 10px;
         }
         .rbc-month-row {
-            min-height: 60px !important;
+            min-height: 80px !important;
         }
         .rbc-show-more {
             font-size: 8px !important;
@@ -180,6 +259,23 @@ const customCalendarStyles = `
         }
         .rbc-show-more::after {
             display: none;
+        }
+        /* TaskEvent minimal sur très petit écran */
+        .rbc-month-view .task-event-root {
+            padding: 1px 3px !important;
+            min-height: 18px !important;
+        }
+        .rbc-month-view .task-event-root > div:first-child {
+            width: 10px !important;
+            height: 10px !important;
+            min-width: 10px !important;
+        }
+        .rbc-month-view .task-event-content > div:first-child > span:first-of-type {
+            font-size: 9px !important;
+        }
+        .rbc-month-view .task-event-content > div:first-child svg {
+            width: 8px !important;
+            height: 8px !important;
         }
     }
 
@@ -267,6 +363,7 @@ const Planning: FC = () => {
 
         // Toast
         toast,
+        showToast,
 
         // Actions
         loadTaches,
@@ -427,20 +524,155 @@ const Planning: FC = () => {
     }, []);
 
     // ========================================================================
-    // PDF EXPORT (simplified - delegates to external function if needed)
+    // PDF EXPORT - Export asynchrone via Celery
     // ========================================================================
+
+    /**
+     * Calcule la plage de dates en fonction de la vue actuelle du calendrier.
+     */
+    const getDateRangeFromView = useCallback((date: Date, view: string): { startDate: Date; endDate: Date } => {
+        switch (view) {
+            case 'month':
+                return {
+                    startDate: startOfMonth(date),
+                    endDate: endOfMonth(date)
+                };
+            case 'week':
+                return {
+                    startDate: startOfWeek(date, { weekStartsOn: 1 }),
+                    endDate: endOfWeek(date, { weekStartsOn: 1 })
+                };
+            case 'day':
+                return {
+                    startDate: startOfDay(date),
+                    endDate: endOfDay(date)
+                };
+            case 'agenda':
+                // Vue agenda: 1 mois complet
+                return {
+                    startDate: startOfMonth(date),
+                    endDate: endOfMonth(addMonthsFn(date, 1))
+                };
+            default:
+                // Fallback: mois courant
+                return {
+                    startDate: startOfMonth(date),
+                    endDate: endOfMonth(date)
+                };
+        }
+    }, []);
 
     const handleExportPDF = useCallback(async () => {
         setIsExporting(true);
         try {
-            // PDF export logic would go here
-            // For now, just show a toast
-            console.log('PDF export triggered');
-            await new Promise(resolve => setTimeout(resolve, 1000));
-        } finally {
+            // Calculer la plage de dates selon la vue
+            const { startDate, endDate } = getDateRangeFromView(currentDate, currentView);
+
+            const exportParams = {
+                startDate: format(startDate, 'yyyy-MM-dd'),
+                endDate: format(endDate, 'yyyy-MM-dd'),
+                structureClientId: filters.clientId || undefined,
+                equipeId: filters.equipeId || undefined,
+            };
+
+            console.log('[PDF Export] Lancement avec params:', exportParams);
+
+            // Fonction pour télécharger le PDF
+            const downloadPDF = (downloadUrl: string, recordCount: number) => {
+                console.log('[PDF Export] Téléchargement:', downloadUrl);
+                window.open(downloadUrl, '_blank');
+                setIsExporting(false);
+                showToast(`Export terminé (${recordCount} tâches)`);
+            };
+
+            // Fonction pour relancer en mode sync (fallback)
+            const runSyncExport = async () => {
+                console.log('[PDF Export] Fallback vers mode synchrone...');
+                showToast('Export en cours (mode direct)...');
+
+                const syncResult = await planningService.exportPDF({ ...exportParams, sync: true });
+
+                if (syncResult.ready && syncResult.result) {
+                    downloadPDF(syncResult.result.download_url, syncResult.result.record_count);
+                } else {
+                    throw new Error('Export synchrone échoué');
+                }
+            };
+
+            // Lancer l'export asynchrone
+            const response = await planningService.exportPDF(exportParams);
+
+            // Si déjà prêt (mode sync retourné directement), télécharger
+            if (response.ready && response.result) {
+                downloadPDF(response.result.download_url, response.result.record_count);
+                return;
+            }
+
+            const task_id = response.task_id;
+            console.log('[PDF Export] Task ID reçu:', task_id);
+            showToast('Export PDF en cours de génération...');
+
+            let pendingCount = 0; // Compteur de statuts PENDING consécutifs
+
+            // Polling du statut (max 60 secondes)
+            const pollStatus = async (attempts = 0): Promise<void> => {
+                if (attempts >= 60) {
+                    setIsExporting(false);
+                    showToast('Export PDF trop long. Réessayez plus tard.');
+                    console.error('[PDF Export] Timeout après 60 tentatives');
+                    return;
+                }
+
+                try {
+                    const status = await planningService.getExportStatus(task_id);
+                    console.log(`[PDF Export] Polling #${attempts + 1}:`, status);
+
+                    if (status.status === 'SUCCESS' && status.result) {
+                        downloadPDF(status.result.download_url, status.result.record_count);
+                    } else if (status.status === 'FAILURE') {
+                        setIsExporting(false);
+                        console.error('[PDF Export] Échec:', status.error);
+                        showToast(status.error || 'Erreur lors de l\'export PDF');
+                    } else if (status.status === 'PENDING') {
+                        pendingCount++;
+
+                        // Si PENDING depuis 10 secondes, Celery n'est probablement pas actif
+                        // Basculer vers le mode synchrone
+                        if (pendingCount >= 10) {
+                            console.warn('[PDF Export] Celery semble inactif, bascule en mode sync');
+                            try {
+                                await runSyncExport();
+                            } catch (syncErr) {
+                                console.error('[PDF Export] Erreur mode sync:', syncErr);
+                                setIsExporting(false);
+                                showToast('Erreur lors de l\'export PDF');
+                            }
+                            return;
+                        }
+
+                        // Continuer le polling
+                        setTimeout(() => pollStatus(attempts + 1), 1000);
+                    } else {
+                        // STARTED ou autre statut: réinitialiser le compteur PENDING et continuer
+                        pendingCount = 0;
+                        setTimeout(() => pollStatus(attempts + 1), 1000);
+                    }
+                } catch (pollError) {
+                    console.error('[PDF Export] Erreur polling:', pollError);
+                    setIsExporting(false);
+                    showToast('Erreur lors de la vérification du statut de l\'export');
+                }
+            };
+
+            // Commencer le polling
+            pollStatus();
+        } catch (err: unknown) {
+            console.error('[PDF Export] Erreur:', err);
             setIsExporting(false);
+            const errorMessage = err instanceof Error ? err.message : 'Erreur lors du lancement de l\'export PDF';
+            showToast(errorMessage);
         }
-    }, []);
+    }, [currentDate, currentView, filters.clientId, filters.equipeId, getDateRangeFromView, showToast]);
 
     // ========================================================================
     // RENDER
@@ -463,7 +695,7 @@ const Planning: FC = () => {
     }
 
     return (
-        <div className="h-full flex flex-col bg-white font-sans relative">
+        <div className="flex flex-col bg-white font-sans relative">
             <style>{customCalendarStyles}</style>
 
             {/* Toolbar */}

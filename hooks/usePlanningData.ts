@@ -473,9 +473,9 @@ export function usePlanningData(): UsePlanningDataReturn {
             setTacheToDelete(null);
             setPopoverInfo(null);
             showToast('Tâche supprimée');
-        } catch (err) {
+        } catch (err: any) {
             console.error('Erreur suppression tâche:', err);
-            alert("Erreur lors de la suppression de la tâche");
+            showToast(err.message || 'Erreur lors de la suppression de la tâche', 'error');
         }
     }, [tacheToDelete, loadTaches, showToast]);
 
@@ -487,9 +487,9 @@ export function usePlanningData(): UsePlanningDataReturn {
             await loadTaches();
             setDistributionToDelete(null);
             showToast('Distribution supprimée avec succès');
-        } catch (err) {
+        } catch (err: any) {
             console.error('Erreur suppression distribution:', err);
-            alert("Erreur lors de la suppression de la distribution");
+            showToast(err.message || 'Erreur lors de la suppression de la distribution', 'error');
         }
     }, [distributionToDelete, loadTaches, showToast]);
 
@@ -497,10 +497,12 @@ export function usePlanningData(): UsePlanningDataReturn {
         try {
             await planningService.resetCharge(tacheId);
             await loadTaches();
-        } catch (err) {
-            alert('Erreur charge');
+            showToast('Charge recalculée');
+        } catch (err: any) {
+            console.error('Erreur reset charge:', err);
+            showToast(err.message || 'Erreur lors du recalcul de la charge', 'error');
         }
-    }, [loadTaches]);
+    }, [loadTaches, showToast]);
 
     // ========================================================================
     // DISTRIBUTION STATUS OPERATIONS (Nouveau workflow complet)

@@ -704,7 +704,7 @@ const ReclamationDetailPage: React.FC = () => {
 
     if (error || !reclamation) {
         return (
-            <div className="flex items-center justify-center h-full min-h-screen bg-slate-50">
+            <div className="flex items-center justify-center bg-slate-50 min-h-[400px]">
                 <div className="text-center bg-red-50 border border-red-200 rounded-lg p-8 max-w-md">
                     <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-red-800 mb-2">Erreur</h3>
@@ -718,7 +718,7 @@ const ReclamationDetailPage: React.FC = () => {
     }
 
     return (
-        <div className="h-full bg-slate-50">
+        <div className="bg-slate-50">
             {/* Bannière Réclamation Rejetée */}
             {reclamation.statut === 'REJETEE' && (
                 <div className="bg-red-600 text-white px-6 py-3 flex items-center justify-center gap-3">
@@ -907,6 +907,11 @@ const ReclamationDetailPage: React.FC = () => {
                                     <dd className="font-semibold text-slate-800 flex items-center gap-2">
                                         <Tag className="w-4 h-4 text-emerald-600" />
                                         {reclamation.type_reclamation_nom}
+                                        {reclamation.type_autre_description && (
+                                            <span className="text-sm font-normal text-slate-600">
+                                                : {reclamation.type_autre_description}
+                                            </span>
+                                        )}
                                     </dd>
                                 </div>
                                 <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">

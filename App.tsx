@@ -73,6 +73,10 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
 
+  // Mobile responsive state
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
   // Global Map State
   const [activeLayerId, setActiveLayerId] = useState<MapLayerType>(MapLayerType.SATELLITE);
   const [targetLocation, setTargetLocation] = useState<{ coordinates: Coordinates; zoom?: number } | null>(null);
@@ -102,6 +106,19 @@ function App() {
   const mapRef = useRef<any>(null);
 
   // REMOVED: useSearch hook call - state is now managed by SearchProvider
+
+  // Mobile detection: listen for resize events
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) {
+        setIsMobileSidebarOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     console.log("GreenSIG Application v1.0.1 Mounted");
@@ -272,7 +289,16 @@ function App() {
                           user={user}
                           onLogout={() => setUser(null)}
                           isSidebarCollapsed={isSidebarCollapsed}
-                          onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                          onToggleSidebar={() => {
+                            if (isMobile) {
+                              setIsMobileSidebarOpen(!isMobileSidebarOpen);
+                            } else {
+                              setIsSidebarCollapsed(!isSidebarCollapsed);
+                            }
+                          }}
+                          isMobile={isMobile}
+                          isMobileSidebarOpen={isMobileSidebarOpen}
+                          onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
                           // REMOVED: Search props are no longer passed to Layout
                           mapComponent={
                             <OLMap

@@ -216,3 +216,104 @@ canvas:active {
         font-size: 16px; /* Prevents zoom on iOS */
     }
 }
+
+/* ========================
+   Task Detail Panel Animations
+   ======================== */
+
+/* Slow pulse for validation buttons */
+@keyframes pulse-slow {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.85;
+    }
+}
+
+.animate-pulse-slow {
+    animation: pulse-slow 2s ease-in-out infinite;
+}
+
+/* Attention indicator for tasks needing action */
+@keyframes attention-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(245, 158, 11, 0);
+    }
+}
+
+.animate-attention {
+    animation: attention-pulse 2s ease-in-out infinite;
+}
+
+/* Tab content fade-in animation */
+@keyframes tab-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-tab-fade-in {
+    animation: tab-fade-in 0.2s ease-out forwards;
+}
+
+/* Staggered children animation for lists - respects reduced motion */
+@keyframes stagger-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Only animate if user hasn't requested reduced motion */
+@media (prefers-reduced-motion: no-preference) {
+    .animate-stagger > * {
+        animation: stagger-fade-in 0.3s ease-out forwards;
+        opacity: 0;
+    }
+
+    .animate-stagger > *:nth-child(1) { animation-delay: 0.05s; }
+    .animate-stagger > *:nth-child(2) { animation-delay: 0.1s; }
+    .animate-stagger > *:nth-child(3) { animation-delay: 0.15s; }
+    .animate-stagger > *:nth-child(4) { animation-delay: 0.2s; }
+    .animate-stagger > *:nth-child(5) { animation-delay: 0.25s; }
+    .animate-stagger > *:nth-child(6) { animation-delay: 0.3s; }
+    .animate-stagger > *:nth-child(7) { animation-delay: 0.35s; }
+    .animate-stagger > *:nth-child(8) { animation-delay: 0.4s; }
+}
+
+/* Fallback: ensure children are visible if reduced motion or animation fails */
+@media (prefers-reduced-motion: reduce) {
+    .animate-stagger > * {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* Scale-in animation for cards/panels */
+@keyframes scale-in {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.animate-scale-in {
+    animation: scale-in 0.2s ease-out forwards;
+}

@@ -314,7 +314,7 @@ const Dashboard: React.FC = () => {
   }, [statistics]);
 
   return (
-    <div className="p-6 h-full flex flex-col gap-4 overflow-hidden">
+    <div className="p-4 md:p-6 flex flex-col gap-4">
       {/* Onglets - Uniquement visibles pour Admin */}
       {userRole === 'ADMIN' && (
         <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg w-fit">

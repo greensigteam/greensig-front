@@ -81,7 +81,7 @@ const ReclamationsDashboard: React.FC = () => {
     }));
 
     return (
-        <div className="h-screen flex flex-col overflow-hidden">
+        <div className="flex flex-col">
             {/* Header */}
             <div className="flex justify-between items-center p-6 pb-4 flex-shrink-0">
                 <div>

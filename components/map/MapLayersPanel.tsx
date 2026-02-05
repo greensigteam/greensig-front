@@ -40,7 +40,7 @@ export const MapLayersPanel: React.FC<MapLayersPanelProps> = ({
   if (!showLayers) return null;
 
   return (
-    <div className="absolute top-4 right-16 pointer-events-auto w-96 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-white/40 animate-slide-in origin-top-right ring-1 ring-black/5 overflow-hidden flex flex-col max-h-[calc(100vh-2rem)] z-50">
+    <div className="absolute top-4 right-2 md:right-16 pointer-events-auto w-[calc(100vw-80px)] md:w-96 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-white/40 animate-slide-in origin-top-right ring-1 ring-black/5 overflow-hidden flex flex-col max-h-[calc(100vh-2rem)] z-50">
       <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-white/50">
         <div className="flex items-center gap-2">
           <Layers className="w-4 h-4 text-emerald-600" />
@@ -84,7 +84,7 @@ export const MapLayersPanel: React.FC<MapLayersPanelProps> = ({
               <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
                 <MapIcon className="w-3 h-3" /> Fonds de plan
               </h4>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                 {Object.values(MAP_LAYERS).map(layer => {
                   let Icon = MapIcon;
                   if (layer.id === 'SATELLITE') Icon = ImageIcon;

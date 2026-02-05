@@ -26,6 +26,7 @@ import {
 import { planningService } from '../services/planningService';
 import { SiteFrontend } from '../services/api';
 import { cloturerReclamation } from '../services/reclamationsApi';
+import { fetchPhotosParTache } from '../services/suiviTachesApi';
 import { queryKeys } from '../lib/queryKeys';
 
 // Types
@@ -98,8 +99,14 @@ export interface UseSuiviTachesDataReturn {
     handleAssignEquipe: (equipeId: number) => Promise<void>;
     handleRemoveEquipe: (equipeId: number) => Promise<void>;
 
-    // Actions - Status
-    handleChangeStatut: (type: 'start' | 'complete' | 'cancel') => Promise<void>;
+    // Actions - Status (annulation avec justification obligatoire)
+    handleChangeStatut: (
+        type: 'start' | 'complete' | 'cancel',
+        options?: {
+            motif_annulation?: 'METEO' | 'ABSENCE' | 'EQUIPEMENT' | 'CLIENT' | 'URGENCE' | 'DOUBLON' | 'ERREUR' | 'AUTRE';
+            commentaire_annulation?: string;
+        }
+    ) => Promise<void>;
 
     // Actions - Validation
     handleValidation: (type: 'VALIDEE' | 'REJETEE', comment: string) => Promise<{
@@ -227,6 +234,18 @@ export function useSuiviTachesData(): UseSuiviTachesDataReturn {
         }
     }, [searchParams, setSearchParams]);
 
+    // ⚡ OPTIMISATION: Prefetch photos dès la sélection d'une tâche
+    // Cela réduit le délai lors du clic sur l'onglet "Photos"
+    useEffect(() => {
+        if (selectedTache?.id) {
+            queryClient.prefetchQuery({
+                queryKey: queryKeys.taskDetails.photos(selectedTache.id),
+                queryFn: () => fetchPhotosParTache(selectedTache.id),
+                staleTime: 60 * 1000, // 1 minute
+            });
+        }
+    }, [selectedTache?.id, queryClient]);
+
     // Auto-select task from URL
     useEffect(() => {
         if (pendingTaskId && taches.length > 0 && !tachesQuery.isLoading) {
@@ -352,7 +371,13 @@ export function useSuiviTachesData(): UseSuiviTachesDataReturn {
     }, [selectedTache, assignEquipeMutation, reloadSelectedTask, showToast]);
 
     // Change status
-    const handleChangeStatut = useCallback(async (type: 'start' | 'complete' | 'cancel') => {
+    const handleChangeStatut = useCallback(async (
+        type: 'start' | 'complete' | 'cancel',
+        options?: {
+            motif_annulation?: 'METEO' | 'ABSENCE' | 'EQUIPEMENT' | 'CLIENT' | 'URGENCE' | 'DOUBLON' | 'ERREUR' | 'AUTRE';
+            commentaire_annulation?: string;
+        }
+    ) => {
         if (!selectedTache) return;
 
         const tacheId = selectedTache.id;
@@ -366,15 +391,17 @@ export function useSuiviTachesData(): UseSuiviTachesDataReturn {
                 case 'cancel': nouveauStatut = 'ANNULEE'; break;
             }
 
-            await planningService.changeStatut(tacheId, nouveauStatut);
+            // Passer les options d'annulation si statut = ANNULEE
+            await planningService.changeStatut(tacheId, nouveauStatut, type === 'cancel' ? options : undefined);
 
             // Invalidate and refetch
             await queryClient.invalidateQueries({ queryKey: queryKeys.taches.all });
             await tachesQuery.refetch();
             await reloadSelectedTask(tacheId);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Erreur changement statut", error);
-            showToast("Erreur lors du changement de statut", 'error');
+            showToast(error.message || "Erreur lors du changement de statut", 'error');
+            throw error; // Re-throw pour permettre à l'appelant de gérer l'erreur
         } finally {
             setChangingStatut(false);
         }

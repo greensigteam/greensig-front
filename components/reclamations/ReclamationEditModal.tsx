@@ -94,6 +94,7 @@ export const ReclamationEditModal: React.FC<ReclamationEditModalProps> = ({
                 type_reclamation: fullRec.type_reclamation,
                 urgence: fullRec.urgence,
                 description: fullRec.description,
+                type_autre_description: fullRec.type_autre_description || undefined,
                 zone: fullRec.zone,
                 date_constatation: dateConstatation,
                 visible_client: fullRec.visible_client ?? true,
@@ -114,6 +115,13 @@ export const ReclamationEditModal: React.FC<ReclamationEditModalProps> = ({
         // Validation
         if (!formData.type_reclamation || !formData.urgence || !formData.description || !formData.date_constatation) {
             setError('Veuillez remplir tous les champs obligatoires (*)');
+            return;
+        }
+
+        // Validation: type_autre_description obligatoire si type = "Autre"
+        const selectedType = types.find(t => t.id === formData.type_reclamation);
+        if (selectedType?.code_reclamation === 'AUTRE-DIVERS' && !formData.type_autre_description?.trim()) {
+            setError('Veuillez préciser le type de réclamation');
             return;
         }
 
@@ -218,7 +226,7 @@ export const ReclamationEditModal: React.FC<ReclamationEditModalProps> = ({
                             {/* Type de réclamation */}
                             <PremiumSelect
                                 value={formData.type_reclamation?.toString() || ''}
-                                onChange={(value) => setFormData({ ...formData, type_reclamation: Number(value) })}
+                                onChange={(value) => setFormData({ ...formData, type_reclamation: Number(value), type_autre_description: undefined })}
                                 options={types.map(t => ({
                                     value: t.id.toString(),
                                     label: t.nom_reclamation
@@ -230,6 +238,20 @@ export const ReclamationEditModal: React.FC<ReclamationEditModalProps> = ({
                                 variant="outlined"
                                 size="md"
                             />
+
+                            {/* Champ conditionnel si "Autre" est sélectionné */}
+                            {formData.type_reclamation && types.find(t => t.id === formData.type_reclamation)?.code_reclamation === 'AUTRE-DIVERS' && (
+                                <PremiumInput
+                                    value={formData.type_autre_description || ''}
+                                    onChange={(value) => setFormData({ ...formData, type_autre_description: value })}
+                                    label="Précisez votre réclamation"
+                                    placeholder="Ex: Problème d'éclairage, Nuisance sonore..."
+                                    icon={<FileText className="w-4 h-4" />}
+                                    required
+                                    variant="outlined"
+                                    size="md"
+                                />
+                            )}
 
                             {/* Urgence */}
                             <PremiumSelect

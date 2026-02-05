@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { User, ViewState, MapSearchResult, SearchSuggestion, TargetLocation } from '../types';
-import { X, Search, Loader2, MapPin, ChevronRight, Command, Clock } from 'lucide-react';
+import { X, Search, Loader2, MapPin, ChevronRight, Command, Clock, Menu } from 'lucide-react';
 import { useSearch } from '../contexts/SearchContext';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -10,6 +10,7 @@ import NotificationBell from './NotificationBell';
 interface HeaderProps {
   user: User;
   collapsed: boolean;
+  onToggleMobileSidebar?: () => void;
 }
 
 const VIEW_TITLES: Record<ViewState, string> = {
@@ -51,7 +52,7 @@ const PATH_TO_VIEW: Record<string, ViewState> = {
   '/parametres': 'PARAMETRES'
 };
 
-const Header: React.FC<HeaderProps> = ({ user }) => {
+const Header: React.FC<HeaderProps> = ({ user, onToggleMobileSidebar }) => {
   const location = useLocation();
   const {
     searchQuery,
@@ -121,8 +122,17 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
   return (
     <header className="h-16 md:h-20 bg-white/80 backdrop-blur-md border-b border-slate-200/60 shadow-sm flex items-center justify-between px-3 md:px-6 z-20 shrink-0 transition-all duration-300 sticky top-0">
 
-      {/* LEFT: Title & Breadcrumbs */}
-      <div className="flex flex-col justify-center min-w-0 shrink-0">
+      {/* LEFT: Hamburger (mobile only) + Title & Breadcrumbs */}
+      <div className="flex items-center gap-2 min-w-0 shrink-0">
+        {onToggleMobileSidebar && (
+          <button
+            onClick={onToggleMobileSidebar}
+            className="md:hidden p-2 -ml-1 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
+      <div className="flex flex-col justify-center min-w-0">
         <h2 className="text-sm md:text-lg font-bold text-slate-800 tracking-tight truncate leading-tight">
           {VIEW_TITLES[currentView] || 'GreenSIG'}
         </h2>
@@ -133,6 +143,7 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
             {currentView ? (currentView.charAt(0) + currentView.slice(1).toLowerCase()) : ''}
           </span>
         </div>
+      </div>
       </div>
 
       {/* CENTER: Search Bar - Hidden on small screens, shown on md+ */}

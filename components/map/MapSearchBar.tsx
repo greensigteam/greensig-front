@@ -59,11 +59,15 @@ const MapSearchBarComponent: React.FC<MapSearchBarProps> = ({
 
   return (
     <div
-      className="absolute top-4 transition-all duration-300 pointer-events-auto flex flex-row gap-2 items-start z-50 max-w-[calc(100vw-400px)]"
-      style={{ left: isSidebarCollapsed ? '88px' : '276px' }}
+      className={`
+        absolute top-4 transition-all duration-300 pointer-events-auto flex flex-row gap-2 items-start z-50
+        left-3 right-3 md:right-auto
+        md:max-w-[calc(100vw-400px)]
+        ${isSidebarCollapsed ? 'md:left-[88px]' : 'md:left-[276px]'}
+      `}
     >
       {/* Search Group */}
-      <div className="flex gap-2 w-72 md:w-96 shrink-0" ref={searchContainerRef}>
+      <div className="flex gap-2 w-full md:w-96 shrink-0" ref={searchContainerRef}>
         <div className="flex-1 relative">
           <div className="bg-white/90 backdrop-blur-md shadow-xl rounded-xl flex items-center p-1 border border-white/20 ring-1 ring-black/5 transition-all focus-within:ring-2 focus-within:ring-emerald-600/50">
             <div className="p-2.5 text-slate-400">
@@ -155,7 +159,7 @@ const MapSearchBarComponent: React.FC<MapSearchBarProps> = ({
 
       {/* Search Result Info */}
       {searchResult && (
-        <div className="absolute top-14 left-0 w-96 bg-white/90 backdrop-blur-md shadow-xl rounded-xl p-4 border border-white/20 animate-slide-in pointer-events-auto z-50">
+        <div className="absolute top-14 left-0 w-full md:w-96 bg-white/90 backdrop-blur-md shadow-xl rounded-xl p-4 border border-white/20 animate-slide-in pointer-events-auto z-50">
           <div className="flex justify-between items-start">
             <div>
               <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">

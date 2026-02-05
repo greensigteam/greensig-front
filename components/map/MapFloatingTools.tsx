@@ -205,7 +205,7 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
   const isDrawingActive = isDrawing || drawingMode !== 'none';
 
   return (
-    <div className="absolute top-24 right-4 pointer-events-auto flex flex-col gap-2 z-50 items-end">
+    <div className="absolute top-16 md:top-24 right-2 md:right-4 pointer-events-auto flex flex-col gap-2 z-50 items-end">
       {/* Main button bar */}
       <div className="bg-white/90 backdrop-blur-md shadow-xl rounded-xl border border-white/20 overflow-hidden flex flex-col ring-1 ring-black/5 w-12">
 
@@ -291,7 +291,7 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
 
       {/* Report Problem Panel */}
       {isReportingProblem && onStartReportDrawing && onCancelReporting && (
-        <div className="bg-white/95 backdrop-blur-md shadow-xl rounded-xl border border-white/20 p-3 ring-1 ring-black/5 w-64 animate-in slide-in-from-right-2 duration-200">
+        <div className="bg-white/95 backdrop-blur-md shadow-xl rounded-xl border border-white/20 p-3 ring-1 ring-black/5 w-56 md:w-64 animate-in slide-in-from-right-2 duration-200">
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-semibold text-slate-700 text-sm flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-orange-500" />
@@ -354,7 +354,7 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
 
       {/* ===== DRAWING TOOLS PANEL ===== */}
       {(showDrawingTools || isDrawingActive) && (
-        <div className="bg-white/95 backdrop-blur-md shadow-xl rounded-xl border border-white/20 p-3 ring-1 ring-black/5 w-64 animate-in slide-in-from-right-2 duration-200">
+        <div className="bg-white/95 backdrop-blur-md shadow-xl rounded-xl border border-white/20 p-3 ring-1 ring-black/5 w-56 md:w-64 animate-in slide-in-from-right-2 duration-200">
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-semibold text-slate-700 text-sm">Outils de dessin</h4>
             <button onClick={toggleDrawingTools} className="text-slate-400 hover:text-slate-600">
@@ -545,7 +545,7 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
 
       {/* ===== MEASUREMENT TOOLS PANEL ===== */}
       {(showMeasureTools || isMeasuring) && (
-        <div className="bg-white/95 backdrop-blur-md shadow-xl rounded-xl border border-white/20 p-3 ring-1 ring-black/5 w-64 animate-in slide-in-from-right-2 duration-200">
+        <div className="bg-white/95 backdrop-blur-md shadow-xl rounded-xl border border-white/20 p-3 ring-1 ring-black/5 w-56 md:w-64 animate-in slide-in-from-right-2 duration-200">
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-semibold text-slate-700 text-sm">Mesures</h4>
             <button onClick={toggleMeasureTool} className="text-slate-400 hover:text-slate-600">

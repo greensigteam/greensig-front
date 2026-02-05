@@ -268,14 +268,27 @@ export const TaskDetailPopover: FC<TaskDetailPopoverProps> = ({
                                 )}
 
                                 {/* Actions de distribution */}
-                                {distributionId && !isReadOnly && !isDistributionDisabled && (
+                                {distributionId && !isReadOnly && tache.statut !== 'TERMINEE' && (
                                     <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100">
+                                        {/* Badge "Sans équipe" */}
+                                        {!hasEquipe && (
+                                            <span className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium bg-yellow-100 text-yellow-700 border border-yellow-300 rounded-full">
+                                                <AlertTriangle className="w-3 h-3" />
+                                                Sans équipe
+                                            </span>
+                                        )}
+
                                         {/* Démarrer */}
                                         {canDemarrer && onDemarrer && (
                                             <button
-                                                onClick={onDemarrer}
-                                                disabled={isActionLoading}
-                                                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors disabled:opacity-50"
+                                                onClick={!hasEquipe ? undefined : onDemarrer}
+                                                disabled={isActionLoading || !hasEquipe}
+                                                className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
+                                                    !hasEquipe
+                                                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                                        : 'text-white bg-orange-500 hover:bg-orange-600'
+                                                }`}
+                                                title={!hasEquipe ? "Assignez d'abord une équipe à la tâche" : "Démarrer"}
                                             >
                                                 <Play className="w-4 h-4" />
                                                 Démarrer
@@ -285,9 +298,14 @@ export const TaskDetailPopover: FC<TaskDetailPopoverProps> = ({
                                         {/* Terminer */}
                                         {canTerminer && onTerminer && (
                                             <button
-                                                onClick={onTerminer}
-                                                disabled={isActionLoading}
-                                                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-green-500 hover:bg-green-600 rounded-lg transition-colors disabled:opacity-50"
+                                                onClick={!hasEquipe ? undefined : onTerminer}
+                                                disabled={isActionLoading || !hasEquipe}
+                                                className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
+                                                    !hasEquipe
+                                                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                                        : 'text-white bg-green-500 hover:bg-green-600'
+                                                }`}
+                                                title={!hasEquipe ? "Assignez d'abord une équipe à la tâche" : "Terminer"}
                                             >
                                                 <CheckCircle className="w-4 h-4" />
                                                 Terminer
@@ -297,9 +315,14 @@ export const TaskDetailPopover: FC<TaskDetailPopoverProps> = ({
                                         {/* Reporter */}
                                         {canReporter && onReporter && (
                                             <button
-                                                onClick={onReporter}
-                                                disabled={isActionLoading}
-                                                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors disabled:opacity-50"
+                                                onClick={!hasEquipe ? undefined : onReporter}
+                                                disabled={isActionLoading || !hasEquipe}
+                                                className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
+                                                    !hasEquipe
+                                                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                                        : 'text-purple-700 bg-purple-100 hover:bg-purple-200'
+                                                }`}
+                                                title={!hasEquipe ? "Assignez d'abord une équipe à la tâche" : "Reporter"}
                                             >
                                                 <CalendarClock className="w-4 h-4" />
                                                 Reporter
@@ -309,9 +332,14 @@ export const TaskDetailPopover: FC<TaskDetailPopoverProps> = ({
                                         {/* Annuler */}
                                         {canAnnuler && onAnnuler && (
                                             <button
-                                                onClick={onAnnuler}
-                                                disabled={isActionLoading}
-                                                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-lg transition-colors disabled:opacity-50"
+                                                onClick={!hasEquipe ? undefined : onAnnuler}
+                                                disabled={isActionLoading || !hasEquipe}
+                                                className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
+                                                    !hasEquipe
+                                                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                                        : 'text-red-700 bg-red-100 hover:bg-red-200'
+                                                }`}
+                                                title={!hasEquipe ? "Assignez d'abord une équipe à la tâche" : "Annuler"}
                                             >
                                                 <XCircle className="w-4 h-4" />
                                                 Annuler
@@ -321,16 +349,21 @@ export const TaskDetailPopover: FC<TaskDetailPopoverProps> = ({
                                         {/* Restaurer */}
                                         {canRestaurer && onRestaurer && (
                                             <button
-                                                onClick={onRestaurer}
-                                                disabled={isActionLoading}
-                                                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-50"
+                                                onClick={!hasEquipe ? undefined : onRestaurer}
+                                                disabled={isActionLoading || !hasEquipe}
+                                                className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
+                                                    !hasEquipe
+                                                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                                        : 'text-slate-700 bg-slate-100 hover:bg-slate-200'
+                                                }`}
+                                                title={!hasEquipe ? "Assignez d'abord une équipe à la tâche" : "Restaurer"}
                                             >
                                                 <RotateCcw className="w-4 h-4" />
                                                 Restaurer
                                             </button>
                                         )}
 
-                                        {/* Historique */}
+                                        {/* Historique - toujours actif (lecture seule) */}
                                         {hasHistorique && onHistorique && (
                                             <button
                                                 onClick={onHistorique}
@@ -340,16 +373,6 @@ export const TaskDetailPopover: FC<TaskDetailPopoverProps> = ({
                                                 Historique
                                             </button>
                                         )}
-                                    </div>
-                                )}
-
-                                {/* Message si équipe manquante */}
-                                {distributionId && !hasEquipe && !isReadOnly && (
-                                    <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                                        <p className="text-sm text-amber-700">
-                                            <AlertTriangle className="w-4 h-4 inline mr-1" />
-                                            Assignez une équipe à la tâche pour pouvoir modifier les distributions.
-                                        </p>
                                     </div>
                                 )}
 

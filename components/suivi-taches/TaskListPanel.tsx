@@ -1,7 +1,7 @@
 import React from 'react';
 import {
     Calendar, MapPin, ChevronLeft, ChevronRight,
-    ChevronsLeft, ChevronsRight, Loader2
+    ChevronsLeft, ChevronsRight
 } from 'lucide-react';
 import { Tache, STATUT_TACHE_COLORS, STATUT_TACHE_LABELS } from '../../types/planning';
 
@@ -35,11 +35,15 @@ export const TaskListPanel: React.FC<TaskListPanelProps> = ({
     if (isHidden) return null;
 
     return (
-        <div className="flex-1 flex flex-col min-h-0">
-            <div className="flex-1 overflow-y-auto p-4 min-h-0">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            {/* Zone scrollable isolée */}
+            <div className="flex-1 overflow-y-auto">
                 {loading ? (
-                    <div className="flex justify-center p-12">
-                        <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+                    // ⚡ OPTIMISATION: Skeleton loading au lieu d'un simple spinner
+                    <div className="p-4 space-y-3">
+                        {[...Array(5)].map((_, i) => (
+                            <TaskCardSkeleton key={i} />
+                        ))}
                     </div>
                 ) : filteredTachesCount === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 text-slate-500">
@@ -47,8 +51,9 @@ export const TaskListPanel: React.FC<TaskListPanelProps> = ({
                         <p className="text-lg font-medium">Aucune tâche trouvée</p>
                     </div>
                 ) : (
-                    <div className="grid gap-3">
-                        {paginatedTaches.map(tache => (
+                    // Liste des tâches
+                    <div className="p-4 space-y-3">
+                        {paginatedTaches.map((tache) => (
                             <TaskCard
                                 key={tache.id}
                                 tache={tache}
@@ -60,9 +65,9 @@ export const TaskListPanel: React.FC<TaskListPanelProps> = ({
                 )}
             </div>
 
-            {/* Pagination Controls */}
+            {/* Pagination Controls - fixée en bas */}
             {filteredTachesCount > 0 && (
-                <div className="sticky bottom-0 bg-white border-t border-slate-200 px-6 py-3">
+                <div className="shrink-0 bg-white border-t border-slate-200 px-6 py-3">
                     <div className="flex items-center justify-between">
                         <div className="text-sm text-slate-600">
                             Affichage {(currentPage - 1) * itemsPerPage + 1} à {Math.min(currentPage * itemsPerPage, filteredTachesCount)} sur {filteredTachesCount}
@@ -164,5 +169,22 @@ const TaskCard: React.FC<TaskCardProps> = ({ tache, isSelected, onClick }) => {
         </div>
     );
 };
+
+// ⚡ OPTIMISATION: Skeleton component for loading state
+const TaskCardSkeleton: React.FC = () => (
+    <div className="bg-white rounded-xl border border-slate-200 p-4 animate-pulse">
+        <div className="flex justify-between items-start mb-2">
+            <div className="flex flex-col gap-1.5">
+                <div className="h-5 w-40 bg-slate-200 rounded" />
+                <div className="h-4 w-20 bg-slate-100 rounded" />
+            </div>
+            <div className="h-6 w-20 bg-slate-200 rounded-full" />
+        </div>
+        <div className="flex items-center gap-4">
+            <div className="h-4 w-24 bg-slate-100 rounded" />
+            <div className="h-4 w-32 bg-slate-100 rounded" />
+        </div>
+    </div>
+);
 
 export default TaskListPanel;

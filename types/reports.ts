@@ -25,6 +25,45 @@ export interface MonthlyReportTravail {
   count: number;
 }
 
+// Détail d'une tâche effectuée (pour la timeline)
+export interface MonthlyReportTravailDetail {
+  id: number;
+  reference: string;
+  date: string | null;
+  type: string;
+  equipes: string;
+  heures: number;
+  description?: string | null;
+}
+
+// Détail d'une tâche planifiée (pour la timeline)
+export interface MonthlyReportTravailPlanifieDetail {
+  id: number;
+  reference: string;
+  date_debut: string | null;
+  date_fin: string | null;
+  type: string;
+  equipes: string;
+  heures: number | null;
+  priorite: number;
+}
+
+// Format hybride pour travaux effectués
+export interface MonthlyReportTravauxEffectues {
+  par_type: MonthlyReportTravail[];
+  details: MonthlyReportTravailDetail[];
+  total: number;
+  error?: string;
+}
+
+// Format hybride pour travaux planifiés
+export interface MonthlyReportTravauxPlanifies {
+  par_type: MonthlyReportTravail[];
+  details: MonthlyReportTravailPlanifieDetail[];
+  total: number;
+  error?: string;
+}
+
 export interface MonthlyReportPhoto {
   id: number;
   url?: string;
@@ -79,8 +118,8 @@ export interface MonthlyReportEquipe {
 export interface MonthlyReportData {
   periode: MonthlyReportPeriode;
   site: MonthlyReportSite;
-  travaux_effectues: MonthlyReportTravail[];
-  travaux_planifies: MonthlyReportTravail[];
+  travaux_effectues: MonthlyReportTravauxEffectues;
+  travaux_planifies: MonthlyReportTravauxPlanifies;
   equipes: MonthlyReportEquipe[];
   photos: MonthlyReportPhotoGroup[];
   reclamations: MonthlyReportReclamation[];

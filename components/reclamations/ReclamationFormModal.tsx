@@ -159,6 +159,13 @@ export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
             return;
         }
 
+        // Validation: type_autre_description obligatoire si type = "Autre"
+        const selectedType = types.find(t => t.id === formData.type_reclamation);
+        if (selectedType?.code_reclamation === 'AUTRE-DIVERS' && !formData.type_autre_description?.trim()) {
+            setError('Veuillez préciser le type de réclamation');
+            return;
+        }
+
         setIsSubmitting(true);
 
         try {
@@ -171,6 +178,7 @@ export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
                 site: formData.site,
                 localisation: geometry, // Include drawn geometry
                 visible_client: formData.visible_client ?? true, // Par défaut visible
+                ...(formData.type_autre_description && { type_autre_description: formData.type_autre_description }),
             };
 
             // Create reclamation
@@ -282,7 +290,7 @@ export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
                 {/* Type de réclamation */}
                 <PremiumSelect
                     value={formData.type_reclamation?.toString() || ''}
-                    onChange={(value) => setFormData({ ...formData, type_reclamation: Number(value) })}
+                    onChange={(value) => setFormData({ ...formData, type_reclamation: Number(value), type_autre_description: undefined })}
                     options={[
                         { value: '', label: 'Sélectionner un type...' },
                         ...types.map(t => ({
@@ -297,6 +305,20 @@ export const ReclamationFormModal: React.FC<ReclamationFormModalProps> = ({
                     variant="outlined"
                     size="md"
                 />
+
+                {/* Champ conditionnel si "Autre" est sélectionné */}
+                {formData.type_reclamation && types.find(t => t.id === formData.type_reclamation)?.code_reclamation === 'AUTRE-DIVERS' && (
+                    <PremiumInput
+                        value={formData.type_autre_description || ''}
+                        onChange={(value) => setFormData({ ...formData, type_autre_description: value })}
+                        label="Précisez votre réclamation"
+                        placeholder="Ex: Problème d'éclairage, Nuisance sonore..."
+                        icon={<FileText className="w-4 h-4" />}
+                        required
+                        variant="outlined"
+                        size="md"
+                    />
+                )}
 
                 {/* Urgence */}
                 <PremiumSelect

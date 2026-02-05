@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { useLocation, Outlet } from 'react-router-dom';
+import { Menu } from 'lucide-react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { ViewState, User, MapSearchResult, SearchSuggestion, TargetLocation } from '../types';
@@ -13,6 +14,9 @@ interface LayoutProps {
   onLogout: () => void;
   isSidebarCollapsed: boolean;
   onToggleSidebar: () => void;
+  isMobile?: boolean;
+  isMobileSidebarOpen?: boolean;
+  onCloseMobileSidebar?: () => void;
 
   // Search Props (kept for compatibility but unused by Header now)
   searchQuery?: string;
@@ -34,6 +38,9 @@ const Layout: React.FC<LayoutProps> = ({
   onLogout,
   isSidebarCollapsed,
   onToggleSidebar,
+  isMobile = false,
+  isMobileSidebarOpen = false,
+  onCloseMobileSidebar,
 }) => {
   const location = useLocation();
   const isMapView = location.pathname === '/map' || location.pathname === '/';
@@ -54,24 +61,53 @@ const Layout: React.FC<LayoutProps> = ({
         </div>
       )}
 
-      {/* LAYER 1: Sidebar (z-700) - Positioned independently */}
-      <div className="absolute left-0 top-0 h-full pointer-events-auto z-[700]">
+      {/* Mobile sidebar backdrop */}
+      {isMobile && isMobileSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-[699] transition-opacity duration-300"
+          onClick={onCloseMobileSidebar}
+        />
+      )}
+
+      {/* LAYER 1: Sidebar (z-700) - Desktop: static, Mobile: overlay */}
+      <div
+        className={`
+          absolute left-0 top-0 h-full pointer-events-auto z-[700]
+          transition-transform duration-300 ease-[cubic-bezier(0.25,0.8,0.25,1)]
+          ${isMobile ? (isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0'}
+        `}
+      >
         <Sidebar
-          collapsed={isSidebarCollapsed}
+          collapsed={isMobile ? false : isSidebarCollapsed}
           onToggle={onToggleSidebar}
           onLogout={onLogout}
           userRole={user.role}
+          isMobile={isMobile}
+          onNavigate={isMobile ? onCloseMobileSidebar : undefined}
         />
       </div>
+
+      {/* Mobile hamburger button - visible on map view only on mobile */}
+      {isMobile && isMapView && (
+        <button
+          onClick={onToggleSidebar}
+          className="fixed top-3 left-3 z-[650] bg-white/90 backdrop-blur-md shadow-lg rounded-xl p-2.5 border border-white/20 ring-1 ring-black/5 pointer-events-auto"
+        >
+          <Menu className="w-5 h-5 text-slate-700" />
+        </button>
+      )}
 
       {/* LAYER 1: Floating Content Panel (Module) z-[500] - Positioned independently */}
       <div
         className={`
           pointer-events-auto
-          absolute top-4 bottom-4 right-4
-          bg-white/95 backdrop-blur-xl shadow-2xl rounded-2xl border border-white/20
+          absolute
+          top-0 bottom-0 right-0 left-0
+          md:top-4 md:bottom-4 md:right-4
+          bg-white/95 backdrop-blur-xl shadow-2xl
+          md:rounded-2xl md:border md:border-white/20
           transition-all duration-300 ease-[cubic-bezier(0.25,0.8,0.25,1)] flex flex-col overflow-hidden
-          ${isSidebarCollapsed ? 'left-[88px]' : 'left-[276px]'}
+          ${isMobile ? '' : (isSidebarCollapsed ? 'md:left-[88px]' : 'md:left-[276px]')}
           ${panelOpen
             ? 'z-[500] translate-x-0 opacity-100 scale-100'
             : 'invisible -z-10 pointer-events-none translate-x-[20px] opacity-0 scale-95'}
@@ -84,11 +120,12 @@ const Layout: React.FC<LayoutProps> = ({
               <Header
                 user={user}
                 collapsed={false}
+                onToggleMobileSidebar={isMobile ? onToggleSidebar : undefined}
               />
             </div>
 
             {/* Panel Content */}
-            <div className="flex-1 overflow-y-auto p-0 bg-slate-50/50">
+            <div className="flex-1 min-h-0 overflow-y-auto p-0 bg-slate-50/50">
               <Outlet />
             </div>
           </>

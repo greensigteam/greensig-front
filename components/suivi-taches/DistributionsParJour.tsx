@@ -131,87 +131,92 @@ export const DistributionsParJour: React.FC<DistributionsParJourProps> = ({
         return ALLOWED_DISTRIBUTION_TRANSITIONS[currentStatus]?.includes(targetStatus);
     };
 
-    return (
-        <div className="flex flex-col h-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            {/* Header avec navigation de date */}
-            <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-emerald-50 to-teal-50">
-                <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                        <Calendar className="w-5 h-5 text-emerald-600" />
-                        <h2 className="text-lg font-semibold text-slate-800">
-                            Distributions du jour
-                        </h2>
-                    </div>
-
-                    {/* Navigation rapide */}
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => navigateDate(-1)}
-                            className="p-2 hover:bg-emerald-100 rounded-lg transition-colors"
-                            title="Jour précédent"
-                        >
-                            <ChevronLeft className="w-5 h-5 text-slate-600" />
-                        </button>
-
-                        <input
-                            type="date"
-                            value={selectedDate}
-                            onChange={(e) => onDateChange(e.target.value)}
-                            className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                        />
-
-                        <button
-                            onClick={() => navigateDate(1)}
-                            className="p-2 hover:bg-emerald-100 rounded-lg transition-colors"
-                            title="Jour suivant"
-                        >
-                            <ChevronRight className="w-5 h-5 text-slate-600" />
-                        </button>
-
-                        {!isToday && (
-                            <button
-                                onClick={goToToday}
-                                className="px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition-colors"
-                            >
-                                Aujourd'hui
-                            </button>
-                        )}
-                    </div>
+    // Rendu du bloc navigation + stats (partagé desktop/mobile)
+    const renderDateNav = () => (
+        <>
+            <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-emerald-600" />
+                    <h2 className="text-base lg:text-lg font-semibold text-slate-800">
+                        Distributions du jour
+                    </h2>
                 </div>
-
-                {/* Date affichée */}
-                <p className="text-sm text-slate-600 capitalize">
-                    {formatDisplayDate(selectedDate)}
-                    {isToday && (
-                        <span className="ml-2 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">
-                            Aujourd'hui
-                        </span>
-                    )}
-                </p>
-
-                {/* Statistiques */}
-                <div className="flex flex-wrap gap-2 mt-3">
-                    {Object.entries(stats).map(([status, count]) => {
-                        if (count === 0) return null;
-                        const colors = STATUS_DISTRIBUTION_COLORS[status as StatusDistribution];
-                        return (
-                            <span
-                                key={status}
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full ${colors?.bg || 'bg-slate-100'} ${colors?.text || 'text-slate-700'}`}
-                            >
-                                {getStatusIcon(status as StatusDistribution)}
-                                {STATUS_DISTRIBUTION_LABELS[status as StatusDistribution] || status}: {count}
-                            </span>
-                        );
-                    })}
-                    {distributions.length === 0 && !loading && (
-                        <span className="text-sm text-slate-500">Aucune distribution</span>
+                <div className="flex items-center gap-1 lg:gap-2">
+                    <button
+                        onClick={() => navigateDate(-1)}
+                        className="p-1.5 lg:p-2 hover:bg-emerald-100 rounded-lg transition-colors"
+                        title="Jour précédent"
+                    >
+                        <ChevronLeft className="w-4 h-4 lg:w-5 lg:h-5 text-slate-600" />
+                    </button>
+                    <input
+                        type="date"
+                        value={selectedDate}
+                        onChange={(e) => onDateChange(e.target.value)}
+                        className="px-2 lg:px-3 py-1 lg:py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                    />
+                    <button
+                        onClick={() => navigateDate(1)}
+                        className="p-1.5 lg:p-2 hover:bg-emerald-100 rounded-lg transition-colors"
+                        title="Jour suivant"
+                    >
+                        <ChevronRight className="w-4 h-4 lg:w-5 lg:h-5 text-slate-600" />
+                    </button>
+                    {!isToday && (
+                        <button
+                            onClick={goToToday}
+                            className="px-2 lg:px-3 py-1 lg:py-1.5 text-xs font-medium text-emerald-700 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition-colors"
+                        >
+                            Auj.
+                        </button>
                     )}
                 </div>
             </div>
+            <p className="text-sm text-slate-600 capitalize">
+                {formatDisplayDate(selectedDate)}
+                {isToday && (
+                    <span className="ml-2 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">
+                        Aujourd'hui
+                    </span>
+                )}
+            </p>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+                {Object.entries(stats).map(([status, count]) => {
+                    if (count === 0) return null;
+                    const colors = STATUS_DISTRIBUTION_COLORS[status as StatusDistribution];
+                    return (
+                        <span
+                            key={status}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${colors?.bg || 'bg-slate-100'} ${colors?.text || 'text-slate-700'}`}
+                        >
+                            {getStatusIcon(status as StatusDistribution)}
+                            {STATUS_DISTRIBUTION_LABELS[status as StatusDistribution] || status}: {count}
+                        </span>
+                    );
+                })}
+                {distributions.length === 0 && !loading && (
+                    <span className="text-sm text-slate-500">Aucune distribution</span>
+                )}
+            </div>
+        </>
+    );
 
-            {/* Liste des distributions */}
-            <div className="flex-1 overflow-y-auto p-4">
+    return (
+        <div className="flex flex-col h-full bg-white lg:rounded-xl lg:shadow-sm lg:border lg:border-slate-200">
+            {/* ═══ Header fixe — DESKTOP UNIQUEMENT ═══ */}
+            <div className="hidden lg:block shrink-0 p-4 border-b border-slate-200 bg-gradient-to-r from-emerald-50 to-teal-50 lg:rounded-t-xl">
+                {renderDateNav()}
+            </div>
+
+            {/* ═══ Zone scrollable ═══ */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+                {/* MOBILE: navigation dans le scroll */}
+                <div className="lg:hidden p-3 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-slate-200">
+                    {renderDateNav()}
+                </div>
+
+                {/* Liste des distributions */}
+                <div className="p-3 lg:p-4">
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-12">
                         <div className="w-10 h-10 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
@@ -238,6 +243,9 @@ export const DistributionsParJour: React.FC<DistributionsParJourProps> = ({
                             const canAnnuler = isActionAllowed(status, 'ANNULEE');
                             const canRestaurer = isActionAllowed(status, 'NON_REALISEE') && status === 'ANNULEE';
                             const hasHistorique = (distribution.nombre_reports ?? 0) > 0;
+                            // Vérifier si une équipe est assignée à la tâche
+                            const hasEquipe = distribution.tache_equipes && distribution.tache_equipes.length > 0;
+                            const isBlockedByNoEquipe = !hasEquipe && !isClientView;
 
                             return (
                                 <div
@@ -272,6 +280,14 @@ export const DistributionsParJour: React.FC<DistributionsParJourProps> = ({
                                             {hasHistorique && (
                                                 <span className="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded-full">
                                                     {distribution.nombre_reports} report{distribution.nombre_reports > 1 ? 's' : ''}
+                                                </span>
+                                            )}
+
+                                            {/* Badge "Sans équipe" */}
+                                            {isBlockedByNoEquipe && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 border border-yellow-300 rounded-full">
+                                                    <AlertTriangle className="w-3 h-3" />
+                                                    Sans équipe
                                                 </span>
                                             )}
                                         </div>
@@ -336,9 +352,14 @@ export const DistributionsParJour: React.FC<DistributionsParJourProps> = ({
                                             {/* Démarrer */}
                                             {canDemarrer && onDemarrer && (
                                                 <button
-                                                    onClick={() => onDemarrer(distribution.id)}
-                                                    disabled={isActionLoading}
-                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors disabled:opacity-50"
+                                                    onClick={isBlockedByNoEquipe ? undefined : () => onDemarrer(distribution.id)}
+                                                    disabled={isActionLoading || isBlockedByNoEquipe}
+                                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 ${
+                                                        isBlockedByNoEquipe
+                                                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                                            : 'text-white bg-orange-500 hover:bg-orange-600'
+                                                    }`}
+                                                    title={isBlockedByNoEquipe ? "Assignez d'abord une équipe à la tâche" : "Démarrer"}
                                                 >
                                                     <Play className="w-3.5 h-3.5" />
                                                     Démarrer
@@ -348,9 +369,14 @@ export const DistributionsParJour: React.FC<DistributionsParJourProps> = ({
                                             {/* Terminer */}
                                             {canTerminer && onTerminer && (
                                                 <button
-                                                    onClick={() => onTerminer(distribution.id)}
-                                                    disabled={isActionLoading}
-                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-green-500 hover:bg-green-600 rounded-lg transition-colors disabled:opacity-50"
+                                                    onClick={isBlockedByNoEquipe ? undefined : () => onTerminer(distribution.id)}
+                                                    disabled={isActionLoading || isBlockedByNoEquipe}
+                                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 ${
+                                                        isBlockedByNoEquipe
+                                                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                                            : 'text-white bg-green-500 hover:bg-green-600'
+                                                    }`}
+                                                    title={isBlockedByNoEquipe ? "Assignez d'abord une équipe à la tâche" : "Terminer"}
                                                 >
                                                     <CheckCircle className="w-3.5 h-3.5" />
                                                     Terminer
@@ -360,9 +386,14 @@ export const DistributionsParJour: React.FC<DistributionsParJourProps> = ({
                                             {/* Reporter */}
                                             {canReporter && onReporter && (
                                                 <button
-                                                    onClick={() => onReporter(distribution)}
-                                                    disabled={isActionLoading}
-                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors disabled:opacity-50"
+                                                    onClick={isBlockedByNoEquipe ? undefined : () => onReporter(distribution)}
+                                                    disabled={isActionLoading || isBlockedByNoEquipe}
+                                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 ${
+                                                        isBlockedByNoEquipe
+                                                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                                            : 'text-purple-700 bg-purple-100 hover:bg-purple-200'
+                                                    }`}
+                                                    title={isBlockedByNoEquipe ? "Assignez d'abord une équipe à la tâche" : "Reporter"}
                                                 >
                                                     <CalendarClock className="w-3.5 h-3.5" />
                                                     Reporter
@@ -372,9 +403,14 @@ export const DistributionsParJour: React.FC<DistributionsParJourProps> = ({
                                             {/* Annuler */}
                                             {canAnnuler && onAnnuler && (
                                                 <button
-                                                    onClick={() => onAnnuler(distribution)}
-                                                    disabled={isActionLoading}
-                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-lg transition-colors disabled:opacity-50"
+                                                    onClick={isBlockedByNoEquipe ? undefined : () => onAnnuler(distribution)}
+                                                    disabled={isActionLoading || isBlockedByNoEquipe}
+                                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 ${
+                                                        isBlockedByNoEquipe
+                                                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                                            : 'text-red-700 bg-red-100 hover:bg-red-200'
+                                                    }`}
+                                                    title={isBlockedByNoEquipe ? "Assignez d'abord une équipe à la tâche" : "Annuler"}
                                                 >
                                                     <XCircle className="w-3.5 h-3.5" />
                                                     Annuler
@@ -384,9 +420,14 @@ export const DistributionsParJour: React.FC<DistributionsParJourProps> = ({
                                             {/* Restaurer */}
                                             {canRestaurer && onRestaurer && (
                                                 <button
-                                                    onClick={() => onRestaurer(distribution.id)}
-                                                    disabled={isActionLoading}
-                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-50"
+                                                    onClick={isBlockedByNoEquipe ? undefined : () => onRestaurer(distribution.id)}
+                                                    disabled={isActionLoading || isBlockedByNoEquipe}
+                                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 ${
+                                                        isBlockedByNoEquipe
+                                                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                                            : 'text-slate-700 bg-slate-100 hover:bg-slate-200'
+                                                    }`}
+                                                    title={isBlockedByNoEquipe ? "Assignez d'abord une équipe à la tâche" : "Restaurer"}
                                                 >
                                                     <RotateCcw className="w-3.5 h-3.5" />
                                                     Restaurer
@@ -410,21 +451,22 @@ export const DistributionsParJour: React.FC<DistributionsParJourProps> = ({
                         })}
                     </div>
                 )}
-            </div>
-
-            {/* Footer avec résumé */}
-            {sortedDistributions.length > 0 && (
-                <div className="p-4 border-t border-slate-200 bg-slate-50">
-                    <div className="flex items-center justify-between text-sm">
-                        <span className="text-slate-600">
-                            {sortedDistributions.length} distribution{sortedDistributions.length > 1 ? 's' : ''}
-                        </span>
-                        <span className="font-medium text-slate-700">
-                            Total: {sortedDistributions.reduce((sum, d) => sum + (d.heures_planifiees || 0), 0).toFixed(2)}h planifiées
-                        </span>
-                    </div>
                 </div>
-            )}
+
+                {/* Footer résumé (dans le scroll) */}
+                {sortedDistributions.length > 0 && (
+                    <div className="p-3 lg:p-4 border-t border-slate-200 bg-slate-50 lg:rounded-b-xl">
+                        <div className="flex items-center justify-between text-sm">
+                            <span className="text-slate-600">
+                                {sortedDistributions.length} distribution{sortedDistributions.length > 1 ? 's' : ''}
+                            </span>
+                            <span className="font-medium text-slate-700">
+                                Total: {sortedDistributions.reduce((sum, d) => sum + (d.heures_planifiees || 0), 0).toFixed(2)}h
+                            </span>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

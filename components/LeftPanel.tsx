@@ -111,7 +111,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({ onToggleLayer, isSidebarCollapsed
   // Adjust position based on sidebar state
   // Sidebar collapsed is 80px (approx 5rem) -> Panel at 100px
   // Sidebar expanded is 256px (approx 16rem) -> Panel at 280px
-  const leftPosition = isSidebarCollapsed ? 'left-[90px]' : 'left-[280px]';
+  const leftPosition = isSidebarCollapsed ? 'left-2 md:left-[90px]' : 'left-2 md:left-[280px]';
 
   return (
     <div
@@ -124,7 +124,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({ onToggleLayer, isSidebarCollapsed
           className={`
             bg-white/95 backdrop-blur-sm shadow-xl rounded-lg border border-gray-200 overflow-hidden
             transition-all duration-300 ease-in-out
-            ${open ? 'w-[320px] opacity-100' : 'w-0 opacity-0 border-none'}
+            ${open ? 'w-[calc(100vw-16px)] md:w-[320px] max-w-[calc(100vw-16px)] opacity-100' : 'w-0 opacity-0 border-none'}
           `}
           style={{ maxHeight: 'calc(100vh - 120px)' }}
         >

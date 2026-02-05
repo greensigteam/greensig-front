@@ -216,7 +216,7 @@ const KPIDetail: React.FC = () => {
     // Vérifier que le KPI existe
     if (!kpiKey || !ALL_KPI_KEYS.includes(kpiKey as typeof ALL_KPI_KEYS[number])) {
         return (
-            <div className="h-screen flex items-center justify-center p-6 bg-slate-50">
+            <div className="flex items-center justify-center p-6 bg-slate-50 min-h-[400px]">
                 <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
                     <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-3" />
                     <h3 className="text-lg font-semibold text-red-800 mb-2">KPI non trouvé</h3>
@@ -235,7 +235,7 @@ const KPIDetail: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="h-screen flex items-center justify-center bg-slate-50">
+            <div className="flex items-center justify-center bg-slate-50 min-h-[400px]">
                 <LoadingScreen isLoading={true} loop={true} minDuration={0} />
             </div>
         );
@@ -243,7 +243,7 @@ const KPIDetail: React.FC = () => {
 
     if (error) {
         return (
-            <div className="h-screen flex items-center justify-center p-6 bg-slate-50">
+            <div className="flex items-center justify-center p-6 bg-slate-50 min-h-[400px]">
                 <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
                     <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-3" />
                     <h3 className="text-lg font-semibold text-red-800 mb-2">Erreur de chargement</h3>
@@ -271,7 +271,7 @@ const KPIDetail: React.FC = () => {
     const selectedSiteName = data.sites_disponibles.find(s => s.id.toString() === selectedSite)?.nom;
 
     return (
-        <div className="h-screen flex flex-col overflow-hidden bg-slate-50">
+        <div className="flex flex-col bg-slate-50">
             {/* Header avec navigation */}
             <div className="bg-white border-b border-slate-200 flex-shrink-0 z-10">
                 <div className="max-w-7xl mx-auto px-6 py-4">
@@ -606,26 +606,42 @@ const KPIDetail: React.FC = () => {
                         {/* Affichage spécifique selon le KPI */}
                         {kpiKey === 'respect_planning' && kpi.details && (
                             <div className="space-y-4">
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     <div className="text-center p-4 bg-emerald-50 rounded-lg">
                                         <div className="text-3xl font-bold text-emerald-600">
                                             {kpi.details.taches_conformes ?? 0}
                                         </div>
-                                        <div className="text-sm text-emerald-700">Tâches dans les délais</div>
+                                        <div className="text-sm text-emerald-700">Dans les délais</div>
                                     </div>
                                     <div className="text-center p-4 bg-orange-50 rounded-lg">
                                         <div className="text-3xl font-bold text-orange-600">
                                             {kpi.details.taches_retard_1_7j ?? 0}
                                         </div>
-                                        <div className="text-sm text-orange-700">Tâches en retard</div>
+                                        <div className="text-sm text-orange-700">Retard 1-7j</div>
                                     </div>
                                     <div className="text-center p-4 bg-red-50 rounded-lg">
                                         <div className="text-3xl font-bold text-red-600">
                                             {kpi.details.taches_retard_critique ?? 0}
                                         </div>
-                                        <div className="text-sm text-red-700">Retards &gt; 7 jours</div>
+                                        <div className="text-sm text-red-700">Retard &gt; 7j</div>
+                                    </div>
+                                    <div className="text-center p-4 bg-slate-50 rounded-lg">
+                                        <div className="text-3xl font-bold text-slate-600">
+                                            {kpi.details.taches_non_terminees ?? 0}
+                                        </div>
+                                        <div className="text-sm text-slate-500">Non terminées</div>
                                     </div>
                                 </div>
+
+                                {/* Alerte si tâches non terminées */}
+                                {(kpi.details.taches_non_terminees ?? 0) > 0 && (
+                                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                        <div className="flex items-center gap-2 text-yellow-700 text-sm">
+                                            <AlertTriangle className="w-4 h-4" />
+                                            {kpi.details.taches_non_terminees} tâche(s) planifiée(s) non encore terminée(s) — comptées comme non conformes
+                                        </div>
+                                    </div>
+                                )}
 
                                 {kpi.details.details_retards_critiques?.length > 0 && (
                                     <div className="mt-4">
@@ -755,23 +771,81 @@ const KPIDetail: React.FC = () => {
                         )}
 
                         {kpiKey === 'temps_travail_par_site' && kpi.details?.par_site && (
-                            <div className="space-y-4">
-                                <div className="h-64">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={kpi.details.par_site} layout="vertical" margin={{ left: 100 }}>
-                                            <CartesianGrid strokeDasharray="3 3" />
-                                            <XAxis type="number" />
-                                            <YAxis
-                                                dataKey="site_nom"
-                                                type="category"
-                                                tick={{ fontSize: 12 }}
-                                                width={100}
-                                            />
-                                            <Tooltip formatter={(value: number) => [`${value}h`, 'Heures']} />
-                                            <Bar dataKey="heures" name="Heures" fill={color} radius={[0, 4, 4, 0]} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
+                            <div className="space-y-6">
+                                {/* Graphique par site */}
+                                <div>
+                                    <h4 className="text-sm font-medium text-slate-700 mb-3">Par site</h4>
+                                    <div className="h-64">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={kpi.details.par_site} layout="vertical" margin={{ left: 100 }}>
+                                                <CartesianGrid strokeDasharray="3 3" />
+                                                <XAxis type="number" />
+                                                <YAxis
+                                                    dataKey="site_nom"
+                                                    type="category"
+                                                    tick={{ fontSize: 12 }}
+                                                    width={100}
+                                                />
+                                                <Tooltip formatter={(value: number) => [`${value}h`, 'Heures']} />
+                                                <Bar dataKey="heures" name="Heures" fill={color} radius={[0, 4, 4, 0]} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
                                 </div>
+
+                                {/* Détail par jour */}
+                                {kpi.details.par_jour?.length > 0 && (
+                                    <div>
+                                        <h4 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
+                                            <Calendar className="w-4 h-4" />
+                                            Par jour
+                                        </h4>
+                                        <div className="h-48">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={kpi.details.par_jour}>
+                                                    <CartesianGrid strokeDasharray="3 3" />
+                                                    <XAxis
+                                                        dataKey="date"
+                                                        tick={{ fontSize: 10 }}
+                                                        tickFormatter={(value: string) => new Date(value).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+                                                    />
+                                                    <YAxis tick={{ fontSize: 11 }} />
+                                                    <Tooltip
+                                                        labelFormatter={(value: string) => new Date(value).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                                        formatter={(value: number, name: string) => [
+                                                            name === 'heures' ? `${value}h` : value,
+                                                            name === 'heures' ? 'Heures' : 'Distributions'
+                                                        ]}
+                                                    />
+                                                    <Bar dataKey="heures" name="heures" fill={color} radius={[4, 4, 0, 0]} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Détail par type de tâche */}
+                                {kpi.details.par_type_tache?.length > 0 && (
+                                    <div>
+                                        <h4 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
+                                            <Layers className="w-4 h-4" />
+                                            Par type de tâche
+                                        </h4>
+                                        <div className="space-y-2">
+                                            {kpi.details.par_type_tache.map((item: any, index: number) => (
+                                                <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                                    <span className="text-sm text-slate-700">
+                                                        {item.tache__id_type_tache__nom_tache || 'Non défini'}
+                                                    </span>
+                                                    <div className="text-right">
+                                                        <span className="text-sm font-medium text-slate-800">{item.heures?.toFixed(1)}h</span>
+                                                        <span className="text-xs text-slate-400 ml-2">({item.nb_taches} tâches)</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

@@ -997,7 +997,7 @@ const Inventory: React.FC<InventoryProps> = ({ user }) => {
   };
 
   return (
-    <div className="p-6 h-full flex flex-col">
+    <div className="p-4 md:p-6 flex flex-col">
       {/* Styles pour l'impression */}
       <style>{`
         @media print {

@@ -450,7 +450,7 @@ const SiteDetailPage: React.FC = () => {
     if (!site) return <ErrorDisplay message="Site non trouvé." />;
 
     return (
-        <div className="h-full bg-white flex flex-col">
+        <div className="bg-white flex flex-col">
             {/* Header */}
             <header className="flex-shrink-0 bg-white border-b border-slate-200 p-4 flex justify-between items-center">
                 <div className="flex items-center gap-4">

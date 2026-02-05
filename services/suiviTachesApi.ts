@@ -307,10 +307,29 @@ export const fetchPhotos = async (params?: {
 };
 
 export const fetchPhotosParTache = async (tacheId: number): Promise<PhotoList[]> => {
-    const response = await fetch(`${API_BASE_URL}/photos/par_tache/?tache_id=${tacheId}`, {
-        headers: getAuthHeaders()
-    });
-    return handleResponse<PhotoList[]>(response);
+    // ⚡ OPTIMISATION: Le backend renvoie maintenant des réponses paginées
+    // On récupère toutes les pages pour garder la compatibilité
+    const allPhotos: PhotoList[] = [];
+    let nextUrl: string | null = `${API_BASE_URL}/photos/par_tache/?tache_id=${tacheId}`;
+
+    while (nextUrl) {
+        const response = await fetch(nextUrl, { headers: getAuthHeaders() });
+        const data = await handleResponse<any>(response);
+
+        // Gérer les réponses paginées (results + next) et non-paginées (array)
+        if (Array.isArray(data)) {
+            // Réponse non-paginée (fallback)
+            return data;
+        }
+
+        // Réponse paginée
+        if (data.results) {
+            allPhotos.push(...data.results);
+        }
+        nextUrl = data.next || null;
+    }
+
+    return allPhotos;
 };
 
 export const fetchPhotosAvant = async (tacheId: number): Promise<PhotoList[]> => {

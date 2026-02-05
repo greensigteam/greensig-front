@@ -152,7 +152,7 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
                 <h3 className="text-sm font-semibold text-slate-800">Informations générales</h3>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Nom de l'équipe */}
               <PremiumInput
                 type="text"

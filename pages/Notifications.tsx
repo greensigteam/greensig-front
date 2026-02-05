@@ -386,7 +386,7 @@ export default function NotificationsPage({ user }: NotificationsPageProps) {
   const unreadCount = notifications.filter(n => !n.lu).length;
 
   return (
-    <div className="h-screen flex flex-col bg-slate-50 overflow-hidden">
+    <div className="flex flex-col bg-slate-50">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-6 py-4 mx-6 mt-6 mb-4 rounded-xl shadow-sm flex-shrink-0">
         <div className="flex items-center justify-between">

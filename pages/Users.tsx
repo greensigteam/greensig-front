@@ -1049,7 +1049,7 @@ const Users: React.FC<UsersProps> = ({ triggerCreate }) => {
   }
 
   return (
-    <div className="p-4 sm:p-6 h-full flex flex-col overflow-hidden">
+    <div className="p-4 md:p-6 flex flex-col">
       {/* Stats Cards */}
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6 flex-shrink-0">

@@ -146,7 +146,7 @@ function DataTableInner<T extends Record<string, any>>({
     }, [totalPages, serverSide, onPageChange]);
 
     return (
-        <div className="bg-white h-full flex flex-col">
+        <div className="bg-white flex flex-col">
             {/* Header with Export */}
             {showExport && (
                 <div className="p-3 md:p-4 border-b border-gray-200 flex justify-between items-center flex-shrink-0 gap-2">
@@ -165,7 +165,7 @@ function DataTableInner<T extends Record<string, any>>({
 
             {/* Table with scroll area and sticky pagination */}
             <div className="relative border-b border-gray-200">
-                <div className="max-h-[500px] overflow-auto">
+                <div className="max-h-[50vh] md:max-h-[500px] overflow-auto">
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead className="bg-gray-50 border-b border-gray-200">

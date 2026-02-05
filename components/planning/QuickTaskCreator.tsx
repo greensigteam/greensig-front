@@ -9,6 +9,7 @@ import { TypeTache, TacheCreate, PrioriteTache, DistributionChargeData } from '.
 import { EquipeList } from '../../types/users';
 import { InventoryObjectOption } from './TaskFormModal';
 import { DistributionChargeEditor } from './DistributionChargeEditor';
+import { RecurrenceSelector, type RecurrenceConfig } from './RecurrenceSelector';
 import { DataTable, Column } from '../DataTable';
 import { StatusBadge } from '../StatusBadge';
 import { PremiumInput } from '../modals/PremiumFormComponents';
@@ -255,6 +256,14 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
     // Mode de planification: 'simple' ou 'multi-jours'
     const [modeDistribution, setModeDistribution] = useState<'simple' | 'multi-jours'>('simple');
 
+    // ✅ Récurrence (pour créer plusieurs tâches automatiquement)
+    const [recurrenceConfig, setRecurrenceConfig] = useState<RecurrenceConfig>({
+        enabled: false,
+        mode: 'frequency',
+        conserver_equipes: true,
+        conserver_objets: true
+    });
+
     // ✅ PHASE 1: États pour planification intelligente
     const [ratios, setRatios] = useState<RatioProductivite[]>([]);
     const [loadingRatios, setLoadingRatios] = useState(false);
@@ -265,6 +274,13 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
     const [loadingObjects, setLoadingObjects] = useState(false);
     const [availableObjects, setAvailableObjects] = useState<InventoryObjectOption[]>([]);
     const [filteredTypesTaches, setFilteredTypesTaches] = useState<TypeTache[]>(typesTaches);
+
+    // Sync filteredTypesTaches when typesTaches prop changes (async loading)
+    useEffect(() => {
+        console.log('[QuickTaskCreator] typesTaches prop received:', typesTaches.length, 'types');
+        console.log('[QuickTaskCreator] Traitement types:', typesTaches.filter(t => t.nom_tache.toLowerCase().includes('traitement')).map(t => t.nom_tache));
+        setFilteredTypesTaches(typesTaches);
+    }, [typesTaches]);
 
     // Search queries
     const [typeSearchQuery, setTypeSearchQuery] = useState('');
@@ -318,14 +334,23 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
         console.log('[QuickTaskCreator] Sites count:', sites.length);
     }, [sites]);
 
-    // ✅ PHASE 1: Charger les ratios de productivité au montage
+    // ✅ PHASE 1: Charger les ratios de productivité quand le type de tâche change
+    // On filtre par type de tâche pour éviter les problèmes de pagination (seulement 20 ratios par page)
     useEffect(() => {
+        if (!selectedType) {
+            setRatios([]);
+            return;
+        }
+
         setLoadingRatios(true);
-        planningService.getRatios({ actif: true })
-            .then(setRatios)
+        planningService.getRatios({ type_tache_id: selectedType.id, actif: true })
+            .then(loadedRatios => {
+                console.log(`✅ [QuickTaskCreator] Loaded ${loadedRatios.length} ratios for task type ${selectedType.id} (${selectedType.nom_tache})`);
+                setRatios(loadedRatios);
+            })
             .catch(err => console.error('Erreur chargement ratios:', err))
             .finally(() => setLoadingRatios(false));
-    }, []);
+    }, [selectedType]);
 
     // Filter types by search
     const filteredTypes = useMemo(() => {
@@ -542,7 +567,9 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                 id_client: null,
                 reclamation: null,
                 charge_estimee_heures: chargePreview?.totalHeures || null,
-                distributions_charge_data: sortedDistributions
+                distributions_charge_data: sortedDistributions,
+                // Recurrence config (if enabled)
+                ...(recurrenceConfig.enabled && { recurrence_config: recurrenceConfig })
             };
         } else {
             // Mode simple: utiliser les horaires
@@ -571,7 +598,9 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                     heure_debut: startTime,
                     heure_fin: endTime,
                     commentaire: ''
-                }]
+                }],
+                // Recurrence config (if enabled)
+                ...(recurrenceConfig.enabled && { recurrence_config: recurrenceConfig })
             };
         }
 
@@ -1144,6 +1173,16 @@ export const QuickTaskCreator: FC<QuickTaskCreatorProps> = ({
                                         rows={3}
                                         className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all resize-none"
                                         placeholder="Ajoutez des notes ou instructions..."
+                                    />
+                                </div>
+
+                                {/* Récurrence */}
+                                <div className="mt-4">
+                                    <RecurrenceSelector
+                                        dateDebut={format(initialDate, 'yyyy-MM-dd')}
+                                        dateFin={format(initialDate, 'yyyy-MM-dd')}
+                                        value={recurrenceConfig}
+                                        onChange={setRecurrenceConfig}
                                     />
                                 </div>
 

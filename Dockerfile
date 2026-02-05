@@ -18,8 +18,8 @@ WORKDIR /app
 # Copier les fichiers de dependances
 COPY package*.json ./
 
-# Installer les dependances
-RUN npm ci --silent
+# Installer les dependances (--legacy-peer-deps pour React 19 avec libs pas encore compatibles)
+RUN npm ci --legacy-peer-deps
 
 # Copier le code source
 COPY . .

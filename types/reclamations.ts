@@ -11,7 +11,6 @@ export interface Urgence {
     id: number;
     niveau_urgence: string;
     couleur: string;
-    delai_max_traitement: number;
     ordre: number;
 }
 
@@ -52,6 +51,7 @@ export interface Reclamation {
     equipe_nom?: string | null;
 
     description: string;
+    type_autre_description?: string | null; // Précision si type = "Autre"
     localisation?: any;
 
     date_creation: string;
@@ -60,7 +60,6 @@ export interface Reclamation {
     statut: string;
     statut_display?: string;
 
-    date_cloture_prevue?: string | null;
     date_prise_en_compte?: string | null;
     date_debut_traitement?: string | null;
     date_resolution?: string | null;
@@ -110,6 +109,7 @@ export interface ReclamationCreate {
     site?: number | null;
     zone?: number | null;
     description: string;
+    type_autre_description?: string; // Obligatoire si type = "Autre"
     date_constatation?: string;
     localisation?: any;
     photos?: any[];

@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Map as MapIcon, Package, Calendar,
-  ClipboardList, Users, UserCog, BarChart3,
+  ClipboardList, Users, UserCog, BarChart3, Building2,
   LogOut, ChevronLeft, ChevronRight, AlertCircle, MapPin, Gauge, FileText, MessageSquare,
-  Settings, ChevronDown
+  Settings, ChevronDown, X
 } from 'lucide-react';
 import { ViewState, Role } from '../types';
 
@@ -13,6 +13,8 @@ interface SidebarProps {
   userRole: Role;
   collapsed: boolean;
   onToggle: () => void;
+  isMobile?: boolean;
+  onNavigate?: () => void;
 }
 
 const viewToPath: Record<string, string> = {
@@ -67,7 +69,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   userRole,
   collapsed,
-  onToggle
+  onToggle,
+  isMobile = false,
+  onNavigate,
 }) => {
   const location = useLocation();
   const [openGroups, setOpenGroups] = useState<string[]>([]);
@@ -86,7 +90,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'MAP', label: 'Cartographie', icon: MapIcon, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'SITES', label: 'Gestion des sites', icon: MapPin, roles: ['ADMIN', 'SUPERVISEUR'] },
-    { id: 'CLIENTS', label: 'Clients', icon: Users, roles: ['ADMIN'] },
+    { id: 'CLIENTS', label: 'Clients', icon: Building2, roles: ['ADMIN'] },
     { id: 'PRODUCTS', label: 'Gestion de produits', icon: Package, roles: ['ADMIN'] },
     { id: 'PLANNING', label: 'Planification', icon: Calendar, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'INTERVENTIONS', label: 'Réclamations', icon: AlertCircle, roles: ['ADMIN', 'SUPERVISEUR'] },
@@ -129,7 +133,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       {/* Brand Section */}
       <div className={`
         flex items-center h-16 px-4 bg-emerald-900/30
-        ${collapsed ? 'justify-center' : 'justify-start gap-3'}
+        ${collapsed ? 'justify-center' : 'justify-between gap-3'}
       `}>
         {/* Logo */}
         {collapsed ? (
@@ -141,15 +145,25 @@ const Sidebar: React.FC<SidebarProps> = ({
             />
           </div>
         ) : (
-          <div className="max-w-[160px] w-full mx-auto">
-            <div className="inline-block bg-transparent rounded-sm p-0 overflow-hidden h-14 flex items-center justify-center">
-              <img
-                src="/logofinal.png"
-                alt="GreenSIG Logo"
-                className="w-auto h-10 object-contain"
-              />
+          <>
+            <div className="max-w-[160px] w-full">
+              <div className="inline-block bg-transparent rounded-sm p-0 overflow-hidden h-14 flex items-center justify-center">
+                <img
+                  src="/logofinal.png"
+                  alt="GreenSIG Logo"
+                  className="w-auto h-10 object-contain"
+                />
+              </div>
             </div>
-          </div>
+            {isMobile && (
+              <button
+                onClick={onNavigate}
+                className="p-1.5 text-emerald-300/70 hover:text-white hover:bg-emerald-800/30 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -200,6 +214,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                           <li key={child.id}>
                             <NavLink
                               to={viewToPath[child.id] || '#'}
+                              onClick={onNavigate}
                               className={({ isActive }) =>
                                 `w-full flex items-center rounded-lg transition-all duration-200 group relative px-3 py-2 gap-3
                                 ${isActive
@@ -233,6 +248,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 // Regular menu item
                 <NavLink
                   to={viewToPath[entry.id] || '#'}
+                  onClick={onNavigate}
                   className={({ isActive }) =>
                     `w-full flex items-center rounded-lg transition-all duration-200 group relative
                     ${collapsed ? 'justify-center p-2.5' : 'px-3 py-2.5 gap-3'}
@@ -273,7 +289,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-2 bg-emerald-900/20">
         {!collapsed && (
           <button
-            onClick={onLogout}
+            onClick={() => { onLogout(); onNavigate?.(); }}
             className="w-full flex items-center gap-3 px-3 py-2 text-emerald-300/70 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors text-sm mb-2"
           >
             <LogOut className="w-4 h-4" />
@@ -281,15 +297,18 @@ const Sidebar: React.FC<SidebarProps> = ({
           </button>
         )}
 
-        <button
-          onClick={onToggle}
-          className={`
-              flex items-center justify-center w-full h-8 rounded-md
-              hover:bg-emerald-800/30 text-emerald-400 hover:text-white transition-colors
-            `}
-        >
-          {collapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
-        </button>
+        {/* Hide desktop collapse toggle on mobile */}
+        {!isMobile && (
+          <button
+            onClick={onToggle}
+            className={`
+                flex items-center justify-center w-full h-8 rounded-md
+                hover:bg-emerald-800/30 text-emerald-400 hover:text-white transition-colors
+              `}
+          >
+            {collapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+          </button>
+        )}
       </div>
     </aside>
   );

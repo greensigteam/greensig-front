@@ -6,11 +6,13 @@ import {
     ReporterDistributionModal, AnnulerDistributionModal, HistoriqueDistributionModal,
     TerminerDistributionModal, DemarrerDistributionModal
 } from '../components/suivi-taches';
+import { AnnulerTacheModal } from '../components/suivi-taches/AnnulerTacheModal';
 import { ViewMode } from '../components/suivi-taches/SuiviTachesToolbar';
 import {
     TacheCreate, DistributionChargeEnriched,
     DistributionCharge, MotifDistribution, DistributionHistorique,
-    DistributionFilters as DistributionFiltersType
+    DistributionFilters as DistributionFiltersType,
+    MotifAnnulationTache
 } from '../types/planning';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import TaskFormModal from '../components/planning/TaskFormModal';
@@ -118,13 +120,16 @@ const SuiviTaches: React.FC = () => {
     const [deletingDistributionId, setDeletingDistributionId] = useState<number | null>(null);
     const [showAddDistributionsModal, setShowAddDistributionsModal] = useState(false);
 
-    // Confirmation modal state
+    // Confirmation modal state (for start and complete only)
     const [confirmModal, setConfirmModal] = useState<{
         isOpen: boolean;
         title: string;
         message: string;
-        type: 'start' | 'complete' | 'cancel';
+        type: 'start' | 'complete';
     } | null>(null);
+
+    // Task cancellation modal state (separate from confirmModal)
+    const [showCancelTacheModal, setShowCancelTacheModal] = useState(false);
 
     // Validation modal state
     const [validationModal, setValidationModal] = useState<{
@@ -182,10 +187,10 @@ const SuiviTaches: React.FC = () => {
             });
             setDemarrerModalDistribution(null);
             // Recharger la tâche sélectionnée (le statut tâche peut changer: PLANIFIEE → EN_COURS)
+            // Note: reloadSelectedTask déclenche déjà un refetch de la liste en arrière-plan
             if (data.selectedTache) {
                 await data.reloadSelectedTask(data.selectedTache.id);
             }
-            await data.loadTaches();
             showToast('Distribution démarrée', 'success');
         } catch (error: any) {
             console.error('Erreur démarrage distribution:', error);
@@ -214,10 +219,10 @@ const SuiviTaches: React.FC = () => {
             });
             setTerminerModalDistribution(null);
             // Recharger la tâche sélectionnée (le statut tâche peut changer: EN_COURS → TERMINEE)
+            // Note: reloadSelectedTask déclenche déjà un refetch de la liste en arrière-plan
             if (data.selectedTache) {
                 await data.reloadSelectedTask(data.selectedTache.id);
             }
-            await data.loadTaches();
             showToast('Distribution terminée', 'success');
         } catch (error: any) {
             console.error('Erreur terminaison distribution:', error);
@@ -237,10 +242,10 @@ const SuiviTaches: React.FC = () => {
             });
             setReporterModalDistribution(null);
             // Recharger les données tâche (le report peut affecter le statut tâche)
+            // Note: reloadSelectedTask déclenche déjà un refetch de la liste en arrière-plan
             if (data.selectedTache) {
                 await data.reloadSelectedTask(data.selectedTache.id);
             }
-            await data.loadTaches();
             showToast('Distribution reportée', 'success');
         } catch (error: any) {
             console.error('Erreur report distribution:', error);
@@ -259,10 +264,10 @@ const SuiviTaches: React.FC = () => {
             });
             setAnnulerModalDistribution(null);
             // Recharger les données tâche (l'annulation peut affecter le statut tâche)
+            // Note: reloadSelectedTask déclenche déjà un refetch de la liste en arrière-plan
             if (data.selectedTache) {
                 await data.reloadSelectedTask(data.selectedTache.id);
             }
-            await data.loadTaches();
             showToast('Distribution annulée', 'success');
         } catch (error: any) {
             console.error('Erreur annulation distribution:', error);
@@ -277,10 +282,10 @@ const SuiviTaches: React.FC = () => {
                 date: selectedDate,
             });
             // Recharger les données tâche (la restauration peut affecter le statut tâche)
+            // Note: reloadSelectedTask déclenche déjà un refetch de la liste en arrière-plan
             if (data.selectedTache) {
                 await data.reloadSelectedTask(data.selectedTache.id);
             }
-            await data.loadTaches();
             showToast('Distribution restaurée', 'success');
         } catch (error: any) {
             console.error('Erreur restauration distribution:', error);
@@ -369,10 +374,10 @@ const SuiviTaches: React.FC = () => {
             });
             setDemarrerModalDistribution(null);
             // Recharger la tâche sélectionnée pour voir le nouveau statut
+            // Note: reloadSelectedTask déclenche déjà un refetch de la liste en arrière-plan
             if (data.selectedTache) {
                 await data.reloadSelectedTask(data.selectedTache.id);
             }
-            await data.loadTaches();
             showToast('Distribution démarrée', 'success');
         } catch (error: any) {
             console.error('Erreur démarrage distribution:', error);
@@ -418,10 +423,10 @@ const SuiviTaches: React.FC = () => {
             });
             setTerminerModalDistribution(null);
             // Recharger la tâche sélectionnée pour voir le nouveau statut
+            // Note: reloadSelectedTask déclenche déjà un refetch de la liste en arrière-plan
             if (data.selectedTache) {
                 await data.reloadSelectedTask(data.selectedTache.id);
             }
-            await data.loadTaches();
             showToast('Distribution terminée', 'success');
         } catch (error: any) {
             console.error('Erreur terminaison distribution:', error);
@@ -430,7 +435,13 @@ const SuiviTaches: React.FC = () => {
     };
 
     const openConfirmModal = (type: 'start' | 'complete' | 'cancel') => {
-        // ✅ SIMPLIFIÉ: Plus de EN_RETARD ni EXPIREE
+        // ✅ ANNULATION: Afficher le modal de justification au lieu d'une simple confirmation
+        if (type === 'cancel') {
+            console.log('[DEBUG] Opening cancel modal, selectedTache:', data.selectedTache?.id);
+            setShowCancelTacheModal(true);
+            return;
+        }
+
         const configs = {
             start: {
                 title: 'Démarrer la tâche',
@@ -440,10 +451,6 @@ const SuiviTaches: React.FC = () => {
                 title: 'Terminer la tâche',
                 message: 'Êtes-vous sûr de vouloir marquer cette tâche comme terminée ?',
             },
-            cancel: {
-                title: 'Annuler la tâche',
-                message: 'Êtes-vous sûr de vouloir annuler cette tâche ?',
-            }
         };
 
         setConfirmModal({ isOpen: true, type, ...configs[type] });
@@ -453,6 +460,21 @@ const SuiviTaches: React.FC = () => {
         if (!confirmModal) return;
         await data.handleChangeStatut(confirmModal.type);
         setConfirmModal(null);
+    };
+
+    // Handler pour l'annulation de tâche avec justification obligatoire
+    const handleCancelTache = async (motif: MotifAnnulationTache, commentaire: string) => {
+        try {
+            await data.handleChangeStatut('cancel', {
+                motif_annulation: motif,
+                commentaire_annulation: commentaire,
+            });
+            setShowCancelTacheModal(false);
+            showToast('Tâche annulée avec succès', 'success');
+        } catch (error: any) {
+            console.error('Erreur annulation tâche:', error);
+            showToast(error.message || 'Erreur lors de l\'annulation', 'error');
+        }
     };
 
     const openValidationModal = (type: 'VALIDEE' | 'REJETEE') => {
@@ -501,7 +523,7 @@ const SuiviTaches: React.FC = () => {
     };
 
     return (
-        <div className="h-full flex flex-col bg-slate-50 overflow-hidden min-h-0">
+        <div className="flex flex-col bg-slate-50 h-full">
             {/* Toolbar */}
             <SuiviTachesToolbar
                 filters={data.filters}
@@ -524,16 +546,17 @@ const SuiviTaches: React.FC = () => {
                 viewMode={viewMode}
                 onViewModeChange={(mode) => {
                     setViewMode(mode);
-                    setSearchQuery(''); // Clear search when switching modes
+                    // ⚡ OPTIMISATION: Ne plus réinitialiser la recherche au changement de vue
+                    // Préserve le contexte utilisateur pour une meilleure UX
                 }}
                 distributionsCount={distributionsParJour.length}
             />
 
             {/* Main Content */}
-            <div className="flex-1 flex overflow-hidden min-h-0">
+            <div className="flex-1 flex min-h-0">
                 {/* View: Distributions par jour */}
                 {viewMode === 'distributions' ? (
-                    <div className="flex-1 p-4 overflow-hidden">
+                    <div className="flex-1 p-0 lg:p-4 min-h-0">
                         <DistributionsParJour
                             distributions={distributionsParJour}
                             selectedDate={selectedDate}
@@ -574,10 +597,11 @@ const SuiviTaches: React.FC = () => {
                             />
                         </div>
 
-                        {/* Right Panel: Task Detail */}
+                        {/* Right Panel: Task Detail - conteneur isolé pour le scroll */}
                         {data.selectedTache && (
-                            <TaskDetailPanel
-                                key={data.detailKey}
+                            <div className="flex-1 lg:flex-none flex flex-col min-h-0">
+                                <TaskDetailPanel
+                                    key={data.detailKey}
                                 tache={data.selectedTache}
                                 photos={data.photos}
                                 consommations={data.consommations}
@@ -613,7 +637,8 @@ const SuiviTaches: React.FC = () => {
                                 onConsommationDelete={data.handleDeleteConsommation}
                                 onAssignEquipe={data.handleAssignEquipe}
                                 onRemoveEquipe={data.handleRemoveEquipe}
-                            />
+                                />
+                            </div>
                         )}
                     </>
                 )}
@@ -873,6 +898,16 @@ const SuiviTaches: React.FC = () => {
                 nombreReports={historiqueModalData.nombreReports}
                 onClose={() => setHistoriqueModalData({ isOpen: false, historique: null, nombreReports: 0, isLoading: false })}
                 isLoading={historiqueModalData.isLoading}
+            />
+
+            {/* Annuler Tâche Modal (justification obligatoire) */}
+            {console.log('[DEBUG] AnnulerTacheModal render - isOpen:', showCancelTacheModal, 'tache:', data.selectedTache?.id)}
+            <AnnulerTacheModal
+                isOpen={showCancelTacheModal}
+                tache={data.selectedTache}
+                onClose={() => setShowCancelTacheModal(false)}
+                onConfirm={handleCancelTache}
+                isLoading={data.changingStatut}
             />
         </div>
     );

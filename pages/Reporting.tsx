@@ -55,7 +55,6 @@ interface ReportingData {
     reclamations: {
         total: number;
         nouvelles_7j: number;
-        en_retard: number;
         resolues_7j: number;
         par_statut: Record<string, number>;
         par_type: Array<{ type_reclamation__nom_reclamation: string; count: number }>;
@@ -180,11 +179,11 @@ const Reporting: React.FC = () => {
     // Render tab content based on active tab
     if (activeTab === 'monthly') {
         return (
-            <div className="h-full flex flex-col overflow-hidden">
+            <div className="flex flex-col">
                 {/* Tab Navigation */}
-                <div className="bg-white border-b border-slate-100 px-6 py-4 flex-shrink-0">
-                    <div className="w-full">
-                        <div className="flex gap-1">
+                <div className="bg-white border-b border-slate-100 px-4 md:px-6 py-3 md:py-4 flex-shrink-0">
+                    <div className="w-full overflow-x-auto">
+                        <div className="flex gap-1 min-w-max">
                             {tabs.map((tab) => (
                                 <button
                                     key={tab.id}
@@ -202,7 +201,7 @@ const Reporting: React.FC = () => {
                         </div>
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto bg-slate-50">
+                <div className="bg-slate-50">
                     <MonthlyReport />
                 </div>
             </div>
@@ -211,11 +210,11 @@ const Reporting: React.FC = () => {
 
     if (activeTab === 'weekly') {
         return (
-            <div className="h-full flex flex-col overflow-hidden">
+            <div className="flex flex-col">
                 {/* Tab Navigation */}
-                <div className="bg-white border-b border-slate-100 px-6 py-4 flex-shrink-0">
-                    <div className="w-full">
-                        <div className="flex gap-1">
+                <div className="bg-white border-b border-slate-100 px-4 md:px-6 py-3 md:py-4 flex-shrink-0">
+                    <div className="w-full overflow-x-auto">
+                        <div className="flex gap-1 min-w-max">
                             {tabs.map((tab) => (
                                 <button
                                     key={tab.id}
@@ -233,7 +232,7 @@ const Reporting: React.FC = () => {
                         </div>
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto bg-slate-50">
+                <div className="bg-slate-50">
                     <WeeklyReport />
                 </div>
             </div>
@@ -242,11 +241,11 @@ const Reporting: React.FC = () => {
 
     if (activeTab === 'kpis') {
         return (
-            <div className="h-full flex flex-col overflow-hidden">
+            <div className="flex flex-col">
                 {/* Tab Navigation */}
-                <div className="bg-white border-b border-slate-100 px-6 py-4 flex-shrink-0">
-                    <div className="w-full">
-                        <div className="flex gap-1">
+                <div className="bg-white border-b border-slate-100 px-4 md:px-6 py-3 md:py-4 flex-shrink-0">
+                    <div className="w-full overflow-x-auto">
+                        <div className="flex gap-1 min-w-max">
                             {tabs.map((tab) => (
                                 <button
                                     key={tab.id}
@@ -264,7 +263,7 @@ const Reporting: React.FC = () => {
                         </div>
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto bg-slate-50">
+                <div className="bg-slate-50">
                     <KPIReport />
                 </div>
             </div>
@@ -282,11 +281,11 @@ const Reporting: React.FC = () => {
 
     if (error) {
         return (
-            <div className="h-full flex flex-col overflow-hidden">
+            <div className="flex flex-col">
                 {/* Tab Navigation */}
-                <div className="bg-white border-b border-slate-100 px-6 py-4 flex-shrink-0">
-                    <div className="w-full">
-                        <div className="flex gap-1">
+                <div className="bg-white border-b border-slate-100 px-4 md:px-6 py-3 md:py-4 flex-shrink-0">
+                    <div className="w-full overflow-x-auto">
+                        <div className="flex gap-1 min-w-max">
                             {tabs.map((tab) => (
                                 <button
                                     key={tab.id}
@@ -352,11 +351,11 @@ const Reporting: React.FC = () => {
     ];
 
     return (
-        <div className="h-full flex flex-col overflow-hidden">
+        <div className="flex flex-col">
             {/* Tab Navigation */}
-            <div className="bg-white border-b border-slate-100 px-6 py-4 flex-shrink-0">
-                <div className="w-full">
-                    <div className="flex gap-1">
+            <div className="bg-white border-b border-slate-100 px-4 md:px-6 py-3 md:py-4 flex-shrink-0">
+                <div className="w-full overflow-x-auto">
+                    <div className="flex gap-1 min-w-max">
                         {tabs.map((tab) => (
                             <button
                                 key={tab.id}
@@ -375,7 +374,7 @@ const Reporting: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto bg-slate-50">
+            <div className="bg-slate-50">
                 <div className="p-6 space-y-6 w-full max-w-[1920px] mx-auto">
 
             {/* KPIs principaux */}
@@ -398,7 +397,6 @@ const Reporting: React.FC = () => {
                 <StatCard
                     title="Réclamations"
                     value={data.reclamations.total}
-                    subtitle={`${data.reclamations.en_retard} en retard`}
                     icon={<AlertTriangle className="w-6 h-6 text-white" />}
                     color="bg-orange-600"
                     trend={{ value: data.reclamations.nouvelles_7j, label: 'nouvelles (7j)' }}
@@ -508,14 +506,10 @@ const Reporting: React.FC = () => {
                 </h2>
 
                 {/* KPIs Réclamations */}
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                     <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
                         <div className="text-2xl font-bold text-blue-600">{data.reclamations.nouvelles_7j}</div>
                         <div className="text-xs text-blue-800 font-medium">Nouvelles (7j)</div>
-                    </div>
-                    <div className="p-4 bg-orange-50 rounded-lg border border-orange-100">
-                        <div className="text-2xl font-bold text-orange-600">{data.reclamations.en_retard}</div>
-                        <div className="text-xs text-orange-800 font-medium">En retard</div>
                     </div>
                     <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-100">
                         <div className="text-2xl font-bold text-emerald-600">{data.reclamations.resolues_7j}</div>

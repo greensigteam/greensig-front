@@ -8,9 +8,9 @@ interface ClientPortalProps {
 // Client Portal - Claims/Réclamations
 const ClientPortal: React.FC<ClientPortalProps> = ({ user: _user }) => {
     return (
-        <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-                <div className="max-w-7xl mx-auto w-full flex flex-col h-full">
+        <div className="flex flex-col bg-gray-50">
+            <div className="p-4 md:p-6">
+                <div className="max-w-7xl mx-auto w-full flex flex-col">
                 <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
                     <div className="flex-1 flex items-center justify-center p-8">
                         <div className="text-center max-w-md">

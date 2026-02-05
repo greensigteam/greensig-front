@@ -38,6 +38,17 @@ declare module 'jspdf' {
   }
 }
 
+// URL du backend pour les images (media files)
+const getBackendUrl = () => {
+  const apiUrl = import.meta.env.VITE_API_BASE_URL || '';
+  // Si l'API est /api, on utilise la même origine
+  if (apiUrl === '/api' || apiUrl === '') {
+    return window.location.origin;
+  }
+  // Sinon on extrait le host de l'URL de l'API
+  return apiUrl.replace('/api', '');
+};
+
 export default function WeeklyReport() {
   // State
   const [sites, setSites] = useState<{ id: number; nom_site: string }[]>([]);
@@ -222,7 +233,12 @@ export default function WeeklyReport() {
         }
       };
       img.onerror = () => resolve(null);
-      img.src = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
+      // Construire l'URL complète si c'est une URL relative (ex: /media/...)
+      let fullUrl = url;
+      if (url && url.startsWith('/')) {
+        fullUrl = getBackendUrl() + url;
+      }
+      img.src = fullUrl + (fullUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
     });
   };
 
@@ -338,13 +354,12 @@ export default function WeeklyReport() {
       doc.text(formatPeriode(), pageWidth / 2, periodeBoxY + 11, { align: 'center' });
 
       // Pied de page couverture
-      doc.setFontSize(8);
-      doc.setTextColor(...grayColor);
-      doc.text(`Document généré le ${format(new Date(), 'dd MMMM yyyy à HH:mm', { locale: fr })}`, pageWidth / 2, pageHeight - 20, { align: 'center' });
-      doc.setFontSize(9);
-      doc.setTextColor(...darkColor);
-      doc.setFont('helvetica', 'bold');
-      doc.text('GreenSIG - Système de Gestion des Espaces Verts', pageWidth / 2, pageHeight - 12, { align: 'center' });
+      // Logo centré en pied de page
+      if (logoBase64) {
+        const footerLogoWidth = 30;
+        const footerLogoHeight = 10;
+        doc.addImage(logoBase64, 'PNG', (pageWidth - footerLogoWidth) / 2, pageHeight - 18, footerLogoWidth, footerLogoHeight);
+      }
 
       // ========== PAGE 2: CONTENU ==========
       doc.addPage();
@@ -471,7 +486,6 @@ export default function WeeklyReport() {
 
         doc.setFontSize(10);
         doc.setTextColor(...grayColor);
-        doc.text(`${photos.length} groupe(s) de photos documentés`, margin, y);
         y += 10;
 
         const imgWidth = 75;
@@ -717,10 +731,12 @@ export default function WeeklyReport() {
       doc.setFontSize(8);
       doc.setTextColor(...grayColor);
       doc.text(`Document généré le ${format(new Date(), 'dd MMMM yyyy à HH:mm', { locale: fr })}`, pageWidth / 2, pageHeight - 20, { align: 'center' });
-      doc.setFontSize(9);
-      doc.setTextColor(...darkColor);
-      doc.setFont('helvetica', 'bold');
-      doc.text('GreenSIG - Système de Gestion des Espaces Verts', pageWidth / 2, pageHeight - 12, { align: 'center' });
+      // Logo centré
+      if (logoBase64) {
+        const footerLogoWidth = 30;
+        const footerLogoHeight = 10;
+        doc.addImage(logoBase64, 'PNG', (pageWidth - footerLogoWidth) / 2, pageHeight - 15, footerLogoWidth, footerLogoHeight);
+      }
 
       // ========== PAGE SYNTHÈSE ==========
       doc.addPage();

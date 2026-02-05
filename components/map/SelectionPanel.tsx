@@ -98,8 +98,7 @@ export const SelectionPanel: React.FC<SelectionPanelProps> = ({
 
     return (
         <div
-            className="absolute bottom-[230px] w-80 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/40 ring-1 ring-black/5 z-50 max-h-[500px] flex flex-col transition-all duration-300 pointer-events-auto"
-            style={{ left: isSidebarCollapsed ? '88px' : '276px' }}
+            className={`absolute bottom-[180px] md:bottom-[230px] w-[calc(100vw-16px)] md:w-80 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/40 ring-1 ring-black/5 z-50 max-h-[500px] flex flex-col transition-all duration-300 pointer-events-auto left-2 ${isSidebarCollapsed ? 'md:left-[88px]' : 'md:left-[276px]'}`}
         >
             {/* Header */}
             <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-yellow-50/80">

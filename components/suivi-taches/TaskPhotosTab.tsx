@@ -59,7 +59,7 @@ export const TaskPhotosTab: React.FC<TaskPhotosTabProps> = ({
         <div className="space-y-4">
             {/* Upload Zone */}
             {canModify && (
-                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 hover:border-slate-200 transition-colors">
                     <div className="flex gap-2 mb-3">
                         <button
                             onClick={() => setSelectedPhotoType('AVANT')}

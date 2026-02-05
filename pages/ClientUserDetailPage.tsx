@@ -388,7 +388,7 @@ export default function ClientUserDetailPage() {
     if (!user) return null;
 
     return (
-        <div className="h-full bg-slate-50 flex flex-col">
+        <div className="bg-slate-50 flex flex-col">
             {/* Header */}
             <header className="flex-shrink-0 bg-white border-b border-slate-100 p-4 flex justify-between items-center">
                 <div className="flex items-center gap-4">

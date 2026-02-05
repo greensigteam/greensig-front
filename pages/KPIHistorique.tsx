@@ -470,7 +470,7 @@ export default function KPIHistorique() {
     }
 
     return (
-        <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 to-slate-100 overflow-hidden">
+        <div className="flex flex-col bg-gradient-to-br from-slate-50 to-slate-100">
             {/* Header */}
             <div className="bg-white border-b border-slate-200 flex-shrink-0 z-30">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

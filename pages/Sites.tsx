@@ -250,8 +250,8 @@ export default function Sites() {
     };
 
     return (
-        <div className="h-full flex flex-col overflow-hidden">
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex flex-col">
+            <div className="p-4 md:p-6 space-y-4 md:space-y-6">
             {/* Toolbar */}
             <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
 
@@ -322,25 +322,26 @@ export default function Sites() {
                     </div>
                 ) : (
                     <>
-                        <table className="w-full">
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[700px]">
                             <thead className="bg-slate-50 border-b border-slate-100">
                                 <tr>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-[25%]">
+                                    <th className="px-3 md:px-6 py-3 md:py-4 text-left text-[10px] md:text-xs font-semibold text-slate-500 uppercase tracking-wider">
                                         Site
                                     </th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-[20%]">
+                                    <th className="px-3 md:px-6 py-3 md:py-4 text-left text-[10px] md:text-xs font-semibold text-slate-500 uppercase tracking-wider">
                                         Propriétaire
                                     </th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-[25%]">
+                                    <th className="px-3 md:px-6 py-3 md:py-4 text-left text-[10px] md:text-xs font-semibold text-slate-500 uppercase tracking-wider hidden md:table-cell">
                                         Adresse
                                     </th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-[15%]">
+                                    <th className="px-3 md:px-6 py-3 md:py-4 text-left text-[10px] md:text-xs font-semibold text-slate-500 uppercase tracking-wider hidden sm:table-cell">
                                         Superficie
                                     </th>
-                                    <th className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider w-[10%]">
+                                    <th className="px-3 md:px-6 py-3 md:py-4 text-center text-[10px] md:text-xs font-semibold text-slate-500 uppercase tracking-wider">
                                         Statut
                                     </th>
-                                    <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-[5%]">
+                                    <th className="px-3 md:px-6 py-3 md:py-4 text-right text-[10px] md:text-xs font-semibold text-slate-500 uppercase tracking-wider">
                                         <Settings className="w-4 h-4 ml-auto text-slate-400" />
                                     </th>
                                 </tr>
@@ -348,38 +349,38 @@ export default function Sites() {
                             <tbody className="divide-y divide-slate-100">
                                 {paginatedSites.map((site) => (
                                     <tr key={site.id} className="hover:bg-slate-50 transition-colors group">
-                                        <td className="px-6 py-4">
-                                            <Link to={`/sites/${site.id}`} className="flex items-center gap-3 group-hover:text-emerald-600 transition-colors">
-                                                <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center group-hover:bg-emerald-200 transition-colors flex-shrink-0">
-                                                    <MapPin className="w-5 h-5 text-emerald-600" />
+                                        <td className="px-3 md:px-6 py-3 md:py-4">
+                                            <Link to={`/sites/${site.id}`} className="flex items-center gap-2 md:gap-3 group-hover:text-emerald-600 transition-colors">
+                                                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-emerald-100 flex items-center justify-center group-hover:bg-emerald-200 transition-colors flex-shrink-0">
+                                                    <MapPin className="w-4 h-4 md:w-5 md:h-5 text-emerald-600" />
                                                 </div>
-                                                <span className="font-medium text-slate-800 group-hover:text-emerald-700 truncate">
+                                                <span className="font-medium text-xs md:text-sm text-slate-800 group-hover:text-emerald-700 truncate max-w-[120px] md:max-w-none">
                                                     {site.name}
                                                 </span>
                                             </Link>
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-3 md:px-6 py-3 md:py-4">
                                             <div className="flex items-center gap-2 text-slate-600">
-                                                <Users className="w-4 h-4 text-slate-400" />
-                                                <span className="text-sm truncate max-w-[200px]" title={site.client_nom || 'Non assigné'}>
+                                                <Users className="w-4 h-4 text-slate-400 hidden md:block" />
+                                                <span className="text-xs md:text-sm truncate max-w-[120px] md:max-w-[200px]" title={site.client_nom || 'Non assigné'}>
                                                     {site.client_nom || <span className="text-slate-400 italic">Non assigné</span>}
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-3 md:px-6 py-3 md:py-4 hidden md:table-cell">
                                             <span className="text-sm text-slate-600 line-clamp-1" title={site.adresse}>
                                                 {site.adresse || '-'}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <span className="text-sm text-slate-600 font-mono font-medium bg-slate-50 px-2 py-1 rounded border border-slate-100">
+                                        <td className="px-3 md:px-6 py-3 md:py-4 hidden sm:table-cell">
+                                            <span className="text-xs md:text-sm text-slate-600 font-mono font-medium bg-slate-50 px-2 py-1 rounded border border-slate-100">
                                                 {site.superficie_calculee || site.superficie_totale
                                                     ? `${(site.superficie_calculee || site.superficie_totale)!.toLocaleString()} m²`
                                                     : '-'
                                                 }
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 text-center">
+                                        <td className="px-3 md:px-6 py-3 md:py-4 text-center">
                                             <span
                                                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${site.actif !== false
                                                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
@@ -390,7 +391,7 @@ export default function Sites() {
                                                 {site.actif !== false ? 'Actif' : 'Inactif'}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 text-right">
+                                        <td className="px-3 md:px-6 py-3 md:py-4 text-right">
                                             {canEditSite(site) ? (
                                                 <ActionDropdown
                                                     onEdit={() => setEditingSite(site)}
@@ -408,12 +409,13 @@ export default function Sites() {
                                 ))}
                             </tbody>
                         </table>
+                      </div>
 
                         {/* Pagination */}
-                        <div className="sticky bottom-0 bg-white border-t border-slate-200 px-6 py-3">
-                            <div className="flex items-center justify-between">
-                                <div className="text-sm text-slate-600">
-                                    Affichage {startIndex + 1} à {Math.min(startIndex + itemsPerPage, filteredSites.length)} sur {filteredSites.length}
+                        <div className="sticky bottom-0 bg-white border-t border-slate-200 px-3 md:px-6 py-2 md:py-3">
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="text-[10px] md:text-sm text-slate-600 whitespace-nowrap">
+                                    <span className="hidden sm:inline">Affichage </span>{startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredSites.length)}<span className="hidden sm:inline"> sur</span><span className="sm:hidden">/</span> {filteredSites.length}
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <button

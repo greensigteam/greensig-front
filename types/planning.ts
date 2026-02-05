@@ -16,6 +16,20 @@ export type StatutTache = 'PLANIFIEE' | 'EN_COURS' | 'TERMINEE' | 'ANNULEE';
 
 export type EtatValidation = 'EN_ATTENTE' | 'VALIDEE' | 'REJETEE';
 
+// ✅ Motifs d'annulation de tâche (justification obligatoire)
+export type MotifAnnulationTache = 'METEO' | 'ABSENCE' | 'EQUIPEMENT' | 'CLIENT' | 'URGENCE' | 'DOUBLON' | 'ERREUR' | 'AUTRE';
+
+export const MOTIF_ANNULATION_TACHE_LABELS: Record<MotifAnnulationTache, string> = {
+    METEO: 'Conditions météorologiques',
+    ABSENCE: 'Absence équipe',
+    EQUIPEMENT: 'Problème équipement',
+    CLIENT: 'Demande client',
+    URGENCE: 'Réaffectation urgente',
+    DOUBLON: 'Tâche en doublon',
+    ERREUR: 'Erreur de planification',
+    AUTRE: 'Autre motif',
+};
+
 
 export type RoleParticipation = 'CHEF' | 'MEMBRE';
 
@@ -54,12 +68,35 @@ export const ROLE_PARTICIPATION_LABELS: Record<RoleParticipation, string> = {
 // OBJETS & TYPES
 // ============================================================================
 
+export type UniteProductivite = 'm2' | 'ml' | 'unite' | 'cuvettes' | 'arbres';
+
+export const UNITE_PRODUCTIVITE_LABELS: Record<UniteProductivite, string> = {
+    'm2': 'Mètres carrés (m²)',
+    'ml': 'Mètres linéaires (ml)',
+    'unite': 'Unités',
+    'cuvettes': 'Cuvettes',
+    'arbres': 'Arbres'
+};
+
 export interface TypeTache {
     id: number;
     nom_tache: string;
     symbole: string;
     description: string;
     productivite_theorique: number | null;
+    unite_productivite?: UniteProductivite;
+}
+
+export interface TypeTacheCreate {
+    nom_tache: string;
+    symbole?: string;
+    description?: string;
+    productivite_theorique?: number | null;
+    unite_productivite?: UniteProductivite;
+}
+
+export interface TypeTacheWithRatios extends TypeTache {
+    ratios: RatioProductivite[];
 }
 
 // ============================================================================
@@ -379,6 +416,12 @@ export interface Tache {
 
     // ✅ Flag de replanification - empêche l'expiration automatique
     a_ete_replanifiee?: boolean;
+
+    // ✅ Champs d'annulation (justification obligatoire)
+    motif_annulation?: MotifAnnulationTache | null;
+    commentaire_annulation?: string;
+    date_annulation?: string | null;
+    annulee_par?: number | null;
 }
 
 export interface TacheCreate {
@@ -437,6 +480,10 @@ export interface TacheUpdate {
 
     // ✅ NOUVEAU: Distributions de charge (tâches multi-jours)
     distributions_charge_data?: DistributionChargeData[];
+
+    // ✅ Champs d'annulation (obligatoire si statut = ANNULEE)
+    motif_annulation?: MotifAnnulationTache | null;
+    commentaire_annulation?: string;
 }
 
 export interface ParticipationCreate {
