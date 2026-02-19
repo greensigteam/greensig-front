@@ -33,6 +33,7 @@ import {
   Eye,
   User as UserIcon,
   MapPin,
+  Clock,
 } from 'lucide-react';
 import { useNotificationContext, Notification } from '../contexts/NotificationContext';
 import { apiFetch } from '../services/api';
@@ -63,6 +64,8 @@ const NOTIFICATION_TYPES: Record<string, { label: string; icon: typeof Bell; col
   reclamation_prise_en_compte: { label: 'Reclamation prise en compte', icon: Check, color: 'text-blue-600 bg-blue-50' },
   reclamation_resolue: { label: 'Reclamation resolue', icon: Check, color: 'text-green-600 bg-green-50' },
   reclamation_cloturee: { label: 'Reclamation cloturee', icon: Check, color: 'text-slate-600 bg-slate-50' },
+  reclamation_rappel_cloture: { label: 'Rappel cloture', icon: Clock, color: 'text-amber-600 bg-amber-50' },
+  reclamation_auto_cloture: { label: 'Reclamation auto-cloturee', icon: Clock, color: 'text-amber-600 bg-amber-50' },
   // Absences
   absence_demandee: { label: 'Demande absence', icon: Calendar, color: 'text-purple-600 bg-purple-50' },
   absence_validee: { label: 'Absence validee', icon: Check, color: 'text-green-600 bg-green-50' },
@@ -552,6 +555,8 @@ export default function NotificationsPage({ user }: NotificationsPageProps) {
                     <option value="reclamation_creee">Nouvelle reclamation</option>
                     <option value="reclamation_urgente">Reclamation urgente</option>
                     <option value="reclamation_resolue">Reclamation resolue</option>
+                    <option value="reclamation_rappel_cloture">Rappel cloture</option>
+                    <option value="reclamation_auto_cloture">Auto-cloture</option>
                   </optgroup>
                   <optgroup label="Absences">
                     <option value="absence_demandee">Demande absence</option>

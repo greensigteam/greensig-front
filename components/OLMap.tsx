@@ -17,7 +17,7 @@ import { defaults as defaultControls, ScaleLine } from 'ol/control';
 
 import { LayerConfig, Coordinates, MapSearchResult, UserLocation, MapObjectDetail, OverlayState, MapHandle, Measurement, MeasurementType } from "../types";
 import { INITIAL_POSITION, VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND, RECLAMATION_STATUS_COLORS } from "../constants";
-import { createMarkerIcon, createSiteIcon, OBJECT_COLORS, TYPE_TO_API } from '../utils/mapHelpers';
+import { OBJECT_COLORS, TYPE_TO_API } from '../utils/mapHelpers';
 import { useSearchHighlight } from '../hooks/useSearchHighlight';
 import { useUserLocationDisplay } from '../hooks/useUserLocationDisplay';
 import { useMapHoverTooltip } from '../hooks/useMapHoverTooltip';
@@ -1000,39 +1000,17 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
 
         // Handling Points (Sites, Trees, Furniture) differently to keep icon visible
         if (geom && geom instanceof Point) {
-          const type = obj.type as string;
-          const color = OBJECT_COLORS[type] || '#10b981';
-
-          // 1. Highlight Halo (Yellow Circle)
+          // Highlight circle centered on the geometry point
           const highlightStyle = new Style({
             image: new CircleStyle({
-              radius: 28,
-              fill: new Fill({ color: 'rgba(255, 215, 0, 0.5)' }),
-              stroke: new Stroke({ color: '#FFD700', width: 4 })
+              radius: 12,
+              fill: new Fill({ color: 'rgba(255, 215, 0, 0.35)' }),
+              stroke: new Stroke({ color: '#FFD700', width: 2 })
             }),
             zIndex: 999
           });
 
-          // 2. Original Icon (Recreated)
-          let iconSrc;
-          if (type === 'Site') {
-            const category = originalFeature.get('site_categorie') || 'INFRASTRUCTURE';
-            iconSrc = createSiteIcon(color, category, true);
-          } else {
-            iconSrc = createMarkerIcon(color, true);
-          }
-
-          const iconStyle = new Style({
-            image: new Icon({
-              src: iconSrc,
-              anchor: [0.5, 1],
-              anchorXUnits: 'fraction',
-              anchorYUnits: 'fraction'
-            }),
-            zIndex: 1000
-          });
-
-          clonedFeature.setStyle([highlightStyle, iconStyle]);
+          clonedFeature.setStyle(highlightStyle);
 
         } else {
           // Polygons / Lines
@@ -1061,29 +1039,17 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
             });
             newFeature.setId(obj.id);
 
-            // Create highlight style for point
+            // Highlight circle centered on the geometry point
             const highlightStyle = new Style({
               image: new CircleStyle({
-                radius: 28,
-                fill: new Fill({ color: 'rgba(255, 215, 0, 0.5)' }),
-                stroke: new Stroke({ color: '#FFD700', width: 4 })
+                radius: 10,
+                fill: new Fill({ color: 'rgba(255, 215, 0, 0.35)' }),
+                stroke: new Stroke({ color: '#FFD700', width: 2 })
               }),
               zIndex: 999
             });
 
-            // Create marker icon
-            const iconSrc = createMarkerIcon(color, true);
-            const iconStyle = new Style({
-              image: new Icon({
-                src: iconSrc,
-                anchor: [0.5, 1],
-                anchorXUnits: 'fraction',
-                anchorYUnits: 'fraction'
-              }),
-              zIndex: 1000
-            });
-
-            newFeature.setStyle([highlightStyle, iconStyle]);
+            newFeature.setStyle(highlightStyle);
             source.addFeature(newFeature);
           } else {
             // For Polygon/LineString geometries from inventory

@@ -44,7 +44,6 @@ export const ReclamationTimeline: React.FC<ReclamationTimelineProps> = ({
     const getStatusColor = (statut: string) => {
         switch (statut) {
             case 'NOUVELLE': return 'bg-red-100 text-red-800 border-red-200';
-            case 'PRISE_EN_COMPTE': return 'bg-blue-100 text-blue-800 border-blue-200';
             case 'EN_COURS': return 'bg-orange-100 text-orange-800 border-orange-200';
             case 'RESOLUE': return 'bg-green-100 text-green-800 border-green-200';
             case 'EN_ATTENTE_VALIDATION_CLOTURE': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
@@ -58,7 +57,6 @@ export const ReclamationTimeline: React.FC<ReclamationTimelineProps> = ({
     const getStatusIcon = (statut: string) => {
         switch (statut) {
             case 'NOUVELLE': return <AlertCircle className="w-5 h-5 text-red-600" />;
-            case 'PRISE_EN_COMPTE': return <Circle className="w-5 h-5 text-blue-600" />;
             case 'EN_COURS': return <Clock className="w-5 h-5 text-orange-600" />;
             case 'RESOLUE': return <CheckCircle2 className="w-5 h-5 text-green-600" />;
             case 'EN_ATTENTE_VALIDATION_CLOTURE': return <Clock className="w-5 h-5 text-emerald-600" />;

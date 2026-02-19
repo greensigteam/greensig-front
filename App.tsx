@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { queryClient } from './lib/queryClient';
+import { queryClient, prefetchCriticalData } from './lib/queryClient';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import LoadingScreen from './components/LoadingScreen';
@@ -21,8 +21,6 @@ const RatiosProductivite = lazy(() => import('./pages/RatiosProductivite'));
 const SuiviTaches = lazy(() => import('./pages/SuiviTaches'));
 const Produits = lazy(() => import('./pages/Produits'));
 const Reporting = lazy(() => import('./pages/Reporting'));
-const KPIDetail = lazy(() => import('./pages/KPIDetail'));
-const KPIHistorique = lazy(() => import('./pages/KPIHistorique'));
 const MonthlyReport = lazy(() => import('./pages/MonthlyReport'));
 const WeeklyReport = lazy(() => import('./pages/WeeklyReport'));
 const Users = lazy(() => import('./pages/Users'));
@@ -153,6 +151,7 @@ function App() {
             avatar: undefined
           };
           setUser(user);
+          prefetchCriticalData(); // Précharge les données en arrière-plan
         } catch (error) {
           console.error("Session restoration failed", error);
           localStorage.removeItem('token');
@@ -362,7 +361,11 @@ function App() {
                       }
                     >
                       <Route index element={<Navigate to={user.role === 'CLIENT' ? '/client/map' : '/dashboard'} replace />} />
-                      <Route path="dashboard" element={<Dashboard />} />
+                      <Route path="dashboard" element={
+                        <RequireRole user={user} roles={['ADMIN', 'SUPERVISEUR']}>
+                          <Dashboard />
+                        </RequireRole>
+                      } />
                       <Route path="inventory" element={<Suspense fallback={<PageLoadingFallback />}><Inventory user={user} /></Suspense>} />
                       <Route path="inventory/:objectType/:objectId" element={<Suspense fallback={<PageLoadingFallback />}><InventoryDetailPage /></Suspense>} />
                       <Route path="sites" element={
@@ -417,16 +420,6 @@ function App() {
                       <Route path="reporting" element={
                         <RequireRole user={user} roles={['ADMIN', 'SUPERVISEUR', 'CLIENT']}>
                           <Suspense fallback={<PageLoadingFallback />}><Reporting /></Suspense>
-                        </RequireRole>
-                      } />
-                      <Route path="reporting/kpi/:kpiKey" element={
-                        <RequireRole user={user} roles={['ADMIN', 'SUPERVISEUR', 'CLIENT']}>
-                          <Suspense fallback={<PageLoadingFallback />}><KPIDetail /></Suspense>
-                        </RequireRole>
-                      } />
-                      <Route path="reporting/kpis/historique" element={
-                        <RequireRole user={user} roles={['ADMIN', 'SUPERVISEUR', 'CLIENT']}>
-                          <Suspense fallback={<PageLoadingFallback />}><KPIHistorique /></Suspense>
                         </RequireRole>
                       } />
                       <Route path="monthly-report" element={

@@ -17,50 +17,46 @@ export interface MonthlyReportSite {
     lat: number;
     lng: number;
   } | null;
+  geometry?: {
+    type: string;
+    coordinates: number[][][];
+  } | null;
 }
 
-export interface MonthlyReportTravail {
-  type: string;
-  description?: string;
-  count: number;
-}
-
-// Détail d'une tâche effectuée (pour la timeline)
-export interface MonthlyReportTravailDetail {
+// Item du planning (format style export planning)
+export interface MonthlyReportPlanningItem {
   id: number;
-  reference: string;
+  tache_id: number;
   date: string | null;
-  type: string;
-  equipes: string;
-  heures: number;
-  description?: string | null;
-}
-
-// Détail d'une tâche planifiée (pour la timeline)
-export interface MonthlyReportTravailPlanifieDetail {
-  id: number;
   reference: string;
-  date_debut: string | null;
-  date_fin: string | null;
   type: string;
   equipes: string;
-  heures: number | null;
+  horaires: string | null;
+  charge: number;
+  statut: 'NON_REALISEE' | 'EN_COURS' | 'REALISEE' | 'REPORTEE' | 'ANNULEE';
+  statut_label: string;
   priorite: number;
+  priorite_label: string;
 }
 
-// Format hybride pour travaux effectués
-export interface MonthlyReportTravauxEffectues {
-  par_type: MonthlyReportTravail[];
-  details: MonthlyReportTravailDetail[];
+// Statistiques du planning
+export interface MonthlyReportPlanningStats {
   total: number;
+  total_heures: number;
+  par_statut: Record<string, number>;
+}
+
+// Format planning pour travaux effectués
+export interface MonthlyReportTravauxEffectues {
+  planning: MonthlyReportPlanningItem[];
+  statistiques: MonthlyReportPlanningStats;
   error?: string;
 }
 
-// Format hybride pour travaux planifiés
+// Format planning pour travaux planifiés
 export interface MonthlyReportTravauxPlanifies {
-  par_type: MonthlyReportTravail[];
-  details: MonthlyReportTravailPlanifieDetail[];
-  total: number;
+  planning: MonthlyReportPlanningItem[];
+  statistiques: MonthlyReportPlanningStats;
   error?: string;
 }
 

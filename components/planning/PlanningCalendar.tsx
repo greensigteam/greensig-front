@@ -294,7 +294,7 @@ export const PlanningCalendar: FC<PlanningCalendarProps> = ({
 
     // Convert tasks to calendar events
     const events: CalendarEvent[] = useMemo(() => {
-        return filteredTaches.flatMap(t => {
+        const result = filteredTaches.flatMap(t => {
             // Case 1: Task with distributions
             if (t.distributions_charge && t.distributions_charge.length > 0) {
                 return t.distributions_charge.map(dist => {
@@ -343,6 +343,7 @@ export const PlanningCalendar: FC<PlanningCalendarProps> = ({
                 resource: t
             }];
         });
+        return result;
     }, [filteredTaches, currentView]);
 
     // Custom Event Prop Getter to make RBC events transparent

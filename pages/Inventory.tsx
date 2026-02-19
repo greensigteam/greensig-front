@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Filter, X, MapPin, FileText, Leaf, Droplet, AlertCircle, ClipboardList, Map as MapIcon, Ban, Activity, Sprout, Wrench, ChevronDown, Check, Printer, Download } from 'lucide-react';
+import { Filter, X, MapPin, FileText, Leaf, Droplet, AlertCircle, ClipboardList, Map as MapIcon, Ban, Activity, Sprout, Wrench, ChevronDown, Check, Printer, Download, Trash2 } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
 import { MOCK_INVENTORY, InventoryItem } from '../services/mockData';
-import { fetchInventory, ApiError, type InventoryResponse, fetchAllSites, type SiteFrontend, fetchFilterOptions, exportInventoryExcel, exportInventoryPDF, downloadBlob } from '../services/api';
+import { fetchInventory, ApiError, type InventoryResponse, fetchAllSites, type SiteFrontend, fetchFilterOptions, exportInventoryExcel, exportInventoryPDF, downloadBlob, deleteInventoryItem } from '../services/api';
 import { planningService } from '../services/planningService';
 import { fetchEquipes } from '../services/usersApi';
 import TaskFormModal, { InventoryObjectOption } from '../components/planning/TaskFormModal';
@@ -14,6 +14,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useSearch } from '../contexts/SearchContext';
 import { usePermissions } from '../hooks/usePermissions';
 import LoadingScreen from '../components/LoadingScreen';
+import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import { User } from '../types';
 
 interface InventoryProps {
@@ -200,6 +201,10 @@ const Inventory: React.FC<InventoryProps> = ({ user }) => {
   const [compatibilityLoading, setCompatibilityLoading] = useState(false);
   const [applicableTasksCount, setApplicableTasksCount] = useState<number | null>(null);
 
+  // Bulk delete state
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [refreshCounter, setRefreshCounter] = useState(0);
+
   // Task modal state
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
@@ -381,7 +386,7 @@ const Inventory: React.FC<InventoryProps> = ({ user }) => {
     };
 
     loadInventory();
-  }, [mainTab, currentPage, filters, searchQuery]);
+  }, [mainTab, currentPage, filters, searchQuery, refreshCounter]);
 
   // Transform API data to InventoryItem format
   const inventoryData = useMemo((): InventoryItem[] => {
@@ -559,6 +564,33 @@ const Inventory: React.FC<InventoryProps> = ({ user }) => {
       soussite: item.zone
     }));
   }, [selectedItemsCache, sites]);
+
+  // Bulk delete selected items
+  const handleBulkDelete = async () => {
+    const items = Array.from(selectedItemsCache.entries());
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const [id, item] of items) {
+      try {
+        await deleteInventoryItem(item.type, id);
+        successCount++;
+      } catch (err) {
+        console.error(`Erreur suppression ${item.type} #${id}:`, err);
+        errorCount++;
+      }
+    }
+
+    if (errorCount === 0) {
+      showToast(`${successCount} élément${successCount > 1 ? 's' : ''} supprimé${successCount > 1 ? 's' : ''}`, 'success');
+    } else {
+      showToast(`${successCount} supprimé${successCount > 1 ? 's' : ''}, ${errorCount} erreur${errorCount > 1 ? 's' : ''}`, 'error');
+    }
+
+    setSelectedIds(new Set());
+    setSelectedItemsCache(new Map());
+    setRefreshCounter(c => c + 1);
+  };
 
   // Open task creation modal - fetch required data first
   const handleOpenTaskModal = async () => {
@@ -1340,10 +1372,30 @@ const Inventory: React.FC<InventoryProps> = ({ user }) => {
                   )}
                 </button>
               )}
+
+              {/* Bulk delete - Only for ADMIN */}
+              {user.role === 'ADMIN' && (
+                <button
+                  onClick={() => setShowBulkDeleteModal(true)}
+                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-sm font-medium shadow-sm whitespace-nowrap"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Supprimer
+                </button>
+              )}
             </div>
           </div>
         </div>
       )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={showBulkDeleteModal}
+        title={`Supprimer ${selectedItemsCache.size} élément${selectedItemsCache.size > 1 ? 's' : ''} ?`}
+        message="Cette action est irréversible. Tous les éléments sélectionnés seront définitivement supprimés."
+        onConfirm={handleBulkDelete}
+        onClose={() => setShowBulkDeleteModal(false)}
+      />
 
       {/* Task Creation Modal */}
       {showTaskModal && (

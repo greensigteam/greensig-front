@@ -278,7 +278,7 @@ export async function createStructure(data: StructureClientCreate): Promise<Stru
   const cleanData: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(data)) {
     if (key === 'logo') continue; // Ignorer logo (fichier) si null
-    cleanData[key] = value === '' ? null : value;
+    cleanData[key] = value;
   }
   return fetchApi<StructureClient>(`${USERS_API_URL}/structures/`, {
     method: 'POST',
@@ -318,7 +318,7 @@ export async function updateStructure(
   const cleanData: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(data)) {
     if (key === 'logo') continue; // Ignorer logo (fichier) si null
-    cleanData[key] = value === '' ? null : value;
+    cleanData[key] = value;
   }
   return fetchApi<StructureClient>(`${USERS_API_URL}/structures/${id}/`, {
     method: 'PATCH',

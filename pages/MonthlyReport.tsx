@@ -27,7 +27,8 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 import { fetchMonthlyReport } from '../services/reportsApi';
-import { fetchSites } from '../services/api';
+import { fetchSites, apiFetch } from '../services/api';
+import { renderSitePolygonMap, renderMultiSitePolygonMap, loadStaticAsset } from '../services/pdfGenerator';
 import type { MonthlyReportData, MonthlyReportOptions } from '../types/reports';
 
 // Extend jsPDF types for autoTable
@@ -48,6 +49,227 @@ const getBackendUrl = () => {
   // Sinon on extrait le host de l'URL de l'API
   return apiUrl.replace('/api', '');
 };
+
+// ===== KPI Table Helpers =====
+const KPI_LABELS: Record<string, string> = {
+  respect_planning: 'Respect du planning',
+  qualite_service: 'Qualité de service',
+  taux_realisation_reclamations: 'Taux de réalisation réclamations',
+  temps_moyen_traitement: 'Temps moyen traitement réclamations',
+  temps_total_par_site: 'Temps total de travail',
+};
+
+const KPI_KEYS = Object.keys(KPI_LABELS);
+
+function formatKpiStatut(statut: string | undefined | null): string {
+  switch (statut) {
+    case 'vert': return 'Conforme';
+    case 'orange': return 'Attention';
+    case 'rouge': return 'Non conforme';
+    default: return '-';
+  }
+}
+
+function extractKpiRow(key: string, kpis: any): [string, string, string, string] {
+  const label = KPI_LABELS[key] || key;
+
+  // KPI 1, 2, 3 — simple structure {valeur, seuil, statut, unite}
+  if (['respect_planning', 'qualite_service', 'taux_realisation_reclamations'].includes(key)) {
+    const kpi = kpis[key];
+    if (!kpi) return [label, '-', '-', '-'];
+    const valeur = kpi.valeur != null ? `${Number(kpi.valeur).toFixed(1)}${kpi.unite || ''}` : '-';
+    const seuil = kpi.seuil != null ? `${kpi.seuil}${kpi.unite || ''}` : '-';
+    const statut = formatKpiStatut(kpi.statut);
+    return [label, valeur, seuil, statut];
+  }
+
+  // KPI 4 — nested {global: {valeur, seuil, statut, unite}, par_type: [...]}
+  if (key === 'temps_moyen_traitement') {
+    const kpi = kpis.temps_moyen_traitement;
+    if (!kpi?.global) return [label, '-', '-', '-'];
+    const valeur = kpi.global.valeur != null ? `${Number(kpi.global.valeur).toFixed(1)}${kpi.global.unite || 'h'}` : '-';
+    const seuil = kpi.global.seuil != null ? `${kpi.global.seuil}${kpi.global.unite || 'h'}` : '-';
+    const statut = formatKpiStatut(kpi.global.statut);
+    return [label, valeur, seuil, statut];
+  }
+
+  // KPI 6 — object {total_heures, total_heures_m1, evolution}
+  if (key === 'temps_total_par_site') {
+    const kpi = kpis.temps_total_par_site;
+    if (!kpi) return [label, '-', '-', '-'];
+    const valeur = `${kpi.total_heures ?? '-'}h`;
+    const m1 = kpi.total_heures_m1 != null ? `${kpi.total_heures_m1}h` : '-';
+    return [label, valeur, m1, '-'];
+  }
+
+  return [label, '-', '-', '-'];
+}
+
+function buildKpiRows(kpis: any): [string, string, string, string][] {
+  return KPI_KEYS.map(key => extractKpiRow(key, kpis));
+}
+
+const kpiDidParseCell = (data: any) => {
+  if (data.section === 'body' && data.column.index === 3) {
+    const val = data.cell.raw;
+    if (val === 'Conforme') {
+      data.cell.styles.textColor = [22, 163, 74];
+      data.cell.styles.fontStyle = 'bold';
+    } else if (val === 'Attention') {
+      data.cell.styles.textColor = [217, 119, 6];
+      data.cell.styles.fontStyle = 'bold';
+    } else if (val === 'Non conforme') {
+      data.cell.styles.textColor = [220, 38, 38];
+      data.cell.styles.fontStyle = 'bold';
+    }
+  }
+};
+
+// ===== KPI 4 & 5 Chart Helpers =====
+
+function drawHorizontalBarChart(
+  doc: jsPDF,
+  bars: { label: string; value: number; detail?: string }[],
+  options: {
+    x: number;
+    y: number;
+    width: number;
+    barHeight: number;
+    barGap: number;
+    barColor: [number, number, number];
+    maxValue?: number;
+  }
+): number {
+  const { x, y, width, barHeight, barGap, barColor } = options;
+  const maxVal = options.maxValue || Math.max(...bars.map(b => b.value), 1);
+  const labelWidth = 55;
+  const valueWidth = 30;
+  const chartWidth = width - labelWidth - valueWidth;
+  let currentY = y;
+
+  for (const bar of bars) {
+    // Label (left)
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(55, 65, 81);
+    const truncatedLabel = bar.label.length > 22 ? bar.label.substring(0, 20) + '...' : bar.label;
+    doc.text(truncatedLabel, x, currentY + barHeight / 2 + 1);
+
+    // Bar background track
+    const barWidth = maxVal > 0 ? (bar.value / maxVal) * chartWidth : 0;
+    doc.setFillColor(230, 230, 230);
+    doc.roundedRect(x + labelWidth, currentY, chartWidth, barHeight, 1.5, 1.5, 'F');
+    if (barWidth > 0) {
+      doc.setFillColor(...barColor);
+      doc.roundedRect(x + labelWidth, currentY, Math.max(barWidth, 3), barHeight, 1.5, 1.5, 'F');
+    }
+
+    // Value (right)
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(17, 24, 39);
+    const valText = bar.detail || String(bar.value);
+    doc.text(valText, x + labelWidth + chartWidth + 3, currentY + barHeight / 2 + 1);
+
+    currentY += barHeight + barGap;
+  }
+
+  return currentY;
+}
+
+function renderKpi4Detail(
+  doc: jsPDF,
+  kpis: any,
+  y: number,
+  margin: number,
+  pageWidth: number,
+  ensureSpace: (h: number) => number,
+  darkColor: [number, number, number],
+): number {
+  const kpi = kpis.temps_moyen_traitement;
+  if (!kpi?.par_type || !Array.isArray(kpi.par_type) || kpi.par_type.length === 0) return y;
+
+  const chartHeight = 15 + kpi.par_type.length * 9 + 5;
+  y = ensureSpace(chartHeight);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...darkColor);
+  doc.text('Détail par type de réclamation', margin, y);
+  y += 7;
+
+  const bars = kpi.par_type.map((t: any) => ({
+    label: t.nom || 'N/A',
+    value: t.valeur || 0,
+    detail: `${(t.valeur || 0).toFixed(1)}h (${t.total})`
+  }));
+  y = drawHorizontalBarChart(doc, bars, {
+    x: margin,
+    y,
+    width: pageWidth - 2 * margin,
+    barHeight: 6,
+    barGap: 3,
+    barColor: [245, 158, 11] as [number, number, number],
+  });
+
+  return y + 5;
+}
+
+function renderKpi5(
+  doc: jsPDF,
+  kpis: any,
+  y: number,
+  margin: number,
+  pageWidth: number,
+  ensureSpace: (h: number) => number,
+  darkColor: [number, number, number],
+  primaryColor: [number, number, number],
+): number {
+  const entries = kpis.temps_realisation_tache;
+  if (!Array.isArray(entries) || entries.length === 0) return y;
+
+  const byType: Record<string, { heures: number; interventions: number }> = {};
+  for (const e of entries) {
+    const key = e.type_tache || 'Autre';
+    if (!byType[key]) byType[key] = { heures: 0, interventions: 0 };
+    byType[key].heures += e.heures || 0;
+    byType[key].interventions += e.nb_interventions || 0;
+  }
+
+  const aggregated = Object.entries(byType)
+    .sort((a, b) => b[1].heures - a[1].heures);
+
+  const chartHeight = 15 + aggregated.length * 9 + 10;
+  y = ensureSpace(chartHeight);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...darkColor);
+  doc.text('Temps de réalisation par type de tâche', margin, y);
+  y += 7;
+
+  const totalH = aggregated.reduce((s, [, v]) => s + v.heures, 0);
+  const totalI = aggregated.reduce((s, [, v]) => s + v.interventions, 0);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(107, 114, 128);
+  doc.text(`Total : ${totalH.toFixed(1)}h — ${totalI} intervention(s)`, margin, y);
+  y += 8;
+
+  const bars = aggregated.map(([type, data]) => ({
+    label: type,
+    value: data.heures,
+    detail: `${data.heures.toFixed(1)}h (${data.interventions})`
+  }));
+  y = drawHorizontalBarChart(doc, bars, {
+    x: margin,
+    y,
+    width: pageWidth - 2 * margin,
+    barHeight: 6,
+    barGap: 3,
+    barColor: primaryColor,
+  });
+
+  return y + 5;
+}
 
 export default function MonthlyReport() {
   // State
@@ -244,6 +466,9 @@ export default function MonthlyReport() {
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 20;
+      const headerHeight = 18; // Espace réservé pour le header (logo)
+      const footerHeight = 25; // Espace réservé pour le footer (infos société ENJR)
+      const contentEndY = pageHeight - margin - footerHeight; // Limite basse du contenu
       let y = margin;
 
       // Couleurs professionnelles
@@ -252,13 +477,91 @@ export default function MonthlyReport() {
       const grayColor: [number, number, number] = [107, 114, 128]; // gray-500
       const lightGray: [number, number, number] = [243, 244, 246]; // gray-100
 
-      // Charger le logo (avec transparence)
+      // Charger le logo (asset statique Vite, pas via le backend)
       let logoBase64: string | null = null;
       try {
-        logoBase64 = await loadImageAsBase64('/GreenSIG_Logo_V1nobackground.png', true);
+        logoBase64 = await new Promise<string | null>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0);
+              resolve(canvas.toDataURL('image/png'));
+            } else resolve(null);
+          };
+          img.onerror = () => resolve(null);
+          img.src = '/logo.png';
+        });
       } catch {
         console.log('Logo non chargé');
       }
+
+      // Charger le logo ENJR (asset statique Vite)
+      let logoEnjrBase64: string | null = null;
+      try {
+        logoEnjrBase64 = await loadStaticAsset('/Logo ENJR.png', 'png');
+      } catch {
+        console.log('Logo ENJR non chargé');
+      }
+
+      // Charger l'image footer (asset statique Vite)
+      let footerBase64: string | null = null;
+      try {
+        footerBase64 = await loadStaticAsset('/footer.jpeg', 'jpeg');
+      } catch {
+        console.log('Footer image non chargée');
+      }
+
+      // Fonction pour ajouter le header sur les pages de contenu
+      const addPageHeader = () => {
+        if (logoBase64) {
+          doc.addImage(logoBase64, 'PNG', margin, 5, 25, 10);
+        } else {
+          doc.setFontSize(12);
+          doc.setTextColor(...primaryColor);
+          doc.setFont('helvetica', 'bold');
+          doc.text('GreenSIG', margin, 12);
+        }
+        // Ligne de séparation
+        doc.setDrawColor(...lightGray);
+        doc.setLineWidth(0.3);
+        doc.line(margin, headerHeight, pageWidth - margin, headerHeight);
+      };
+
+      // Fonction pour ajouter une nouvelle page avec header
+      const addContentPage = () => {
+        doc.addPage();
+        addPageHeader();
+        return margin + headerHeight; // Retourne la position Y de départ
+      };
+
+      // Fonction pour vérifier l'espace et ajouter une page si nécessaire
+      const ensureSpace = (requiredHeight: number): number => {
+        if (y + requiredHeight > contentEndY) {
+          return addContentPage();
+        }
+        return y;
+      };
+
+      // Configuration des marges pour autoTable (respecte header/footer)
+      const tableMargins = {
+        top: margin + headerHeight,
+        bottom: margin + footerHeight,
+        left: margin,
+        right: margin
+      };
+
+      // Callback pour ajouter le header quand autoTable crée une nouvelle page
+      const didDrawPage = (data: any) => {
+        const currentPage = doc.getNumberOfPages();
+        // Ajouter le header sur les pages de contenu (pas la couverture)
+        if (currentPage > 1 && data.pageNumber > 1) {
+          addPageHeader();
+        }
+      };
 
       // ========== PAGE DE COUVERTURE ==========
 
@@ -266,20 +569,25 @@ export default function MonthlyReport() {
       doc.setFillColor(255, 255, 255);
       doc.rect(0, 0, pageWidth, pageHeight, 'F');
 
-      // Charger la carte satellite du site si coordonnées disponibles
+      // Charger la carte satellite avec polygone du site
       let mapBase64: string | null = null;
+      const siteGeometry = reportData.site?.geometry;
       const centroid = reportData.site?.centroid;
-      if (centroid?.lat && centroid?.lng) {
+
+      // Essayer le rendu polygone d'abord, fallback sur tuile unique
+      if (siteGeometry) {
         try {
-          // Utiliser Esri World Imagery (satellite)
+          mapBase64 = await renderSitePolygonMap(siteGeometry);
+        } catch {
+          console.log('Rendu polygone échoué, fallback tuile unique');
+        }
+      }
+      if (!mapBase64 && centroid?.lat && centroid?.lng) {
+        try {
           const zoom = 17;
-          const lat = centroid.lat;
-          const lng = centroid.lng;
-          // Calculer les coordonnées de tile
           const n = Math.pow(2, zoom);
-          const xtile = Math.floor((lng + 180) / 360 * n);
-          const ytile = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n);
-          // Utiliser Esri Satellite Imagery
+          const xtile = Math.floor((centroid.lng + 180) / 360 * n);
+          const ytile = Math.floor((1 - Math.log(Math.tan(centroid.lat * Math.PI / 180) + 1 / Math.cos(centroid.lat * Math.PI / 180)) / Math.PI) / 2 * n);
           const tileUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${ytile}/${xtile}`;
           mapBase64 = await loadImageAsBase64(tileUrl);
         } catch {
@@ -287,70 +595,56 @@ export default function MonthlyReport() {
         }
       }
 
-      // Logo plus grand (centré en haut)
-      if (logoBase64) {
-        doc.addImage(logoBase64, 'PNG', pageWidth / 2 - 45, 20, 90, 68);
-      } else {
-        // Texte de remplacement
-        doc.setFontSize(40);
-        doc.setTextColor(...darkColor);
-        doc.setFont('helvetica', 'bold');
-        doc.text('GreenSIG', pageWidth / 2, 55, { align: 'center' });
+      // Logos en haut : GreenSIG à gauche, ENJR à droite
+      if (logoBase64 && logoEnjrBase64) {
+        doc.addImage(logoBase64, 'PNG', margin, 15, 55, 28);
+        doc.addImage(logoEnjrBase64, 'PNG', pageWidth - margin - 55, 15, 55, 28);
+      } else if (logoBase64) {
+        const logoW = 70;
+        const logoH = 35;
+        doc.addImage(logoBase64, 'PNG', (pageWidth - logoW) / 2, 15, logoW, logoH);
       }
 
       // Titre principal
       doc.setFontSize(28);
       doc.setTextColor(...darkColor);
       doc.setFont('helvetica', 'bold');
-      doc.text('RAPPORT D\'ACTIVITÉ', pageWidth / 2, 105, { align: 'center' });
+      doc.text('RAPPORT D\'ACTIVITÉ', pageWidth / 2, 65, { align: 'center' });
 
       // Sous-titre
       doc.setFontSize(12);
       doc.setTextColor(...grayColor);
       doc.setFont('helvetica', 'normal');
-      doc.text('Gestion des Espaces Verts', pageWidth / 2, 115, { align: 'center' });
+      doc.text('Gestion des Espaces Verts', pageWidth / 2, 75, { align: 'center' });
 
       // Nom du site (fond gris foncé)
-      const siteBoxY = 125;
+      const siteBoxY = 85;
       doc.setFillColor(50, 50, 50);
-      doc.roundedRect(30, siteBoxY, pageWidth - 60, 25, 3, 3, 'F');
+      doc.roundedRect(30, siteBoxY, pageWidth - 60, 20, 3, 3, 'F');
 
-      doc.setFontSize(18);
+      doc.setFontSize(16);
       doc.setTextColor(255, 255, 255);
       doc.setFont('helvetica', 'bold');
-      doc.text(reportData.site?.nom || 'Site', pageWidth / 2, siteBoxY + 17, { align: 'center' });
+      doc.text(reportData.site?.nom || 'Site', pageWidth / 2, siteBoxY + 14, { align: 'center' });
 
       // Carte du site (si disponible)
-      const mapY = 158;
-      const mapWidth = pageWidth - 50;
-      const mapHeight = 70;
-      let contentEndY = 155; // Position après la carte ou le nom du site
+      const mapY = 115;
+      const mapWidth = pageWidth - 40;
+      const mapHeight = 100;
+      let coverContentY = 112;
 
       if (mapBase64) {
-        // Image de la carte satellite
-        doc.addImage(mapBase64, 'JPEG', 25, mapY, mapWidth, mapHeight);
+        // Cadre léger autour de la carte
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.5);
+        doc.rect(20 - 0.5, mapY - 0.5, mapWidth + 1, mapHeight + 1);
 
-        // Marqueur du site au centre de la carte
-        const markerX = 25 + mapWidth / 2;
-        const markerY = mapY + mapHeight / 2;
-
-        // Ombre du marqueur
-        doc.setFillColor(0, 0, 0);
-        doc.circle(markerX + 1, markerY + 1, 5, 'F');
-
-        // Marqueur rouge
-        doc.setFillColor(220, 38, 38); // red-600
-        doc.circle(markerX, markerY, 5, 'F');
-
-        // Point blanc au centre du marqueur
-        doc.setFillColor(255, 255, 255);
-        doc.circle(markerX, markerY, 2, 'F');
-
-        contentEndY = mapY + mapHeight + 5;
+        doc.addImage(mapBase64, 'JPEG', 20, mapY, mapWidth, mapHeight);
+        coverContentY = mapY + mapHeight + 5;
       }
 
       // Période
-      const periodeBoxY = contentEndY + 5;
+      const periodeBoxY = coverContentY + 5;
       doc.setFillColor(...lightGray);
       doc.roundedRect(35, periodeBoxY, pageWidth - 70, 16, 2, 2, 'F');
 
@@ -359,47 +653,35 @@ export default function MonthlyReport() {
       doc.setFont('helvetica', 'normal');
       doc.text(formatPeriode(), pageWidth / 2, periodeBoxY + 11, { align: 'center' });
 
-      // Informations du site
+      // Informations du site - Coordonnées géographiques + Superficie
       y = periodeBoxY + 25;
       doc.setFontSize(10);
       doc.setTextColor(...darkColor);
 
-      if (reportData.site?.adresse) {
+      if (centroid?.lat != null && centroid?.lng != null) {
         doc.setFont('helvetica', 'bold');
-        doc.text('Adresse :', 35, y);
+        doc.text('Coordonnées :', 35, y);
         doc.setFont('helvetica', 'normal');
-        const adresseLines = doc.splitTextToSize(reportData.site.adresse, pageWidth - 100);
-        doc.text(adresseLines, 65, y);
-        y += adresseLines.length * 5 + 3;
+        const latDir = centroid.lat >= 0 ? 'N' : 'S';
+        const lngDir = centroid.lng >= 0 ? 'E' : 'W';
+        const coordStr = `${latDir} ${Math.abs(centroid.lat).toFixed(4)}\u00B0  ${lngDir} ${Math.abs(centroid.lng).toFixed(4)}\u00B0`;
+        doc.text(coordStr, 70, y);
+        y += 7;
       }
       if (reportData.site?.superficie) {
         doc.setFont('helvetica', 'bold');
         doc.text('Superficie :', 35, y);
         doc.setFont('helvetica', 'normal');
-        // Formater avec des espaces normaux pour éviter les problèmes d'affichage PDF
         const superficieFormatted = reportData.site.superficie.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-        doc.text(`${superficieFormatted} m²`, 65, y);
+        doc.text(`${superficieFormatted} m\u00B2`, 70, y);
       }
 
-      const stats = reportData.statistiques || {};
-
-      // Pied de page couverture - Logo centré
-      if (logoBase64) {
-        const footerLogoWidth = 30;
-        const footerLogoHeight = 10;
-        doc.addImage(logoBase64, 'PNG', (pageWidth - footerLogoWidth) / 2, pageHeight - 18, footerLogoWidth, footerLogoHeight);
-      }
-
-      // ========== PAGE 2: SOMMAIRE & TRAVAUX ==========
-      doc.addPage();
-      y = margin;
+      // ========== PAGE 2: CONTENU ==========
+      y = addContentPage();
 
       // Fonction pour ajouter un titre de section
       const addSectionTitle = (title: string, number: string) => {
-        if (y > pageHeight - 40) {
-          doc.addPage();
-          y = margin;
-        }
+        y = ensureSpace(20);
         doc.setFillColor(...primaryColor);
         doc.rect(margin, y - 5, 6, 12, 'F');
         doc.setFontSize(16);
@@ -410,209 +692,343 @@ export default function MonthlyReport() {
         doc.setFont('helvetica', 'normal');
       };
 
-      // Section 1: Travaux effectués
-      addSectionTitle('TRAVAUX EFFECTUÉS', '1');
+      // ========== SECTION 1: AVANT-PROPOS ==========
+      addSectionTitle('AVANT-PROPOS', '1');
+
+      doc.setFontSize(10);
+      doc.setTextColor(...darkColor);
+      doc.setFont('helvetica', 'normal');
+
+      const avantProposIntro = [
+        'Grâce à nos experts éprouvés, nos techniques bien conçues, et nos méthodes convenablement exécutées, la société ENJR a pour objectif principal la réussite de l\'opération d\'entretien et de jardinage et ce dans les règles de l\'art.',
+        '',
+        'Ainsi, durant ce mois, nos équipes de jardiniers ont effectué les travaux d\'entretien des espaces verts des sites suivants :',
+      ];
+
+      for (const text of avantProposIntro) {
+        if (text === '') {
+          y += 4;
+        } else {
+          const wrappedLines = doc.splitTextToSize(text, pageWidth - 2 * margin);
+          for (const line of wrappedLines) {
+            y = ensureSpace(6);
+            doc.text(line, margin, y);
+            y += 5;
+          }
+          y += 2;
+        }
+      }
+
+      // Nom du site en puce
+      y += 2;
+      doc.setFont('helvetica', 'bold');
+      y = ensureSpace(8);
+      doc.text(`\u2022  ${reportData.site?.nom || 'Site'}`, margin + 5, y);
+      y += 10;
+      doc.setFont('helvetica', 'normal');
+
+      const avantProposFin = [
+        'L\'encadrement d\'ENJR met en \u0153uvre toutes les dispositions nécessaires pour une amélioration continue des conditions de travail de ce projet.',
+        '',
+        'Aussi, nous supervisons de près toutes les actions opérationnelles afin d\'avoir un livrable à la hauteur des espérances de nos clients.',
+        '',
+        'Grâce à toutes ces actions, nous constatons, indéniablement un changement favorable et motivant au niveau de tous les sites.',
+        '',
+        'Dans ce qui suit, les photos prises illustrent l\'avancement et les situations de chaque site.',
+      ];
+
+      for (const text of avantProposFin) {
+        if (text === '') {
+          y += 4;
+        } else {
+          const wrappedLines = doc.splitTextToSize(text, pageWidth - 2 * margin);
+          for (const line of wrappedLines) {
+            y = ensureSpace(6);
+            doc.text(line, margin, y);
+            y += 5;
+          }
+          y += 2;
+        }
+      }
+      y += 10;
+
+      // ========== SECTION 2: ACTIONS MISES EN PLACE ==========
+      addSectionTitle('ACTIONS MISES EN PLACE', '2');
+
+      doc.setFontSize(10);
+      doc.setTextColor(...darkColor);
+      doc.setFont('helvetica', 'normal');
+
+      const actionsIntro = 'Afin d\'améliorer notre rendement, et éviter les éventuelles dérives de nos process, nous avons mis en place plusieurs actions notamment :';
+      const actionsIntroLines = doc.splitTextToSize(actionsIntro, pageWidth - 2 * margin);
+      for (const line of actionsIntroLines) {
+        y = ensureSpace(6);
+        doc.text(line, margin, y);
+        y += 5;
+      }
+      y += 5;
+
+      const actionsListe = [
+        'Instaurer une réunion hebdomadaire chaque lundi en présence de tous les responsables des sites',
+        'Standardiser les méthodes de travail pour tous les sites : explications théoriques et suivi sur le terrain : bordures du gazon, hauteur de taille, ...',
+        'Augmenter la fréquence de nettoyage des ordures éventuelles à trois fois par jour',
+        'Désinfecter systématiquement les outils de travail',
+        'Nommer un caporal par site pour le suivi et l\'exécution des travaux',
+        'Programmer au minimum deux visites par jour du superviseur de tous les sites pour la planification des actions et le suivi des réalisations',
+        'Recueillir le besoin de chaque site en outillage et en consommable et distribuer le matériel nécessaire selon les besoins (asperseurs, tuyaux, ...)',
+        '\u00C9diter une matrice de polyvalence pour connaître le niveau de compétence des techniques et la maîtrise des outils de travail pour définir les affectations des jardiniers en fonction des spécificités de chaque site',
+      ];
+
+      for (const action of actionsListe) {
+        const bulletLines = doc.splitTextToSize(`\u2022  ${action}`, pageWidth - 2 * margin - 5);
+        for (const line of bulletLines) {
+          y = ensureSpace(6);
+          doc.text(line, margin + 5, y);
+          y += 5;
+        }
+        y += 3;
+      }
+      y += 10;
+
+      // ========== SECTION 3: INDICATEURS DE PERFORMANCE (KPI) ==========
+      addSectionTitle('INDICATEURS DE PERFORMANCE', '3');
+
+      // Charger les KPI depuis l'API
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+      const siteId = reportData.site?.id;
+      const moisDebut = reportData.periode.date_debut.substring(0, 7); // YYYY-MM
+      let kpiData: any = null;
+      try {
+        const kpiParams = new URLSearchParams();
+        if (siteId) kpiParams.append('site_id', String(siteId));
+        if (moisDebut) kpiParams.append('mois', moisDebut);
+        const kpiResp = await apiFetch(`${API_BASE_URL}/kpis/?${kpiParams.toString()}`);
+        kpiData = await kpiResp.json();
+      } catch {
+        console.log('KPI data non chargée');
+      }
+
+      if (kpiData?.kpis) {
+        const kpiRows = buildKpiRows(kpiData.kpis);
+
+        autoTable(doc, {
+          startY: y,
+          head: [['Indicateur', 'Valeur', 'Seuil', 'Statut']],
+          body: kpiRows,
+          theme: 'grid',
+          styles: { fontSize: 9, cellPadding: 4 },
+          headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold' },
+          columnStyles: {
+            0: { fontStyle: 'bold', cellWidth: 70 },
+            1: { halign: 'center', cellWidth: 35 },
+            2: { halign: 'center', cellWidth: 30 },
+            3: { halign: 'center', cellWidth: 30 },
+          },
+          margin: tableMargins,
+          didDrawPage: didDrawPage,
+          didParseCell: kpiDidParseCell,
+        });
+        y = (doc as any).lastAutoTable.finalY + 15;
+
+        // KPI 4 — Temps moyen traitement réclamations (graphique)
+        y = renderKpi4Detail(doc, kpiData.kpis, y, margin, pageWidth, ensureSpace, darkColor);
+
+        // KPI 5 — Temps réalisation par tâche (graphique)
+        y = renderKpi5(doc, kpiData.kpis, y, margin, pageWidth, ensureSpace, darkColor, primaryColor);
+      } else {
+        doc.setFontSize(10);
+        doc.setTextColor(...darkColor);
+        doc.text('Données KPI non disponibles pour cette période.', margin, y);
+        y += 15;
+      }
+
+      // ========== SECTION 4: TRAVAUX EFFECTUÉS ==========
+      addSectionTitle('TRAVAUX EFFECTUÉS', '4');
 
       doc.setFontSize(10);
       doc.setTextColor(...grayColor);
-      doc.text('Opérations validées sur la période', margin, y);
+      doc.text('Planning des opérations réalisées sur la période', margin, y);
       y += 10;
 
       const travauxEffectues = reportData.travaux_effectues;
-      if (!travauxEffectues || travauxEffectues.total === 0) {
+      const planningEffectues = travauxEffectues?.planning || [];
+      const statsEffectues = travauxEffectues?.statistiques;
+
+      if (planningEffectues.length === 0) {
         doc.setTextColor(...darkColor);
-        doc.text('Aucun travail validé sur cette période.', margin, y);
+        doc.text('Aucun travail réalisé sur cette période.', margin, y);
         y += 15;
       } else {
-        // Tableau récapitulatif par type
-        doc.setFontSize(9);
-        doc.setTextColor(...darkColor);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Récapitulatif par type', margin, y);
-        doc.setFont('helvetica', 'normal');
-        y += 6;
+        // Couleurs par statut
+        const STATUT_COLORS: Record<string, [number, number, number]> = {
+          'REALISEE': [200, 230, 201],    // Vert clair
+          'EN_COURS': [187, 222, 251],    // Bleu clair
+          'REPORTEE': [255, 249, 196],    // Jaune clair
+          'ANNULEE': [255, 205, 210],     // Rouge clair
+          'NON_REALISEE': [255, 255, 255], // Blanc
+        };
+
+        // Construire les données du tableau
+        const tableBody = planningEffectues.map(item => [
+          item.date ? format(new Date(item.date), 'dd/MM/yyyy') : '-',
+          item.reference || '-',
+          item.type || '-',
+          item.equipes || '-',
+          item.horaires || '-',
+          item.charge ? `${item.charge}h` : '-',
+          item.statut_label || '-',
+          item.priorite_label || '-'
+        ]);
+
+        // Ligne de statistiques
+        const statsText = `Total: ${statsEffectues?.total || 0} interventions, ${statsEffectues?.total_heures || 0}h`;
+        tableBody.push([statsText, '', '', '', '', '', '', '']);
 
         autoTable(doc, {
           startY: y,
-          head: [['Type d\'intervention', 'Nombre']],
-          body: (travauxEffectues.par_type || []).map(t => [t.type || 'N/A', String(t.count || 0)]),
+          head: [['Date', 'Réf.', 'Type', 'Équipe(s)', 'Horaires', 'Charge', 'Statut', 'Priorité']],
+          body: tableBody,
           theme: 'striped',
-          styles: { fontSize: 9, cellPadding: 3 },
-          headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold' },
-          alternateRowStyles: { fillColor: [249, 250, 251] },
-          margin: { left: margin, right: margin }
+          styles: { fontSize: 7, cellPadding: 2 },
+          headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+          columnStyles: {
+            0: { cellWidth: 18 },  // Date
+            1: { cellWidth: 18 },  // Réf
+            2: { cellWidth: 30 },  // Type
+            3: { cellWidth: 35 },  // Équipes
+            4: { cellWidth: 22 },  // Horaires
+            5: { cellWidth: 14 },  // Charge
+            6: { cellWidth: 18 },  // Statut
+            7: { cellWidth: 22 },  // Priorité
+          },
+          margin: tableMargins,
+          didDrawPage: didDrawPage,
+          didParseCell: (data: any) => {
+            // Appliquer couleur par statut (colonne 6)
+            if (data.section === 'body' && data.column.index === 6 && data.row.index < planningEffectues.length) {
+              const item = planningEffectues[data.row.index];
+              if (item && STATUT_COLORS[item.statut]) {
+                data.cell.styles.fillColor = STATUT_COLORS[item.statut];
+              }1
+            }
+            // Priorité urgente en rouge (colonne 7)
+            if (data.section === 'body' && data.column.index === 7 && data.row.index < planningEffectues.length) {
+              const item = planningEffectues[data.row.index];
+              if (item && item.priorite === 5) {
+                data.cell.styles.textColor = [220, 38, 38];
+                data.cell.styles.fontStyle = 'bold';
+              }
+            }
+            // Ligne de stats (dernière ligne)
+            if (data.section === 'body' && data.row.index === planningEffectues.length) {
+              data.cell.styles.fillColor = [232, 245, 233];
+              data.cell.styles.textColor = [46, 125, 50];
+              data.cell.styles.fontStyle = 'italic';
+              if (data.column.index === 0) {
+                data.cell.colSpan = 8;
+              }
+            }
+          }
         });
-        y = (doc as any).lastAutoTable.finalY + 8;
-
-        // Tableau chronologique détaillé
-        if ((travauxEffectues.details || []).length > 0) {
-          doc.setFontSize(9);
-          doc.setFont('helvetica', 'bold');
-          doc.text('Chronologie des interventions', margin, y);
-          doc.setFont('helvetica', 'normal');
-          y += 6;
-
-          autoTable(doc, {
-            startY: y,
-            head: [['Date', 'Type', 'Équipe', 'Heures']],
-            body: (travauxEffectues.details || []).map(t => [
-              t.date ? format(new Date(t.date), 'dd/MM/yyyy') : '-',
-              t.type || 'N/A',
-              t.equipes || '-',
-              t.heures ? `${t.heures}h` : '-'
-            ]),
-            theme: 'striped',
-            styles: { fontSize: 8, cellPadding: 2 },
-            headStyles: { fillColor: [75, 85, 99], textColor: [255, 255, 255], fontStyle: 'bold' },
-            alternateRowStyles: { fillColor: [249, 250, 251] },
-            columnStyles: {
-              0: { cellWidth: 25 },
-              1: { cellWidth: 50 },
-              2: { cellWidth: 60 },
-              3: { cellWidth: 20 }
-            },
-            margin: { left: margin, right: margin }
-          });
-          y = (doc as any).lastAutoTable.finalY + 15;
-        } else {
-          y += 10;
-        }
+        y = (doc as any).lastAutoTable.finalY + 15;
       }
 
-      // Section 2: Travaux planifiés
-      addSectionTitle('TRAVAUX PLANIFIÉS', '2');
+      // ========== SECTION 5: TRAVAUX PLANIFIÉS ==========
+      addSectionTitle('TRAVAUX PLANIFIÉS', '5');
 
       doc.setFontSize(10);
       doc.setTextColor(...grayColor);
-      doc.text('Interventions prévues pour les 30 prochains jours', margin, y);
+      doc.text('Planning des interventions prévues pour les 30 prochains jours', margin, y);
       y += 10;
 
       const travauxPlanifies = reportData.travaux_planifies;
-      if (!travauxPlanifies || travauxPlanifies.total === 0) {
+      const planningPlanifies = travauxPlanifies?.planning || [];
+      const statsPlanifies = travauxPlanifies?.statistiques;
+
+      if (planningPlanifies.length === 0) {
         doc.setTextColor(...darkColor);
-        doc.text('Aucun travail planifié.', margin, y);
+        doc.text('Aucune intervention planifiée.', margin, y);
         y += 15;
       } else {
-        // Tableau récapitulatif par type
-        doc.setFontSize(9);
-        doc.setTextColor(...darkColor);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Récapitulatif par type', margin, y);
-        doc.setFont('helvetica', 'normal');
-        y += 6;
+        // Couleurs par statut
+        const STATUT_COLORS_PLANIF: Record<string, [number, number, number]> = {
+          'REALISEE': [200, 230, 201],    // Vert clair
+          'EN_COURS': [187, 222, 251],    // Bleu clair
+          'REPORTEE': [255, 249, 196],    // Jaune clair
+          'ANNULEE': [255, 205, 210],     // Rouge clair
+          'NON_REALISEE': [255, 255, 255], // Blanc
+        };
+
+        // Construire les données du tableau
+        const tableBodyPlanif = planningPlanifies.map(item => [
+          item.date ? format(new Date(item.date), 'dd/MM/yyyy') : '-',
+          item.reference || '-',
+          item.type || '-',
+          item.equipes || '-',
+          item.horaires || '-',
+          item.charge ? `${item.charge}h` : '-',
+          item.statut_label || '-',
+          item.priorite_label || '-'
+        ]);
+
+        // Ligne de statistiques
+        const statsTextPlanif = `Total: ${statsPlanifies?.total || 0} interventions, ${statsPlanifies?.total_heures || 0}h`;
+        tableBodyPlanif.push([statsTextPlanif, '', '', '', '', '', '', '']);
 
         autoTable(doc, {
           startY: y,
-          head: [['Type d\'intervention', 'Nombre prévu']],
-          body: (travauxPlanifies.par_type || []).map(t => [t.type || 'N/A', String(t.count || 0)]),
+          head: [['Date', 'Réf.', 'Type', 'Équipe(s)', 'Horaires', 'Charge', 'Statut', 'Priorité']],
+          body: tableBodyPlanif,
           theme: 'striped',
-          styles: { fontSize: 9, cellPadding: 3 },
-          headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255], fontStyle: 'bold' },
-          alternateRowStyles: { fillColor: [249, 250, 251] },
-          margin: { left: margin, right: margin }
-        });
-        y = (doc as any).lastAutoTable.finalY + 8;
-
-        // Tableau chronologique détaillé
-        if ((travauxPlanifies.details || []).length > 0) {
-          doc.setFontSize(9);
-          doc.setFont('helvetica', 'bold');
-          doc.text('Planning des interventions', margin, y);
-          doc.setFont('helvetica', 'normal');
-          y += 6;
-
-          autoTable(doc, {
-            startY: y,
-            head: [['Date début', 'Date fin', 'Type', 'Équipe', 'Heures']],
-            body: (travauxPlanifies.details || []).map(t => [
-              t.date_debut ? format(new Date(t.date_debut), 'dd/MM/yyyy') : '-',
-              t.date_fin ? format(new Date(t.date_fin), 'dd/MM/yyyy') : '-',
-              t.type || 'N/A',
-              t.equipes || '-',
-              t.heures ? `${t.heures}h` : '-'
-            ]),
-            theme: 'striped',
-            styles: { fontSize: 8, cellPadding: 2 },
-            headStyles: { fillColor: [75, 85, 99], textColor: [255, 255, 255], fontStyle: 'bold' },
-            alternateRowStyles: { fillColor: [249, 250, 251] },
-            columnStyles: {
-              0: { cellWidth: 22 },
-              1: { cellWidth: 22 },
-              2: { cellWidth: 45 },
-              3: { cellWidth: 50 },
-              4: { cellWidth: 18 }
-            },
-            margin: { left: margin, right: margin }
-          });
-          y = (doc as any).lastAutoTable.finalY + 15;
-        } else {
-          y += 10;
-        }
-      }
-
-      // Section 3: Équipes intervenantes
-      const equipes = reportData.equipes || [];
-      if (equipes.length > 0) {
-        addSectionTitle('ÉQUIPES INTERVENANTES', '3');
-
-        doc.setFontSize(10);
-        doc.setTextColor(...grayColor);
-        doc.text('Personnel ayant travaillé sur le site', margin, y);
-        y += 10;
-
-        for (const equipe of equipes) {
-          if (y > pageHeight - 50) {
-            doc.addPage();
-            y = margin;
-          }
-
-          // Nom de l'équipe
-          doc.setFillColor(...lightGray);
-          doc.roundedRect(margin, y - 3, pageWidth - 2 * margin, 10, 2, 2, 'F');
-          doc.setFontSize(11);
-          doc.setTextColor(...darkColor);
-          doc.setFont('helvetica', 'bold');
-          doc.text(equipe.nom || 'Équipe', margin + 5, y + 3);
-          if (equipe.chef) {
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(9);
-            doc.setTextColor(...grayColor);
-            doc.text(`Chef: ${equipe.chef}`, margin + 80, y + 3);
-          }
-          doc.setFontSize(9);
-          doc.setTextColor(...primaryColor);
-          doc.text(`${(equipe.heures_totales ?? 0).toFixed(1)}h`, pageWidth - margin - 20, y + 3);
-          y += 12;
-
-          // Opérateurs
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(9);
-          for (const op of (equipe.operateurs || [])) {
-            // Si absent, afficher en gris clair avec indication
-            if (op.absent) {
-              doc.setTextColor(150, 150, 150); // Gris clair
-              doc.text(`• ${op.nom || 'Opérateur'} (absent)`, margin + 10, y);
-              doc.text(`${(op.heures ?? 0).toFixed(1)}h`, pageWidth - margin - 25, y);
-            } else {
-              doc.setTextColor(...darkColor);
-              doc.text(`• ${op.nom || 'Opérateur'}`, margin + 10, y);
-              doc.setTextColor(...grayColor);
-              doc.text(`${(op.heures ?? 0).toFixed(1)}h`, pageWidth - margin - 25, y);
+          styles: { fontSize: 7, cellPadding: 2 },
+          headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+          columnStyles: {
+            0: { cellWidth: 18 },  // Date
+            1: { cellWidth: 18 },  // Réf
+            2: { cellWidth: 30 },  // Type
+            3: { cellWidth: 35 },  // Équipes
+            4: { cellWidth: 22 },  // Horaires
+            5: { cellWidth: 14 },  // Charge
+            6: { cellWidth: 18 },  // Statut
+            7: { cellWidth: 22 },  // Priorité
+          },
+          margin: tableMargins,
+          didDrawPage: didDrawPage,
+          didParseCell: (data: any) => {
+            // Appliquer couleur par statut (colonne 6)
+            if (data.section === 'body' && data.column.index === 6 && data.row.index < planningPlanifies.length) {
+              const item = planningPlanifies[data.row.index];
+              if (item && STATUT_COLORS_PLANIF[item.statut]) {
+                data.cell.styles.fillColor = STATUT_COLORS_PLANIF[item.statut];
+              }
             }
-            y += 5;
+            // Priorité urgente en rouge (colonne 7)
+            if (data.section === 'body' && data.column.index === 7 && data.row.index < planningPlanifies.length) {
+              const item = planningPlanifies[data.row.index];
+              if (item && item.priorite === 5) {
+                data.cell.styles.textColor = [220, 38, 38];
+                data.cell.styles.fontStyle = 'bold';
+              }
+            }
+            // Ligne de stats (dernière ligne)
+            if (data.section === 'body' && data.row.index === planningPlanifies.length) {
+              data.cell.styles.fillColor = [219, 234, 254];
+              data.cell.styles.textColor = [29, 78, 216];
+              data.cell.styles.fontStyle = 'italic';
+              if (data.column.index === 0) {
+                data.cell.colSpan = 8;
+              }
+            }
           }
-          doc.setTextColor(...darkColor);
-          y += 5;
-        }
-        y += 10;
+        });
+        y = (doc as any).lastAutoTable.finalY + 15;
       }
 
-      // Section 4: Photos
+      // ========== SECTION 6: PHOTOS AVANT/APRÈS ==========
       const photos = reportData.photos || [];
       if (photos.length > 0) {
-        doc.addPage();
-        y = margin;
-        addSectionTitle('PHOTOS AVANT/APRÈS', equipes.length > 0 ? '4' : '3');
+        y = addContentPage();
+        addSectionTitle('PHOTOS AVANT/APRÈS', '6');
 
         doc.setFontSize(10);
         doc.setTextColor(...grayColor);
@@ -623,10 +1039,7 @@ export default function MonthlyReport() {
         const imgGap = 10;
 
         for (const group of photos.slice(0, 6)) {
-          if (y > pageHeight - 85) {
-            doc.addPage();
-            y = margin;
-          }
+          y = ensureSpace(85);
 
           const taskName = group.tache_nom || 'Intervention';
           doc.setFont('helvetica', 'bold');
@@ -683,91 +1096,57 @@ export default function MonthlyReport() {
         }
       }
 
-      // Section 5: Points d'attention (Réclamations)
-      const reclamations = reportData.reclamations || [];
-      if (reclamations.length > 0) {
-        if (y > pageHeight - 60) {
-          doc.addPage();
-          y = margin;
-        }
-        const sectionNum = photos.length > 0 ? (equipes.length > 0 ? '5' : '4') : (equipes.length > 0 ? '4' : '3');
-        addSectionTitle('POINTS D\'ATTENTION', sectionNum);
+      // ========== SECTION 7: POINTAGE MENSUEL (page vierge) ==========
+      y = addContentPage();
+      addSectionTitle('POINTAGE MENSUEL', '7');
 
-        doc.setFontSize(10);
-        doc.setTextColor(...grayColor);
-        doc.text('Réclamations enregistrées sur la période', margin, y);
-        y += 10;
+      // ========== SECTION 8: MATÉRIEL EXISTANT (page vierge) ==========
+      y = addContentPage();
+      addSectionTitle('MATÉRIEL EXISTANT', '8');
 
-        autoTable(doc, {
-          startY: y,
-          head: [['N°', 'Description', 'Statut', 'Urgence']],
-          body: reclamations.map(r => [
-            r.numero || 'N/A',
-            (r.description || 'N/A').substring(0, 50) + (r.description && r.description.length > 50 ? '...' : ''),
-            r.statut || 'N/A',
-            r.urgence || 'N/A'
-          ]),
-          theme: 'striped',
-          styles: { fontSize: 9, cellPadding: 3 },
-          headStyles: { fillColor: [245, 158, 11], textColor: [255, 255, 255], fontStyle: 'bold' },
-          columnStyles: {
-            0: { cellWidth: 25 },
-            1: { cellWidth: 80 },
-            2: { cellWidth: 30 },
-            3: { cellWidth: 25 }
-          },
-          margin: { left: margin, right: margin }
-        });
-        y = (doc as any).lastAutoTable.finalY + 15;
-      }
+      // ========== SECTION 9: POINT D'ATTENTION (page vierge) ==========
+      y = addContentPage();
+      addSectionTitle('POINT D\'ATTENTION', '9');
 
-      // Section finale: Statistiques détaillées
-      doc.addPage();
-      y = margin;
-      const finalSectionNum = String(
-        1 + 1 + (equipes.length > 0 ? 1 : 0) + (photos.length > 0 ? 1 : 0) + (reclamations.length > 0 ? 1 : 0) + 1
-      );
-      addSectionTitle('STATISTIQUES DE LA PÉRIODE', finalSectionNum);
-
-      const statsData = [
-        ['Tâches terminées (validées)', String(stats.taches_terminees ?? 0)],
-        ['Tâches planifiées sur la période', String(stats.taches_planifiees ?? 0)],
-        ['Taux de réalisation', `${stats.taux_realisation ?? 0}%`],
-        ['Réclamations créées', String(stats.reclamations_creees ?? 0)],
-        ['Réclamations résolues', String(stats.reclamations_resolues ?? 0)],
-        ['Total heures travaillées', `${stats.heures_travaillees ?? 0}h`],
-        ['Heures théoriques', `${stats.heures_theoriques ?? 0}h`],
-        ['Ratio de productivité', stats.ratio_productivite != null ? `${stats.ratio_productivite}%` : 'N/A']
-      ];
-
-      autoTable(doc, {
-        startY: y,
-        head: [['Indicateur', 'Valeur']],
-        body: statsData,
-        theme: 'grid',
-        styles: { fontSize: 11, cellPadding: 6 },
-        headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold' },
-        columnStyles: {
-          0: { fontStyle: 'bold', cellWidth: 120 },
-          1: { halign: 'center', cellWidth: 40 }
-        },
-        margin: { left: margin, right: margin }
-      });
-
-      // Signature
-      y = (doc as any).lastAutoTable.finalY + 40;
-      doc.setFontSize(10);
-      doc.setTextColor(...grayColor);
-      doc.text(`Fait le ${format(new Date(), 'dd MMMM yyyy', { locale: fr })}`, pageWidth - margin, y, { align: 'right' });
-
-      // Numéros de page (à partir de la page 2, numérotation commence à 1)
+      // Ajouter headers et footers sur toutes les pages de contenu
       const totalPages = doc.getNumberOfPages();
       const contentPages = totalPages - 1; // Exclure la page de couverture
       for (let i = 2; i <= totalPages; i++) {
         doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(...grayColor);
-        doc.text(`Page ${i - 1} / ${contentPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+
+        // Header (logo)
+        if (logoBase64) {
+          doc.addImage(logoBase64, 'PNG', margin, 5, 25, 10);
+        }
+        // Ligne de séparation header
+        doc.setDrawColor(...lightGray);
+        doc.setLineWidth(0.3);
+        doc.line(margin, headerHeight, pageWidth - margin, headerHeight);
+
+        // Footer - image ou texte de fallback
+        if (footerBase64) {
+          const footerImgW = pageWidth - 2 * margin;
+          const footerImgH = 12;
+          doc.addImage(footerBase64, 'JPEG', margin, pageHeight - 22, footerImgW, footerImgH);
+        } else {
+          doc.setDrawColor(...lightGray);
+          doc.setLineWidth(0.3);
+          doc.line(margin, pageHeight - 22, pageWidth - margin, pageHeight - 22);
+          doc.setFontSize(5.5);
+          doc.setTextColor(120, 120, 120);
+          doc.setFont('helvetica', 'bold');
+          doc.text('EXPERT NETTOYAGE & JARDINAGE RHAMNA SARL au capital social : 100 000,00DH', pageWidth / 2, pageHeight - 18, { align: 'center' });
+          doc.setFont('helvetica', 'normal');
+          doc.text(
+            'Si\u00E8ge social : Hay Massira N\u00B0 22 BENGUERIR - Email : enjr.contact@gmail.com  IF : 51685065  ICE : 002948885000033  Patente : 45404667  RC : 3051',
+            pageWidth / 2, pageHeight - 14, { align: 'center' }
+          );
+        }
+
+        // Numéro de page
+        doc.setFontSize(7);
+        doc.setTextColor(120, 120, 120);
+        doc.text(`Page ${i - 1} / ${contentPages}`, pageWidth - margin, pageHeight - 6, { align: 'right' });
       }
 
       // Télécharger
@@ -784,7 +1163,7 @@ export default function MonthlyReport() {
     }
   };
 
-  // Générer le PDF multi-sites
+  // Générer le PDF multi-sites (8 sections)
   const handleDownloadMultiPDF = async () => {
     if (multiSiteReports.length === 0) return;
 
@@ -794,393 +1173,474 @@ export default function MonthlyReport() {
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 20;
+      const headerHeight = 18;
+      const footerHeight = 25;
+      const contentEndY = pageHeight - margin - footerHeight;
       let y = margin;
 
-      // Couleurs
-      const primaryColor: [number, number, number] = [16, 185, 129]; // emerald-500
+      const primaryColor: [number, number, number] = [16, 185, 129];
       const darkColor: [number, number, number] = [17, 24, 39];
       const grayColor: [number, number, number] = [107, 114, 128];
       const lightGray: [number, number, number] = [243, 244, 246];
-      const emeraldColor: [number, number, number] = [16, 185, 129];
 
-      // Charger le logo
+      // Charger le logo GreenSIG
       let logoBase64: string | null = null;
       try {
-        logoBase64 = await loadImageAsBase64('/GreenSIG_Logo_V1nobackground.png', true);
-      } catch {
-        console.log('Logo non chargé');
-      }
+        logoBase64 = await loadStaticAsset('/logo.png', 'png');
+      } catch { console.log('Logo non chargé'); }
+
+      // Charger le logo ENJR
+      let logoEnjrBase64: string | null = null;
+      try {
+        logoEnjrBase64 = await loadStaticAsset('/Logo ENJR.png', 'png');
+      } catch { console.log('Logo ENJR non chargé'); }
+
+      // Charger l'image footer
+      let footerBase64: string | null = null;
+      try {
+        footerBase64 = await loadStaticAsset('/footer.jpeg', 'jpeg');
+      } catch { console.log('Footer image non chargée'); }
+
+      const addPageHeader = () => {
+        if (logoBase64) {
+          doc.addImage(logoBase64, 'PNG', margin, 5, 25, 10);
+        } else {
+          doc.setFontSize(12);
+          doc.setTextColor(...primaryColor);
+          doc.setFont('helvetica', 'bold');
+          doc.text('GreenSIG', margin, 12);
+        }
+        doc.setDrawColor(...lightGray);
+        doc.setLineWidth(0.3);
+        doc.line(margin, headerHeight, pageWidth - margin, headerHeight);
+      };
+
+      const addContentPage = () => {
+        doc.addPage();
+        addPageHeader();
+        return margin + headerHeight;
+      };
+
+      const ensureSpace = (requiredHeight: number): number => {
+        if (y + requiredHeight > contentEndY) {
+          return addContentPage();
+        }
+        return y;
+      };
+
+      const tableMargins = {
+        top: margin + headerHeight,
+        bottom: margin + footerHeight,
+        left: margin,
+        right: margin
+      };
+
+      const didDrawPage = (data: any) => {
+        const currentPage = doc.getNumberOfPages();
+        if (currentPage > 1 && data.pageNumber > 1) {
+          addPageHeader();
+        }
+      };
+
+      const addSectionTitle = (title: string, number: string) => {
+        y = ensureSpace(20);
+        doc.setFillColor(...primaryColor);
+        doc.rect(margin, y - 5, 6, 12, 'F');
+        doc.setFontSize(16);
+        doc.setTextColor(...darkColor);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${number}. ${title}`, margin + 10, y + 3);
+        y += 15;
+        doc.setFont('helvetica', 'normal');
+      };
 
       // ========== PAGE DE COUVERTURE GLOBALE ==========
       doc.setFillColor(255, 255, 255);
       doc.rect(0, 0, pageWidth, pageHeight, 'F');
 
-      // Logo
-      if (logoBase64) {
-        doc.addImage(logoBase64, 'PNG', pageWidth / 2 - 45, 20, 90, 68);
-      } else {
-        doc.setFontSize(40);
-        doc.setTextColor(...darkColor);
-        doc.setFont('helvetica', 'bold');
-        doc.text('GreenSIG', pageWidth / 2, 55, { align: 'center' });
+      // Logos : GreenSIG à gauche, ENJR à droite
+      if (logoBase64 && logoEnjrBase64) {
+        doc.addImage(logoBase64, 'PNG', margin, 15, 55, 28);
+        doc.addImage(logoEnjrBase64, 'PNG', pageWidth - margin - 55, 15, 55, 28);
+      } else if (logoBase64) {
+        doc.addImage(logoBase64, 'PNG', (pageWidth - 70) / 2, 15, 70, 35);
       }
 
       // Titre
       doc.setFontSize(28);
       doc.setTextColor(...darkColor);
       doc.setFont('helvetica', 'bold');
-      doc.text('RAPPORT GLOBAL', pageWidth / 2, 105, { align: 'center' });
-
-      doc.setFontSize(16);
-      doc.setTextColor(...emeraldColor);
-      doc.text(`${multiSiteReports.length} Sites`, pageWidth / 2, 118, { align: 'center' });
+      doc.text('RAPPORT D\'ACTIVITÉ', pageWidth / 2, 65, { align: 'center' });
 
       doc.setFontSize(12);
       doc.setTextColor(...grayColor);
       doc.setFont('helvetica', 'normal');
-      doc.text('Gestion des Espaces Verts', pageWidth / 2, 130, { align: 'center' });
+      doc.text('Gestion des Espaces Verts', pageWidth / 2, 75, { align: 'center' });
+
+      // Bandeau "RAPPORT GLOBAL"
+      const globalBoxY = 85;
+      doc.setFillColor(50, 50, 50);
+      doc.roundedRect(30, globalBoxY, pageWidth - 60, 20, 3, 3, 'F');
+      doc.setFontSize(16);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`RAPPORT GLOBAL - ${multiSiteReports.length} Sites`, pageWidth / 2, globalBoxY + 14, { align: 'center' });
+
+      // Carte multi-polygones
+      const allGeometries = multiSiteReports.map(r => r.site?.geometry).filter(Boolean);
+      let mapBase64: string | null = null;
+      if (allGeometries.length > 0) {
+        try {
+          mapBase64 = await renderMultiSitePolygonMap(allGeometries as any);
+        } catch {
+          console.log('Rendu multi-polygone échoué');
+        }
+      }
+
+      const mapY = 115;
+      const mapWidth = pageWidth - 40;
+      const mapHeight = 100;
+      let coverContentY = 112;
+
+      if (mapBase64) {
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.5);
+        doc.rect(20 - 0.5, mapY - 0.5, mapWidth + 1, mapHeight + 1);
+        doc.addImage(mapBase64, 'JPEG', 20, mapY, mapWidth, mapHeight);
+        coverContentY = mapY + mapHeight + 5;
+      }
 
       // Période
+      const periodeBoxY = coverContentY + 5;
       doc.setFillColor(...lightGray);
-      doc.roundedRect(35, 145, pageWidth - 70, 16, 2, 2, 'F');
+      doc.roundedRect(35, periodeBoxY, pageWidth - 70, 16, 2, 2, 'F');
       doc.setFontSize(10);
       doc.setTextColor(...darkColor);
-      const periodeText = `Du ${format(new Date(dateDebut), 'dd MMMM yyyy', { locale: fr })} au ${format(new Date(dateFin), 'dd MMMM yyyy', { locale: fr })}`;
-      doc.text(periodeText, pageWidth / 2, 156, { align: 'center' });
-
-      // Collecter les coordonnées de tous les sites
-      const siteCoords: { lat: number; lng: number; nom: string }[] = [];
-      for (const report of multiSiteReports) {
-        const centroid = report.site?.centroid;
-        if (centroid?.lat && centroid?.lng) {
-          siteCoords.push({ lat: centroid.lat, lng: centroid.lng, nom: report.site?.nom || 'Site' });
-        }
-      }
-
-      // Carte globale avec tous les sites
-      let globalMapY = 170;
-      if (siteCoords.length > 0) {
-        // Calculer le centre et le zoom pour englober tous les sites
-        const lats = siteCoords.map(c => c.lat);
-        const lngs = siteCoords.map(c => c.lng);
-        const minLat = Math.min(...lats);
-        const maxLat = Math.max(...lats);
-        const minLng = Math.min(...lngs);
-        const maxLng = Math.max(...lngs);
-        const centerLat = (minLat + maxLat) / 2;
-        const centerLng = (minLng + maxLng) / 2;
-
-        // Déterminer le zoom en fonction de l'étendue
-        const latDiff = maxLat - minLat;
-        const lngDiff = maxLng - minLng;
-        const maxDiff = Math.max(latDiff, lngDiff);
-        let zoom = 15;
-        if (maxDiff > 0.5) zoom = 10;
-        else if (maxDiff > 0.1) zoom = 12;
-        else if (maxDiff > 0.05) zoom = 13;
-        else if (maxDiff > 0.01) zoom = 14;
-        else if (maxDiff > 0.005) zoom = 15;
-        else zoom = 16;
-
-        // Charger la carte satellite centrée
-        try {
-          const n = Math.pow(2, zoom);
-          const xtile = Math.floor((centerLng + 180) / 360 * n);
-          const ytile = Math.floor((1 - Math.log(Math.tan(centerLat * Math.PI / 180) + 1 / Math.cos(centerLat * Math.PI / 180)) / Math.PI) / 2 * n);
-          const tileUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${ytile}/${xtile}`;
-          const globalMapBase64 = await loadImageAsBase64(tileUrl);
-
-          if (globalMapBase64) {
-            const mapWidth = pageWidth - 50;
-            const mapHeight = 60;
-            doc.addImage(globalMapBase64, 'JPEG', 25, globalMapY, mapWidth, mapHeight);
-
-            // Dessiner les marqueurs pour chaque site
-            for (let i = 0; i < siteCoords.length; i++) {
-              const coord = siteCoords[i]!;
-              // Calculer la position relative du marqueur sur la carte
-              const tileSize = 256;
-              const tileLng = (xtile + 0.5) / n * 360 - 180;
-              const tileLatRad = Math.atan(Math.sinh(Math.PI * (1 - 2 * (ytile + 0.5) / n)));
-              const tileLat = tileLatRad * 180 / Math.PI;
-
-              // Position relative normalisée (-0.5 à 0.5)
-              const relX = (coord.lng - tileLng) / (360 / n);
-              const relY = (tileLat - coord.lat) / (180 / n) * 2;
-
-              // Position sur la carte dans le PDF
-              const markerX = 25 + mapWidth / 2 + relX * mapWidth;
-              const markerY = globalMapY + mapHeight / 2 + relY * mapHeight;
-
-              // Vérifier que le marqueur est dans les limites de la carte
-              if (markerX >= 25 && markerX <= 25 + mapWidth && markerY >= globalMapY && markerY <= globalMapY + mapHeight) {
-                // Ombre
-                doc.setFillColor(0, 0, 0);
-                doc.circle(markerX + 0.5, markerY + 0.5, 4, 'F');
-                // Marqueur rouge
-                doc.setFillColor(220, 38, 38);
-                doc.circle(markerX, markerY, 4, 'F');
-                // Point blanc
-                doc.setFillColor(255, 255, 255);
-                doc.circle(markerX, markerY, 1.5, 'F');
-                // Numéro du site
-                doc.setFontSize(6);
-                doc.setTextColor(255, 255, 255);
-                doc.text(String(i + 1), markerX, markerY + 1, { align: 'center' });
-              }
-            }
-
-            globalMapY += mapHeight + 5;
-          }
-        } catch {
-          console.log('Carte globale non chargée');
-        }
-      }
-
-      // Liste des sites
-      y = globalMapY + 5;
-      doc.setFontSize(11);
-      doc.setTextColor(...darkColor);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Sites inclus dans ce rapport:', margin, y);
-      y += 8;
       doc.setFont('helvetica', 'normal');
+      const periodeText = `Du ${format(new Date(dateDebut), 'dd MMMM yyyy', { locale: fr })} au ${format(new Date(dateFin), 'dd MMMM yyyy', { locale: fr })}`;
+      doc.text(periodeText, pageWidth / 2, periodeBoxY + 11, { align: 'center' });
+
+      // ========== SECTION 1: AVANT-PROPOS ==========
+      y = addContentPage();
+      addSectionTitle('AVANT-PROPOS', '1');
+
       doc.setFontSize(10);
-      for (let i = 0; i < multiSiteReports.length; i++) {
-        const report = multiSiteReports[i]!;
-        doc.text(`${i + 1}. ${report.site?.nom || 'Site'}`, margin + 5, y);
-        y += 5;
-        if (y > 270) break;
-      }
-
-      // Pied de page
-      doc.setFontSize(8);
-      doc.setTextColor(...grayColor);
-      doc.text(`Document généré le ${format(new Date(), 'dd MMMM yyyy à HH:mm', { locale: fr })}`, pageWidth / 2, pageHeight - 20, { align: 'center' });
-      // Logo centré
-      if (logoBase64) {
-        const footerLogoWidth = 30;
-        const footerLogoHeight = 10;
-        doc.addImage(logoBase64, 'PNG', (pageWidth - footerLogoWidth) / 2, pageHeight - 15, footerLogoWidth, footerLogoHeight);
-      }
-
-      // ========== PAGE SYNTHÈSE GLOBALE ==========
-      doc.addPage();
-      y = margin;
-
-      doc.setFillColor(...primaryColor);
-      doc.rect(margin, y - 5, 6, 12, 'F');
-      doc.setFontSize(16);
       doc.setTextColor(...darkColor);
-      doc.setFont('helvetica', 'bold');
-      doc.text('1. SYNTHÈSE GLOBALE', margin + 10, y + 3);
-      y += 20;
+      doc.setFont('helvetica', 'normal');
 
-      // Statistiques globales
-      const globalStats = getGlobalStats();
-      if (globalStats) {
-        const statsData = [
-          ['Total tâches terminées', String(globalStats.taches_terminees)],
-          ['Total tâches planifiées', String(globalStats.taches_planifiees)],
-          ['Taux de réalisation moyen', `${globalStats.taux_realisation}%`],
-          ['Total réclamations créées', String(globalStats.reclamations_creees)],
-          ['Total réclamations résolues', String(globalStats.reclamations_resolues)],
-          ['Total heures travaillées', `${globalStats.heures_travaillees}h`],
-          ['Heures théoriques', `${globalStats.heures_theoriques}h`],
-          ['Ratio de productivité', globalStats.ratio_productivite != null ? `${globalStats.ratio_productivite}%` : 'N/A']
-        ];
+      const avantProposIntro = [
+        'Grâce à nos experts éprouvés, nos techniques bien conçues, et nos méthodes convenablement exécutées, la société ENJR a pour objectif principal la réussite de l\'opération d\'entretien et de jardinage et ce dans les règles de l\'art.',
+        '',
+        'Ainsi, durant ce mois, nos équipes de jardiniers ont effectué les travaux d\'entretien des espaces verts des sites suivants :',
+      ];
 
-        autoTable(doc, {
-          startY: y,
-          head: [['Indicateur', 'Valeur']],
-          body: statsData,
-          theme: 'grid',
-          styles: { fontSize: 11, cellPadding: 6 },
-          headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold' },
-          columnStyles: {
-            0: { fontStyle: 'bold', cellWidth: 120 },
-            1: { halign: 'center', cellWidth: 40 }
-          },
-          margin: { left: margin, right: margin }
-        });
-        y = (doc as any).lastAutoTable.finalY + 20;
-      }
-
-      // ========== TABLEAU COMPARATIF DES SITES ==========
-      doc.setFillColor(...primaryColor);
-      doc.rect(margin, y - 5, 6, 12, 'F');
-      doc.setFontSize(16);
-      doc.setTextColor(...darkColor);
-      doc.setFont('helvetica', 'bold');
-      doc.text('2. COMPARATIF PAR SITE', margin + 10, y + 3);
-      y += 15;
-
-      const siteRows = multiSiteReports.map(r => [
-        r.site?.nom || 'Site',
-        String(r.statistiques?.taches_terminees || 0),
-        String(r.statistiques?.taches_planifiees || 0),
-        `${r.statistiques?.taux_realisation || 0}%`,
-        String(r.statistiques?.reclamations_creees || 0),
-        `${r.statistiques?.heures_travaillees || 0}h`
-      ]);
-
-      autoTable(doc, {
-        startY: y,
-        head: [['Site', 'Terminées', 'Planifiées', 'Taux', 'Réclam.', 'Heures']],
-        body: siteRows,
-        theme: 'striped',
-        styles: { fontSize: 9, cellPadding: 4 },
-        headStyles: { fillColor: emeraldColor, textColor: [255, 255, 255], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [249, 250, 251] },
-        columnStyles: {
-          0: { cellWidth: 50 },
-          1: { halign: 'center', cellWidth: 22 },
-          2: { halign: 'center', cellWidth: 22 },
-          3: { halign: 'center', cellWidth: 20 },
-          4: { halign: 'center', cellWidth: 20 },
-          5: { halign: 'center', cellWidth: 22 }
-        },
-        margin: { left: margin, right: margin }
-      });
-
-      // ========== DÉTAIL PAR SITE ==========
-      for (const [index, report] of multiSiteReports.entries()) {
-        doc.addPage();
-        y = margin;
-
-        // Header du site
-        doc.setFillColor(50, 50, 50);
-        doc.roundedRect(margin, y, pageWidth - 2 * margin, 20, 3, 3, 'F');
-        doc.setFontSize(14);
-        doc.setTextColor(255, 255, 255);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`${index + 1}. ${report.site?.nom || 'Site'}`, margin + 10, y + 14);
-        y += 28;
-
-        // Carte satellite du site
-        const siteCentroid = report.site?.centroid;
-        if (siteCentroid?.lat && siteCentroid?.lng) {
-          try {
-            const zoom = 17;
-            const lat = siteCentroid.lat;
-            const lng = siteCentroid.lng;
-            const n = Math.pow(2, zoom);
-            const xtile = Math.floor((lng + 180) / 360 * n);
-            const ytile = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n);
-            const tileUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${ytile}/${xtile}`;
-            const siteMapBase64 = await loadImageAsBase64(tileUrl);
-
-            if (siteMapBase64) {
-              const mapWidth = pageWidth - 2 * margin;
-              const mapHeight = 50;
-              doc.addImage(siteMapBase64, 'JPEG', margin, y, mapWidth, mapHeight);
-
-              // Marqueur au centre
-              const markerX = margin + mapWidth / 2;
-              const markerY = y + mapHeight / 2;
-              doc.setFillColor(0, 0, 0);
-              doc.circle(markerX + 0.5, markerY + 0.5, 4, 'F');
-              doc.setFillColor(220, 38, 38);
-              doc.circle(markerX, markerY, 4, 'F');
-              doc.setFillColor(255, 255, 255);
-              doc.circle(markerX, markerY, 1.5, 'F');
-
-              y += mapHeight + 8;
-            }
-          } catch {
-            // Carte non chargée, continuer sans
+      for (const text of avantProposIntro) {
+        if (text === '') { y += 4; }
+        else {
+          const wrappedLines = doc.splitTextToSize(text, pageWidth - 2 * margin);
+          for (const line of wrappedLines) {
+            y = ensureSpace(6);
+            doc.text(line, margin, y);
+            y += 5;
           }
+          y += 2;
+        }
+      }
+
+      // Liste de TOUS les sites en puces
+      y += 2;
+      doc.setFont('helvetica', 'bold');
+      for (const report of multiSiteReports) {
+        y = ensureSpace(8);
+        doc.text(`\u2022  ${report.site?.nom || 'Site'}`, margin + 5, y);
+        y += 6;
+      }
+      y += 4;
+      doc.setFont('helvetica', 'normal');
+
+      const avantProposFin = [
+        'L\'encadrement d\'ENJR met en \u0153uvre toutes les dispositions nécessaires pour une amélioration continue des conditions de travail de ce projet.',
+        '',
+        'Aussi, nous supervisons de près toutes les actions opérationnelles afin d\'avoir un livrable à la hauteur des espérances de nos clients.',
+        '',
+        'Grâce à toutes ces actions, nous constatons, indéniablement un changement favorable et motivant au niveau de tous les sites.',
+        '',
+        'Dans ce qui suit, les photos prises illustrent l\'avancement et les situations de chaque site.',
+      ];
+
+      for (const text of avantProposFin) {
+        if (text === '') { y += 4; }
+        else {
+          const wrappedLines = doc.splitTextToSize(text, pageWidth - 2 * margin);
+          for (const line of wrappedLines) {
+            y = ensureSpace(6);
+            doc.text(line, margin, y);
+            y += 5;
+          }
+          y += 2;
+        }
+      }
+      y += 10;
+
+      // ========== SECTION 2: ACTIONS MISES EN PLACE ==========
+      addSectionTitle('ACTIONS MISES EN PLACE', '2');
+
+      doc.setFontSize(10);
+      doc.setTextColor(...darkColor);
+      doc.setFont('helvetica', 'normal');
+
+      const actionsIntro = 'Afin d\'améliorer notre rendement, et éviter les éventuelles dérives de nos process, nous avons mis en place plusieurs actions notamment :';
+      const actionsIntroLines = doc.splitTextToSize(actionsIntro, pageWidth - 2 * margin);
+      for (const line of actionsIntroLines) {
+        y = ensureSpace(6);
+        doc.text(line, margin, y);
+        y += 5;
+      }
+      y += 5;
+
+      const actionsListe = [
+        'Instaurer une réunion hebdomadaire chaque lundi en présence de tous les responsables des sites',
+        'Standardiser les méthodes de travail pour tous les sites : explications théoriques et suivi sur le terrain : bordures du gazon, hauteur de taille, ...',
+        'Augmenter la fréquence de nettoyage des ordures éventuelles à trois fois par jour',
+        'Désinfecter systématiquement les outils de travail',
+        'Nommer un caporal par site pour le suivi et l\'exécution des travaux',
+        'Programmer au minimum deux visites par jour du superviseur de tous les sites pour la planification des actions et le suivi des réalisations',
+        'Recueillir le besoin de chaque site en outillage et en consommable et distribuer le matériel nécessaire selon les besoins (asperseurs, tuyaux, ...)',
+        '\u00C9diter une matrice de polyvalence pour connaître le niveau de compétence des techniques et la maîtrise des outils de travail pour définir les affectations des jardiniers en fonction des spécificités de chaque site',
+      ];
+
+      for (const action of actionsListe) {
+        const bulletLines = doc.splitTextToSize(`\u2022  ${action}`, pageWidth - 2 * margin - 5);
+        for (const line of bulletLines) {
+          y = ensureSpace(6);
+          doc.text(line, margin + 5, y);
+          y += 5;
+        }
+        y += 3;
+      }
+      y += 10;
+
+      // ========== SECTION 3: INDICATEURS DE PERFORMANCE (KPI) ==========
+      addSectionTitle('INDICATEURS DE PERFORMANCE', '3');
+
+      {
+        const API_BASE_URL_MULTI = import.meta.env.VITE_API_BASE_URL || '/api';
+        const moisDebutMulti = multiSiteReports[0]?.travaux_effectues ?
+          (multiSiteReports[0] as any).periode?.date_debut?.substring(0, 7) :
+          dateDebut.substring(0, 7);
+        let kpiDataMulti: any = null;
+        try {
+          const kpiParams = new URLSearchParams();
+          if (moisDebutMulti) kpiParams.append('mois', moisDebutMulti);
+          const kpiResp = await apiFetch(`${API_BASE_URL_MULTI}/kpis/?${kpiParams.toString()}`);
+          kpiDataMulti = await kpiResp.json();
+        } catch {
+          console.log('KPI data non chargée (multi-site)');
         }
 
-        // Statistiques du site
-        const siteStats = report.statistiques || {};
-        doc.setFontSize(10);
-        doc.setTextColor(...darkColor);
-        doc.setFont('helvetica', 'normal');
-
-        const miniStats = [
-          `Tâches terminées: ${siteStats.taches_terminees || 0}`,
-          `Tâches planifiées: ${siteStats.taches_planifiees || 0}`,
-          `Taux: ${siteStats.taux_realisation || 0}%`,
-          `Heures: ${siteStats.heures_travaillees || 0}h`
-        ];
-        doc.text(miniStats.join('   •   '), margin, y);
-        y += 15;
-
-        // Travaux effectués
-        if (report.travaux_effectues && report.travaux_effectues.total > 0) {
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(11);
-          doc.text('Travaux effectués', margin, y);
-          y += 8;
+        if (kpiDataMulti?.kpis) {
+          const kpiRows = buildKpiRows(kpiDataMulti.kpis);
 
           autoTable(doc, {
             startY: y,
-            head: [['Type', 'Nombre']],
-            body: (report.travaux_effectues.par_type || []).map(t => [t.type || 'N/A', String(t.count || 0)]),
+            head: [['Indicateur', 'Valeur', 'Seuil', 'Statut']],
+            body: kpiRows,
+            theme: 'grid',
+            styles: { fontSize: 9, cellPadding: 4 },
+            headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold' },
+            columnStyles: {
+              0: { fontStyle: 'bold', cellWidth: 70 },
+              1: { halign: 'center' as const, cellWidth: 35 },
+              2: { halign: 'center' as const, cellWidth: 30 },
+              3: { halign: 'center' as const, cellWidth: 30 },
+            },
+            margin: tableMargins,
+            didDrawPage: didDrawPage,
+            didParseCell: kpiDidParseCell,
+          });
+          y = (doc as any).lastAutoTable.finalY + 15;
+
+          // KPI 4 — Temps moyen traitement réclamations (graphique)
+          y = renderKpi4Detail(doc, kpiDataMulti.kpis, y, margin, pageWidth, ensureSpace, darkColor);
+
+          // KPI 5 — Temps réalisation par tâche (graphique)
+          y = renderKpi5(doc, kpiDataMulti.kpis, y, margin, pageWidth, ensureSpace, darkColor, primaryColor);
+        } else {
+          doc.setFontSize(10);
+          doc.setTextColor(...darkColor);
+          doc.text('Données KPI non disponibles pour cette période.', margin, y);
+          y += 15;
+        }
+      }
+
+      // ========== SECTION 4: TRAVAUX EFFECTUÉS (par site) ==========
+      addSectionTitle('TRAVAUX EFFECTUÉS', '4');
+
+      for (const report of multiSiteReports) {
+        // Sous-titre site
+        y = ensureSpace(15);
+        doc.setFillColor(50, 50, 50);
+        doc.roundedRect(margin, y - 3, pageWidth - 2 * margin, 12, 2, 2, 'F');
+        doc.setFontSize(11);
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.text(report.site?.nom || 'Site', margin + 5, y + 5);
+        y += 15;
+
+        const planningEffectues = report.travaux_effectues?.planning || [];
+        if (planningEffectues.length === 0) {
+          doc.setFontSize(10);
+          doc.setTextColor(...darkColor);
+          doc.setFont('helvetica', 'normal');
+          doc.text('Aucun travail réalisé sur cette période.', margin, y);
+          y += 10;
+        } else {
+          const STATUT_COLORS: Record<string, [number, number, number]> = {
+            'REALISEE': [200, 230, 201],
+            'EN_COURS': [187, 222, 251],
+            'REPORTEE': [255, 249, 196],
+            'ANNULEE': [255, 205, 210],
+            'NON_REALISEE': [255, 255, 255],
+          };
+
+          const tableBody = planningEffectues.map(item => [
+            item.date ? format(new Date(item.date), 'dd/MM/yyyy') : '-',
+            item.reference || '-',
+            item.type || '-',
+            item.equipes || '-',
+            item.horaires || '-',
+            item.charge ? `${item.charge}h` : '-',
+            item.statut_label || '-',
+            item.priorite_label || '-'
+          ]);
+
+          const statsEffectues = report.travaux_effectues?.statistiques;
+          const statsText = `Total: ${statsEffectues?.total || 0} interventions, ${statsEffectues?.total_heures || 0}h`;
+          tableBody.push([statsText, '', '', '', '', '', '', '']);
+
+          autoTable(doc, {
+            startY: y,
+            head: [['Date', 'Réf.', 'Type', 'Équipe(s)', 'Horaires', 'Charge', 'Statut', 'Priorité']],
+            body: tableBody,
             theme: 'striped',
-            styles: { fontSize: 9, cellPadding: 3 },
-            headStyles: { fillColor: emeraldColor, textColor: [255, 255, 255] },
-            margin: { left: margin, right: margin }
+            styles: { fontSize: 7, cellPadding: 2 },
+            headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+            columnStyles: {
+              0: { cellWidth: 18 }, 1: { cellWidth: 18 }, 2: { cellWidth: 30 },
+              3: { cellWidth: 35 }, 4: { cellWidth: 22 }, 5: { cellWidth: 14 },
+              6: { cellWidth: 18 }, 7: { cellWidth: 22 },
+            },
+            margin: tableMargins,
+            didDrawPage: didDrawPage,
+            didParseCell: (data: any) => {
+              if (data.section === 'body' && data.column.index === 6 && data.row.index < planningEffectues.length) {
+                const item = planningEffectues[data.row.index];
+                if (item && STATUT_COLORS[item.statut]) {
+                  data.cell.styles.fillColor = STATUT_COLORS[item.statut];
+                }
+              }
+              if (data.section === 'body' && data.row.index === planningEffectues.length) {
+                data.cell.styles.fillColor = [232, 245, 233];
+                data.cell.styles.textColor = [46, 125, 50];
+                data.cell.styles.fontStyle = 'italic';
+                if (data.column.index === 0) data.cell.colSpan = 8;
+              }
+            }
           });
           y = (doc as any).lastAutoTable.finalY + 10;
         }
+      }
 
-        // Équipes
-        if (report.equipes && report.equipes.length > 0 && y < pageHeight - 60) {
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(11);
+      // ========== SECTION 5: TRAVAUX PLANIFIÉS (par site) ==========
+      y = ensureSpace(20);
+      addSectionTitle('TRAVAUX PLANIFIÉS', '5');
+
+      for (const report of multiSiteReports) {
+        y = ensureSpace(15);
+        doc.setFillColor(50, 50, 50);
+        doc.roundedRect(margin, y - 3, pageWidth - 2 * margin, 12, 2, 2, 'F');
+        doc.setFontSize(11);
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.text(report.site?.nom || 'Site', margin + 5, y + 5);
+        y += 15;
+
+        const planningPlanifies = report.travaux_planifies?.planning || [];
+        if (planningPlanifies.length === 0) {
+          doc.setFontSize(10);
           doc.setTextColor(...darkColor);
-          doc.text('Équipes', margin, y);
-          y += 8;
-
-          for (const equipe of report.equipes.slice(0, 3)) {
-            doc.setFontSize(9);
-            doc.setFont('helvetica', 'normal');
-            doc.text(`• ${equipe.nom || 'Équipe'} - ${(equipe.heures_totales ?? 0).toFixed(1)}h`, margin + 5, y);
-            y += 5;
-          }
-          y += 5;
-        }
-
-        // Réclamations
-        if (report.reclamations && report.reclamations.length > 0 && y < pageHeight - 50) {
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(11);
-          doc.setTextColor(...darkColor);
-          doc.text(`Points d'attention (${report.reclamations.length})`, margin, y);
-          y += 8;
-
-          for (const rec of report.reclamations.slice(0, 5)) {
-            doc.setFontSize(9);
-            doc.setFont('helvetica', 'normal');
-            const recText = `• ${rec.numero} - ${(rec.description || '').substring(0, 50)}${rec.description && rec.description.length > 50 ? '...' : ''} [${rec.statut}]`;
-            doc.text(recText, margin + 5, y);
-            y += 5;
-          }
-        }
-
-        // Photos pour ce site
-        const sitePhotos = report.photos || [];
-        if (sitePhotos.length > 0) {
-          doc.addPage();
-          y = margin;
-
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(12);
-          doc.setTextColor(...darkColor);
-          doc.text(`Photos - ${report.site?.nom || 'Site'}`, margin, y);
+          doc.setFont('helvetica', 'normal');
+          doc.text('Aucune intervention planifiée.', margin, y);
           y += 10;
+        } else {
+          const tableBodyPlanif = planningPlanifies.map(item => [
+            item.date ? format(new Date(item.date), 'dd/MM/yyyy') : '-',
+            item.reference || '-',
+            item.type || '-',
+            item.equipes || '-',
+            item.horaires || '-',
+            item.charge ? `${item.charge}h` : '-',
+            item.statut_label || '-',
+            item.priorite_label || '-'
+          ]);
+
+          const statsPlanifies = report.travaux_planifies?.statistiques;
+          const statsTextPlanif = `Total: ${statsPlanifies?.total || 0} interventions, ${statsPlanifies?.total_heures || 0}h`;
+          tableBodyPlanif.push([statsTextPlanif, '', '', '', '', '', '', '']);
+
+          autoTable(doc, {
+            startY: y,
+            head: [['Date', 'Réf.', 'Type', 'Équipe(s)', 'Horaires', 'Charge', 'Statut', 'Priorité']],
+            body: tableBodyPlanif,
+            theme: 'striped',
+            styles: { fontSize: 7, cellPadding: 2 },
+            headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+            columnStyles: {
+              0: { cellWidth: 18 }, 1: { cellWidth: 18 }, 2: { cellWidth: 30 },
+              3: { cellWidth: 35 }, 4: { cellWidth: 22 }, 5: { cellWidth: 14 },
+              6: { cellWidth: 18 }, 7: { cellWidth: 22 },
+            },
+            margin: tableMargins,
+            didDrawPage: didDrawPage,
+            didParseCell: (data: any) => {
+              if (data.section === 'body' && data.row.index === planningPlanifies.length) {
+                data.cell.styles.fillColor = [219, 234, 254];
+                data.cell.styles.textColor = [29, 78, 216];
+                data.cell.styles.fontStyle = 'italic';
+                if (data.column.index === 0) data.cell.colSpan = 8;
+              }
+            }
+          });
+          y = (doc as any).lastAutoTable.finalY + 10;
+        }
+      }
+
+      // ========== SECTION 6: PHOTOS AVANT/APRÈS (par site) ==========
+      const hasAnyPhotos = multiSiteReports.some(r => (r.photos || []).length > 0);
+      if (hasAnyPhotos) {
+        y = addContentPage();
+        addSectionTitle('PHOTOS AVANT/APRÈS', '6');
+
+        for (const report of multiSiteReports) {
+          const sitePhotos = report.photos || [];
+          if (sitePhotos.length === 0) continue;
+
+          // Sous-titre site
+          y = ensureSpace(15);
+          doc.setFillColor(50, 50, 50);
+          doc.roundedRect(margin, y - 3, pageWidth - 2 * margin, 12, 2, 2, 'F');
+          doc.setFontSize(11);
+          doc.setTextColor(255, 255, 255);
+          doc.setFont('helvetica', 'bold');
+          doc.text(report.site?.nom || 'Site', margin + 5, y + 5);
+          y += 15;
 
           const imgWidth = 75;
           const imgHeight = 55;
           const imgGap = 10;
 
           for (const group of sitePhotos.slice(0, 4)) {
-            if (y > pageHeight - 85) {
-              doc.addPage();
-              y = margin;
-            }
+            y = ensureSpace(85);
 
             const taskName = group.tache_nom || 'Intervention';
             doc.setFont('helvetica', 'bold');
@@ -1198,7 +1658,6 @@ export default function MonthlyReport() {
             if (avantUrl) avantBase64 = await loadImageAsBase64(avantUrl);
             if (apresUrl) apresBase64 = await loadImageAsBase64(apresUrl);
 
-            // Labels
             doc.setFontSize(8);
             doc.setTextColor(...grayColor);
             doc.setFont('helvetica', 'normal');
@@ -1206,7 +1665,6 @@ export default function MonthlyReport() {
             doc.text('APRÈS', margin + imgWidth + imgGap + imgWidth / 2, y, { align: 'center' });
             y += 4;
 
-            // Images
             if (avantBase64) {
               doc.addImage(avantBase64, 'JPEG', margin, y, imgWidth, imgHeight);
             } else {
@@ -1234,18 +1692,59 @@ export default function MonthlyReport() {
             doc.setFontSize(9);
             doc.setTextColor(...grayColor);
             doc.text(`+ ${sitePhotos.length - 4} autre(s) groupe(s) de photos`, margin, y);
+            y += 8;
           }
         }
       }
 
-      // Numéros de page
+      // ========== SECTION 7: POINTAGE MENSUEL (page vierge) ==========
+      y = addContentPage();
+      addSectionTitle('POINTAGE MENSUEL', '7');
+
+      // ========== SECTION 8: MATÉRIEL EXISTANT (page vierge) ==========
+      y = addContentPage();
+      addSectionTitle('MATÉRIEL EXISTANT', '8');
+
+      // ========== SECTION 9: POINT D'ATTENTION (page vierge) ==========
+      y = addContentPage();
+      addSectionTitle('POINT D\'ATTENTION', '9');
+
+      // Ajouter headers et footers sur toutes les pages de contenu
       const totalPages = doc.getNumberOfPages();
       const contentPages = totalPages - 1;
       for (let i = 2; i <= totalPages; i++) {
         doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(...grayColor);
-        doc.text(`Page ${i - 1} / ${contentPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+
+        if (logoBase64) {
+          doc.addImage(logoBase64, 'PNG', margin, 5, 25, 10);
+        }
+        doc.setDrawColor(...lightGray);
+        doc.setLineWidth(0.3);
+        doc.line(margin, headerHeight, pageWidth - margin, headerHeight);
+
+        // Footer - image ou texte de fallback
+        if (footerBase64) {
+          const footerImgW = pageWidth - 2 * margin;
+          const footerImgH = 12;
+          doc.addImage(footerBase64, 'JPEG', margin, pageHeight - 22, footerImgW, footerImgH);
+        } else {
+          doc.setDrawColor(...lightGray);
+          doc.setLineWidth(0.3);
+          doc.line(margin, pageHeight - 22, pageWidth - margin, pageHeight - 22);
+          doc.setFontSize(5.5);
+          doc.setTextColor(120, 120, 120);
+          doc.setFont('helvetica', 'bold');
+          doc.text('EXPERT NETTOYAGE & JARDINAGE RHAMNA SARL au capital social : 100 000,00DH', pageWidth / 2, pageHeight - 18, { align: 'center' });
+          doc.setFont('helvetica', 'normal');
+          doc.text(
+            'Si\u00E8ge social : Hay Massira N\u00B0 22 BENGUERIR - Email : enjr.contact@gmail.com  IF : 51685065  ICE : 002948885000033  Patente : 45404667  RC : 3051',
+            pageWidth / 2, pageHeight - 14, { align: 'center' }
+          );
+        }
+
+        doc.setFontSize(7);
+        doc.setTextColor(120, 120, 120);
+        doc.text(`Page ${i - 1} / ${contentPages}`, pageWidth - margin, pageHeight - 6, { align: 'right' });
       }
 
       // Télécharger
@@ -1563,137 +2062,143 @@ export default function MonthlyReport() {
               <StatCard icon={<Users className="w-5 h-5" />} label="Heures travail" value={`${reportData.statistiques?.heures_travaillees ?? 0}h`} color="blue" />
             </div>
 
-            {/* Travaux effectués - Vue hybride */}
+            {/* Travaux effectués - Format planning */}
             <CollapsibleSection
               title="Travaux effectués (validés)"
               icon={<ClipboardList className="w-5 h-5" />}
-              count={reportData.travaux_effectues?.total || 0}
+              count={reportData.travaux_effectues?.statistiques?.total || 0}
               isOpen={openSections.travaux}
               onToggle={() => toggleSection('travaux')}
             >
-              {!reportData.travaux_effectues || reportData.travaux_effectues.total === 0 ? (
-                <p className="text-gray-500 text-center py-4">Aucun travail validé sur cette période</p>
+              {!reportData.travaux_effectues?.planning || reportData.travaux_effectues.planning.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">Aucun travail réalisé sur cette période</p>
               ) : (
                 <div className="space-y-4">
-                  {/* Récapitulatif par type */}
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4" />
-                      Récapitulatif par type
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {(reportData.travaux_effectues.par_type || []).map((travail, index) => (
-                        <div key={index} className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
-                          <span className="text-sm font-medium text-gray-700">{travail.type || 'Type inconnu'}</span>
-                          <span className="px-2 py-0.5 bg-emerald-500 text-white rounded-full text-xs font-bold">
-                            {travail.count || 0}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                  {/* Statistiques */}
+                  <div className="flex items-center gap-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                    <span className="text-sm text-emerald-700">
+                      <strong>{reportData.travaux_effectues.statistiques?.total || 0}</strong> interventions
+                    </span>
+                    <span className="text-sm text-emerald-700">
+                      <strong>{reportData.travaux_effectues.statistiques?.total_heures || 0}</strong>h totales
+                    </span>
                   </div>
 
-                  {/* Timeline chronologique */}
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
-                      <CalendarDays className="w-4 h-4" />
-                      Chronologie des interventions
-                    </h4>
-                    <div className="space-y-2 max-h-80 overflow-y-auto">
-                      {(reportData.travaux_effectues.details || []).map((tache, index) => (
-                        <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border-l-4 border-emerald-500">
-                          <div className="flex-shrink-0 text-center min-w-[60px]">
-                            <div className="text-xs text-gray-500">
-                              {tache.date ? format(new Date(tache.date), 'dd MMM', { locale: fr }) : '-'}
-                            </div>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-gray-900 truncate">{tache.type}</p>
-                            <p className="text-xs text-gray-500 truncate">{tache.equipes}</p>
-                          </div>
-                          <div className="flex-shrink-0 flex items-center gap-1 text-sm text-gray-600">
-                            <Clock className="w-3.5 h-3.5" />
-                            {tache.heures}h
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                  {/* Tableau planning */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-emerald-600 text-white">
+                          <th className="px-2 py-2 text-left">Date</th>
+                          <th className="px-2 py-2 text-left">Réf.</th>
+                          <th className="px-2 py-2 text-left">Type</th>
+                          <th className="px-2 py-2 text-left">Équipe(s)</th>
+                          <th className="px-2 py-2 text-left">Horaires</th>
+                          <th className="px-2 py-2 text-center">Charge</th>
+                          <th className="px-2 py-2 text-center">Statut</th>
+                          <th className="px-2 py-2 text-center">Priorité</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportData.travaux_effectues.planning.map((item, index) => (
+                          <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            <td className="px-2 py-2 whitespace-nowrap">
+                              {item.date ? format(new Date(item.date), 'dd/MM/yy') : '-'}
+                            </td>
+                            <td className="px-2 py-2 whitespace-nowrap font-mono text-xs">{item.reference}</td>
+                            <td className="px-2 py-2">{item.type}</td>
+                            <td className="px-2 py-2 text-xs">{item.equipes}</td>
+                            <td className="px-2 py-2 whitespace-nowrap text-xs">{item.horaires || '-'}</td>
+                            <td className="px-2 py-2 text-center whitespace-nowrap">{item.charge}h</td>
+                            <td className="px-2 py-2 text-center">
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                item.statut === 'REALISEE' ? 'bg-green-100 text-green-800' :
+                                item.statut === 'EN_COURS' ? 'bg-blue-100 text-blue-800' :
+                                item.statut === 'REPORTEE' ? 'bg-yellow-100 text-yellow-800' :
+                                item.statut === 'ANNULEE' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {item.statut_label}
+                              </span>
+                            </td>
+                            <td className={`px-2 py-2 text-center text-xs ${item.priorite === 5 ? 'text-red-600 font-bold' : ''}`}>
+                              {item.priorite_label}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}
             </CollapsibleSection>
 
-            {/* Travaux planifiés - Vue hybride */}
+            {/* Travaux planifiés - Format planning */}
             <CollapsibleSection
               title="Travaux planifiés (30 prochains jours)"
               icon={<Calendar className="w-5 h-5" />}
-              count={reportData.travaux_planifies?.total || 0}
+              count={reportData.travaux_planifies?.statistiques?.total || 0}
               isOpen={openSections.planifies}
               onToggle={() => toggleSection('planifies')}
             >
-              {!reportData.travaux_planifies || reportData.travaux_planifies.total === 0 ? (
-                <p className="text-gray-500 text-center py-4">Aucun travail planifié pour les 30 prochains jours</p>
+              {!reportData.travaux_planifies?.planning || reportData.travaux_planifies.planning.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">Aucune intervention planifiée pour les 30 prochains jours</p>
               ) : (
                 <div className="space-y-4">
-                  {/* Récapitulatif par type */}
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4" />
-                      Récapitulatif par type
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {(reportData.travaux_planifies.par_type || []).map((travail, index) => (
-                        <div key={index} className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-                          <span className="text-sm font-medium text-gray-700">{travail.type || 'Type inconnu'}</span>
-                          <span className="px-2 py-0.5 bg-blue-500 text-white rounded-full text-xs font-bold">
-                            {travail.count || 0}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                  {/* Statistiques */}
+                  <div className="flex items-center gap-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <span className="text-sm text-blue-700">
+                      <strong>{reportData.travaux_planifies.statistiques?.total || 0}</strong> interventions
+                    </span>
+                    <span className="text-sm text-blue-700">
+                      <strong>{reportData.travaux_planifies.statistiques?.total_heures || 0}</strong>h totales
+                    </span>
                   </div>
 
-                  {/* Timeline chronologique */}
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
-                      <CalendarDays className="w-4 h-4" />
-                      Planning des interventions
-                    </h4>
-                    <div className="space-y-2 max-h-80 overflow-y-auto">
-                      {(reportData.travaux_planifies.details || []).map((tache, index) => (
-                        <div key={index} className={`flex items-center gap-3 p-3 bg-gray-50 rounded-xl border-l-4 ${
-                          tache.priorite >= 4 ? 'border-red-500' : 'border-blue-500'
-                        }`}>
-                          <div className="flex-shrink-0 text-center min-w-[70px]">
-                            <div className="text-xs text-gray-500">
-                              {tache.date_debut ? format(new Date(tache.date_debut), 'dd MMM', { locale: fr }) : '-'}
-                            </div>
-                            {tache.date_fin && tache.date_fin !== tache.date_debut && (
-                              <div className="text-xs text-gray-400">
-                                → {format(new Date(tache.date_fin), 'dd MMM', { locale: fr })}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-gray-900 truncate">{tache.type}</p>
-                            <p className="text-xs text-gray-500 truncate">{tache.equipes}</p>
-                          </div>
-                          <div className="flex-shrink-0 flex items-center gap-2">
-                            {tache.heures && (
-                              <span className="flex items-center gap-1 text-sm text-gray-600">
-                                <Clock className="w-3.5 h-3.5" />
-                                {tache.heures}h
+                  {/* Tableau planning */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-blue-600 text-white">
+                          <th className="px-2 py-2 text-left">Date</th>
+                          <th className="px-2 py-2 text-left">Réf.</th>
+                          <th className="px-2 py-2 text-left">Type</th>
+                          <th className="px-2 py-2 text-left">Équipe(s)</th>
+                          <th className="px-2 py-2 text-left">Horaires</th>
+                          <th className="px-2 py-2 text-center">Charge</th>
+                          <th className="px-2 py-2 text-center">Statut</th>
+                          <th className="px-2 py-2 text-center">Priorité</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportData.travaux_planifies.planning.map((item, index) => (
+                          <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            <td className="px-2 py-2 whitespace-nowrap">
+                              {item.date ? format(new Date(item.date), 'dd/MM/yy') : '-'}
+                            </td>
+                            <td className="px-2 py-2 whitespace-nowrap font-mono text-xs">{item.reference}</td>
+                            <td className="px-2 py-2">{item.type}</td>
+                            <td className="px-2 py-2 text-xs">{item.equipes}</td>
+                            <td className="px-2 py-2 whitespace-nowrap text-xs">{item.horaires || '-'}</td>
+                            <td className="px-2 py-2 text-center whitespace-nowrap">{item.charge}h</td>
+                            <td className="px-2 py-2 text-center">
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                item.statut === 'REALISEE' ? 'bg-green-100 text-green-800' :
+                                item.statut === 'EN_COURS' ? 'bg-blue-100 text-blue-800' :
+                                item.statut === 'REPORTEE' ? 'bg-yellow-100 text-yellow-800' :
+                                item.statut === 'ANNULEE' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {item.statut_label}
                               </span>
-                            )}
-                            {tache.priorite >= 4 && (
-                              <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium">
-                                Urgent
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                            </td>
+                            <td className={`px-2 py-2 text-center text-xs ${item.priorite === 5 ? 'text-red-600 font-bold' : ''}`}>
+                              {item.priorite_label}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}

@@ -82,38 +82,14 @@ export function useDeleteTask() {
             return planningService.deleteTache(taskId);
         },
 
-        onMutate: async ({ taskId }) => {
-            await queryClient.cancelQueries({
-                queryKey: queryKeys.taches.lists(),
-            });
-
-            const previousTaches = queryClient.getQueryData<Tache[]>(
-                queryKeys.taches.lists()
-            );
-
-            // Optimistic update - retirer de la liste
-            if (previousTaches) {
-                queryClient.setQueryData<Tache[]>(
-                    queryKeys.taches.lists(),
-                    previousTaches.filter(t => t.id !== taskId)
-                );
-            }
-
-            return { previousTaches };
-        },
-
-        onError: (_error, _variables, context) => {
-            if (context?.previousTaches) {
-                queryClient.setQueryData(
-                    queryKeys.taches.lists(),
-                    context.previousTaches
-                );
-            }
-        },
-
-        onSettled: () => {
+        onSettled: (_data, _error, { taskId }) => {
+            // Invalider toutes les listes pour refetch avec données fraîches du serveur
             queryClient.invalidateQueries({
                 queryKey: queryKeys.taches.all,
+            });
+            // Nettoyer le cache détail de la tâche supprimée
+            queryClient.removeQueries({
+                queryKey: queryKeys.taches.detail(taskId),
             });
         },
     });

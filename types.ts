@@ -10,13 +10,6 @@ export interface User {
   avatar?: string;
 }
 
-export interface KPI {
-  label: string;
-  value: string | number;
-  change: number; // percentage
-  trend: 'up' | 'down' | 'neutral';
-}
-
 export interface InventoryItem {
   id: string;
   name: string;

@@ -7,8 +7,10 @@ import {
     MapPin,
     Crosshair,
     Building2,
+    Plus,
+    SkipForward,
 } from 'lucide-react';
-import { AttributeMapping, fetchAllSites, SiteFrontend } from '../../services/api';
+import { AttributeMapping, ImportMode, fetchAllSites, SiteFrontend } from '../../services/api';
 import { OBJECT_TYPES, getObjectTypesByGeometry } from '../../contexts/DrawingContext';
 import { ObjectTypeInfo } from '../../types';
 import { PremiumSelect } from '../modals/PremiumFormComponents';
@@ -24,6 +26,8 @@ interface AttributeMapperProps {
     onSiteIdChange: (siteId: number | null) => void;
     autoDetectSite: boolean;
     onAutoDetectSiteChange: (autoDetect: boolean) => void;
+    importMode: ImportMode;
+    onImportModeChange: (mode: ImportMode) => void;
 }
 
 export default function AttributeMapper({
@@ -37,6 +41,8 @@ export default function AttributeMapper({
     onSiteIdChange,
     autoDetectSite,
     onAutoDetectSiteChange,
+    importMode,
+    onImportModeChange,
 }: AttributeMapperProps) {
     const [sites, setSites] = useState<SiteFrontend[]>([]);
     const [isLoadingSites, setIsLoadingSites] = useState(true);
@@ -279,6 +285,64 @@ export default function AttributeMapper({
                 <div className="flex items-center gap-2 p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-800">
                     <HelpCircle className="w-5 h-5 flex-shrink-0" />
                     <span>Les Sites sont des objets racines et n'ont pas besoin de site parent.</span>
+                </div>
+            )}
+
+            {/* Import Mode Selector */}
+            {targetType && (
+                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                    <label className="block text-sm font-medium text-gray-700">
+                        Mode d'import
+                    </label>
+                    <div className="flex gap-3">
+                        <button
+                            type="button"
+                            onClick={() => onImportModeChange('create')}
+                            className={`flex-1 flex items-center gap-3 p-3 rounded-lg border-2 transition-colors ${
+                                importMode === 'create'
+                                    ? 'border-blue-500 bg-blue-50'
+                                    : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                        >
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                                importMode === 'create' ? 'bg-blue-100' : 'bg-gray-100'
+                            }`}>
+                                <Plus className={`w-5 h-5 ${importMode === 'create' ? 'text-blue-600' : 'text-gray-500'}`} />
+                            </div>
+                            <div className="text-left">
+                                <div className={`font-medium text-sm ${importMode === 'create' ? 'text-blue-700' : 'text-gray-700'}`}>
+                                    Créer tout
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                    Tous les objets seront créés, même s'ils existent déjà
+                                </div>
+                            </div>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => onImportModeChange('skip_duplicates')}
+                            className={`flex-1 flex items-center gap-3 p-3 rounded-lg border-2 transition-colors ${
+                                importMode === 'skip_duplicates'
+                                    ? 'border-amber-500 bg-amber-50'
+                                    : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                        >
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                                importMode === 'skip_duplicates' ? 'bg-amber-100' : 'bg-gray-100'
+                            }`}>
+                                <SkipForward className={`w-5 h-5 ${importMode === 'skip_duplicates' ? 'text-amber-600' : 'text-gray-500'}`} />
+                            </div>
+                            <div className="text-left">
+                                <div className={`font-medium text-sm ${importMode === 'skip_duplicates' ? 'text-amber-700' : 'text-gray-700'}`}>
+                                    Ignorer les doublons
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                    Les objets existants (même nom + site + proximité) seront ignorés
+                                </div>
+                            </div>
+                        </button>
+                    </div>
                 </div>
             )}
 

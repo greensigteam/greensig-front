@@ -1,12 +1,5 @@
 
-import { InventoryItem, Task, TeamMember, KPI } from './types';
-
-export const MOCK_KPIS: KPI[] = [
-  { label: "Interventions actives", value: 12, change: 5, trend: 'up' },
-  { label: "Réclamations ouvertes", value: 3, change: -2, trend: 'down' },
-  { label: "Taux de disponibilité", value: "94%", change: 1.2, trend: 'up' },
-  { label: "Rentabilité Site A", value: "+12%", change: 0, trend: 'neutral' },
-];
+import { InventoryItem, Task, TeamMember } from './types';
 
 export const MOCK_INVENTORY: InventoryItem[] = [
   { id: '1', name: 'Tondeuse Autoportée John Deere', category: 'Machinerie', status: 'DISPONIBLE', location: 'Entrepôt A', lastService: '2023-10-15', nextService: '2024-04-15', serialNumber: 'JD-8842-X', description: 'Tondeuse professionnelle pour grandes surfaces.' },

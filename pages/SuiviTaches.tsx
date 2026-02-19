@@ -831,8 +831,8 @@ const SuiviTaches: React.FC = () => {
             {/* Add Distributions Modal */}
             {showAddDistributionsModal && data.selectedTache && (
                 <SelectDaysModal
-                    startDate={data.selectedTache.date_debut_planifiee}
-                    endDate={data.selectedTache.date_fin_planifiee}
+                    dateDebut={new Date(data.selectedTache.date_debut_planifiee)}
+                    dateFin={new Date(data.selectedTache.date_fin_planifiee)}
                     initialSelection={data.selectedTache.distributions_charge?.map(d => d.date) || []}
                     protectedDates={data.selectedTache.distributions_charge?.map(d => d.date) || []}
                     existingDistributions={data.selectedTache.distributions_charge?.map(d => ({

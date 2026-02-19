@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { planningService } from '../../services/planningService';
 import { queryKeys } from '../../lib/queryKeys';
 import { Tache, PlanningFilters } from '../../types/planning';
@@ -38,7 +38,10 @@ export function useTaches(filters?: Partial<PlanningFilters>) {
             const tachesData = Array.isArray(response) ? response : (response.results || []);
             return tachesData as Tache[];
         },
-        staleTime: 30 * 1000, // 30 secondes
+        staleTime: 2 * 60 * 1000, // 2 minutes
+        refetchInterval: 60 * 1000, // Polling toutes les 60s
+        refetchIntervalInBackground: false, // Stop polling quand l'onglet est masqué
+        placeholderData: keepPreviousData,
     });
 }
 
@@ -57,7 +60,7 @@ export function useTache(taskId: number | null, options?: { enabled?: boolean })
             return planningService.getTache(taskId);
         },
         enabled: options?.enabled !== false && taskId !== null,
-        staleTime: 30 * 1000,
+        staleTime: 2 * 60 * 1000, // 2 minutes
     });
 }
 
@@ -71,7 +74,7 @@ export function usePrefetchTache() {
         queryClient.prefetchQuery({
             queryKey: queryKeys.taches.detail(taskId),
             queryFn: () => planningService.getTache(taskId),
-            staleTime: 30 * 1000,
+            staleTime: 2 * 60 * 1000,
         });
     };
 }

@@ -9,17 +9,20 @@ import {
     Info,
     MapPin,
     Ban,
+    SkipForward,
 } from 'lucide-react';
-import { ImportValidationResponse } from '../../services/api';
+import { ImportValidationResponse, ImportMode } from '../../services/api';
 
 interface ValidationResultsProps {
     result: ImportValidationResponse;
     onRetry: () => void;
+    importMode?: ImportMode;
 }
 
-export default function ValidationResults({ result, onRetry }: ValidationResultsProps) {
+export default function ValidationResults({ result, onRetry, importMode }: ValidationResultsProps) {
     const [showErrors, setShowErrors] = useState(true);
     const [showWarnings, setShowWarnings] = useState(true);
+    const [showExisting, setShowExisting] = useState(true);
     const [expandedFeatures, setExpandedFeatures] = useState<Set<number>>(new Set());
 
     const toggleFeature = (index: number) => {
@@ -67,13 +70,18 @@ export default function ValidationResults({ result, onRetry }: ValidationResults
         return Object.values(groups);
     }, [result.features, hasAutoDetectedSites]);
 
-    const totalCount = result.valid_count + result.invalid_count;
+    const existingCount = result.existing_count ?? 0;
+    const existingFeatures = useMemo(() =>
+        result.features.filter(f => f.is_existing),
+        [result.features]
+    );
+    const totalCount = result.valid_count + result.invalid_count + existingCount;
     const validPercent = totalCount > 0 ? Math.round((result.valid_count / totalCount) * 100) : 0;
 
     return (
         <div className="space-y-6">
             {/* Summary Cards */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className={`grid gap-4 ${existingCount > 0 ? 'grid-cols-4' : 'grid-cols-3'}`}>
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
                     <CheckCircle2 className="w-8 h-8 mx-auto text-green-600 mb-2" />
                     <div className="text-2xl font-bold text-green-700">
@@ -81,6 +89,16 @@ export default function ValidationResults({ result, onRetry }: ValidationResults
                     </div>
                     <div className="text-sm text-green-600">Seront importés</div>
                 </div>
+
+                {existingCount > 0 && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
+                        <SkipForward className="w-8 h-8 mx-auto text-amber-600 mb-2" />
+                        <div className="text-2xl font-bold text-amber-700">
+                            {existingCount}
+                        </div>
+                        <div className="text-sm text-amber-600">Doublons ignorés</div>
+                    </div>
+                )}
 
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
                     <Ban className="w-8 h-8 mx-auto text-red-600 mb-2" />
@@ -156,6 +174,62 @@ export default function ValidationResults({ result, onRetry }: ValidationResults
                             </div>
                         ))}
                     </div>
+                </div>
+            )}
+
+            {/* Existing duplicates info message */}
+            {existingCount > 0 && (
+                <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <SkipForward className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                        <p className="font-medium text-amber-800">
+                            {existingCount} objet(s) existent déjà et seront ignorés
+                        </p>
+                        <p className="text-sm text-amber-600 mt-1">
+                            Seuls les {result.valid_count} nouveau(x) objet(s) seront créés.
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* Existing duplicates detail section */}
+            {existingFeatures.length > 0 && (
+                <div className="border border-amber-200 rounded-lg overflow-hidden">
+                    <button
+                        onClick={() => setShowExisting(!showExisting)}
+                        className="w-full flex items-center justify-between px-4 py-3 bg-amber-50 hover:bg-amber-100 transition-colors"
+                    >
+                        <div className="flex items-center gap-2">
+                            <SkipForward className="w-5 h-5 text-amber-600" />
+                            <span className="font-medium text-amber-800">
+                                Doublons détectés ({existingFeatures.length})
+                            </span>
+                        </div>
+                        {showExisting ? (
+                            <ChevronUp className="w-5 h-5 text-amber-600" />
+                        ) : (
+                            <ChevronDown className="w-5 h-5 text-amber-600" />
+                        )}
+                    </button>
+
+                    {showExisting && (
+                        <div className="divide-y divide-amber-100 max-h-48 overflow-y-auto">
+                            {existingFeatures.map((feature) => (
+                                <div key={feature.index} className="px-4 py-2 text-sm flex items-center gap-2">
+                                    <SkipForward className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                                    <span className="font-medium text-amber-700">
+                                        Feature #{feature.index + 1}:
+                                    </span>
+                                    <span className="text-amber-600">
+                                        Doublon de «{feature.existing_match?.nom}» (ID: {feature.existing_match?.id})
+                                    </span>
+                                    <span className="text-amber-400 text-xs ml-auto">
+                                        [{feature.existing_match?.match_type}]
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -268,11 +342,13 @@ export default function ValidationResults({ result, onRetry }: ValidationResults
                         <div key={feature.index}>
                             <div
                                 className={`flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-gray-50 ${
-                                    !feature.is_valid ? 'bg-red-50' : ''
+                                    !feature.is_valid ? 'bg-red-50' : feature.is_existing ? 'bg-amber-50' : ''
                                 }`}
                                 onClick={() => toggleFeature(feature.index)}
                             >
-                                {feature.is_valid ? (
+                                {feature.is_existing ? (
+                                    <SkipForward className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                                ) : feature.is_valid ? (
                                     <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
                                 ) : (
                                     <XCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
@@ -284,8 +360,15 @@ export default function ValidationResults({ result, onRetry }: ValidationResults
                                     <span className="text-gray-500 text-sm ml-2">
                                         ({feature.geometry_type})
                                     </span>
+                                    {/* Show existing match badge */}
+                                    {feature.is_existing && feature.existing_match && (
+                                        <span className="ml-2 inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                                            <SkipForward className="w-3 h-3" />
+                                            Doublon de «{feature.existing_match.nom}»
+                                        </span>
+                                    )}
                                     {/* Show detected site name if available */}
-                                    {feature.is_valid && (feature as any).detected_site_name && (
+                                    {feature.is_valid && !feature.is_existing && (feature as any).detected_site_name && (
                                         <span className="ml-2 inline-flex items-center gap-1 text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
                                             <MapPin className="w-3 h-3" />
                                             {(feature as any).detected_site_name}

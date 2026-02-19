@@ -19,6 +19,7 @@ import {
     ImportExecuteResponse,
     ImportFeature,
     AttributeMapping,
+    ImportMode,
 } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import ImportPreview from './ImportPreview';
@@ -64,6 +65,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
     const [siteId, setSiteId] = useState<number | null>(null);
     const [autoDetectSite, setAutoDetectSite] = useState<boolean>(false);
     const [attributeMapping, setAttributeMapping] = useState<AttributeMapping>({});
+    const [importMode, setImportMode] = useState<ImportMode>('create');
     const [validationResult, setValidationResult] = useState<ImportValidationResponse | null>(null);
     const [executeResult, setExecuteResult] = useState<ImportExecuteResponse | null>(null);
 
@@ -79,6 +81,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
         setTargetType('');
         setSiteId(null);
         setAutoDetectSite(false);
+        setImportMode('create');
         setAttributeMapping({});
         setValidationResult(null);
         setExecuteResult(null);
@@ -201,7 +204,8 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                 targetType,
                 attributeMapping,
                 requiresSite ? siteId : null,
-                requiresSite ? autoDetectSite : false
+                requiresSite ? autoDetectSite : false,
+                importMode
             );
             setValidationResult(result);
             setCurrentStep('validation');
@@ -226,7 +230,8 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                 attributeMapping,
                 requiresSite ? siteId : null,
                 undefined, // sousSiteId
-                requiresSite ? autoDetectSite : false
+                requiresSite ? autoDetectSite : false,
+                importMode
             );
             setExecuteResult(result);
             setCurrentStep('complete');
@@ -454,6 +459,8 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                             onSiteIdChange={setSiteId}
                             autoDetectSite={autoDetectSite}
                             onAutoDetectSiteChange={setAutoDetectSite}
+                            importMode={importMode}
+                            onImportModeChange={setImportMode}
                         />
                     )}
 
@@ -462,6 +469,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                         <ValidationResults
                             result={validationResult}
                             onRetry={() => setCurrentStep('mapping')}
+                            importMode={importMode}
                         />
                     )}
 
@@ -476,6 +484,16 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                                 {executeResult.summary.created} objet(s) créé(s) sur{' '}
                                 {executeResult.summary.total}
                             </p>
+                            {(executeResult.summary.skipped ?? 0) > 0 && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-left max-w-md mx-auto mb-4">
+                                    <div className="flex items-center gap-2 text-amber-800">
+                                        <AlertTriangle className="w-5 h-5" />
+                                        <span className="font-medium">
+                                            {executeResult.summary.skipped} doublon(s) ignoré(s)
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
                             {executeResult.summary.failed > 0 && (
                                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-left max-w-md mx-auto">
                                     <div className="flex items-center gap-2 text-yellow-800 mb-2">

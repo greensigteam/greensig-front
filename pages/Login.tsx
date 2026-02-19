@@ -5,6 +5,7 @@
 import React, { useState } from 'react';
 import { User, Role } from '../types';
 import { Lock, Mail, UserCircle, Eye, EyeOff } from 'lucide-react';
+import { prefetchCriticalData } from '../lib/queryClient';
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -75,6 +76,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           avatar: undefined
         };
         setUserInfo(user);
+        prefetchCriticalData(); // Précharge les données en arrière-plan
         onLogin(user);
       } else {
         setError('Identifiants invalides');

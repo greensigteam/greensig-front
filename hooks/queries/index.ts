@@ -25,6 +25,21 @@ export {
     useInvalidateTaskDetails,
 } from './useTaskDetails';
 
+// Réclamations
+export {
+    useReclamations,
+    useReclamation,
+    useReclamationStats,
+    useTypesReclamations,
+    useUrgences,
+} from './useReclamations';
+
+// KPIs
+export {
+    useKPIs,
+    useKPIHistorique,
+} from './useKPIData';
+
 // Données de référence
 export {
     useTypesTaches,

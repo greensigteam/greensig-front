@@ -797,8 +797,39 @@ export interface Statistics {
 
 export async function fetchStatistics(): Promise<Statistics> {
   try {
-    const response = await apiFetch(`${API_BASE_URL}/statistics/`)
-    return handleResponse<Statistics>(response)
+    const response = await apiFetch(`${API_BASE_URL}/reporting/`)
+    const data = await handleResponse<any>(response)
+
+    // Mapper les données de /api/reporting/ vers l'interface Statistics
+    return {
+      hierarchy: {
+        total_sites: data.inventaire?.sites?.total ?? 0,
+        total_sous_sites: 0,
+        active_sites: data.inventaire?.sites?.actifs ?? 0,
+      },
+      vegetation: {
+        arbres: { total: data.inventaire?.vegetation?.par_type?.Arbres ?? 0, by_taille: {}, top_families: [] },
+        gazons: { total: data.inventaire?.vegetation?.par_type?.Gazons ?? 0, total_area_sqm: 0 },
+        palmiers: { total: data.inventaire?.vegetation?.par_type?.Palmiers ?? 0, by_taille: {} },
+      },
+      hydraulique: {
+        puits: { total: data.inventaire?.hydraulique?.par_type?.Puits ?? 0, avg_profondeur: 0, max_profondeur: 0 },
+        pompes: { total: data.inventaire?.hydraulique?.par_type?.Pompes ?? 0, avg_puissance: 0, avg_debit: 0 },
+      },
+      global: {
+        total_objets: data.inventaire?.total_objets ?? 0,
+        total_vegetation: data.inventaire?.vegetation?.total ?? 0,
+        total_hydraulique: data.inventaire?.hydraulique?.total ?? 0,
+      },
+      superviseur_stats: data.taches ? {
+        taches_today: 0,
+        taches_en_cours: data.taches.en_cours ?? 0,
+        taches_planifiees: data.taches.planifiees ?? 0,
+        taches_terminees: data.taches.terminees ?? 0,
+        absences_today: 0,
+        equipes_count: data.equipes?.total ?? 0,
+      } : undefined,
+    } as Statistics
   } catch (error) {
     logger.error('Erreur fetchStatistics:', error)
     throw error
@@ -1354,6 +1385,7 @@ export async function getObjectsInGeometry(
 // ==============================================================================
 
 export type ImportFormat = 'geojson' | 'kml' | 'shapefile' | 'auto';
+export type ImportMode = 'create' | 'skip_duplicates';
 
 export interface ImportFeature {
   index: number;
@@ -1378,6 +1410,8 @@ export interface ImportPreviewResponse {
 export interface ImportValidationResponse {
   valid_count: number;
   invalid_count: number;
+  existing_count?: number;
+  import_mode?: ImportMode;
   warnings: Array<{
     index: number;
     message: string;
@@ -1391,6 +1425,12 @@ export interface ImportValidationResponse {
   features: Array<{
     index: number;
     is_valid: boolean;
+    is_existing?: boolean;
+    existing_match?: {
+      id: number;
+      nom: string;
+      match_type: string;
+    };
     geometry_type: string;
     mapped_properties: Record<string, any>;
   }>;
@@ -1398,6 +1438,7 @@ export interface ImportValidationResponse {
 
 export interface ImportExecuteResponse {
   created: number[];
+  skipped?: number[];
   errors: Array<{
     index: number;
     error: string;
@@ -1405,6 +1446,7 @@ export interface ImportExecuteResponse {
   summary: {
     total: number;
     created: number;
+    skipped?: number;
     failed: number;
   };
 }
@@ -1460,7 +1502,8 @@ export async function importValidate(
   targetType: string,
   mapping: AttributeMapping,
   siteId: number | null,
-  autoDetectSite: boolean = false
+  autoDetectSite: boolean = false,
+  importMode: ImportMode = 'create'
 ): Promise<ImportValidationResponse> {
   try {
     const response = await apiFetch(`${API_BASE_URL}/import/validate/`, {
@@ -1471,6 +1514,7 @@ export async function importValidate(
         mapping,
         site_id: siteId,
         auto_detect_site: autoDetectSite,
+        import_mode: importMode,
       }),
     });
 
@@ -1496,7 +1540,8 @@ export async function importExecute(
   mapping: AttributeMapping,
   siteId: number | null,
   sousSiteId?: number,
-  autoDetectSite: boolean = false
+  autoDetectSite: boolean = false,
+  importMode: ImportMode = 'create'
 ): Promise<ImportExecuteResponse> {
   try {
     const response = await apiFetch(`${API_BASE_URL}/import/execute/`, {
@@ -1508,6 +1553,7 @@ export async function importExecute(
         site_id: siteId,
         sous_site_id: sousSiteId,
         auto_detect_site: autoDetectSite,
+        import_mode: importMode,
       }),
     });
 

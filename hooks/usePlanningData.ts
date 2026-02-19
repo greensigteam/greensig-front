@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { useSearch } from '../contexts/SearchContext';
+import { useToast } from '../contexts/ToastContext';
 import { planningService } from '../services/planningService';
-import { fetchEquipes, fetchStructures } from '../services/usersApi';
-import { fetchCurrentUser, fetchAllSites, fetchInventory, SiteFrontend } from '../services/api';
+import { fetchInventory, SiteFrontend } from '../services/api';
 import {
     Tache, TacheCreate, TacheUpdate, TypeTache,
     PlanningFilters, EMPTY_PLANNING_FILTERS,
@@ -13,6 +14,8 @@ import {
 } from '../types/planning';
 import { EquipeList, StructureClient } from '../types/users';
 import { usePermissions } from './usePermissions';
+import { useTaches, useTypesTaches, useEquipes, useSites, useStructures, useCurrentUser } from './queries';
+import { queryKeys } from '../lib/queryKeys';
 import type { User, Role, SearchSuggestion } from '../types';
 import type { InventoryObjectOption } from '../components/planning/TaskFormModal';
 
@@ -27,12 +30,6 @@ export interface PopoverInfo {
     eventEnd?: Date;
     distributionStatus?: StatusDistribution;
     distributionId?: number;
-}
-
-export interface ToastState {
-    message: string;
-    visible: boolean;
-    undoAction?: () => void;
 }
 
 export interface UsePlanningDataReturn {
@@ -101,9 +98,8 @@ export interface UsePlanningDataReturn {
     preSelectedObjects: InventoryObjectOption[] | undefined;
     setPreSelectedObjects: React.Dispatch<React.SetStateAction<InventoryObjectOption[] | undefined>>;
 
-    // Toast
-    toast: ToastState;
-    showToast: (message: string, undoAction?: () => void) => void;
+    // Toast (global ToastContext)
+    showToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
 
     // Actions - CRUD
     loadTaches: () => Promise<void>;
@@ -136,18 +132,33 @@ export interface UsePlanningDataReturn {
 // ============================================================================
 
 export function usePlanningData(): UsePlanningDataReturn {
-    // Core data
-    const [taches, setTaches] = useState<Tache[]>([]);
-    const [equipes, setEquipes] = useState<EquipeList[]>([]);
-    const [typesTaches, setTypesTaches] = useState<TypeTache[]>([]);
-    const [sites, setSites] = useState<SiteFrontend[]>([]);
-    const [structures, setStructures] = useState<StructureClient[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    // React Query hooks for data
+    const queryClient = useQueryClient();
+    const { data: taches = [], isLoading: tachesLoading, error: tachesError } = useTaches();
+    const { data: typesTaches = [], isLoading: refLoading } = useTypesTaches();
+    const { data: equipes = [] } = useEquipes();
+    const { data: sites = [] } = useSites();
+    const { data: structures = [] } = useStructures();
+    const { data: userData } = useCurrentUser();
 
-    // User & Permissions
-    const [currentUser, setCurrentUser] = useState<User | null>(null);
-    const [isReadOnly, setIsReadOnly] = useState(false);
+    // Derive currentUser and isReadOnly from userData
+    const currentUser: User | null = useMemo(() => {
+        if (!userData) return null;
+        return {
+            id: String(userData.id),
+            name: userData.nom || '',
+            email: userData.email,
+            role: (userData.roles?.[0] || 'CLIENT') as Role
+        };
+    }, [userData]);
+
+    const isReadOnly = userData?.roles?.includes('CLIENT') ?? false;
+
+    // Derived loading and error states
+    const loading = tachesLoading || refLoading;
+    const error = tachesError ? (tachesError as Error).message : null;
+
+    // Permissions
     const permissions = usePermissions(currentUser);
 
     // Filters
@@ -183,8 +194,8 @@ export function usePlanningData(): UsePlanningDataReturn {
     const [initialTaskValues, setInitialTaskValues] = useState<Partial<TacheCreate> | undefined>(undefined);
     const [preSelectedObjects, setPreSelectedObjects] = useState<InventoryObjectOption[] | undefined>(undefined);
 
-    // Toast
-    const [toast, setToast] = useState<ToastState>({ message: '', visible: false });
+    // Toast (global)
+    const { showToast } = useToast();
 
     // Search context
     const { searchQuery, setPlaceholder, setSearchSuggestions } = useSearch();
@@ -203,7 +214,7 @@ export function usePlanningData(): UsePlanningDataReturn {
     }, [filters]);
 
     const filteredTaches = useMemo(() => {
-        return taches.filter((t: Tache) => {
+        const result = taches.filter((t: Tache) => {
             const task = t as any;
 
             // 1. Search filter
@@ -254,6 +265,7 @@ export function usePlanningData(): UsePlanningDataReturn {
 
             return true;
         });
+        return result;
     }, [taches, searchQuery, filters, sites]);
 
     // Group tasks by date for List View
@@ -339,101 +351,12 @@ export function usePlanningData(): UsePlanningDataReturn {
         setSearchSuggestions(suggestions);
     }, [searchQuery, taches, sites, equipes, setSearchSuggestions]);
 
-    // Initial data load
-    useEffect(() => {
-        loadStableData();
-        loadTaches();
-    }, []);
+    // React Query loads data automatically on mount — no useEffect needed
 
-    // ========================================================================
-    // DATA LOADING
-    // ========================================================================
-
-    const loadStableData = async () => {
-        try {
-            setLoading(true);
-            const [equipesData, typesData, userData, structuresRes] = await Promise.all([
-                fetchEquipes().then(data => data.results || data),
-                planningService.getTypesTaches(),
-                fetchCurrentUser(),
-                fetchStructures()
-            ]);
-
-            setEquipes(Array.isArray(equipesData) ? equipesData : []);
-            setTypesTaches(typesData);
-
-            const structuresArray = Array.isArray(structuresRes) ? structuresRes : (structuresRes.results || []);
-            setStructures(structuresArray);
-
-            const user: User = {
-                id: String(userData.id),
-                name: userData.nom || '',
-                email: userData.email,
-                role: (userData.roles?.[0] || 'CLIENT') as Role
-            };
-            setCurrentUser(user);
-
-            const roles = userData.roles || [];
-            setIsReadOnly(roles.includes('CLIENT'));
-
-            // Load all sites
-            fetchAllSites()
-                .then(sitesArray => {
-                    setSites(sitesArray.filter(s => s.actif));
-                })
-                .catch(err => {
-                    console.error("Erreur chargement sites:", err);
-                    setSites([]);
-                });
-        } catch (err) {
-            console.error('Erreur chargement données:', err);
-            setError('Erreur chargement données');
-        } finally {
-            setLoading(false);
-        }
-    };
-
+    // Invalidation function (replaces loadTaches, same signature for compatibility)
     const loadTaches = useCallback(async () => {
-        try {
-            const allTaches: Tache[] = [];
-            let page = 1;
-            let hasMore = true;
-
-            // Fetch all pages of tasks
-            while (hasMore) {
-                const tachesData = await planningService.getTaches({ page });
-                const tachesArray = tachesData.results || tachesData;
-
-                if (Array.isArray(tachesArray)) {
-                    allTaches.push(...tachesArray);
-                }
-
-                // Check if there are more pages
-                hasMore = tachesData.next !== null && tachesData.next !== undefined;
-                page++;
-
-                // Safety limit
-                if (page > 100) {
-                    console.warn('[loadTaches] Reached page limit (100), stopping pagination');
-                    break;
-                }
-            }
-
-            console.log(`[loadTaches] Loaded ${allTaches.length} tasks (${page - 1} pages)`);
-            setTaches(allTaches);
-        } catch (err) {
-            console.error('Erreur chargement tâches:', err);
-        }
-    }, []);
-
-    // ========================================================================
-    // TOAST HELPER
-    // ========================================================================
-
-    const showToast = useCallback((message: string, undoAction?: () => void) => {
-        setToast({ visible: true, message, undoAction });
-        setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 4000);
-    }, []);
+        await queryClient.invalidateQueries({ queryKey: queryKeys.taches.all });
+    }, [queryClient]);
 
     // ========================================================================
     // CRUD OPERATIONS
@@ -442,67 +365,67 @@ export function usePlanningData(): UsePlanningDataReturn {
     const handleCreateTache = useCallback(async (data: TacheCreate) => {
         try {
             await planningService.createTache(data);
-            await loadTaches();
+            await queryClient.invalidateQueries({ queryKey: queryKeys.taches.all });
             setShowCreateForm(false);
-            showToast('Tâche créée avec succès');
+            showToast('Tâche créée avec succès', 'success');
         } catch (err) {
             console.error('Erreur création tâche:', err);
             throw err;
         }
-    }, [loadTaches, showToast]);
+    }, [queryClient, showToast]);
 
     const handleUpdateTache = useCallback(async (id: number, data: TacheUpdate) => {
         try {
             await planningService.updateTache(id, data);
-            await loadTaches();
+            await queryClient.invalidateQueries({ queryKey: queryKeys.taches.all });
             setTacheToEdit(null);
             setPopoverInfo(null);
-            showToast('Tâche mise à jour avec succès');
+            showToast('Tâche mise à jour avec succès', 'success');
         } catch (err) {
             console.error('Erreur mise à jour tâche:', err);
             throw err;
         }
-    }, [loadTaches, showToast]);
+    }, [queryClient, showToast]);
 
     const handleDeleteTache = useCallback(async () => {
         if (!tacheToDelete) return;
 
         try {
             await planningService.deleteTache(tacheToDelete);
-            await loadTaches();
+            await queryClient.invalidateQueries({ queryKey: queryKeys.taches.all });
             setTacheToDelete(null);
             setPopoverInfo(null);
-            showToast('Tâche supprimée');
+            showToast('Tâche supprimée', 'success');
         } catch (err: any) {
             console.error('Erreur suppression tâche:', err);
             showToast(err.message || 'Erreur lors de la suppression de la tâche', 'error');
         }
-    }, [tacheToDelete, loadTaches, showToast]);
+    }, [tacheToDelete, queryClient, showToast]);
 
     const handleDeleteDistribution = useCallback(async () => {
         if (!distributionToDelete) return;
 
         try {
             await planningService.deleteDistribution(distributionToDelete);
-            await loadTaches();
+            await queryClient.invalidateQueries({ queryKey: queryKeys.taches.all });
             setDistributionToDelete(null);
-            showToast('Distribution supprimée avec succès');
+            showToast('Distribution supprimée avec succès', 'success');
         } catch (err: any) {
             console.error('Erreur suppression distribution:', err);
             showToast(err.message || 'Erreur lors de la suppression de la distribution', 'error');
         }
-    }, [distributionToDelete, loadTaches, showToast]);
+    }, [distributionToDelete, queryClient, showToast]);
 
     const handleResetCharge = useCallback(async (tacheId: number) => {
         try {
             await planningService.resetCharge(tacheId);
-            await loadTaches();
-            showToast('Charge recalculée');
+            await queryClient.invalidateQueries({ queryKey: queryKeys.taches.all });
+            showToast('Charge recalculée', 'success');
         } catch (err: any) {
             console.error('Erreur reset charge:', err);
             showToast(err.message || 'Erreur lors du recalcul de la charge', 'error');
         }
-    }, [loadTaches, showToast]);
+    }, [queryClient, showToast]);
 
     // ========================================================================
     // DISTRIBUTION STATUS OPERATIONS (Nouveau workflow complet)
@@ -542,16 +465,16 @@ export function usePlanningData(): UsePlanningDataReturn {
             await planningService.demarrerDistribution(demarrerModalDistribution.id, data);
             setDemarrerModalDistribution(null);
             setPopoverInfo(null);
-            await loadTaches();
+            await queryClient.invalidateQueries({ queryKey: queryKeys.taches.all });
 
-            showToast('Distribution démarrée');
+            showToast('Distribution démarrée', 'success');
         } catch (err: any) {
             console.error('Erreur démarrage distribution:', err);
-            showToast(err.message || 'Erreur lors du démarrage');
+            showToast(err.message || 'Erreur lors du démarrage', 'error');
         } finally {
             setDistributionActionLoading(false);
         }
-    }, [demarrerModalDistribution, loadTaches, showToast]);
+    }, [demarrerModalDistribution, queryClient, showToast]);
 
     const handleDistributionTerminer = useCallback((distributionId: number) => {
         // Trouver la distribution pour ouvrir le modal
@@ -585,16 +508,16 @@ export function usePlanningData(): UsePlanningDataReturn {
             await planningService.terminerDistribution(terminerModalDistribution.id, data);
             setTerminerModalDistribution(null);
             setPopoverInfo(null);
-            await loadTaches();
+            await queryClient.invalidateQueries({ queryKey: queryKeys.taches.all });
 
-            showToast('Distribution terminée');
+            showToast('Distribution terminée', 'success');
         } catch (err: any) {
             console.error('Erreur terminaison distribution:', err);
-            showToast(err.message || 'Erreur lors de la terminaison');
+            showToast(err.message || 'Erreur lors de la terminaison', 'error');
         } finally {
             setDistributionActionLoading(false);
         }
-    }, [terminerModalDistribution, loadTaches, showToast]);
+    }, [terminerModalDistribution, queryClient, showToast]);
 
     const handleDistributionReporter = useCallback(async (nouvelleDate: string, motif: MotifDistribution, commentaire: string) => {
         if (!reporterModalDistribution) return;
@@ -604,15 +527,15 @@ export function usePlanningData(): UsePlanningDataReturn {
             await planningService.reporterDistribution(reporterModalDistribution.id, nouvelleDate, motif, commentaire);
             setReporterModalDistribution(null);
             setPopoverInfo(null);
-            await loadTaches();
-            showToast('Distribution reportée');
+            await queryClient.invalidateQueries({ queryKey: queryKeys.taches.all });
+            showToast('Distribution reportée', 'success');
         } catch (err: any) {
             console.error('Erreur report distribution:', err);
-            showToast(err.message || 'Erreur lors du report');
+            showToast(err.message || 'Erreur lors du report', 'error');
         } finally {
             setDistributionActionLoading(false);
         }
-    }, [reporterModalDistribution, loadTaches, showToast]);
+    }, [reporterModalDistribution, queryClient, showToast]);
 
     const handleDistributionAnnuler = useCallback(async (motif: MotifDistribution, commentaire: string) => {
         if (!annulerModalDistribution) return;
@@ -622,35 +545,35 @@ export function usePlanningData(): UsePlanningDataReturn {
             await planningService.annulerDistribution(annulerModalDistribution.id, motif, commentaire);
             setAnnulerModalDistribution(null);
             setPopoverInfo(null);
-            await loadTaches();
-            showToast('Distribution annulée');
+            await queryClient.invalidateQueries({ queryKey: queryKeys.taches.all });
+            showToast('Distribution annulée', 'success');
         } catch (err: any) {
             console.error('Erreur annulation distribution:', err);
-            showToast(err.message || 'Erreur lors de l\'annulation');
+            showToast(err.message || 'Erreur lors de l\'annulation', 'error');
         } finally {
             setDistributionActionLoading(false);
         }
-    }, [annulerModalDistribution, loadTaches, showToast]);
+    }, [annulerModalDistribution, queryClient, showToast]);
 
     const handleDistributionRestaurer = useCallback(async (distributionId: number) => {
         setDistributionActionLoading(true);
         try {
             await planningService.restaurerDistribution(distributionId);
-            await loadTaches();
+            await queryClient.invalidateQueries({ queryKey: queryKeys.taches.all });
 
             // Update popover if open
             if (popoverInfo && popoverInfo.distributionId === distributionId) {
                 setPopoverInfo({ ...popoverInfo, distributionStatus: 'NON_REALISEE' });
             }
 
-            showToast('Distribution restaurée');
+            showToast('Distribution restaurée', 'success');
         } catch (err: any) {
             console.error('Erreur restauration distribution:', err);
-            showToast(err.message || 'Erreur lors de la restauration');
+            showToast(err.message || 'Erreur lors de la restauration', 'error');
         } finally {
             setDistributionActionLoading(false);
         }
-    }, [popoverInfo, loadTaches, showToast]);
+    }, [popoverInfo, queryClient, showToast]);
 
     // ========================================================================
     // HELPERS
@@ -779,8 +702,7 @@ export function usePlanningData(): UsePlanningDataReturn {
         preSelectedObjects,
         setPreSelectedObjects,
 
-        // Toast
-        toast,
+        // Toast (global ToastContext)
         showToast,
 
         // Actions - CRUD

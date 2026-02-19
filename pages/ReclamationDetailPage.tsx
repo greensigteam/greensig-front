@@ -27,6 +27,7 @@ import {
     reprendreIntervention,
     createSatisfaction,
     deleteReclamation,
+    updateReclamation,
     fetchTypesReclamations,
     fetchUrgences
 } from '../services/reclamationsApi';
@@ -770,14 +771,43 @@ const ReclamationDetailPage: React.FC = () => {
 
                         {/* Actions */}
                         <div className="flex items-center gap-3">
-                            {/* Bouton Modifier - visible pour Admin ou créateur si pas clôturée/rejetée */}
-                            {(isAdmin || (currentUser && reclamation.createur === currentUser.id)) && reclamation.statut !== 'CLOTUREE' && reclamation.statut !== 'REJETEE' && (
+                            {/* Bouton Modifier - visible pour le créateur uniquement si pas clôturée/rejetée */}
+                            {currentUser && reclamation.createur === currentUser.id && reclamation.statut !== 'CLOTUREE' && reclamation.statut !== 'REJETEE' && (
                                 <button
                                     onClick={handleEdit}
                                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2 text-sm transition-colors"
                                 >
                                     <Edit2 className="w-4 h-4" />
                                     Modifier
+                                </button>
+                            )}
+
+                            {/* Toggle visibilité client - Admin/Superviseur uniquement */}
+                            {(isAdmin || isSupervisor) && (
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            await updateReclamation(reclamation.id, { visible_client: !reclamation.visible_client } as any);
+                                            await loadData();
+                                            showToast(
+                                                reclamation.visible_client
+                                                    ? 'Réclamation masquée au client'
+                                                    : 'Réclamation rendue visible au client',
+                                                'success'
+                                            );
+                                        } catch {
+                                            showToast('Erreur lors du changement de visibilité', 'error');
+                                        }
+                                    }}
+                                    className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 text-sm transition-colors ${
+                                        reclamation.visible_client
+                                            ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    }`}
+                                    title={reclamation.visible_client ? 'Masquer au client' : 'Rendre visible au client'}
+                                >
+                                    {reclamation.visible_client ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    {reclamation.visible_client ? 'Masquer au client' : 'Rendre visible'}
                                 </button>
                             )}
 

@@ -1,31 +1,24 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, Edit2, Trash2, X, MapPin, ClipboardList, Calendar, TrendingUp, RefreshCw, Loader2, Settings, MoreVertical, Clock, Star, BarChart3, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertOctagon, Filter, Check, ChevronDown, Download, Eye, EyeOff } from 'lucide-react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useSearch } from '../contexts/SearchContext';
-import { Reclamation, TypeReclamation, Urgence, ReclamationCreate, ReclamationStats } from '../types/reclamations';
+import { Reclamation, ReclamationCreate } from '../types/reclamations';
 import {
-    fetchReclamations,
-    fetchTypesReclamations,
-    fetchUrgences,
-    fetchReclamationById,
-    createReclamation,
     deleteReclamation,
     updateReclamation,
-    uploadPhoto,
-    fetchReclamationStats,
     exportReclamationsExcel
 } from '../services/reclamationsApi';
 import { planningService } from '../services/planningService';
-import { fetchEquipes, fetchCurrentUser } from '../services/usersApi';
-import { fetchAllSites, SiteFrontend } from '../services/api';
-import { TypeTache, TacheCreate, PRIORITE_LABELS, Tache, STATUT_TACHE_COLORS } from '../types/planning';
-import { EquipeList, Utilisateur } from '../types/users';
+import { TacheCreate, PRIORITE_LABELS, Tache, STATUT_TACHE_COLORS } from '../types/planning';
 import TaskFormModal from '../components/planning/TaskFormModal';
 import { ReclamationEditModal } from '../components/reclamations/ReclamationEditModal';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
-import LoadingScreen from '../components/LoadingScreen';
 import { RECLAMATION_STATUS_LABELS } from '../constants';
+import { useReclamations, useReclamationStats, useTypesReclamations, useUrgences, ReclamationFilters } from '../hooks/queries/useReclamations';
+import { useCurrentUser, useTypesTaches, useEquipes, useSites } from '../hooks/queries/useReferenceData';
+import { invalidateAllReclamationQueries } from '../lib/queryClient';
 
 import ConfirmModal from '../components/ConfirmModal';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
@@ -98,9 +91,9 @@ const Reclamations: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { searchQuery, setSearchQuery, setPlaceholder } = useSearch();
-    const [reclamations, setReclamations] = useState<Reclamation[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [currentUser, setCurrentUser] = useState<Utilisateur | null>(null);
+
+    // ===== React Query hooks (remplace useState + useEffect + fetch) =====
+    const { data: currentUser } = useCurrentUser();
 
     // Helpers rôles
     const isAdmin = !!currentUser?.roles?.includes('ADMIN');
@@ -109,27 +102,14 @@ const Reclamations: React.FC = () => {
 
     // UI State
     const [activeTab, setActiveTab] = useState<'reclamations' | 'taches' | 'stats'>('reclamations');
-    const [tachesLiees, setTachesLiees] = useState<Tache[]>([]);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
     const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
     const actionsMenuRef = useRef<HTMLDivElement>(null);
     const [rowMenuOpen, setRowMenuOpen] = useState<number | null>(null);
 
-    // Stats
-    const [stats, setStats] = useState<ReclamationStats | null>(null);
-    const [statsLoading, setStatsLoading] = useState(false);
-
     // Export
     const [exporting, setExporting] = useState(false);
-
-    // Referentiels Réclamation
-    const [types, setTypes] = useState<TypeReclamation[]>([]);
-    const [urgences, setUrgences] = useState<Urgence[]>([]);
-
-    // Referentiels Tâche (pour création intervention)
-    const [typesTaches, setTypesTaches] = useState<TypeTache[]>([]);
-    const [equipes, setEquipes] = useState<EquipeList[]>([]);
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [taskInitialValues, setTaskInitialValues] = useState<Partial<TacheCreate>>({});
@@ -170,13 +150,46 @@ const Reclamations: React.FC = () => {
     const [itemsPerPageTache, setItemsPerPageTache] = useState(10);
 
     // Filtres
-    const [sites, setSites] = useState<SiteFrontend[]>([]);
     const [filterStatut, setFilterStatut] = useState<string>('');
     const [filterSite, setFilterSite] = useState<string>('');
     const [filterDateDebut, setFilterDateDebut] = useState<string>('');
     const [filterDateFin, setFilterDateFin] = useState<string>('');
     const [showFilters, setShowFilters] = useState(false);
     const [filterPeriod, setFilterPeriod] = useState<string>('all');
+
+    // ===== Données via React Query (polling 60s, keepPreviousData) =====
+    const reclamationFilters = useMemo<ReclamationFilters>(() => {
+        const f: ReclamationFilters = {};
+        if (filterStatut) f.statut = filterStatut;
+        if (filterSite) f.site = Number(filterSite);
+        if (filterDateDebut) f.date_debut = filterDateDebut;
+        if (filterDateFin) f.date_fin = filterDateFin;
+        return f;
+    }, [filterStatut, filterSite, filterDateDebut, filterDateFin]);
+
+    const { data: reclamations = [], isLoading: reclamationsLoading, isFetching: reclamationsFetching } = useReclamations(reclamationFilters);
+    const { data: stats = null, isLoading: statsLoading } = useReclamationStats({}, { enabled: activeTab === 'stats' });
+    const { data: types = [] } = useTypesReclamations();
+    const { data: urgences = [] } = useUrgences();
+    const { data: typesTaches = [] } = useTypesTaches();
+    const { data: equipes = [] } = useEquipes();
+    const { data: sites = [] } = useSites();
+
+    // Tâches liées aux réclamations
+    const { data: tachesLiees = [], isLoading: tachesLoading } = useQuery({
+        queryKey: ['taches', 'reclamations-liees'],
+        queryFn: async () => {
+            const response = await planningService.getTaches({ has_reclamation: true });
+            const data = (response as any).results || response;
+            return (Array.isArray(data) ? data : []) as Tache[];
+        },
+        staleTime: 2 * 60 * 1000,
+        refetchInterval: 60 * 1000,
+        refetchIntervalInBackground: false,
+    });
+
+    // Loading combiné pour l'affichage initial
+    const loading = reclamationsLoading;
 
     const handlePeriodChange = (value: string) => {
         setFilterPeriod(value);
@@ -230,41 +243,11 @@ const Reclamations: React.FC = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    // Load stats when stats tab is selected
-    useEffect(() => {
-        if (activeTab === 'stats' && !stats && !statsLoading) {
-            loadStats();
-        }
-    }, [activeTab]);
-
-    const loadStats = async () => {
-        setStatsLoading(true);
-        try {
-            const data = await fetchReclamationStats({});
-            setStats(data);
-        } catch (error) {
-            console.error('Erreur chargement stats:', error);
-        } finally {
-            setStatsLoading(false);
-        }
-    };
-
     // Reset pages on search or filter change
     useEffect(() => {
         setCurrentPageRec(1);
         setCurrentPageTache(1);
-    }, [searchQuery, activeTab]);
-
-    // Reload reclamations when filters change
-    useEffect(() => {
-        if (sites.length > 0) { // S'assurer que les données de base sont chargées
-            loadReclamations();
-        }
-    }, [filterStatut, filterSite, filterDateDebut, filterDateFin]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [searchQuery, activeTab, reclamationFilters]);
 
     // Handle navigation from MapPage with site pre-selected
     useEffect(() => {
@@ -300,59 +283,9 @@ const Reclamations: React.FC = () => {
         }
     }, [location.state, navigate]);
 
-    const loadReclamations = async () => {
-        setLoading(true);
-        try {
-            const params: any = {};
-            if (filterStatut) params.statut = filterStatut;
-            if (filterSite) params.site = Number(filterSite);
-            if (filterDateDebut) params.date_debut = filterDateDebut;
-            if (filterDateFin) params.date_fin = filterDateFin;
-
-            const recsData = await fetchReclamations(params);
-            setReclamations(recsData);
-        } catch (error) {
-            console.error("Erreur chargement réclamations", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const loadData = async () => {
-        setLoading(true);
-        try {
-            const [typesData, urgencesData, typesTachesData, equipesData, tachesLieesData, currentUserData, sitesData] = await Promise.all([
-                fetchTypesReclamations(),
-                fetchUrgences(),
-                planningService.getTypesTaches(),
-                fetchEquipes(),
-                planningService.getTaches({ has_reclamation: true }),
-                fetchCurrentUser(),
-                fetchAllSites()
-            ]);
-            setTypes(typesData);
-            setUrgences(urgencesData);
-            setTypesTaches(typesTachesData);
-            setCurrentUser(currentUserData);
-            // fetchEquipes retourne { count, results } ou array selon format API
-            const eqList = Array.isArray(equipesData) ? equipesData : (equipesData as any).results || [];
-            setEquipes(eqList);
-
-            // Taches liées retourne PaginatedResponse ou tableau
-            const tData = (tachesLieesData as any).results || tachesLieesData;
-            setTachesLiees(Array.isArray(tData) ? tData : []);
-
-            // Sites - fetchAllSites retourne directement SiteFrontend[]
-            setSites(sitesData);
-
-            // Charger les réclamations avec les filtres
-            await loadReclamations();
-
-        } catch (error) {
-            console.error("Erreur chargement données", error);
-        } finally {
-            setLoading(false);
-        }
+    // Fonction de rafraîchissement (invalide le cache React Query → refetch)
+    const refreshData = () => {
+        invalidateAllReclamationQueries();
     };
 
     // ===================================
@@ -367,7 +300,7 @@ const Reclamations: React.FC = () => {
         if (!deletingReclamationId) return;
         try {
             await deleteReclamation(deletingReclamationId);
-            setReclamations(prev => prev.filter(r => r.id !== deletingReclamationId));
+            invalidateAllReclamationQueries();
             setDeletingReclamationId(null);
             // Feedback différé
             setTimeout(() => {
@@ -577,8 +510,8 @@ const Reclamations: React.FC = () => {
             setTaskSiteFilter(undefined);
             setReclamationTargetForTask(null);
 
-            // Recharger les tâches liées
-            loadData();
+            // Invalider le cache pour rafraîchir les tâches liées
+            invalidateAllReclamationQueries();
 
         } catch (error: any) {
             console.error("❌ [Reclamations] Erreur création tâche", error);
@@ -711,7 +644,7 @@ const Reclamations: React.FC = () => {
                     {/* Export Button */}
                     <button
                         onClick={handleExportExcel}
-                        disabled={exporting || loading}
+                        disabled={exporting || reclamationsLoading}
                         className="flex items-center gap-2 px-4 py-2 border border-slate-300 bg-white text-slate-700 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
                         title="Exporter en Excel"
                     >
@@ -737,17 +670,13 @@ const Reclamations: React.FC = () => {
                             <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-200 py-1 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                                 <button
                                     onClick={() => {
-                                        loadData();
-                                        if (activeTab === 'stats') {
-                                            setStats(null);
-                                            loadStats();
-                                        }
+                                        refreshData();
                                         setActionsMenuOpen(false);
                                     }}
-                                    disabled={loading || statsLoading}
+                                    disabled={reclamationsFetching || statsLoading}
                                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
                                 >
-                                    <RefreshCw className={`w-4 h-4 text-slate-400 ${loading || statsLoading ? 'animate-spin' : ''}`} />
+                                    <RefreshCw className={`w-4 h-4 text-slate-400 ${reclamationsFetching ? 'animate-spin' : ''}`} />
                                     Actualiser
                                 </button>
                             </div>
@@ -767,9 +696,7 @@ const Reclamations: React.FC = () => {
                             options={[
                                 { value: '', label: 'Statut: Tous' },
                                 { value: 'NOUVELLE', label: 'En attente de lecture' },
-                                { value: 'PRISE_EN_COMPTE', label: 'Prise en compte' },
                                 { value: 'EN_COURS', label: 'En attente de réalisation' },
-                                { value: 'RESOLUE', label: 'Tâche terminée côté admin.' },
                                 { value: 'EN_ATTENTE_VALIDATION_CLOTURE', label: 'En attente validation clôture' },
                                 { value: 'CLOTUREE', label: 'Clôturée' },
                                 { value: 'REJETEE', label: 'Rejetée' }
@@ -1010,8 +937,8 @@ const Reclamations: React.FC = () => {
                                                                             </button>
                                                                         )}
 
-                                                                        {/* Modifier - ADMIN ou créateur, pas si clôturée/rejetée */}
-                                                                        {(isAdmin || rec.createur === currentUser?.id) && rec.statut !== 'CLOTUREE' && rec.statut !== 'REJETEE' && (
+                                                                        {/* Modifier - créateur uniquement, pas si clôturée/rejetée */}
+                                                                        {rec.createur === currentUser?.id && rec.statut !== 'CLOTUREE' && rec.statut !== 'REJETEE' && (
                                                                             <>
                                                                                 {!isClient && (
                                                                                     <div className="my-1 border-t border-slate-100" />
@@ -1026,6 +953,44 @@ const Reclamations: React.FC = () => {
                                                                                 >
                                                                                     <Edit2 className="w-4 h-4 text-emerald-500" />
                                                                                     Modifier
+                                                                                </button>
+                                                                            </>
+                                                                        )}
+
+                                                                        {/* Toggle visibilité client - Admin/Superviseur */}
+                                                                        {(isAdmin || isSupervisor) && (
+                                                                            <>
+                                                                                <div className="my-1 border-t border-slate-100" />
+                                                                                <button
+                                                                                    onClick={async (e) => {
+                                                                                        e.stopPropagation();
+                                                                                        try {
+                                                                                            await updateReclamation(rec.id, { visible_client: !rec.visible_client } as any);
+                                                                                            invalidateAllReclamationQueries();
+                                                                                            setModalConfig({
+                                                                                                isOpen: true,
+                                                                                                title: 'Succès',
+                                                                                                message: rec.visible_client
+                                                                                                    ? 'Réclamation masquée au client.'
+                                                                                                    : 'Réclamation rendue visible au client.',
+                                                                                                variant: 'success',
+                                                                                                onConfirm: () => setModalConfig(p => ({ ...p, isOpen: false }))
+                                                                                            });
+                                                                                        } catch {
+                                                                                            setModalConfig({
+                                                                                                isOpen: true,
+                                                                                                title: 'Erreur',
+                                                                                                message: 'Erreur lors du changement de visibilité.',
+                                                                                                variant: 'danger',
+                                                                                                onConfirm: () => setModalConfig(p => ({ ...p, isOpen: false }))
+                                                                                            });
+                                                                                        }
+                                                                                        setRowMenuOpen(null);
+                                                                                    }}
+                                                                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                                                                                >
+                                                                                    {rec.visible_client ? <EyeOff className="w-4 h-4 text-amber-500" /> : <Eye className="w-4 h-4 text-blue-500" />}
+                                                                                    {rec.visible_client ? 'Masquer au client' : 'Rendre visible'}
                                                                                 </button>
                                                                             </>
                                                                         )}
@@ -1106,7 +1071,7 @@ const Reclamations: React.FC = () => {
             {/* Table TACHES LIEES */}
             {activeTab === 'taches' && (
                 <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-                    {loading ? (
+                    {tachesLoading ? (
                         <div className="flex items-center justify-center py-12">
                             <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
                         </div>
@@ -1448,7 +1413,7 @@ const Reclamations: React.FC = () => {
                         variant: 'success',
                         onConfirm: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
                     });
-                    loadData();
+                    refreshData();
                 }}
                 types={types}
                 urgences={urgences}

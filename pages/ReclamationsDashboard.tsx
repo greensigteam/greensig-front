@@ -10,7 +10,6 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'
 
 const STATUT_LABELS: { [key: string]: string } = {
     'NOUVELLE': 'En attente de lecture',
-    'PRISE_EN_COMPTE': 'Prise en compte',
     'EN_COURS': 'En attente de réalisation',
     'RESOLUE': 'Tâche terminée côté admin.',
     'EN_ATTENTE_VALIDATION_CLOTURE': 'En attente validation clôture',

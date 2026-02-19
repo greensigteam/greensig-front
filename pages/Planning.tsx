@@ -361,8 +361,7 @@ const Planning: FC = () => {
         setDemarrerModalDistribution,
         distributionActionLoading,
 
-        // Toast
-        toast,
+        // Toast (global)
         showToast,
 
         // Actions
@@ -573,6 +572,8 @@ const Planning: FC = () => {
                 endDate: format(endDate, 'yyyy-MM-dd'),
                 structureClientId: filters.clientId || undefined,
                 equipeId: filters.equipeId || undefined,
+                siteId: filters.siteId || undefined,
+                statuts: filters.statuts.length > 0 ? filters.statuts : undefined,
             };
 
             console.log('[PDF Export] Lancement avec params:', exportParams);
@@ -582,13 +583,13 @@ const Planning: FC = () => {
                 console.log('[PDF Export] Téléchargement:', downloadUrl);
                 window.open(downloadUrl, '_blank');
                 setIsExporting(false);
-                showToast(`Export terminé (${recordCount} tâches)`);
+                showToast(`Export terminé (${recordCount} tâches)`, 'success');
             };
 
             // Fonction pour relancer en mode sync (fallback)
             const runSyncExport = async () => {
                 console.log('[PDF Export] Fallback vers mode synchrone...');
-                showToast('Export en cours (mode direct)...');
+                showToast('Export en cours (mode direct)...', 'info');
 
                 const syncResult = await planningService.exportPDF({ ...exportParams, sync: true });
 
@@ -610,7 +611,7 @@ const Planning: FC = () => {
 
             const task_id = response.task_id;
             console.log('[PDF Export] Task ID reçu:', task_id);
-            showToast('Export PDF en cours de génération...');
+            showToast('Export PDF en cours de génération...', 'info');
 
             let pendingCount = 0; // Compteur de statuts PENDING consécutifs
 
@@ -618,7 +619,7 @@ const Planning: FC = () => {
             const pollStatus = async (attempts = 0): Promise<void> => {
                 if (attempts >= 60) {
                     setIsExporting(false);
-                    showToast('Export PDF trop long. Réessayez plus tard.');
+                    showToast('Export PDF trop long. Réessayez plus tard.', 'warning');
                     console.error('[PDF Export] Timeout après 60 tentatives');
                     return;
                 }
@@ -632,7 +633,7 @@ const Planning: FC = () => {
                     } else if (status.status === 'FAILURE') {
                         setIsExporting(false);
                         console.error('[PDF Export] Échec:', status.error);
-                        showToast(status.error || 'Erreur lors de l\'export PDF');
+                        showToast(status.error || 'Erreur lors de l\'export PDF', 'error');
                     } else if (status.status === 'PENDING') {
                         pendingCount++;
 
@@ -645,7 +646,7 @@ const Planning: FC = () => {
                             } catch (syncErr) {
                                 console.error('[PDF Export] Erreur mode sync:', syncErr);
                                 setIsExporting(false);
-                                showToast('Erreur lors de l\'export PDF');
+                                showToast('Erreur lors de l\'export PDF', 'error');
                             }
                             return;
                         }
@@ -660,7 +661,7 @@ const Planning: FC = () => {
                 } catch (pollError) {
                     console.error('[PDF Export] Erreur polling:', pollError);
                     setIsExporting(false);
-                    showToast('Erreur lors de la vérification du statut de l\'export');
+                    showToast('Erreur lors de la vérification du statut de l\'export', 'error');
                 }
             };
 
@@ -670,9 +671,9 @@ const Planning: FC = () => {
             console.error('[PDF Export] Erreur:', err);
             setIsExporting(false);
             const errorMessage = err instanceof Error ? err.message : 'Erreur lors du lancement de l\'export PDF';
-            showToast(errorMessage);
+            showToast(errorMessage, 'error');
         }
-    }, [currentDate, currentView, filters.clientId, filters.equipeId, getDateRangeFromView, showToast]);
+    }, [currentDate, currentView, filters.clientId, filters.equipeId, filters.siteId, filters.statuts, getDateRangeFromView, showToast]);
 
     // ========================================================================
     // RENDER
@@ -746,23 +747,6 @@ const Planning: FC = () => {
                     />
                 )}
             </div>
-
-            {/* Toast */}
-            {toast.visible && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 duration-300">
-                    <div className="bg-gray-800 text-white px-6 py-3 rounded-xl shadow-xl flex items-center gap-4">
-                        <span className="text-sm font-medium">{toast.message}</span>
-                        {toast.undoAction && (
-                            <button
-                                onClick={toast.undoAction}
-                                className="text-emerald-400 hover:text-emerald-300 text-sm font-semibold uppercase tracking-wide"
-                            >
-                                Annuler
-                            </button>
-                        )}
-                    </div>
-                </div>
-            )}
 
             {/* Popover */}
             {popoverInfo && (

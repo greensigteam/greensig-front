@@ -158,21 +158,27 @@ export const planningService = {
         const response = await apiFetch(`${BASE_URL}/taches/${id}/`, {
             method: 'DELETE'
         });
-        if (!response.ok) throw new Error('Erreur suppression tâche');
+        if (!response.ok) {
+            if (response.status === 404) {
+                throw new Error('Tâche introuvable. Elle a peut-être déjà été supprimée.');
+            }
+            let message = 'Erreur lors de la suppression de la tâche';
+            try {
+                const error = await response.json();
+                message = error.message || error.detail || error.error || message;
+            } catch {
+                // ignore parse error
+            }
+            throw new Error(message);
+        }
     },
 
     // --- TYPES DE TACHES ---
 
     async getTypesTaches(): Promise<TypeTache[]> {
-        // page_size=500 pour s'assurer de récupérer TOUS les types de tâches
-        const url = `${BASE_URL}/types-taches/?page_size=500`;
-        console.log('[planningService.getTypesTaches] Fetching:', url);
-        const response = await apiFetch(url);
+        const response = await apiFetch(`${BASE_URL}/types-taches/`);
         if (!response.ok) throw new Error('Erreur chargement types tâches');
-
         const data = await response.json();
-        console.log('[planningService.getTypesTaches] Response count:', data.count, 'results:', data.results?.length);
-        // Gestion souple : si array direct ou si format paginé
         return Array.isArray(data) ? data : (data.results || []);
     },
 
@@ -1103,6 +1109,8 @@ export const planningService = {
         endDate: string;
         structureClientId?: number;
         equipeId?: number;
+        siteId?: number;
+        statuts?: string[];
         sync?: boolean;
     }): Promise<{
         task_id: string;
@@ -1124,6 +1132,12 @@ export const planningService = {
         }
         if (params.equipeId) {
             query.append('equipe_id', params.equipeId.toString());
+        }
+        if (params.siteId) {
+            query.append('site_id', params.siteId.toString());
+        }
+        if (params.statuts && params.statuts.length > 0) {
+            query.append('statuts', params.statuts.join(','));
         }
         if (params.sync) {
             query.append('sync', 'true');

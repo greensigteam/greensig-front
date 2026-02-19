@@ -59,6 +59,24 @@ export const queryKeys = {
     },
 
     // ============================================================================
+    // RÉCLAMATIONS
+    // ============================================================================
+
+    reclamations: {
+        all: ['reclamations'] as const,
+        lists: () => [...queryKeys.reclamations.all, 'list'] as const,
+        list: (filters?: Record<string, string | number | undefined>) =>
+            filters
+                ? [...queryKeys.reclamations.lists(), filters] as const
+                : [...queryKeys.reclamations.lists()] as const,
+        detail: (id: number) => [...queryKeys.reclamations.all, 'detail', id] as const,
+        stats: (filters?: Record<string, string | undefined>) =>
+            filters
+                ? [...queryKeys.reclamations.all, 'stats', filters] as const
+                : [...queryKeys.reclamations.all, 'stats'] as const,
+    },
+
+    // ============================================================================
     // DONNÉES DE RÉFÉRENCE
     // ============================================================================
 
@@ -69,6 +87,20 @@ export const queryKeys = {
         sites: () => [...queryKeys.referenceData.all, 'sites'] as const,
         structures: () => [...queryKeys.referenceData.all, 'structures'] as const,
         produits: () => [...queryKeys.referenceData.all, 'produits'] as const,
+        typesReclamations: () => [...queryKeys.referenceData.all, 'typesReclamations'] as const,
+        urgences: () => [...queryKeys.referenceData.all, 'urgences'] as const,
+    },
+
+    // ============================================================================
+    // KPIs
+    // ============================================================================
+
+    kpis: {
+        all: ['kpis'] as const,
+        current: (mois?: string, siteId?: number | null) =>
+            [...queryKeys.kpis.all, 'current', mois, siteId] as const,
+        historique: (siteId?: number | null, nbMois?: number) =>
+            [...queryKeys.kpis.all, 'historique', siteId, nbMois] as const,
     },
 
     // ============================================================================

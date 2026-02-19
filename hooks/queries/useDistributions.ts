@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { planningService } from '../../services/planningService';
 import { queryKeys } from '../../lib/queryKeys';
 import {
@@ -22,7 +22,10 @@ export function useDistributionsParJour(date: string, options?: { enabled?: bool
             return response;
         },
         enabled: options?.enabled !== false && !!date,
-        staleTime: 30 * 1000, // 30 secondes
+        staleTime: 60 * 1000, // 1 minute
+        refetchInterval: 60 * 1000, // Polling toutes les 60s
+        refetchIntervalInBackground: false,
+        placeholderData: keepPreviousData,
     });
 }
 
@@ -41,7 +44,10 @@ export function useDistributions(filters?: DistributionFilters, options?: { enab
             return distributions as DistributionChargeEnriched[];
         },
         enabled: options?.enabled !== false,
-        staleTime: 30 * 1000,
+        staleTime: 60 * 1000, // 1 minute
+        refetchInterval: 60 * 1000,
+        refetchIntervalInBackground: false,
+        placeholderData: keepPreviousData,
     });
 }
 

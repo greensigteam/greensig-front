@@ -1,27 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import {
-    BarChart3, TrendingUp, Users, AlertTriangle, RefreshCw, Calendar,
+    BarChart3, Users, AlertTriangle, RefreshCw, Calendar,
     Trees, Droplet, Building2, FileText, Target
 } from 'lucide-react';
 import {
-    BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
+    PieChart, Pie, Cell,
     Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import { apiFetch } from '../services/api';
 import LoadingScreen from '../components/LoadingScreen';
 import MonthlyReport from './MonthlyReport';
 import WeeklyReport from './WeeklyReport';
-import KPIReport from './KPIReport';
+import { KPITab } from '../components/kpi/KPITab';
+import { useCurrentUser } from '../hooks/queries';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 // Couleurs pour les graphiques
 const COLORS = {
-    primary: '#059669',
-    secondary: '#3b82f6',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    success: '#22c55e',
     gray: '#6b7280',
 };
 
@@ -32,13 +28,6 @@ const STATE_COLORS: Record<string, string> = {
     critique: '#ef4444'
 };
 
-const STATUT_COLORS: Record<string, string> = {
-    NOUVELLE: '#3b82f6',
-    PRISE_EN_COMPTE: '#8b5cf6',
-    EN_COURS: '#f59e0b',
-    RESOLUE: '#22c55e',
-    CLOTUREE: '#6b7280',
-};
 
 interface ReportingData {
     taches: {
@@ -120,29 +109,11 @@ const StatCard: React.FC<{
     </div>
 );
 
-const ProgressBar: React.FC<{
-    label: string;
-    value: number;
-    color: string;
-    suffix?: string;
-}> = ({ label, value, color, suffix = '%' }) => (
-    <div>
-        <div className="flex justify-between text-sm mb-1">
-            <span className="text-slate-600">{label}</span>
-            <span className="font-bold" style={{ color }}>{value}{suffix}</span>
-        </div>
-        <div className="w-full bg-slate-100 rounded-full h-2.5">
-            <div
-                className="h-2.5 rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(value, 100)}%`, backgroundColor: color }}
-            />
-        </div>
-    </div>
-);
-
 type TabType = 'statistics' | 'monthly' | 'weekly' | 'kpis';
 
 const Reporting: React.FC = () => {
+    const { data: currentUser } = useCurrentUser();
+    const isClient = currentUser?.roles?.includes('CLIENT');
     const [activeTab, setActiveTab] = useState<TabType>('statistics');
     const [data, setData] = useState<ReportingData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -169,12 +140,13 @@ const Reporting: React.FC = () => {
         }
     }, [activeTab]);
 
-    const tabs = [
+    const allTabs = [
         { id: 'statistics' as TabType, label: 'Statistiques', icon: BarChart3 },
         { id: 'kpis' as TabType, label: 'KPIs', icon: Target },
         { id: 'monthly' as TabType, label: 'Rapport de Site mensuel', icon: FileText },
         { id: 'weekly' as TabType, label: 'Rapport Hebdomadaire', icon: Calendar },
     ];
+    const tabs = isClient ? allTabs.filter(t => t.id !== 'monthly' && t.id !== 'weekly') : allTabs;
 
     // Render tab content based on active tab
     if (activeTab === 'monthly') {
@@ -264,7 +236,7 @@ const Reporting: React.FC = () => {
                     </div>
                 </div>
                 <div className="bg-slate-50">
-                    <KPIReport />
+                    <KPITab />
                 </div>
             </div>
         );
@@ -327,23 +299,6 @@ const Reporting: React.FC = () => {
     const etatData = Object.entries(data.inventaire.par_etat)
         .map(([name, value]) => ({ name, value }))
         .filter(item => item.value > 0);
-
-    const reclamationsParTypeData = data.reclamations.par_type
-        .slice(0, 5)
-        .map(item => ({
-            name: item.type_reclamation__nom_reclamation || 'Non défini',
-            value: item.count
-        }));
-
-    const reclamationsParStatutData = Object.entries(data.reclamations.par_statut)
-        .map(([name, value]) => ({ name, value }))
-        .filter(item => item.value > 0);
-
-    const equipeChargeData = data.equipes.charges.slice(0, 6).map(eq => ({
-        name: eq.nom.length > 12 ? eq.nom.substring(0, 12) + '...' : eq.nom,
-        charge: eq.charge_percent,
-        taches: eq.nb_taches,
-    }));
 
     const inventaireData = [
         { name: 'Végétation', value: data.inventaire.vegetation.total, color: '#22c55e' },
@@ -408,186 +363,6 @@ const Reporting: React.FC = () => {
                     icon={<Users className="w-6 h-6 text-white" />}
                     color="bg-purple-600"
                 />
-            </div>
-
-            {/* Performance des Tâches et Charge Équipes */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Performance des Interventions */}
-                <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
-                    <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                        <TrendingUp className="w-5 h-5 text-emerald-600" />
-                        Performance des Interventions
-                    </h2>
-                    <div className="space-y-4">
-                        <ProgressBar
-                            label="Taux de réalisation"
-                            value={data.taches.taux_realisation}
-                            color={COLORS.primary}
-                        />
-                        <ProgressBar
-                            label="Respect des délais"
-                            value={data.taches.taux_respect_delais}
-                            color={COLORS.secondary}
-                        />
-                        {data.reclamations.satisfaction_moyenne && (
-                            <ProgressBar
-                                label="Satisfaction client"
-                                value={data.reclamations.satisfaction_moyenne * 20}
-                                color={COLORS.warning}
-                                suffix={` (${data.reclamations.satisfaction_moyenne}/5)`}
-                            />
-                        )}
-                    </div>
-                    <div className="mt-6 grid grid-cols-3 gap-4 pt-4 border-t border-slate-100">
-                        <div className="text-center">
-                            <div className="text-2xl font-bold text-emerald-600">{data.taches.terminees}</div>
-                            <div className="text-xs text-slate-500">Terminées</div>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-2xl font-bold text-blue-600">{data.taches.en_cours}</div>
-                            <div className="text-xs text-slate-500">En cours</div>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-2xl font-bold text-red-600">{data.taches.en_retard}</div>
-                            <div className="text-xs text-slate-500">En retard</div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Charge des Équipes */}
-                <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
-                    <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                        <Users className="w-5 h-5 text-blue-600" />
-                        Charge des Équipes
-                    </h2>
-                    {equipeChargeData.length > 0 ? (
-                        <div className="h-64 w-full">
-                            <ResponsiveContainer width="100%" height={256} minWidth={0}>
-                                <BarChart data={equipeChargeData} layout="vertical" margin={{ left: 60 }}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis type="number" domain={[0, 100]} />
-                                    <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} />
-                                    <Tooltip
-                                        formatter={(value, name) => [
-                                            name === 'charge' ? `${value}%` : value,
-                                            name === 'charge' ? 'Charge' : 'Tâches'
-                                        ]}
-                                    />
-                                    <Bar dataKey="charge" name="Charge" radius={[0, 4, 4, 0]}>
-                                        {equipeChargeData.map((entry, index) => (
-                                            <Cell
-                                                key={`cell-${index}`}
-                                                fill={entry.charge > 90 ? COLORS.danger : entry.charge > 70 ? COLORS.warning : COLORS.secondary}
-                                            />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    ) : (
-                        <div className="h-64 flex items-center justify-center text-slate-400">
-                            Aucune équipe active
-                        </div>
-                    )}
-                    {data.equipes.charges.some(e => e.charge_percent > 90) && (
-                        <p className="text-xs text-orange-600 mt-2 italic flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3" />
-                            Certaines équipes sont proches de la saturation
-                        </p>
-                    )}
-                </div>
-            </div>
-
-            {/* Réclamations */}
-            <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
-                <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-orange-500" />
-                    Analyse des Réclamations
-                </h2>
-
-                {/* KPIs Réclamations */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
-                        <div className="text-2xl font-bold text-blue-600">{data.reclamations.nouvelles_7j}</div>
-                        <div className="text-xs text-blue-800 font-medium">Nouvelles (7j)</div>
-                    </div>
-                    <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-100">
-                        <div className="text-2xl font-bold text-emerald-600">{data.reclamations.resolues_7j}</div>
-                        <div className="text-xs text-emerald-800 font-medium">Résolues (7j)</div>
-                    </div>
-                    <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
-                        <div className="text-2xl font-bold text-slate-600">
-                            {data.reclamations.delai_moyen_heures ? `${data.reclamations.delai_moyen_heures}h` : '-'}
-                        </div>
-                        <div className="text-xs text-slate-800 font-medium">Délai moyen</div>
-                    </div>
-                </div>
-
-                {/* Graphiques Réclamations */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Par Type */}
-                    <div>
-                        <h3 className="text-sm font-semibold text-slate-700 mb-3">Répartition par type</h3>
-                        {reclamationsParTypeData.length > 0 ? (
-                            <div className="h-48 w-full">
-                                <ResponsiveContainer width="100%" height={192} minWidth={0}>
-                                    <PieChart>
-                                        <Pie
-                                            data={reclamationsParTypeData}
-                                            cx="30%"
-                                            cy="50%"
-                                            labelLine={false}
-                                            label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
-                                            outerRadius={65}
-                                            dataKey="value"
-                                        >
-                                            {reclamationsParTypeData.map((_, index) => (
-                                                <Cell key={`cell-${index}`} fill={Object.values(STATUT_COLORS)[index % 5]} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip />
-                                        <Legend
-                                            layout="vertical"
-                                            verticalAlign="middle"
-                                            align="right"
-                                            wrapperStyle={{ fontSize: '11px', paddingLeft: '10px' }}
-                                        />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            </div>
-                        ) : (
-                            <div className="h-48 flex items-center justify-center text-slate-400">
-                                Aucune donnée
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Par Statut */}
-                    <div>
-                        <h3 className="text-sm font-semibold text-slate-700 mb-3">Répartition par statut</h3>
-                        {reclamationsParStatutData.length > 0 ? (
-                            <div className="h-48 w-full">
-                                <ResponsiveContainer width="100%" height={192} minWidth={0}>
-                                    <BarChart data={reclamationsParStatutData}>
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                                        <YAxis />
-                                        <Tooltip />
-                                        <Bar dataKey="value" name="Réclamations" radius={[4, 4, 0, 0]}>
-                                            {reclamationsParStatutData.map((entry) => (
-                                                <Cell key={`cell-${entry.name}`} fill={STATUT_COLORS[entry.name] || COLORS.gray} />
-                                            ))}
-                                        </Bar>
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        ) : (
-                            <div className="h-48 flex items-center justify-center text-slate-400">
-                                Aucune donnée
-                            </div>
-                        )}
-                    </div>
-                </div>
             </div>
 
             {/* Inventaire */}
