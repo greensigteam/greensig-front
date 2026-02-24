@@ -39,6 +39,7 @@ export interface Reclamation {
     // Créateur de la réclamation (tout utilisateur)
     createur?: number | null;
     createur_nom?: string | null;
+    createur_est_client?: boolean; // true si le créateur a le rôle CLIENT
 
     // Client concerné (optionnel)
     client?: number | null;

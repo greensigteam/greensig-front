@@ -957,8 +957,8 @@ const Reclamations: React.FC = () => {
                                                                             </>
                                                                         )}
 
-                                                                        {/* Toggle visibilité client - Admin/Superviseur */}
-                                                                        {(isAdmin || isSupervisor) && (
+                                                                        {/* Toggle visibilité client - Admin/Superviseur, sauf si créée par un client */}
+                                                                        {(isAdmin || isSupervisor) && !rec.createur_est_client && (
                                                                             <>
                                                                                 <div className="my-1 border-t border-slate-100" />
                                                                                 <button

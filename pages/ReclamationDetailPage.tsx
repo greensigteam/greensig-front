@@ -782,8 +782,8 @@ const ReclamationDetailPage: React.FC = () => {
                                 </button>
                             )}
 
-                            {/* Toggle visibilité client - Admin/Superviseur uniquement */}
-                            {(isAdmin || isSupervisor) && (
+                            {/* Toggle visibilité client - Admin/Superviseur, sauf si créée par un client */}
+                            {(isAdmin || isSupervisor) && !reclamation.createur_est_client && (
                                 <button
                                     onClick={async () => {
                                         try {
