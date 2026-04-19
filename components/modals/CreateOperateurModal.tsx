@@ -1,18 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { X, AlertCircle, Loader2, User, Phone, Mail, Calendar, Hash, Users, RefreshCw } from 'lucide-react';
+import {
+  X,
+  AlertCircle,
+  Loader2,
+  User,
+  Phone,
+  Mail,
+  Calendar,
+  Hash,
+  Users,
+  RefreshCw,
+} from 'lucide-react';
 import { OperateurCreate, EquipeList } from '../../types/users';
 import { createOperateur, fetchEquipes } from '../../services/usersApi';
 import { PremiumInput, PremiumSelect, PremiumButton } from '../modals/PremiumFormComponents';
+import { useToast } from '../../contexts/ToastContext';
 
 interface CreateOperateurModalProps {
   onClose: () => void;
   onCreated: () => void;
 }
 
-const CreateOperateurModal: React.FC<CreateOperateurModalProps> = ({
-  onClose,
-  onCreated
-}) => {
+const CreateOperateurModal: React.FC<CreateOperateurModalProps> = ({ onClose, onCreated }) => {
+  const { showToast } = useToast();
   const [formData, setFormData] = useState<OperateurCreate>({
     nom: '',
     prenom: '',
@@ -21,7 +31,7 @@ const CreateOperateurModal: React.FC<CreateOperateurModalProps> = ({
     telephone: '',
     dateEmbauche: new Date().toISOString().split('T')[0] || '',
     statut: 'ACTIF',
-    equipe: null
+    equipe: null,
   });
   const [equipes, setEquipes] = useState<EquipeList[]>([]);
   const [loadingEquipes, setLoadingEquipes] = useState(false);
@@ -33,9 +43,9 @@ const CreateOperateurModal: React.FC<CreateOperateurModalProps> = ({
       setLoadingEquipes(true);
       try {
         const equipesData = await fetchEquipes({ pageSize: 100 });
-        setEquipes(equipesData.results.filter(e => e.actif));
+        setEquipes(equipesData.results.filter((e) => e.actif));
       } catch (error) {
-        console.error('Erreur chargement equipes:', error);
+        showToast('Erreur lors du chargement des équipes', 'error');
       } finally {
         setLoadingEquipes(false);
       }
@@ -46,16 +56,10 @@ const CreateOperateurModal: React.FC<CreateOperateurModalProps> = ({
   // Generateur automatique de matricule
   const generateMatricule = () => {
     const year = new Date().getFullYear();
-    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const random = Math.floor(Math.random() * 10000)
+      .toString()
+      .padStart(4, '0');
     return `OP-${year}-${random}`;
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'equipe' ? (value === '' ? null : Number(value)) : value
-    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -86,7 +90,6 @@ const CreateOperateurModal: React.FC<CreateOperateurModalProps> = ({
       onCreated();
       onClose();
     } catch (err: any) {
-      console.error('Erreur creation operateur:', err);
       if (err.data) {
         const messages: string[] = [];
         for (const [field, value] of Object.entries(err.data)) {
@@ -96,7 +99,9 @@ const CreateOperateurModal: React.FC<CreateOperateurModalProps> = ({
             messages.push(value);
           }
         }
-        setError(messages.length > 0 ? messages.join('\n') : err.message || 'Erreur lors de la creation');
+        setError(
+          messages.length > 0 ? messages.join('\n') : err.message || 'Erreur lors de la creation',
+        );
       } else {
         setError(err.message || "Erreur lors de la creation de l'operateur");
       }
@@ -145,7 +150,7 @@ const CreateOperateurModal: React.FC<CreateOperateurModalProps> = ({
               <PremiumInput
                 type="text"
                 value={formData.nom}
-                onChange={(value) => setFormData(prev => ({ ...prev, nom: value }))}
+                onChange={(value) => setFormData((prev) => ({ ...prev, nom: value }))}
                 label="Nom"
                 placeholder="Dupont"
                 icon={<User className="w-4 h-4" />}
@@ -156,7 +161,7 @@ const CreateOperateurModal: React.FC<CreateOperateurModalProps> = ({
               <PremiumInput
                 type="text"
                 value={formData.prenom}
-                onChange={(value) => setFormData(prev => ({ ...prev, prenom: value }))}
+                onChange={(value) => setFormData((prev) => ({ ...prev, prenom: value }))}
                 label="Prénom"
                 placeholder="Jean"
                 icon={<User className="w-4 h-4" />}
@@ -172,7 +177,9 @@ const CreateOperateurModal: React.FC<CreateOperateurModalProps> = ({
                 <PremiumInput
                   type="text"
                   value={formData.numeroImmatriculation}
-                  onChange={(value) => setFormData(prev => ({ ...prev, numeroImmatriculation: value }))}
+                  onChange={(value) =>
+                    setFormData((prev) => ({ ...prev, numeroImmatriculation: value }))
+                  }
                   label="Matricule"
                   placeholder="OP-2024-0001"
                   icon={<Hash className="w-4 h-4" />}
@@ -184,7 +191,9 @@ const CreateOperateurModal: React.FC<CreateOperateurModalProps> = ({
               <div className="flex items-end pb-2">
                 <PremiumButton
                   type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, numeroImmatriculation: generateMatricule() }))}
+                  onClick={() =>
+                    setFormData((prev) => ({ ...prev, numeroImmatriculation: generateMatricule() }))
+                  }
                   variant="ghost"
                   size="md"
                   icon={<RefreshCw className="w-4 h-4" />}
@@ -199,7 +208,7 @@ const CreateOperateurModal: React.FC<CreateOperateurModalProps> = ({
               <PremiumInput
                 type="email"
                 value={formData.email || ''}
-                onChange={(value) => setFormData(prev => ({ ...prev, email: value }))}
+                onChange={(value) => setFormData((prev) => ({ ...prev, email: value }))}
                 label="Email"
                 placeholder="jean.dupont@email.com"
                 icon={<Mail className="w-4 h-4" />}
@@ -209,7 +218,7 @@ const CreateOperateurModal: React.FC<CreateOperateurModalProps> = ({
               <PremiumInput
                 type="tel"
                 value={formData.telephone || ''}
-                onChange={(value) => setFormData(prev => ({ ...prev, telephone: value }))}
+                onChange={(value) => setFormData((prev) => ({ ...prev, telephone: value }))}
                 label="Téléphone"
                 placeholder="06 12 34 56 78"
                 icon={<Phone className="w-4 h-4" />}
@@ -222,7 +231,7 @@ const CreateOperateurModal: React.FC<CreateOperateurModalProps> = ({
             <PremiumInput
               type="date"
               value={formData.dateEmbauche}
-              onChange={(value) => setFormData(prev => ({ ...prev, dateEmbauche: value }))}
+              onChange={(value) => setFormData((prev) => ({ ...prev, dateEmbauche: value }))}
               label="Date d'embauche"
               icon={<Calendar className="w-4 h-4" />}
               required
@@ -233,11 +242,16 @@ const CreateOperateurModal: React.FC<CreateOperateurModalProps> = ({
             {/* Statut */}
             <PremiumSelect
               value={formData.statut}
-              onChange={(value) => setFormData(prev => ({ ...prev, statut: value as 'ACTIF' | 'INACTIF' | 'EN_CONGE' }))}
+              onChange={(value) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  statut: value as 'ACTIF' | 'INACTIF' | 'EN_CONGE',
+                }))
+              }
               options={[
                 { value: 'ACTIF', label: 'Actif' },
                 { value: 'INACTIF', label: 'Inactif' },
-                { value: 'EN_CONGE', label: 'En congé' }
+                { value: 'EN_CONGE', label: 'En congé' },
               ]}
               label="Statut"
               placeholder="Sélectionner un statut"
@@ -255,13 +269,18 @@ const CreateOperateurModal: React.FC<CreateOperateurModalProps> = ({
               ) : (
                 <PremiumSelect
                   value={formData.equipe?.toString() ?? ''}
-                  onChange={(value) => setFormData(prev => ({ ...prev, equipe: value === '' ? null : Number(value) }))}
+                  onChange={(value) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      equipe: value === '' ? null : Number(value),
+                    }))
+                  }
                   options={[
                     { value: '', label: 'Aucune équipe' },
                     ...equipes.map((eq) => ({
                       value: eq.id.toString(),
-                      label: eq.nomEquipe
-                    }))
+                      label: eq.nomEquipe,
+                    })),
                   ]}
                   label="Équipe (optionnel)"
                   placeholder="Sélectionner une équipe"

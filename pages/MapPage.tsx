@@ -1,20 +1,34 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { X, AlertTriangle } from 'lucide-react';
-import { VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND } from '../constants';
-import { MapLayerType, Coordinates, OverlayState, MapObjectDetail, Measurement, MeasurementType, SearchSuggestion, User, Role } from '../types';
-import { MOCK_SITES } from '../services/mockData';
-import { searchObjects, geoJSONToLatLng, fetchAllSites, SiteFrontend, exportPDF, downloadBlob, deleteInventoryItem, ImportExecuteResponse } from '../services/api';
-import { useSearch } from '../contexts/SearchContext';
+import {
+  MapLayerType,
+  Coordinates,
+  OverlayState,
+  MapObjectDetail,
+  Measurement,
+  MeasurementType,
+  User,
+  Role,
+} from '../types';
+import {
+  fetchAllSites,
+  SiteFrontend,
+  deleteInventoryItem,
+  ImportExecuteResponse,
+} from '../services/api';
 import { useGeolocation } from '../hooks/useGeolocation';
+import { useMapSearch } from '../hooks/useMapSearch';
 import { useMapContext } from '../contexts/MapContext';
 import { useToast } from '../contexts/ToastContext';
 import { useSelection } from '../contexts/SelectionContext';
 import { useDrawing } from '../contexts/DrawingContext';
 import { usePermissions } from '../hooks/usePermissions';
+import { useMapTaskManagement } from '../hooks/useMapTaskManagement';
+import { useMapReportProblem } from '../hooks/useMapReportProblem';
+import { useMapPdfExport } from '../hooks/useMapPdfExport';
+import { createDefaultSymbology } from '../utils/symbology';
 import logger from '../services/logger';
 
-// ✅ IMPORT SUB-COMPONENTS
 import { MapSearchBar } from '../components/map/MapSearchBar';
 import { MapFloatingTools } from '../components/map/MapFloatingTools';
 import { MapObjectDetailCard } from '../components/map/MapObjectDetailCard';
@@ -30,56 +44,7 @@ import ImportWizard from '../components/import/ImportWizard';
 import ExportPanel from '../components/export/ExportPanel';
 import TaskFormModal, { InventoryObjectOption } from '../components/planning/TaskFormModal';
 import { ReclamationFormModal } from '../components/reclamations/ReclamationFormModal';
-import { planningService } from '../services/planningService';
-import { fetchEquipes } from '../services/usersApi';
-import { fetchTypesReclamations, fetchUrgences } from '../services/reclamationsApi';
-import { TypeTache, TacheCreate } from '../types/planning';
-import { TypeReclamation, Urgence, Reclamation } from '../types/reclamations';
-import { EquipeList } from '../types/users';
-import { ReportDrawingMode } from '../components/map/MapFloatingTools';
-import { GeoJSONGeometry, DrawingMode } from '../types';
-
-// Types pour la symbologie
-interface SymbologyConfig {
-  fillColor: string;
-  fillOpacity: number;
-  strokeColor: string;
-  strokeWidth: number;
-}
-
-// Configuration par défaut de la symbologie
-const createDefaultSymbology = (): Record<string, SymbologyConfig> => {
-  const config: Record<string, SymbologyConfig> = {};
-
-  SITE_LEGEND.forEach(item => {
-    config[item.type] = {
-      fillColor: item.color,
-      fillOpacity: 0.2,
-      strokeColor: item.color,
-      strokeWidth: 3
-    };
-  });
-
-  VEG_LEGEND.forEach(item => {
-    config[item.type] = {
-      fillColor: item.color,
-      fillOpacity: 0.6,
-      strokeColor: item.color,
-      strokeWidth: 2
-    };
-  });
-
-  HYDRO_LEGEND.forEach(item => {
-    config[item.type] = {
-      fillColor: item.color,
-      fillOpacity: 0.8,
-      strokeColor: item.color,
-      strokeWidth: 2
-    };
-  });
-
-  return config;
-};
+import ZoomWarningModal from '../components/map/ZoomWarningModal';
 
 interface MapPageProps {
   activeLayerId: MapLayerType;
@@ -124,8 +89,8 @@ export const MapPage: React.FC<MapPageProps> = ({
   getCurrentZoom,
   getMapCenter,
   exportMapCanvas,
-  isPanelOpen = true,
-  onToggleMap,
+  isPanelOpen: _isPanelOpen = true,
+  onToggleMap: _onToggleMap,
   overlays,
   onToggleOverlay,
   selectedObject,
@@ -141,7 +106,7 @@ export const MapPage: React.FC<MapPageProps> = ({
   currentMeasurement,
   onClearMeasurements,
   onRemoveMeasurement,
-  userRole
+  userRole,
 }) => {
   // ✅ USE MAP CONTEXT - Replaces window communication
   const mapContext = useMapContext();
@@ -153,62 +118,35 @@ export const MapPage: React.FC<MapPageProps> = ({
   const navigate = useNavigate();
 
   // ✅ USE PERMISSIONS - Role-based access control
-  const tempUser: User | null = userRole ? { id: '1', name: 'User', email: 'user@example.com', role: userRole as Role } : null;
+  const tempUser: User | null = userRole
+    ? { id: '1', name: 'User', email: 'user@example.com', role: userRole as Role }
+    : null;
   const permissions = usePermissions(tempUser);
   const location = useLocation();
 
   // ✅ USE SELECTION - For multi-object selection
-  const { toggleSelectionMode, isSelectionMode, selectedObjects, getSelectedIds, addMultipleToSelection, setSelectionMode } = useSelection();
+  const {
+    toggleSelectionMode,
+    isSelectionMode,
+    selectedObjects,
+    getSelectedIds,
+    addMultipleToSelection,
+    setSelectionMode,
+  } = useSelection();
 
   // ✅ USE DRAWING - For drawing/editing tools
   const {
-    drawingMode,
+    drawingMode: _drawingMode,
     setDrawingMode,
-    editingMode,
-    setEditingMode,
-    isDrawing,
+    editingMode: _editingMode,
+    setEditingMode: _setEditingMode,
+    isDrawing: _isDrawing,
     drawnGeometry,
     clearDrawnGeometry,
     pendingObjectType,
     setPendingObjectType,
     calculatedMetrics,
-    startDrawing,
-    cancelDrawing,
   } = useDrawing();
-
-  // ✅ USE SEARCH CONTEXT
-  const {
-    searchQuery,
-    setSearchQuery,
-    searchSuggestions,
-    showSuggestions,
-    setShowSuggestions,
-    isSearching,
-    setIsSearching,
-    searchResult,
-    setSearchResult: setGlobalSearchResult,
-    searchContainerRef,
-    handleSuggestionClick: hookHandleSuggestionClick,
-    setPlaceholder,
-    selectedSuggestion,
-    setSelectedSuggestion,
-    setSearchSuggestions
-  } = useSearch();
-
-  // Override hook's handleSuggestionClick to also update targetLocation
-  // ✅ Memoize to prevent MapSearchBar re-renders
-  const handleSuggestionClick = useCallback((suggestion: typeof searchSuggestions[0]) => {
-    hookHandleSuggestionClick(suggestion);
-    // La navigation est maintenant gérée par l'effet sur selectedSuggestion
-  }, [hookHandleSuggestionClick]);
-
-  // ✅ Clear persistent drawing state on mount to prevent "white page" issues
-  useEffect(() => {
-    clearDrawnGeometry();
-    setDrawingMode('none');
-    setPendingObjectType(null);
-    setPlaceholder('Rechercher un lieu, un site, un équipement...');
-  }, []);
 
   // ========== STATE MANAGEMENT ==========
   const [showLayers, setShowLayers] = useState(false);
@@ -225,35 +163,87 @@ export const MapPage: React.FC<MapPageProps> = ({
   // Sites dynamiques chargés depuis l'API
   const [sites, setSites] = useState<SiteFrontend[]>([]);
   const [sitesLoading, setSitesLoading] = useState(true);
+
+  // ✅ USE MAP SEARCH - Search with API + Nominatim fallback
+  const {
+    searchQuery,
+    setSearchQuery,
+    searchSuggestions,
+    showSuggestions,
+    setShowSuggestions,
+    isSearching,
+    setIsSearching,
+    searchResult,
+    setGlobalSearchResult,
+    searchContainerRef,
+    handleSuggestionClick,
+    handleSearch,
+    setPlaceholder,
+  } = useMapSearch({ setTargetLocation, sites });
+
+  // ✅ Clear persistent drawing state on mount to prevent "white page" issues
+  useEffect(() => {
+    clearDrawnGeometry();
+    setDrawingMode('none');
+    setPendingObjectType(null);
+    setPlaceholder('Rechercher un lieu, un site, un équipement...');
+  }, []);
   const [isCarouselOpen, setIsCarouselOpen] = useState(true);
   const [editingSite, setEditingSite] = useState<SiteFrontend | null>(null);
 
   // États pour les onglets Filtres/Symbologie
   const [layersPanelTab, setLayersPanelTab] = useState<'layers' | 'filters'>('layers');
-  const [symbologyConfig] = useState<Record<string, SymbologyConfig>>(createDefaultSymbology);
+  const [symbologyConfig] = useState(createDefaultSymbology);
 
-  const [isExporting, setIsExporting] = useState(false);
+  // Task Creation (extracted hook)
+  const {
+    isTaskModalOpen,
+    setIsTaskModalOpen,
+    isSubmittingTask,
+    taskModalInitialValues,
+    setTaskModalInitialValues,
+    taskPreSelectedObjects,
+    setTaskPreSelectedObjects,
+    taskSiteFilter,
+    typesTaches,
+    equipes,
+    loadTaskData,
+    handleCreateTask,
+    handleTaskSubmit,
+  } = useMapTaskManagement();
 
-  // Task Creation State
-  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
-  const [isSubmittingTask, setIsSubmittingTask] = useState(false);
-  const [taskModalInitialValues, setTaskModalInitialValues] = useState<Partial<TacheCreate>>({});
-  const [taskPreSelectedObjects, setTaskPreSelectedObjects] = useState<InventoryObjectOption[]>([]);
-  const [taskSiteFilter, setTaskSiteFilter] = useState<{ id: number; name: string } | undefined>(undefined);
-  const [typesTaches, setTypesTaches] = useState<TypeTache[]>([]);
-  const [equipes, setEquipes] = useState<EquipeList[]>([]);
+  // Report Problem / Reclamation (extracted hook)
+  const {
+    isReportingProblem,
+    setIsReportingProblem,
+    reportDrawingMode,
+    reportGeometry,
+    setReportGeometry,
+    showReclamationModal,
+    setShowReclamationModal,
+    typesReclamation,
+    urgences,
+    handleReportProblem: hookHandleReportProblem,
+    handleStartReportDrawing,
+    handleCancelReporting,
+    handleReclamationSuccess,
+  } = useMapReportProblem();
 
-  // Reclamation/Report Problem State
-  const [isReportingProblem, setIsReportingProblem] = useState(false);
-  const [reportDrawingMode, setReportDrawingMode] = useState<ReportDrawingMode>('none');
-  const [reportGeometry, setReportGeometry] = useState<GeoJSONGeometry | null>(null);
-  const [showReclamationModal, setShowReclamationModal] = useState(false);
-  const [typesReclamation, setTypesReclamation] = useState<TypeReclamation[]>([]);
-  const [urgences, setUrgencesReclamation] = useState<Urgence[]>([]);
+  // PDF Export (extracted hook)
+  const { isExporting, handleExportPDF } = useMapPdfExport({
+    exportMapCanvas,
+    getMapCenter,
+    getCurrentZoom,
+    sites,
+    selectedObject,
+  });
 
   // ========== HANDLE NAVIGATION FROM INVENTORY ==========
   useEffect(() => {
-    const state = location.state as { highlightFromInventory?: boolean; selectedObjects?: any[] } | null;
+    const state = location.state as {
+      highlightFromInventory?: boolean;
+      selectedObjects?: any[];
+    } | null;
 
     if (state?.highlightFromInventory && state?.selectedObjects?.length) {
       // Convert inventory objects to MapObjectDetail format
@@ -263,10 +253,12 @@ export const MapPage: React.FC<MapPageProps> = ({
         title: obj.title,
         subtitle: obj.subtitle || '',
         attributes: obj.attributes || {},
-        geometry: obj.coordinates ? {
-          type: 'Point' as const,
-          coordinates: [obj.coordinates.lng, obj.coordinates.lat]
-        } : undefined
+        geometry: obj.coordinates
+          ? {
+              type: 'Point' as const,
+              coordinates: [obj.coordinates.lng, obj.coordinates.lat],
+            }
+          : undefined,
       }));
 
       // Activate selection mode and add objects
@@ -287,7 +279,7 @@ export const MapPage: React.FC<MapPageProps> = ({
           // Zoom to center with appropriate zoom level
           setTargetLocation({
             coordinates: { lat: avgLat, lng: avgLng },
-            zoom: coords.length === 1 ? 18 : 16
+            zoom: coords.length === 1 ? 18 : 16,
           });
         }
       }
@@ -317,14 +309,6 @@ export const MapPage: React.FC<MapPageProps> = ({
     loadSites();
   }, []);
 
-  // ✅ Memoize mapped sites to prevent infinite loop
-  const mappedSites = useMemo(() => sites.map(s => ({
-    id: s.id,
-    name: s.name,
-    code_site: s.code_site,
-    coordinates: s.coordinates
-  })), [sites]);
-
   // ✅ Adjust ScaleLine position when carousel opens/closes
   useEffect(() => {
     const scaleLine = document.querySelector('.ol-scale-line') as HTMLElement;
@@ -336,247 +320,23 @@ export const MapPage: React.FC<MapPageProps> = ({
     }
   }, [isCarouselOpen]);
 
-  // ========== TASK MANAGEMENT ==========
-  const loadTaskData = async () => {
-    try {
-      const [types, teamData] = await Promise.all([
-        planningService.getTypesTaches(),
-        fetchEquipes()
-      ]);
-      setTypesTaches(types);
-      // Handle paginated response for equipes
-      const teams = Array.isArray(teamData) ? teamData : (teamData as any).results || [];
-      setEquipes(teams);
-    } catch (err: any) {
-      console.error("Error loading task data", err);
-      showToast("Erreur lors du chargement des données de planification", "error");
-    }
-  };
-
-  const handleCreateTask = async (object?: MapObjectDetail) => {
-    // Load data if needed
-    if (typesTaches.length === 0) {
-      await loadTaskData();
-    }
-
-    const initialValues: Partial<TacheCreate> = {};
-    const preSelected: InventoryObjectOption[] = [];
-
-    if (object) {
-      const objId = Number(object.id);
-
-      // Check if this is a Reclamation
-      if (object.type === 'Reclamation') {
-        // Link the task to this reclamation
-        if (!isNaN(objId)) {
-          initialValues.reclamation = objId;
-
-          // ✅ Pré-remplir le champ commentaires avec le numéro de réclamation
-          const numeroReclamation = object.attributes?.numero_reclamation || object.title;
-          initialValues.commentaires = `Tâche liée à la réclamation ${numeroReclamation}`;
-
-          // ✅ Définir le filtre de site pour ne montrer que les objets de ce site
-          const siteId = object.attributes?.site;
-          const siteNom = object.attributes?.site_nom;
-
-          if (siteId) {
-            setTaskSiteFilter({
-              id: Number(siteId),
-              name: siteNom || `Site #${siteId}`
-            });
-          } else {
-            setTaskSiteFilter(undefined);
-          }
-        }
-      } else if (!isNaN(objId)) {
-        // Regular inventory object - add to pre-selected objects
-        // Clear site filter for regular objects
-        setTaskSiteFilter(undefined);
-
-        // Try to get superficie from attributes (various possible keys)
-        const superficieStr = object.attributes?.['superficie_calculee']
-          || object.attributes?.['Surface (m²)']
-          || object.attributes?.['area_sqm'];
-        const superficie = superficieStr ? parseFloat(superficieStr) : undefined;
-
-        preSelected.push({
-          id: objId,
-          type: object.type,
-          nom: object.title,
-          site: object.subtitle || '', // MapObjectDetail subtitle is site often
-          soussite: object.attributes?.['Sous-site'],
-          superficie: !isNaN(superficie as number) ? superficie : undefined
-        });
-      }
-    } else {
-      // No object selected - clear site filter
-      setTaskSiteFilter(undefined);
-    }
-
-    setTaskPreSelectedObjects(preSelected);
-    setTaskModalInitialValues(initialValues);
-    setIsTaskModalOpen(true);
-  };
-
-  const handleTaskSubmit = async (data: TacheCreate) => {
-    console.log('🟢 [MapPage] handleTaskSubmit APPELÉE');
-    console.log('🔵 [MapPage] Données reçues:', data);
-    console.log('🔵 [MapPage] recurrence_config:', data.recurrence_config);
-
-    setIsSubmittingTask(true);
-    try {
-      // Créer la tâche de base
-      const createdTask = await planningService.createTache(data);
-      console.log('✅ [MapPage] Tâche de base créée:', createdTask);
-
-      // ✅ Gérer la récurrence si activée
-      const recurrenceConfig = data.recurrence_config;
-      console.log('🔵 [MapPage] Configuration de récurrence:', recurrenceConfig);
-
-      if (recurrenceConfig && recurrenceConfig.enabled && createdTask.id) {
-        console.log('🔄 [MapPage] Récurrence activée, mode:', recurrenceConfig.mode);
-
-        try {
-          let recurrenceResult;
-
-          if (recurrenceConfig.mode === 'frequency') {
-            console.log('📅 [MapPage] Appel API dupliquer-recurrence avec fréquence:', recurrenceConfig.frequency);
-            recurrenceResult = await planningService.dupliquerTacheRecurrence(createdTask.id, {
-              frequence: recurrenceConfig.frequency!,
-              nombre_occurrences: recurrenceConfig.nombre_occurrences,
-              date_fin_recurrence: recurrenceConfig.date_fin_recurrence,
-              conserver_equipes: recurrenceConfig.conserver_equipes,
-              conserver_objets: recurrenceConfig.conserver_objets
-            });
-          } else if (recurrenceConfig.mode === 'custom') {
-            console.log('⚙️ [MapPage] Appel API dupliquer avec décalage:', recurrenceConfig.decalage_jours);
-            recurrenceResult = await planningService.dupliquerTache(createdTask.id, {
-              decalage_jours: recurrenceConfig.decalage_jours!,
-              nombre_occurrences: recurrenceConfig.nombre_occurrences,
-              date_fin_recurrence: recurrenceConfig.date_fin_recurrence,
-              conserver_equipes: recurrenceConfig.conserver_equipes,
-              conserver_objets: recurrenceConfig.conserver_objets
-            });
-          } else if (recurrenceConfig.mode === 'dates') {
-            console.log('📆 [MapPage] Appel API dupliquer-dates avec:', recurrenceConfig.dates_cibles);
-            recurrenceResult = await planningService.dupliquerTacheDates(createdTask.id, {
-              dates_cibles: recurrenceConfig.dates_cibles!,
-              conserver_equipes: recurrenceConfig.conserver_equipes,
-              conserver_objets: recurrenceConfig.conserver_objets
-            });
-          }
-
-          console.log('✅ [MapPage] Résultat de la récurrence:', recurrenceResult);
-
-          // Message de succès avec nombre de tâches créées
-          if (recurrenceResult) {
-            const totalCreated = 1 + recurrenceResult.nombre_taches_creees;
-            showToast(`✅ ${totalCreated} tâche${totalCreated > 1 ? 's' : ''} créée${totalCreated > 1 ? 's' : ''} avec succès (1 tâche de base + ${recurrenceResult.nombre_taches_creees} occurrence${recurrenceResult.nombre_taches_creees > 1 ? 's' : ''})`, "success");
-          } else {
-            showToast("Tâche créée avec succès", "success");
-          }
-        } catch (recurrenceError: any) {
-          console.error('❌ [MapPage] Erreur lors de la création des occurrences:', recurrenceError);
-          showToast(`Tâche de base créée, mais erreur lors de la génération des occurrences: ${recurrenceError.message || recurrenceError}`, "error");
-        }
-      } else {
-        console.log('ℹ️ [MapPage] Pas de récurrence activée');
-        showToast("Tâche créée avec succès", "success");
-      }
-
-      setIsTaskModalOpen(false);
-      // Navigate to planning page after successful creation
-      navigate('/planning');
-    } catch (err: any) {
-      console.error("❌ [MapPage] Error creating task", err);
-      showToast(err.message || "Erreur lors de la création de la tâche", "error");
-    } finally {
-      setIsSubmittingTask(false);
-    }
-  };
-
-  // ========== REPORT PROBLEM HANDLERS ==========
-
-  // Load reclamation reference data
-  const loadReclamationData = async () => {
-    try {
-      const [typesData, urgencesData] = await Promise.all([
-        fetchTypesReclamations(),
-        fetchUrgences()
-      ]);
-      setTypesReclamation(typesData);
-      setUrgencesReclamation(urgencesData);
-    } catch (err: any) {
-      console.error("Error loading reclamation data", err);
-      showToast("Erreur lors du chargement des données", "error");
-    }
-  };
-
-  // Handle clicking "Signaler une réclamation" button
-  const handleReportProblem = async () => {
-    // Load reference data if needed
-    if (typesReclamation.length === 0) {
-      await loadReclamationData();
-    }
-    setIsReportingProblem(true);
-    setReportDrawingMode('none');
-    // Close other panels
+  // Wrap hook's handleReportProblem to also close layers panel
+  const handleReportProblem = useCallback(async () => {
+    await hookHandleReportProblem();
     setShowLayers(false);
-  };
-
-  // Handle selecting a geometry type for reporting
-  const handleStartReportDrawing = (mode: ReportDrawingMode) => {
-    setReportDrawingMode(mode);
-    // Activate drawing mode via context
-    if (mode !== 'none') {
-      startDrawing(mode as DrawingMode);
-    }
-  };
-
-  // Handle canceling report mode
-  const handleCancelReporting = () => {
-    setIsReportingProblem(false);
-    setReportDrawingMode('none');
-    setReportGeometry(null);
-    cancelDrawing();
-    clearDrawnGeometry();
-  };
-
-  // Handle successful reclamation creation
-  const handleReclamationSuccess = (reclamation: Reclamation) => {
-    showToast(`Réclamation ${reclamation.numero_reclamation} créée avec succès`, "success");
-    setShowReclamationModal(false);
-    setReportGeometry(null);
-    setIsReportingProblem(false);
-    setReportDrawingMode('none');
-    // Clear drawn geometry from map
-    // Navigate to reclamations page
-    navigate('/reclamations');
-  };
-
-  // Effect to detect when drawing is complete in reporting mode
-  useEffect(() => {
-    if (isReportingProblem && drawnGeometry && reportDrawingMode !== 'none' && !showReclamationModal) {
-      // Drawing completed, open the reclamation modal
-      setReportGeometry(drawnGeometry);
-      setShowReclamationModal(true);
-      setReportDrawingMode('none');
-    }
-  }, [isReportingProblem, drawnGeometry, reportDrawingMode, showReclamationModal]);
+  }, [hookHandleReportProblem]);
 
   // ========== GEOLOCATION HOOK ==========
-  const {
-    requestGeolocation
-  } = useGeolocation({
+  const { requestGeolocation } = useGeolocation({
     enableHighAccuracy: true,
     timeout: 15000,
     maximumAge: 0,
     onSuccess: (result) => {
       setGlobalSearchResult({
-        name: "Ma position",
+        name: 'Ma position',
         description: `Localisation GPS (précision: ${result.accuracy.toFixed(0)}m)`,
         coordinates: result.coordinates,
-        zoom: 18
+        zoom: 18,
       });
       if (setUserLocation) {
         setUserLocation(result.coordinates);
@@ -587,7 +347,7 @@ export const MapPage: React.FC<MapPageProps> = ({
     onError: (error) => {
       setIsSearching(false);
       alert(error.message);
-    }
+    },
   });
 
   // ========== HANDLERS ==========
@@ -596,107 +356,6 @@ export const MapPage: React.FC<MapPageProps> = ({
     setIsSearching(true);
     requestGeolocation();
   }, [requestGeolocation, setIsSearching]);
-
-  // ========== SEARCH HANDLER ==========
-
-  // ✅ Memoize to prevent MapSearchBar re-renders
-  const handleSearch = useCallback(async () => {
-    if (!searchQuery || searchQuery.trim().length < 2) return;
-    setIsSearching(true);
-  }, [searchQuery, setIsSearching]);
-
-  // Effect to handle selection from suggestions (click in list)
-  useEffect(() => {
-    if (selectedSuggestion && selectedSuggestion.coordinates) {
-      // 1. Zoom to location
-      setTargetLocation({ coordinates: selectedSuggestion.coordinates, zoom: 18 });
-
-      // 2. Set search result for highlighting
-      setGlobalSearchResult({
-        name: selectedSuggestion.name,
-        description: `${selectedSuggestion.type} - ID: ${selectedSuggestion.id}`,
-        coordinates: selectedSuggestion.coordinates,
-        zoom: 18,
-        objectId: selectedSuggestion.id,
-        objectType: selectedSuggestion.type
-      });
-
-      // 3. Reset selection to allow re-selecting same item later
-      setSelectedSuggestion(null);
-    }
-  }, [selectedSuggestion]);
-
-  // Effect to trigger search when searchQuery changes in context (typing)
-  useEffect(() => {
-    const performSearch = async () => {
-      if (!searchQuery || searchQuery.trim().length < 2) {
-        setSearchSuggestions([]);
-        setShowSuggestions(false);
-        return;
-      }
-
-      setIsSearching(true);
-
-      try {
-        const suggestions: SearchSuggestion[] = [];
-
-        // Single source of truth: Django API backend
-        // Returns all objects (Sites, Vegetation, Hydraulic) filtered by user permissions
-        try {
-          const apiResults = await searchObjects(searchQuery);
-          if (apiResults && apiResults.length > 0) {
-            apiResults.slice(0, 8).forEach(result => {
-              if (result.location) {
-                const coords = geoJSONToLatLng(result.location.coordinates);
-                suggestions.push({
-                  id: result.id.toString(),
-                  name: result.name,
-                  type: result.type,
-                  coordinates: coords
-                });
-              }
-            });
-          }
-        } catch (error) {
-          logger.error('Erreur recherche API Django:', error);
-        }
-
-        // Fallback: Nominatim ONLY if no API results
-        if (suggestions.length === 0) {
-          try {
-            const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=3`);
-            if (response.ok) {
-              const data = await response.json();
-              data.forEach((result: any) => {
-                suggestions.push({
-                  id: `nominatim-${result.place_id}`,
-                  name: result.display_name,
-                  type: 'Lieu',
-                  coordinates: { lat: parseFloat(result.lat), lng: parseFloat(result.lon) }
-                });
-              });
-            }
-          } catch (error) {
-            logger.error("Error during Nominatim search:", error);
-          }
-        }
-
-        // Update suggestions in context
-        setSearchSuggestions(suggestions);
-        setShowSuggestions(suggestions.length > 0);
-
-      } finally {
-        setIsSearching(false);
-      }
-    };
-
-    // Debounce search execution
-    const timeoutId = setTimeout(() => {
-      if (searchQuery) performSearch();
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [searchQuery, sites]);
 
   const handleZoomOutClick = () => {
     const currentZoom = getCurrentZoom();
@@ -712,113 +371,6 @@ export const MapPage: React.FC<MapPageProps> = ({
     setShowZoomWarning(false);
   };
 
-  const handleExportPDF = async () => {
-    try {
-      setIsExporting(true);
-
-      const btn = document.activeElement as HTMLElement;
-      if (btn) btn.blur();
-
-      const mapImageBase64 = await exportMapCanvas?.();
-      if (!mapImageBase64) {
-        throw new Error("Impossible d'exporter l'image de la carte");
-      }
-
-      const center = getMapCenter?.() || { lat: 32.219, lng: -7.934 };
-      const zoom = getCurrentZoom();
-
-      const contextVisibleLayers = mapContext.getVisibleLayers();
-      const visibleLayers: Record<string, boolean> = {};
-      const layerMapping: Record<string, string> = {
-        'Site': 'sites',
-        'Arbre': 'arbres',
-        'Gazon': 'gazons',
-        'Palmier': 'palmiers',
-        'Arbuste': 'arbustes',
-        'Vivace': 'vivaces',
-        'Cactus': 'cactus',
-        'Graminee': 'graminees',
-        'Puit': 'puits',
-        'Pompe': 'pompes',
-        'Vanne': 'vannes',
-        'Clapet': 'clapets',
-        'Canalisation': 'canalisations',
-        'Aspersion': 'aspersions',
-        'Goutte': 'gouttes',
-        'Ballon': 'ballons'
-      };
-
-      Object.entries(contextVisibleLayers).forEach(([key, value]) => {
-        // Use mapping if available, otherwise fallback to lowercase
-        const backendKey = layerMapping[key] || key.toLowerCase().replace(/\s+/g, '');
-        visibleLayers[backendKey] = value;
-      });
-
-      // Collect site names based on current map viewport
-      const siteNames: string[] = [];
-
-      // If a site is selected, use it
-      if (selectedObject && selectedObject.type === 'Site' && selectedObject.title) {
-        siteNames.push(selectedObject.title);
-      } else if (sites.length > 0 && zoom >= 12) {
-        // Calculate approximate viewport bounds based on zoom level
-        // Rough approximation: at zoom 15, viewport is ~0.01 degrees
-        // Each zoom level halves the viewport size
-        const viewportSize = 0.16 / Math.pow(2, zoom - 12); // Degrees of lat/lng visible
-
-        const bounds = {
-          north: center.lat + viewportSize / 2,
-          south: center.lat - viewportSize / 2,
-          east: center.lng + viewportSize / 2,
-          west: center.lng - viewportSize / 2
-        };
-
-        // Find all sites within the viewport
-        const sitesInViewport = sites
-          .filter(site => {
-            if (!site.coordinates) return false;
-            return (
-              site.coordinates.lat >= bounds.south &&
-              site.coordinates.lat <= bounds.north &&
-              site.coordinates.lng >= bounds.west &&
-              site.coordinates.lng <= bounds.east
-            );
-          })
-          .slice(0, 5); // Limit to 5 sites
-
-        if (sitesInViewport.length > 0) {
-          siteNames.push(...sitesInViewport.map(s => s.name));
-        }
-      }
-
-      const pdfBlob = await exportPDF({
-        mapImageBase64,
-        visibleLayers,
-        center: [center.lng, center.lat],
-        zoom,
-        siteNames
-      });
-
-      const date = new Date().toISOString().split('T')[0];
-      downloadBlob(pdfBlob, `greensig_carte_${date}.pdf`);
-
-      // ✅ Success toast
-      showToast(`PDF exporté avec succès: greensig_carte_${date}.pdf`, 'success');
-
-    } catch (error) {
-      logger.error("Erreur lors de l'export PDF:", error);
-
-      // ✅ Error toast (replaces alert)
-      showToast(
-        "Erreur lors de la génération du PDF. Vérifiez que le serveur backend est accessible.",
-        'error',
-        7000 // 7 seconds for errors
-      );
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
   // ✅ Helper function to toggle map layer via MapContext
   const toggleMapLayerVisibility = (layerId: string, visible: boolean) => {
     // Use MapContext instead of window
@@ -826,7 +378,6 @@ export const MapPage: React.FC<MapPageProps> = ({
 
     if (onToggleLayer) onToggleLayer(layerId, visible);
   };
-
 
   // ✅ Sync local symbology config to MapContext (initial setup only)
   useEffect(() => {
@@ -888,9 +439,8 @@ export const MapPage: React.FC<MapPageProps> = ({
   };
 
   // ✅ Handle site carousel events
-  const handleSiteHover = (siteId: string | null) => {
+  const handleSiteHover = (_siteId: string | null) => {
     // TODO: Highlight site on map when hovered
-    console.log('Site hover:', siteId);
   };
 
   const handleSiteSelect = (site: SiteFrontend) => {
@@ -898,7 +448,7 @@ export const MapPage: React.FC<MapPageProps> = ({
     if (site.coordinates) {
       setTargetLocation({
         coordinates: site.coordinates,
-        zoom: 17
+        zoom: 17,
       });
     }
     showToast(`Site "${site.name}" sélectionné`, 'info');
@@ -918,13 +468,13 @@ export const MapPage: React.FC<MapPageProps> = ({
   // ✅ Handle site creation success
   const handleSiteCreated = (newSite: SiteFrontend) => {
     // Add the new site to the list
-    setSites(prev => [...prev, newSite]);
+    setSites((prev) => [...prev, newSite]);
     // Reset state
     setIsCreatingSite(false);
     setShowCreateSiteModal(false);
     clearDrawnGeometry();
     // Invalidate cache by forcing refresh next time
-    fetchAllSites(true);
+    fetchAllSites();
     // Trigger map refresh
     window.dispatchEvent(new CustomEvent('refresh-map-data'));
   };
@@ -992,10 +542,11 @@ export const MapPage: React.FC<MapPageProps> = ({
           }
 
           // Convert selected objects to the format expected by TaskFormModal
-          const objectsForModal: InventoryObjectOption[] = selectedObjects.map(obj => {
-            const superficieStr = obj.attributes?.['superficie_calculee']
-              || obj.attributes?.['Surface (m²)']
-              || obj.attributes?.['area_sqm'];
+          const objectsForModal: InventoryObjectOption[] = selectedObjects.map((obj) => {
+            const superficieStr =
+              obj.attributes?.['superficie_calculee'] ||
+              obj.attributes?.['Surface (m²)'] ||
+              obj.attributes?.['area_sqm'];
             const superficie = superficieStr ? parseFloat(superficieStr) : undefined;
 
             return {
@@ -1004,7 +555,7 @@ export const MapPage: React.FC<MapPageProps> = ({
               nom: obj.title || obj.type,
               site: obj.subtitle || '',
               soussite: obj.attributes?.sous_site_nom,
-              superficie: !isNaN(superficie as number) ? superficie : undefined
+              superficie: !isNaN(superficie as number) ? superficie : undefined,
             };
           });
 
@@ -1030,7 +581,10 @@ export const MapPage: React.FC<MapPageProps> = ({
 
           // Show result
           if (errorCount === 0) {
-            showToast(`${successCount} objet${successCount > 1 ? 's supprimés' : ' supprimé'} avec succès`, 'success');
+            showToast(
+              `${successCount} objet${successCount > 1 ? 's supprimés' : ' supprimé'} avec succès`,
+              'success',
+            );
           } else {
             showToast(`${successCount} supprimé(s), ${errorCount} erreur(s)`, 'warning');
           }
@@ -1048,18 +602,20 @@ export const MapPage: React.FC<MapPageProps> = ({
         userRole={userRole}
         onViewCentreGest={() => {
           // Placeholder for future implementation
-          console.log('View Centre Gest', selectedObject);
         }}
         onCreateTask={() => handleCreateTask(selectedObject || undefined)}
         onCreateReclamation={() => {
-          if (selectedObject && (selectedObject.type === 'Site' || selectedObject.type === 'site')) {
+          if (
+            selectedObject &&
+            (selectedObject.type === 'Site' || selectedObject.type === 'site')
+          ) {
             // Navigate to reclamations page with site pre-selected
             navigate('/reclamations', {
               state: {
                 createFromSite: true,
                 siteId: selectedObject.id,
-                siteName: selectedObject.title
-              }
+                siteName: selectedObject.title,
+              },
             });
           }
         }}
@@ -1102,16 +658,19 @@ export const MapPage: React.FC<MapPageProps> = ({
       )}
 
       {/* 7. Create Object Modal - Only ADMIN and SUPERVISEUR can create */}
-      {showCreateModal && pendingObjectType && drawnGeometry && permissions.canCreateInventoryItem && (
-        <CreateObjectModal
-          isOpen={showCreateModal}
-          onClose={handleCreateModalClose}
-          objectType={pendingObjectType}
-          geometry={drawnGeometry}
-          metrics={calculatedMetrics}
-          onSuccess={handleObjectCreated}
-        />
-      )}
+      {showCreateModal &&
+        pendingObjectType &&
+        drawnGeometry &&
+        permissions.canCreateInventoryItem && (
+          <CreateObjectModal
+            isOpen={showCreateModal}
+            onClose={handleCreateModalClose}
+            objectType={pendingObjectType}
+            geometry={drawnGeometry}
+            metrics={calculatedMetrics}
+            onSuccess={handleObjectCreated}
+          />
+        )}
 
       {/* 8. Import Wizard Modal - Only ADMIN and SUPERVISEUR can import */}
       {permissions.canImport && (
@@ -1137,7 +696,7 @@ export const MapPage: React.FC<MapPageProps> = ({
         isOpen={showCreateSiteModal}
         onClose={handleCreateSiteModalClose}
         onSuccess={handleSiteCreated}
-        geometry={drawnGeometry as any}
+        geometry={drawnGeometry}
         metrics={calculatedMetrics}
       />
 
@@ -1162,49 +721,15 @@ export const MapPage: React.FC<MapPageProps> = ({
           isOpen={!!editingSite}
           onClose={() => setEditingSite(null)}
           onSaved={(updatedSite) => {
-            setSites(prev => prev.map(s => s.id === updatedSite.id ? updatedSite : s));
-            fetchAllSites(true); // Refresh cache
+            setSites((prev) => prev.map((s) => (s.id === updatedSite.id ? updatedSite : s)));
+            fetchAllSites(); // Refresh cache
             window.dispatchEvent(new CustomEvent('refresh-map-data')); // Refresh map
           }}
         />
       )}
 
-      {/* Zoom Warning Modal */}
       {showZoomWarning && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200 pointer-events-auto">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-100 scale-100 animate-in zoom-in-95 duration-200">
-            <div className="p-6">
-              <div className="flex items-start gap-4">
-                <div className="bg-orange-100 p-3 rounded-full shrink-0">
-                  <AlertTriangle className="w-6 h-6 text-orange-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold text-slate-900">Zoom trop éloigné</h3>
-                  <p className="text-sm text-slate-500 mt-1">
-                    À ce niveau de zoom, les détails des infrastructures ne seront plus visibles. Voulez-vous continuer ?
-                  </p>
-                </div>
-                <button onClick={() => setShowZoomWarning(false)} className="text-slate-400 hover:text-slate-600">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-100">
-              <button
-                onClick={() => setShowZoomWarning(false)}
-                className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-white border border-transparent hover:border-slate-200 rounded-lg transition-all"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={confirmZoomOut}
-                className="px-4 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-all"
-              >
-                Confirmer
-              </button>
-            </div>
-          </div>
-        </div>
+        <ZoomWarningModal onCancel={() => setShowZoomWarning(false)} onConfirm={confirmZoomOut} />
       )}
       {/* Task Creation Modal */}
       {isTaskModalOpen && (

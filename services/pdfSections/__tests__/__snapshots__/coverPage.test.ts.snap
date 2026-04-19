@@ -1,0 +1,1163 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`drawMonthlyCoverPage — snapshot > omits coordinates when centroid is missing 1`] = `
+[
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      0,
+      0,
+      210.0015555555555,
+      297.0000833333333,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "PNG",
+      20,
+      15,
+      55,
+      28,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      "PNG",
+      135.0015555555555,
+      15,
+      55,
+      28,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      28,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "RAPPORT D'ACTIVITÉ",
+      105.00077777777776,
+      65,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      12,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      107,
+      114,
+      128,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Gestion des Espaces Verts",
+      105.00077777777776,
+      75,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      50,
+      50,
+      50,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      30,
+      85,
+      150.0015555555555,
+      20,
+      3,
+      3,
+      "F",
+    ],
+    "op": "roundedRect",
+  },
+  {
+    "args": [
+      16,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Site Test UM6P Benguerir",
+      105.00077777777776,
+      99,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.5,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      19.5,
+      114.5,
+      171.0015555555555,
+      101,
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "JPEG",
+      20,
+      115,
+      170.0015555555555,
+      100,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      243,
+      244,
+      246,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      35,
+      225,
+      140.0015555555555,
+      16,
+      2,
+      2,
+      "F",
+    ],
+    "op": "roundedRect",
+  },
+  {
+    "args": [
+      10,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Du 01 avril 2026 au 30 avril 2026",
+      105.00077777777776,
+      236,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      10,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Superficie :",
+      35,
+      250,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "12 500 m²",
+      70,
+      250,
+    ],
+    "op": "text",
+  },
+]
+`;
+
+exports[`drawMonthlyCoverPage — snapshot > produces a stable trace when all assets are missing 1`] = `
+[
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      0,
+      0,
+      210.0015555555555,
+      297.0000833333333,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      28,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "RAPPORT D'ACTIVITÉ",
+      105.00077777777776,
+      65,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      12,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      107,
+      114,
+      128,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Gestion des Espaces Verts",
+      105.00077777777776,
+      75,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      50,
+      50,
+      50,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      30,
+      85,
+      150.0015555555555,
+      20,
+      3,
+      3,
+      "F",
+    ],
+    "op": "roundedRect",
+  },
+  {
+    "args": [
+      16,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Site Test UM6P Benguerir",
+      105.00077777777776,
+      99,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      243,
+      244,
+      246,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      35,
+      117,
+      140.0015555555555,
+      16,
+      2,
+      2,
+      "F",
+    ],
+    "op": "roundedRect",
+  },
+  {
+    "args": [
+      10,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Du 01 avril 2026 au 30 avril 2026",
+      105.00077777777776,
+      128,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      10,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Coordonnées :",
+      35,
+      142,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "N 32.2160°  W 7.9370°",
+      70,
+      142,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Superficie :",
+      35,
+      149,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "12 500 m²",
+      70,
+      149,
+    ],
+    "op": "text",
+  },
+]
+`;
+
+exports[`drawMonthlyCoverPage — snapshot > produces a stable trace when only the main logo is available 1`] = `
+[
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      0,
+      0,
+      210.0015555555555,
+      297.0000833333333,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "PNG",
+      70.00077777777776,
+      15,
+      70,
+      35,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      28,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "RAPPORT D'ACTIVITÉ",
+      105.00077777777776,
+      65,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      12,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      107,
+      114,
+      128,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Gestion des Espaces Verts",
+      105.00077777777776,
+      75,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      50,
+      50,
+      50,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      30,
+      85,
+      150.0015555555555,
+      20,
+      3,
+      3,
+      "F",
+    ],
+    "op": "roundedRect",
+  },
+  {
+    "args": [
+      16,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Site Test UM6P Benguerir",
+      105.00077777777776,
+      99,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      243,
+      244,
+      246,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      35,
+      117,
+      140.0015555555555,
+      16,
+      2,
+      2,
+      "F",
+    ],
+    "op": "roundedRect",
+  },
+  {
+    "args": [
+      10,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Du 01 avril 2026 au 30 avril 2026",
+      105.00077777777776,
+      128,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      10,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Coordonnées :",
+      35,
+      142,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "N 32.2160°  W 7.9370°",
+      70,
+      142,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Superficie :",
+      35,
+      149,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "12 500 m²",
+      70,
+      149,
+    ],
+    "op": "text",
+  },
+]
+`;
+
+exports[`drawMonthlyCoverPage — snapshot > produces a stable trace with all assets available 1`] = `
+[
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      0,
+      0,
+      210.0015555555555,
+      297.0000833333333,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "PNG",
+      20,
+      15,
+      55,
+      28,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      "PNG",
+      135.0015555555555,
+      15,
+      55,
+      28,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      28,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "RAPPORT D'ACTIVITÉ",
+      105.00077777777776,
+      65,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      12,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      107,
+      114,
+      128,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Gestion des Espaces Verts",
+      105.00077777777776,
+      75,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      50,
+      50,
+      50,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      30,
+      85,
+      150.0015555555555,
+      20,
+      3,
+      3,
+      "F",
+    ],
+    "op": "roundedRect",
+  },
+  {
+    "args": [
+      16,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Site Test UM6P Benguerir",
+      105.00077777777776,
+      99,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.5,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      19.5,
+      114.5,
+      171.0015555555555,
+      101,
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "JPEG",
+      20,
+      115,
+      170.0015555555555,
+      100,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      243,
+      244,
+      246,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      35,
+      225,
+      140.0015555555555,
+      16,
+      2,
+      2,
+      "F",
+    ],
+    "op": "roundedRect",
+  },
+  {
+    "args": [
+      10,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Du 01 avril 2026 au 30 avril 2026",
+      105.00077777777776,
+      236,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      10,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Coordonnées :",
+      35,
+      250,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "N 32.2160°  W 7.9370°",
+      70,
+      250,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Superficie :",
+      35,
+      257,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "12 500 m²",
+      70,
+      257,
+    ],
+    "op": "text",
+  },
+]
+`;

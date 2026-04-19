@@ -1,6 +1,13 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Eye, Navigation, Calendar as CalendarIcon, ClipboardList, AlertTriangle } from 'lucide-react';
+import {
+  X,
+  Eye,
+  Navigation,
+  Calendar as CalendarIcon,
+  ClipboardList,
+  AlertTriangle,
+} from 'lucide-react';
 
 import type { MapObjectDetail } from '../../types';
 import { RECLAMATION_STATUS_COLORS } from '../../constants';
@@ -10,6 +17,7 @@ interface MapObjectDetailCardProps {
   onClose?: () => void;
   onViewCentreGest?: () => void;
   onCreateTask?: () => void;
+  onCreateReclamation?: () => void;
   userRole?: string;
 }
 
@@ -26,7 +34,7 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
   selectedObject,
   onClose,
   onCreateTask,
-  userRole
+  userRole,
 }) => {
   const navigate = useNavigate();
 
@@ -49,8 +57,8 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
     if (isReclamation) {
       navigate('/reclamations', {
         state: {
-          openReclamationId: selectedObject.id
-        }
+          openReclamationId: selectedObject.id,
+        },
       });
       return;
     }
@@ -67,53 +75,53 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
   const translateAttributeLabel = (key: string): string => {
     const translations: Record<string, string> = {
       // Common fields
-      'etat': 'État',
-      'nom': 'Nom',
-      'site_nom': 'Site',
-      'sous_site_nom': 'Sous-site',
-      'observation': 'Observation',
-      'last_intervention_date': 'Dernière intervention',
+      etat: 'État',
+      nom: 'Nom',
+      site_nom: 'Site',
+      sous_site_nom: 'Sous-site',
+      observation: 'Observation',
+      last_intervention_date: 'Dernière intervention',
 
       // Vegetation
-      'famille': 'Famille',
-      'taille': 'Taille',
-      'symbole': 'Symbole',
-      'densite': 'Densité',
-      'area_sqm': 'Surface (m²)',
-      'superficie_calculee': 'Superficie (m²)',
+      famille: 'Famille',
+      taille: 'Taille',
+      symbole: 'Symbole',
+      densite: 'Densité',
+      area_sqm: 'Surface (m²)',
+      superficie_calculee: 'Superficie (m²)',
 
       // Hydraulic
-      'profondeur': 'Profondeur (m)',
-      'diametre': 'Diamètre (mm)',
-      'niveau_statique': 'Niveau statique (m)',
-      'niveau_dynamique': 'Niveau dynamique (m)',
-      'type': 'Type',
-      'marque': 'Marque',
-      'puissance': 'Puissance (kW)',
-      'debit': 'Débit (m³/h)',
-      'materiau': 'Matériau',
-      'pression': 'Pression (bar)',
-      'volume': 'Volume (L)',
+      profondeur: 'Profondeur (m)',
+      diametre: 'Diamètre (mm)',
+      niveau_statique: 'Niveau statique (m)',
+      niveau_dynamique: 'Niveau dynamique (m)',
+      type: 'Type',
+      marque: 'Marque',
+      puissance: 'Puissance (kW)',
+      debit: 'Débit (m³/h)',
+      materiau: 'Matériau',
+      pression: 'Pression (bar)',
+      volume: 'Volume (L)',
 
       // Site fields
-      'Code': 'Code',
-      'Adresse': 'Adresse',
+      Code: 'Code',
+      Adresse: 'Adresse',
       'Surface totale': 'Surface totale',
       'Date début contrat': 'Début contrat',
       'Date fin contrat': 'Fin contrat',
-      'Actif': 'Actif',
+      Actif: 'Actif',
 
       // Reclamation fields
-      'numero_reclamation': 'N° Réclamation',
-      'statut': 'Statut',
-      'statut_display': 'Statut',
-      'urgence': 'Urgence',
-      'type_reclamation': 'Type',
-      'description': 'Description',
+      numero_reclamation: 'N° Réclamation',
+      statut: 'Statut',
+      statut_display: 'Statut',
+      urgence: 'Urgence',
+      type_reclamation: 'Type',
+      description: 'Description',
       // 'site_nom' déjà défini plus haut
-      'zone_nom': 'Zone',
-      'date_creation': 'Date création',
-      'couleur_statut': 'Couleur'
+      zone_nom: 'Zone',
+      date_creation: 'Date création',
+      couleur_statut: 'Couleur',
     };
 
     return translations[key] || key;
@@ -122,7 +130,7 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
   // Déterminer le style du header selon le type
   const getHeaderStyle = () => {
     if (isSite) {
-      return { backgroundColor: selectedObject.attributes?.Couleur as string || '#3b82f6' };
+      return { backgroundColor: (selectedObject.attributes?.Couleur as string) || '#3b82f6' };
     }
     if (isReclamation) {
       const statut = selectedObject.attributes?.statut as string;
@@ -156,15 +164,17 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
         >
           <X className="w-4 h-4" />
         </button>
-        {isReclamation && (
-          <AlertTriangle className="absolute top-3 left-4 w-5 h-5 text-white/80" />
-        )}
-        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded w-fit mb-1 ${getBadgeClass()}`}>
+        {isReclamation && <AlertTriangle className="absolute top-3 left-4 w-5 h-5 text-white/80" />}
+        <span
+          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded w-fit mb-1 ${getBadgeClass()}`}
+        >
           {isReclamation ? 'Réclamation' : selectedObject.type}
         </span>
         <h3 className="text-lg font-bold text-white leading-tight">{selectedObject.title}</h3>
         {selectedObject.attributes?.['Catégorie'] && selectedObject.type === 'Site' && (
-          <span className="text-xs text-white/80 mt-1">{selectedObject.attributes['Catégorie']}</span>
+          <span className="text-xs text-white/80 mt-1">
+            {selectedObject.attributes['Catégorie']}
+          </span>
         )}
         {isReclamation && selectedObject.attributes?.statut_display && (
           <span className="text-xs text-white/90 mt-1 font-medium">
@@ -196,19 +206,23 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
             }
 
             // Pour les réclamations, ignorer les champs techniques et ceux déjà affichés
-            if (isReclamation && (
-              key === 'couleur_statut' ||
-              key === 'statut' ||
-              key === 'statut_display' ||
-              key === 'object_type'
-            )) {
+            if (
+              isReclamation &&
+              (key === 'couleur_statut' ||
+                key === 'statut' ||
+                key === 'statut_display' ||
+                key === 'object_type')
+            ) {
               return null;
             }
 
             // Traitement spécial pour Google Maps
             if (key === 'Google Maps' && typeof value === 'string' && value.startsWith('http')) {
               return (
-                <div key={key} className="col-span-2 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                <div
+                  key={key}
+                  className="col-span-2 bg-blue-50 p-3 rounded-lg border border-blue-100"
+                >
                   <div className="text-[10px] text-blue-400 uppercase font-bold mb-1">{key}</div>
                   <a
                     href={value}
@@ -240,8 +254,12 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
 
             return (
               <div key={key} className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                <div className="text-[10px] text-slate-400 uppercase font-bold">{translateAttributeLabel(key)}</div>
-                <div className="text-sm font-semibold text-slate-700 truncate" title={displayValue}>{displayValue}</div>
+                <div className="text-[10px] text-slate-400 uppercase font-bold">
+                  {translateAttributeLabel(key)}
+                </div>
+                <div className="text-sm font-semibold text-slate-700 truncate" title={displayValue}>
+                  {displayValue}
+                </div>
               </div>
             );
           })}
@@ -250,7 +268,9 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
         {selectedObject.lastIntervention && (
           <div className="flex items-center gap-3 text-xs text-slate-600 border-t border-slate-100 pt-3">
             <CalendarIcon className="w-4 h-4 text-emerald-500" />
-            <span>Dernière intervention : <b>{selectedObject.lastIntervention}</b></span>
+            <span>
+              Dernière intervention : <b>{selectedObject.lastIntervention}</b>
+            </span>
           </div>
         )}
 
@@ -264,14 +284,16 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
               >
                 <Eye className="w-3 h-3" /> Voir détails
               </button>
-              {canCreateTask && onCreateTask && selectedObject.attributes?.statut !== 'CLOTUREE' && (
-                <button
-                  onClick={onCreateTask}
-                  className="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1"
-                >
-                  <ClipboardList className="w-3 h-3" /> Créer Tâche
-                </button>
-              )}
+              {canCreateTask &&
+                onCreateTask &&
+                selectedObject.attributes?.statut !== 'CLOTUREE' && (
+                  <button
+                    onClick={onCreateTask}
+                    className="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1"
+                  >
+                    <ClipboardList className="w-3 h-3" /> Créer Tâche
+                  </button>
+                )}
             </>
           ) : isSite ? (
             <button
@@ -284,10 +306,11 @@ export const MapObjectDetailCard: React.FC<MapObjectDetailCardProps> = ({
             <>
               <button
                 onClick={handleViewDetails}
-                className={`flex-1 ${canCreateTask
-                  ? 'bg-emerald-600 hover:bg-emerald-700'
-                  : 'bg-emerald-600 hover:bg-emerald-700 w-full'
-                  } text-white py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1`}
+                className={`flex-1 ${
+                  canCreateTask
+                    ? 'bg-emerald-600 hover:bg-emerald-700'
+                    : 'bg-emerald-600 hover:bg-emerald-700 w-full'
+                } text-white py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1`}
               >
                 <Eye className="w-3 h-3" /> Voir détails
               </button>

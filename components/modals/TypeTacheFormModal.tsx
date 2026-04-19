@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { FileText, Layers, Info } from 'lucide-react';
+import { FileText, Info } from 'lucide-react';
 import FormModal, { FormSection, FormGrid } from '../FormModal';
 import { PremiumInput, PremiumTextarea } from './PremiumFormComponents';
-import { TypeTache, TypeTacheCreate, TYPES_OBJETS } from '../../types/planning';
+import { TypeTache, TypeTacheCreate } from '../../types/planning';
 import { useToast } from '../../contexts/ToastContext';
 
 // ============================================================================
@@ -25,7 +25,16 @@ interface TypeTacheFormModalProps {
 // ============================================================================
 
 const VEGETATION_TYPES = ['Arbre', 'Palmier', 'Gazon', 'Arbuste', 'Vivace', 'Cactus', 'Graminee'];
-const HYDRAULIQUE_TYPES = ['Puit', 'Pompe', 'Vanne', 'Clapet', 'Ballon', 'Canalisation', 'Aspersion', 'Goutte'];
+const HYDRAULIQUE_TYPES = [
+  'Puit',
+  'Pompe',
+  'Vanne',
+  'Clapet',
+  'Ballon',
+  'Canalisation',
+  'Aspersion',
+  'Goutte',
+];
 
 // ============================================================================
 // CHECKBOX GRID COMPONENT
@@ -46,18 +55,22 @@ const ObjectTypeCheckboxGrid: React.FC<ObjectTypeCheckboxGridProps> = ({
   types,
   selectedTypes,
   onToggle,
-  disabled = false
+  disabled = false,
 }) => {
-  const selectedCount = types.filter(t => selectedTypes.has(t)).length;
+  const selectedCount = types.filter((t) => selectedTypes.has(t)).length;
 
   return (
     <div>
-      <h4 className={`text-xs font-semibold ${titleColor} uppercase tracking-wide mb-2 flex items-center gap-2`}>
+      <h4
+        className={`text-xs font-semibold ${titleColor} uppercase tracking-wide mb-2 flex items-center gap-2`}
+      >
         {title}
-        <span className="font-normal opacity-75">({selectedCount}/{types.length})</span>
+        <span className="font-normal opacity-75">
+          ({selectedCount}/{types.length})
+        </span>
       </h4>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5 sm:gap-2">
-        {types.map(typeObjet => (
+        {types.map((typeObjet) => (
           <label
             key={typeObjet}
             className={`flex items-center gap-1.5 sm:gap-2 p-1.5 sm:p-2 rounded-lg border cursor-pointer transition-all ${
@@ -73,9 +86,11 @@ const ObjectTypeCheckboxGrid: React.FC<ObjectTypeCheckboxGridProps> = ({
               disabled={disabled}
               className="w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 shrink-0"
             />
-            <span className={`text-xs sm:text-sm font-medium truncate ${
-              selectedTypes.has(typeObjet) ? 'text-slate-800' : 'text-slate-500'
-            }`}>
+            <span
+              className={`text-xs sm:text-sm font-medium truncate ${
+                selectedTypes.has(typeObjet) ? 'text-slate-800' : 'text-slate-500'
+              }`}
+            >
               {typeObjet}
             </span>
           </label>
@@ -93,7 +108,7 @@ const TypeTacheFormModal: React.FC<TypeTacheFormModalProps> = ({
   initial = null,
   existingCompatibleObjects = [],
   onClose,
-  onSaved
+  onSaved,
 }) => {
   const { showToast } = useToast();
 
@@ -101,12 +116,12 @@ const TypeTacheFormModal: React.FC<TypeTacheFormModalProps> = ({
   const [form, setForm] = useState<TypeTacheCreate>({
     nom_tache: initial?.nom_tache || '',
     symbole: initial?.symbole || '',
-    description: initial?.description || ''
+    description: initial?.description || '',
   });
 
   // Compatible objects state
   const [compatibleObjects, setCompatibleObjects] = useState<Set<string>>(
-    new Set(existingCompatibleObjects)
+    new Set(existingCompatibleObjects),
   );
 
   // UI state
@@ -118,7 +133,7 @@ const TypeTacheFormModal: React.FC<TypeTacheFormModalProps> = ({
   // ============================================================================
 
   const handleToggleObject = (typeObjet: string) => {
-    setCompatibleObjects(prev => {
+    setCompatibleObjects((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(typeObjet)) {
         newSet.delete(typeObjet);
@@ -131,9 +146,9 @@ const TypeTacheFormModal: React.FC<TypeTacheFormModalProps> = ({
 
   const toggleCategory = (category: 'vegetation' | 'hydraulique', enable: boolean) => {
     const types = category === 'vegetation' ? VEGETATION_TYPES : HYDRAULIQUE_TYPES;
-    setCompatibleObjects(prev => {
+    setCompatibleObjects((prev) => {
       const newSet = new Set(prev);
-      types.forEach(t => {
+      types.forEach((t) => {
         if (enable) {
           newSet.add(t);
         } else {
@@ -155,7 +170,7 @@ const TypeTacheFormModal: React.FC<TypeTacheFormModalProps> = ({
     }
 
     if (compatibleObjects.size === 0) {
-      setError('Sélectionnez au moins un type d\'objet compatible');
+      setError("Sélectionnez au moins un type d'objet compatible");
       return;
     }
 
@@ -164,12 +179,11 @@ const TypeTacheFormModal: React.FC<TypeTacheFormModalProps> = ({
       await onSaved(form, Array.from(compatibleObjects));
       showToast(
         initial ? 'Type de tâche modifié avec succès' : 'Type de tâche créé avec succès',
-        'success'
+        'success',
       );
       onClose();
     } catch (err: any) {
-      console.error('Erreur type tâche:', err);
-      const errorMessage = err?.message || 'Erreur lors de l\'enregistrement';
+      const errorMessage = err?.message || "Erreur lors de l'enregistrement";
       setError(errorMessage);
       showToast(errorMessage, 'error');
     } finally {
@@ -248,7 +262,8 @@ const TypeTacheFormModal: React.FC<TypeTacheFormModalProps> = ({
         {/* Quick toggle buttons */}
         <div className="flex flex-wrap items-center gap-2 mb-4">
           <span className="text-sm text-slate-600">
-            <span className="font-semibold text-emerald-600">{compatibleObjects.size}</span> sélectionné{compatibleObjects.size > 1 ? 's' : ''}
+            <span className="font-semibold text-emerald-600">{compatibleObjects.size}</span>{' '}
+            sélectionné{compatibleObjects.size > 1 ? 's' : ''}
           </span>
           <div className="flex-1" />
           <button
@@ -303,7 +318,8 @@ const TypeTacheFormModal: React.FC<TypeTacheFormModalProps> = ({
         <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 flex items-start gap-2">
           <Info className="w-4 h-4 shrink-0 mt-0.5" />
           <div>
-            <span className="font-medium">Ratios de productivité</span> : configurez-les ensuite dans l'onglet "Ratios de productivité".
+            <span className="font-medium">Ratios de productivité</span> : configurez-les ensuite
+            dans l'onglet "Ratios de productivité".
           </div>
         </div>
       </FormSection>

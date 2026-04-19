@@ -80,6 +80,7 @@ export function PermissionButton({
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
+    return undefined;
   }, [showTooltip]);
 
   // Base styles by variant
@@ -125,9 +126,7 @@ export function PermissionButton({
         title={hasPermission ? title : undefined}
         aria-disabled={!hasPermission}
       >
-        {!hasPermission && showLockIcon && (
-          <Lock className="w-3.5 h-3.5 opacity-60" />
-        )}
+        {!hasPermission && showLockIcon && <Lock className="w-3.5 h-3.5 opacity-60" />}
         {children}
       </button>
 
@@ -165,7 +164,7 @@ interface PermissionIconButtonProps {
 
 export function PermissionIconButton({
   hasPermission,
-  permissionMessage = "Action non autorisée",
+  permissionMessage = 'Action non autorisée',
   onClick,
   icon,
   className = '',
@@ -188,9 +187,10 @@ export function PermissionIconButton({
         onClick={handleClick}
         className={`
           p-2 rounded-lg transition-colors
-          ${hasPermission
-            ? 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
-            : 'text-slate-300 cursor-not-allowed'
+          ${
+            hasPermission
+              ? 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+              : 'text-slate-300 cursor-not-allowed'
           }
           ${className}
         `}

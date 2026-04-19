@@ -8,9 +8,18 @@
  * - Actions pour marquer comme lu
  */
 
-import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  ReactNode,
+} from 'react';
 import { User } from '../types';
 import { apiFetch } from '../services/api';
+import { useToast } from './ToastContext';
 
 // Types
 export interface Notification {
@@ -41,9 +50,9 @@ const NotificationContext = createContext<NotificationContextValue>({
   notifications: [],
   unreadCount: 0,
   isConnected: false,
-  markAsRead: async () => { },
-  markAllAsRead: async () => { },
-  refreshNotifications: async () => { },
+  markAsRead: async () => {},
+  markAllAsRead: async () => {},
+  refreshNotifications: async () => {},
 });
 
 interface NotificationProviderProps {
@@ -55,6 +64,7 @@ interface NotificationProviderProps {
  * Provider pour les notifications temps reel via WebSocket
  */
 export function NotificationProvider({ children, user }: NotificationProviderProps) {
+  const { showToast } = useToast();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
@@ -69,19 +79,25 @@ export function NotificationProvider({ children, user }: NotificationProviderPro
     const token = localStorage.getItem('token');
     if (!token) return null;
 
-    // Determiner le protocol et l'hote
-    const isSecure = window.location.protocol === 'https:';
-    const wsProtocol = isSecure ? 'wss:' : 'ws:';
-
-    // En dev, utiliser le backend Django directement
-    // En prod, utiliser le meme hote que l'app
     let host = window.location.host;
+    let isSecure = window.location.protocol === 'https:';
 
-    // Si on est en dev avec Vite proxy, utiliser localhost:8000
     if (import.meta.env.DEV) {
-      host = 'localhost:8000';
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+      if (apiBaseUrl) {
+        try {
+          const url = new URL(apiBaseUrl);
+          host = url.host;
+          isSecure = url.protocol === 'https:';
+        } catch {
+          host = '127.0.0.1:8000';
+        }
+      } else {
+        host = '127.0.0.1:8000';
+      }
     }
 
+    const wsProtocol = isSecure ? 'wss:' : 'ws:';
     return `${wsProtocol}//${host}/ws/notifications/?token=${token}`;
   }, [user]);
 
@@ -92,11 +108,10 @@ export function NotificationProvider({ children, user }: NotificationProviderPro
     try {
       const response = await apiFetch('/api/notifications/?limit=50');
       const data = await response.json();
-      console.log(`[Notifications] ${data.length || 0} notifications chargees.`);
       if (Array.isArray(data)) {
         // Trier par date de création (plus récent en premier)
-        const sorted = [...data].sort((a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        const sorted = [...data].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
         );
         setNotifications(sorted);
       }
@@ -106,35 +121,37 @@ export function NotificationProvider({ children, user }: NotificationProviderPro
       const countData = await countResponse.json();
       if (countData?.count !== undefined) {
         setUnreadCount(countData.count);
-        console.log(`[Notifications] Count: ${countData.count}`);
       }
     } catch (error) {
-      console.error('[Notifications] Erreur chargement:', error);
+      showToast('Erreur lors du chargement des notifications', 'error');
     }
-  }, [user]);
+  }, [user, showToast]);
 
   // Marquer une notification comme lue
-  const markAsRead = useCallback(async (id: number) => {
-    try {
-      await apiFetch(`/api/notifications/${id}/mark-read/`, { method: 'POST' });
+  const markAsRead = useCallback(
+    async (id: number) => {
+      try {
+        await apiFetch(`/api/notifications/${id}/mark-read/`, { method: 'POST' });
 
-      // Mettre a jour localement
-      setNotifications(prev =>
-        prev.map(n => n.id === id ? { ...n, lu: true } : n)
-      );
-      setUnreadCount(prev => Math.max(0, prev - 1));
+        // Mettre a jour localement
+        setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, lu: true } : n)));
+        setUnreadCount((prev) => Math.max(0, prev - 1));
 
-      // Aussi envoyer via WebSocket si connecte
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
-          action: 'mark_read',
-          notification_id: id,
-        }));
+        // Aussi envoyer via WebSocket si connecte
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(
+            JSON.stringify({
+              action: 'mark_read',
+              notification_id: id,
+            }),
+          );
+        }
+      } catch (error) {
+        showToast('Erreur lors du marquage de la notification', 'error');
       }
-    } catch (error) {
-      console.error('[Notifications] Erreur mark as read:', error);
-    }
-  }, []);
+    },
+    [showToast],
+  );
 
   // Marquer toutes les notifications comme lues
   const markAllAsRead = useCallback(async () => {
@@ -142,7 +159,7 @@ export function NotificationProvider({ children, user }: NotificationProviderPro
       await apiFetch('/api/notifications/mark-all-read/', { method: 'POST' });
 
       // Mettre a jour localement
-      setNotifications(prev => prev.map(n => ({ ...n, lu: true })));
+      setNotifications((prev) => prev.map((n) => ({ ...n, lu: true })));
       setUnreadCount(0);
 
       // Aussi envoyer via WebSocket si connecte
@@ -150,9 +167,9 @@ export function NotificationProvider({ children, user }: NotificationProviderPro
         wsRef.current.send(JSON.stringify({ action: 'mark_all_read' }));
       }
     } catch (error) {
-      console.error('[Notifications] Erreur mark all as read:', error);
+      showToast('Erreur lors du marquage des notifications', 'error');
     }
-  }, []);
+  }, [showToast]);
 
   // Connexion WebSocket
   useEffect(() => {
@@ -172,13 +189,10 @@ export function NotificationProvider({ children, user }: NotificationProviderPro
     if (!wsUrl) return;
 
     const connect = () => {
-      console.log('[WS] Connexion a', wsUrl.replace(/token=.*/, 'token=***'));
-
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log('[WS] Connecte');
         setIsConnected(true);
 
         // Ping periodique pour garder la connexion active
@@ -192,7 +206,6 @@ export function NotificationProvider({ children, user }: NotificationProviderPro
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('[WS] Message recu:', data.type, data);
 
           switch (data.type) {
             case 'connection_established':
@@ -204,15 +217,14 @@ export function NotificationProvider({ children, user }: NotificationProviderPro
             case 'new_notification':
               // Nouvelle notification recue
               if (data.notification) {
-                console.log('[WS] Nouvelle notification:', data.notification.type, data.notification.titre);
-                setNotifications(prev => {
+                setNotifications((prev) => {
                   // Éviter les doublons
-                  if (prev.some(n => n.id === data.notification.id)) {
+                  if (prev.some((n) => n.id === data.notification.id)) {
                     return prev;
                   }
                   return [data.notification, ...prev];
                 });
-                setUnreadCount(prev => prev + 1);
+                setUnreadCount((prev) => prev + 1);
 
                 // Optionnel: jouer un son ou afficher une notification navigateur
                 if (Notification.permission === 'granted') {
@@ -226,12 +238,15 @@ export function NotificationProvider({ children, user }: NotificationProviderPro
 
             case 'unread_notifications':
               // Dédupliquer les notifications par ID et trier par date
-              const uniqueNotifs = (data.notifications || []).filter(
-                (n: Notification, idx: number, arr: Notification[]) =>
-                  arr.findIndex(x => x.id === n.id) === idx
-              ).sort((a: Notification, b: Notification) =>
-                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-              );
+              const uniqueNotifs = (data.notifications || [])
+                .filter(
+                  (n: Notification, idx: number, arr: Notification[]) =>
+                    arr.findIndex((x) => x.id === n.id) === idx,
+                )
+                .sort(
+                  (a: Notification, b: Notification) =>
+                    new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+                );
               setNotifications(uniqueNotifs);
               setUnreadCount(data.count || 0);
               break;
@@ -243,7 +258,6 @@ export function NotificationProvider({ children, user }: NotificationProviderPro
               break;
 
             default:
-              console.log('[WS] Type inconnu:', data.type);
           }
         } catch (error) {
           console.error('[WS] Erreur parsing message:', error);
@@ -255,7 +269,6 @@ export function NotificationProvider({ children, user }: NotificationProviderPro
       };
 
       ws.onclose = (event) => {
-        console.log('[WS] Deconnecte, code:', event.code);
         setIsConnected(false);
 
         // Nettoyer le ping interval
@@ -267,7 +280,6 @@ export function NotificationProvider({ children, user }: NotificationProviderPro
         // Reconnexion automatique apres 5s (sauf si fermeture intentionnelle)
         if (event.code !== 1000 && event.code !== 4001) {
           reconnectTimeoutRef.current = window.setTimeout(() => {
-            console.log('[WS] Tentative de reconnexion...');
             connect();
           }, 5000);
         }
@@ -299,14 +311,16 @@ export function NotificationProvider({ children, user }: NotificationProviderPro
   }, [user]);
 
   return (
-    <NotificationContext.Provider value={{
-      notifications,
-      unreadCount,
-      isConnected,
-      markAsRead,
-      markAllAsRead,
-      refreshNotifications,
-    }}>
+    <NotificationContext.Provider
+      value={{
+        notifications,
+        unreadCount,
+        isConnected,
+        markAsRead,
+        markAllAsRead,
+        refreshNotifications,
+      }}
+    >
       {children}
     </NotificationContext.Provider>
   );

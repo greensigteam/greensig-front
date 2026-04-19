@@ -48,7 +48,7 @@ export const MapProvider: React.FC<MapProviderProps> = ({ children }) => {
   // State for layer visibility - Initialize all layers as visible by default
   const [visibleLayers, setVisibleLayers] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
-    [...SITE_LEGEND, ...VEG_LEGEND, ...HYDRO_LEGEND].forEach(item => {
+    [...SITE_LEGEND, ...VEG_LEGEND, ...HYDRO_LEGEND].forEach((item) => {
       initial[item.type] = true;
     });
     return initial;
@@ -59,19 +59,17 @@ export const MapProvider: React.FC<MapProviderProps> = ({ children }) => {
 
   // Toggle map layer visibility
   const toggleMapLayer = useCallback((layerId: string, visible: boolean) => {
-    setVisibleLayers(prev => ({
+    setVisibleLayers((prev) => ({
       ...prev,
-      [layerId]: visible
+      [layerId]: visible,
     }));
   }, []);
 
   // Set all layers visibility at once (for "Select All" / "Deselect All")
   const setAllLayersVisibility = useCallback((visible: boolean) => {
-    setVisibleLayers(prev => {
+    setVisibleLayers((prev) => {
       // Create completely new object
-      const newVisibility = Object.fromEntries(
-        Object.keys(prev).map(key => [key, visible])
-      );
+      const newVisibility = Object.fromEntries(Object.keys(prev).map((key) => [key, visible]));
       return newVisibility;
     });
   }, []);
@@ -83,10 +81,18 @@ export const MapProvider: React.FC<MapProviderProps> = ({ children }) => {
 
   // Update layer symbology
   const updateLayerSymbology = useCallback((type: string, config: Partial<SymbologyConfig>) => {
-    setSymbologyConfig(prev => ({
-      ...prev,
-      [type]: { ...prev[type], ...config }
-    }));
+    setSymbologyConfig((prev) => {
+      const existing: SymbologyConfig = prev[type] ?? {
+        fillColor: '#3b82f6',
+        fillOpacity: 0.5,
+        strokeColor: '#1e40af',
+        strokeWidth: 2,
+      };
+      return {
+        ...prev,
+        [type]: { ...existing, ...config },
+      };
+    });
   }, []);
 
   // Get symbology config
@@ -101,7 +107,7 @@ export const MapProvider: React.FC<MapProviderProps> = ({ children }) => {
     getVisibleLayers,
     symbologyConfig,
     updateLayerSymbology,
-    getSymbologyConfig
+    getSymbologyConfig,
   };
 
   return <MapContext.Provider value={value}>{children}</MapContext.Provider>;

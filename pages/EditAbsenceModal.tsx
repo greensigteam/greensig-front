@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { format } from 'date-fns';
 import { Calendar, AlertCircle, FileText } from 'lucide-react';
 import {
   Absence,
@@ -8,11 +7,15 @@ import {
   TYPE_ABSENCE_LABELS,
   STATUT_ABSENCE_LABELS,
   STATUT_ABSENCE_COLORS,
-  getBadgeColors
+  getBadgeColors,
 } from '../types/users';
 import { updateAbsence } from '../services/usersApi';
 import FormModal from '../components/FormModal';
-import { PremiumInput, PremiumSelect, PremiumTextarea } from '../components/modals/PremiumFormComponents';
+import {
+  PremiumInput,
+  PremiumSelect,
+  PremiumTextarea,
+} from '../components/modals/PremiumFormComponents';
 
 interface EditAbsenceModalProps {
   absence: Absence;
@@ -20,22 +23,18 @@ interface EditAbsenceModalProps {
   onUpdated: () => void;
 }
 
-const EditAbsenceModal: React.FC<EditAbsenceModalProps> = ({
-  absence,
-  onClose,
-  onUpdated
-}) => {
+const EditAbsenceModal: React.FC<EditAbsenceModalProps> = ({ absence, onClose, onUpdated }) => {
   const [form, setForm] = useState<AbsenceUpdate>({
     typeAbsence: absence.typeAbsence,
     dateDebut: absence.dateDebut,
     dateFin: absence.dateFin,
-    motif: absence.motif || ''
+    motif: absence.motif || '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleChange = (field: keyof AbsenceUpdate, value: string) => {
-    setForm(f => ({ ...f, [field]: value }));
+    setForm((f) => ({ ...f, [field]: value }));
   };
 
   const validateForm = (): string | null => {
@@ -76,7 +75,6 @@ const EditAbsenceModal: React.FC<EditAbsenceModalProps> = ({
       onUpdated();
       onClose();
     } catch (err: any) {
-      console.error('Erreur modification absence:', err);
       if (err.data) {
         const messages: string[] = [];
         for (const [field, value] of Object.entries(err.data)) {
@@ -86,7 +84,11 @@ const EditAbsenceModal: React.FC<EditAbsenceModalProps> = ({
             messages.push(value);
           }
         }
-        setError(messages.length > 0 ? messages.join('\n') : err.message || 'Erreur lors de la modification');
+        setError(
+          messages.length > 0
+            ? messages.join('\n')
+            : err.message || 'Erreur lors de la modification',
+        );
       } else {
         setError(err.message || "Erreur lors de la modification de l'absence");
       }
@@ -116,7 +118,9 @@ const EditAbsenceModal: React.FC<EditAbsenceModalProps> = ({
   const subtitleContent = (
     <div className="flex items-center gap-2">
       <span className="text-sm text-gray-500">{absence.operateurNom}</span>
-      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statutColors.bg} ${statutColors.text}`}>
+      <span
+        className={`px-2 py-0.5 rounded-full text-xs font-medium ${statutColors.bg} ${statutColors.text}`}
+      >
         {STATUT_ABSENCE_LABELS[absence.statut]}
       </span>
     </div>
@@ -142,7 +146,8 @@ const EditAbsenceModal: React.FC<EditAbsenceModalProps> = ({
         <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-2 text-yellow-700">
           <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
           <span className="text-sm">
-            Cette absence est {STATUT_ABSENCE_LABELS[absence.statut].toLowerCase()} et ne peut plus etre modifiee.
+            Cette absence est {STATUT_ABSENCE_LABELS[absence.statut].toLowerCase()} et ne peut plus
+            etre modifiee.
           </span>
         </div>
       )}
@@ -153,7 +158,7 @@ const EditAbsenceModal: React.FC<EditAbsenceModalProps> = ({
         onChange={(value) => handleChange('typeAbsence', value as TypeAbsence)}
         options={(Object.keys(TYPE_ABSENCE_LABELS) as TypeAbsence[]).map((type) => ({
           value: type,
-          label: TYPE_ABSENCE_LABELS[type]
+          label: TYPE_ABSENCE_LABELS[type],
         }))}
         label="Type d'absence"
         placeholder="Sélectionner un type"
@@ -195,7 +200,10 @@ const EditAbsenceModal: React.FC<EditAbsenceModalProps> = ({
       {duration !== null && duration > 0 && (
         <div className="p-3 bg-blue-50 rounded-lg">
           <p className="text-sm text-blue-700">
-            Duree: <span className="font-semibold">{duration} jour{duration > 1 ? 's' : ''}</span>
+            Duree:{' '}
+            <span className="font-semibold">
+              {duration} jour{duration > 1 ? 's' : ''}
+            </span>
           </p>
         </div>
       )}
@@ -219,7 +227,8 @@ const EditAbsenceModal: React.FC<EditAbsenceModalProps> = ({
             <span className="font-medium">Valide par:</span> {absence.valideeParNom || '-'}
           </p>
           <p className="text-sm text-gray-600">
-            <span className="font-medium">Le:</span> {new Date(absence.dateValidation).toLocaleDateString('fr-FR')}
+            <span className="font-medium">Le:</span>{' '}
+            {new Date(absence.dateValidation).toLocaleDateString('fr-FR')}
           </p>
           {absence.commentaire && (
             <p className="text-sm text-gray-600 mt-1">

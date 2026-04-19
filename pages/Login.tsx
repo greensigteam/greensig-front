@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useState } from 'react';
 import { User, Role } from '../types';
 import { Lock, Mail, UserCircle, Eye, EyeOff } from 'lucide-react';
@@ -21,7 +17,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role>('ADMIN');
-  const [userInfo, setUserInfo] = useState<User | null>(null);
+  const [, setUserInfo] = useState<User | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +53,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         }
         // Si l'utilisateur sélectionne SUPERVISEUR, il doit avoir le rôle SUPERVISEUR
         if (selectedRole === 'SUPERVISEUR' && !roles.includes('SUPERVISEUR')) {
-          setError("Seuls les superviseurs peuvent accéder à ce rôle.");
+          setError('Seuls les superviseurs peuvent accéder à ce rôle.');
           setIsLoading(false);
           return;
         }
@@ -70,10 +66,13 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         // Connexion avec le rôle sélectionné
         const user: User = {
           id: userRaw.id,
-          name: userRaw.full_name || `${userRaw.prenom || ''} ${userRaw.nom || ''}`.trim() || userRaw.email,
+          name:
+            userRaw.full_name ||
+            `${userRaw.prenom || ''} ${userRaw.nom || ''}`.trim() ||
+            userRaw.email,
           email: userRaw.email,
           role: selectedRole,
-          avatar: undefined
+          avatar: undefined,
         };
         setUserInfo(user);
         prefetchCriticalData(); // Précharge les données en arrière-plan
@@ -123,9 +122,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 key={r}
                 type="button"
                 onClick={() => handleRoleSelect(r)}
-                className={`text-xs font-bold py-2 rounded-md transition-all ${selectedRole === r
-                  ? 'bg-white text-emerald-700 shadow-sm border border-emerald-100'
-                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}
+                className={`text-xs font-bold py-2 rounded-md transition-all ${
+                  selectedRole === r
+                    ? 'bg-white text-emerald-700 shadow-sm border border-emerald-100'
+                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+                }`}
               >
                 {r}
               </button>
@@ -192,4 +193,3 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 };
 
 export default Login;
-

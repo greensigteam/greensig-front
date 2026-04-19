@@ -1,12 +1,25 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Map as MapIcon, Package, Calendar,
-  ClipboardList, Users, UserCog, BarChart3, Building2,
-  LogOut, ChevronLeft, ChevronRight, AlertCircle, MapPin, Gauge, FileText, MessageSquare,
-  Settings, ChevronDown, X
+  LayoutDashboard,
+  Map as MapIcon,
+  Boxes,
+  FlaskConical,
+  Calendar,
+  ClipboardList,
+  Users,
+  BarChart3,
+  Building2,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
+  AlertCircle,
+  MapPin,
+  Settings,
+  ChevronDown,
+  X,
 } from 'lucide-react';
-import { ViewState, Role } from '../types';
+import { Role } from '../types';
 
 interface SidebarProps {
   onLogout: () => void;
@@ -77,49 +90,67 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [openGroups, setOpenGroups] = useState<string[]>([]);
 
   const toggleGroup = (groupId: string) => {
-    setOpenGroups(prev =>
-      prev.includes(groupId)
-        ? prev.filter(id => id !== groupId)
-        : [...prev, groupId]
+    setOpenGroups((prev) =>
+      prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId],
     );
   };
 
   // User Roles Configuration
   const menuEntries: MenuEntry[] = [
-    { id: 'DASHBOARD', label: 'Tableau de bord', icon: LayoutDashboard, roles: ['ADMIN', 'SUPERVISEUR'] },
+    {
+      id: 'DASHBOARD',
+      label: 'Tableau de bord',
+      icon: LayoutDashboard,
+      roles: ['ADMIN', 'SUPERVISEUR'],
+    },
     { id: 'MAP', label: 'Cartographie', icon: MapIcon, roles: ['ADMIN', 'SUPERVISEUR'] },
-    { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['ADMIN', 'SUPERVISEUR'] },
+    { id: 'INVENTORY', label: 'Inventaire', icon: Boxes, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'SITES', label: 'Gestion des sites', icon: MapPin, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'CLIENTS', label: 'Clients', icon: Building2, roles: ['ADMIN'] },
-    { id: 'PRODUCTS', label: 'Gestion de produits', icon: Package, roles: ['ADMIN'] },
+    { id: 'PRODUCTS', label: 'Gestion de produits', icon: FlaskConical, roles: ['ADMIN'] },
     { id: 'PLANNING', label: 'Planification', icon: Calendar, roles: ['ADMIN', 'SUPERVISEUR'] },
-    { id: 'INTERVENTIONS', label: 'Réclamations', icon: AlertCircle, roles: ['ADMIN', 'SUPERVISEUR'] },
-    { id: 'CLAIMS', label: 'Suivi des Tâches', icon: ClipboardList, roles: ['ADMIN', 'SUPERVISEUR'] },
+    {
+      id: 'INTERVENTIONS',
+      label: 'Réclamations',
+      icon: AlertCircle,
+      roles: ['ADMIN', 'SUPERVISEUR'],
+    },
+    {
+      id: 'CLAIMS',
+      label: 'Suivi des Tâches',
+      icon: ClipboardList,
+      roles: ['ADMIN', 'SUPERVISEUR'],
+    },
     { id: 'TEAMS', label: 'RH', icon: Users, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'REPORTING', label: 'Rapports', icon: BarChart3, roles: ['ADMIN', 'SUPERVISEUR'] },
     { id: 'PARAMETRES', label: 'Paramètres', icon: Settings, roles: ['ADMIN'] },
     // Client specific menu items (accès limité - lecture seule via backend filtering)
     { id: 'CLIENT_MAP', label: 'Carte', icon: MapIcon, roles: ['CLIENT'] },
-    { id: 'INVENTORY', label: 'Inventaire', icon: Package, roles: ['CLIENT'] },
+    { id: 'INVENTORY', label: 'Inventaire', icon: Boxes, roles: ['CLIENT'] },
     { id: 'CLIENT_CLAIMS', label: 'Réclamations', icon: AlertCircle, roles: ['CLIENT'] },
-    { id: 'CLIENT_INTERVENTIONS', label: 'Suivi des Tâches', icon: ClipboardList, roles: ['CLIENT'] },
+    {
+      id: 'CLIENT_INTERVENTIONS',
+      label: 'Suivi des Tâches',
+      icon: ClipboardList,
+      roles: ['CLIENT'],
+    },
     { id: 'CLIENT_PLANNING', label: 'Planning', icon: Calendar, roles: ['CLIENT'] },
     { id: 'CLIENT_TEAMS', label: 'Équipes', icon: Users, roles: ['CLIENT'] },
     { id: 'REPORTING', label: 'Rapports', icon: BarChart3, roles: ['CLIENT'] },
   ];
 
   // Filter entries based on role
-  const filteredEntries = menuEntries.filter(entry => {
+  const filteredEntries = menuEntries.filter((entry) => {
     if (isMenuGroup(entry)) {
       // Show group if user has access to at least one child
-      return entry.children.some(child => child.roles.includes(userRole));
+      return entry.children.some((child) => child.roles.includes(userRole));
     }
     return entry.roles.includes(userRole);
   });
 
   // Check if any child in a group is active
   const isGroupActive = (group: MenuGroup): boolean => {
-    return group.children.some(child => location.pathname === viewToPath[child.id]);
+    return group.children.some((child) => location.pathname === viewToPath[child.id]);
   };
 
   return (
@@ -131,18 +162,16 @@ const Sidebar: React.FC<SidebarProps> = ({
       `}
     >
       {/* Brand Section */}
-      <div className={`
+      <div
+        className={`
         flex items-center h-16 px-4 bg-emerald-900/30
         ${collapsed ? 'justify-center' : 'justify-between gap-3'}
-      `}>
+      `}
+      >
         {/* Logo */}
         {collapsed ? (
           <div className="w-10 h-10 flex items-center justify-center shrink-0">
-            <img
-              src="/logo1.png"
-              alt="GreenSIG"
-              className="w-8 h-8 object-contain"
-            />
+            <img src="/logo1.png" alt="GreenSIG" className="w-8 h-8 object-contain" />
           </div>
         ) : (
           <>
@@ -180,9 +209,11 @@ const Sidebar: React.FC<SidebarProps> = ({
                     className={`
                       w-full flex items-center rounded-lg transition-all duration-200 group relative
                       ${collapsed ? 'justify-center p-2.5' : 'px-3 py-2.5 gap-3'}
-                      ${isGroupActive(entry)
-                        ? 'bg-emerald-700/50 text-white'
-                        : 'hover:bg-emerald-800/30 text-emerald-200/70 hover:text-white'}
+                      ${
+                        isGroupActive(entry)
+                          ? 'bg-emerald-700/50 text-white'
+                          : 'hover:bg-emerald-800/30 text-emerald-200/70 hover:text-white'
+                      }
                     `}
                     title={collapsed ? entry.label : ''}
                   >
@@ -199,8 +230,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                           {entry.label}
                         </span>
                         <ChevronDown
-                          className={`w-4 h-4 transition-transform duration-200 ${openGroups.includes(entry.id) ? 'rotate-180' : ''
-                            }`}
+                          className={`w-4 h-4 transition-transform duration-200 ${
+                            openGroups.includes(entry.id) ? 'rotate-180' : ''
+                          }`}
                         />
                       </>
                     )}
@@ -209,17 +241,19 @@ const Sidebar: React.FC<SidebarProps> = ({
                   {!collapsed && openGroups.includes(entry.id) && (
                     <ul className="mt-1 ml-4 pl-3 border-l border-emerald-700/50 space-y-1">
                       {entry.children
-                        .filter(child => child.roles.includes(userRole))
-                        .map(child => (
+                        .filter((child) => child.roles.includes(userRole))
+                        .map((child) => (
                           <li key={child.id}>
                             <NavLink
                               to={viewToPath[child.id] || '#'}
                               onClick={onNavigate}
                               className={({ isActive }) =>
                                 `w-full flex items-center rounded-lg transition-all duration-200 group relative px-3 py-2 gap-3
-                                ${isActive
-                                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/30 ring-1 ring-emerald-400/20'
-                                  : 'hover:bg-emerald-800/30 text-emerald-200/70 hover:text-white'}`
+                                ${
+                                  isActive
+                                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/30 ring-1 ring-emerald-400/20'
+                                    : 'hover:bg-emerald-800/30 text-emerald-200/70 hover:text-white'
+                                }`
                               }
                             >
                               {({ isActive }) => (
@@ -252,9 +286,11 @@ const Sidebar: React.FC<SidebarProps> = ({
                   className={({ isActive }) =>
                     `w-full flex items-center rounded-lg transition-all duration-200 group relative
                     ${collapsed ? 'justify-center p-2.5' : 'px-3 py-2.5 gap-3'}
-                    ${isActive
-                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/30 ring-1 ring-emerald-400/20'
-                      : 'hover:bg-emerald-800/30 text-emerald-200/70 hover:text-white'}`
+                    ${
+                      isActive
+                        ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/30 ring-1 ring-emerald-400/20'
+                        : 'hover:bg-emerald-800/30 text-emerald-200/70 hover:text-white'
+                    }`
                   }
                   title={collapsed ? entry.label : ''}
                 >
@@ -289,7 +325,10 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-2 bg-emerald-900/20">
         {!collapsed && (
           <button
-            onClick={() => { onLogout(); onNavigate?.(); }}
+            onClick={() => {
+              onLogout();
+              onNavigate?.();
+            }}
             className="w-full flex items-center gap-3 px-3 py-2 text-emerald-300/70 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors text-sm mb-2"
           >
             <LogOut className="w-4 h-4" />

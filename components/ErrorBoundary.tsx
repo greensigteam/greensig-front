@@ -34,11 +34,11 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     this.state = {
       hasError: false,
       error: null,
-      errorInfo: null
+      errorInfo: null,
     };
   }
 
-  static override getDerivedStateFromError(_error: Error): Partial<ErrorBoundaryState> {
+  static getDerivedStateFromError(_error: Error): Partial<ErrorBoundaryState> {
     // Update state to trigger fallback UI
     return { hasError: true };
   }
@@ -51,7 +51,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     // Update state with error details
     this.setState({
       error,
-      errorInfo
+      errorInfo,
     });
 
     // Call optional error handler
@@ -67,7 +67,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     this.setState({
       hasError: false,
       error: null,
-      errorInfo: null
+      errorInfo: null,
     });
   };
 
@@ -111,9 +111,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
               {/* Error Details */}
               <div className="p-6">
                 <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 mb-6">
-                  <h3 className="text-sm font-bold text-slate-700 mb-2">
-                    Détails de l'erreur
-                  </h3>
+                  <h3 className="text-sm font-bold text-slate-700 mb-2">Détails de l'erreur</h3>
                   <p className="text-sm text-slate-600 font-mono bg-white rounded p-3 border border-slate-200">
                     {this.state.error?.message || 'Erreur inconnue'}
                   </p>
@@ -159,7 +157,8 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                 {/* Help Text */}
                 <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <p className="text-sm text-blue-800">
-                    <strong>Besoin d'aide ?</strong> Si le problème persiste, contactez le support technique avec le message d'erreur ci-dessus.
+                    <strong>Besoin d'aide ?</strong> Si le problème persiste, contactez le support
+                    technique avec le message d'erreur ci-dessus.
                   </p>
                 </div>
               </div>

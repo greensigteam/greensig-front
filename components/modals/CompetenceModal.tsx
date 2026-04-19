@@ -23,7 +23,7 @@ const CompetenceModal: React.FC<CompetenceModalProps> = ({ initial = null, onClo
     nomCompetence: initial?.nomCompetence || '',
     categorie: (initial?.categorie as CategorieCompetence) || 'TECHNIQUE',
     description: initial?.description || '',
-    ordreAffichage: initial?.ordreAffichage || 0
+    ordreAffichage: initial?.ordreAffichage || 0,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,8 +53,7 @@ const CompetenceModal: React.FC<CompetenceModalProps> = ({ initial = null, onClo
       onSaved();
       onClose();
     } catch (err: any) {
-      console.error('Erreur compétence:', err);
-      const errorMessage = err?.message || 'Erreur lors de l\'enregistrement';
+      const errorMessage = err?.message || "Erreur lors de l'enregistrement";
       setError(errorMessage);
       showToast(errorMessage, 'error');
     } finally {
@@ -65,7 +64,7 @@ const CompetenceModal: React.FC<CompetenceModalProps> = ({ initial = null, onClo
   // Préparer les options pour le select de catégorie
   const categorieOptions = Object.entries(CATEGORIE_COMPETENCE_LABELS).map(([key, label]) => ({
     value: key,
-    label: label
+    label: label,
   }));
 
   return (

@@ -1,15 +1,22 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { fetchInventoryItem, ApiError } from '../services/api';
-import { InventoryItem } from '../services/mockData'; // Use the correct type definition
+import type { InventoryDetailItem } from '../types/inventory';
 import { OLMap } from '../components/OLMap';
 import { StatusBadge } from '../components/StatusBadge';
 import { EditObjectModal } from '../components/EditObjectModal';
 import { MAP_LAYERS } from '../constants';
 import LoadingScreen from '../components/LoadingScreen';
+import { useUrlModal } from '../hooks/useUrlModal';
 import { planningService } from '../services/planningService';
 import { fetchEquipes, fetchCurrentUser } from '../services/usersApi';
-import { Tache, TacheCreate, TypeTache, STATUT_TACHE_LABELS, STATUT_TACHE_COLORS } from '../types/planning';
+import {
+  Tache,
+  TacheCreate,
+  TypeTache,
+  STATUT_TACHE_LABELS,
+  STATUT_TACHE_COLORS,
+} from '../types/planning';
 import { EquipeList, Utilisateur } from '../types/users';
 import TaskFormModal, { InventoryObjectOption } from '../components/planning/TaskFormModal';
 import { useToast } from '../contexts/ToastContext';
@@ -22,7 +29,7 @@ import {
   Plus,
   Calendar,
   Clock,
-  AlertCircle
+  AlertCircle,
 } from 'lucide-react';
 
 const LoadingSpinner: React.FC = () => (
@@ -44,10 +51,11 @@ const InventoryDetailPage: React.FC = () => {
   const { objectType, objectId } = useParams<{ objectType: string; objectId: string }>();
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const [item, setItem] = useState<InventoryItem | null>(null);
+  const [item, setItem] = useState<InventoryDetailItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const editModal = useUrlModal('edit');
+  const taskModal = useUrlModal('create-task');
   const [refreshKey, setRefreshKey] = useState(0);
 
   // États pour l'historique des tâches
@@ -56,7 +64,6 @@ const InventoryDetailPage: React.FC = () => {
   const [tachesError, setTachesError] = useState<string | null>(null);
 
   // États pour la modale de création de tâche
-  const [showTaskModal, setShowTaskModal] = useState(false);
   const [modalEquipes, setModalEquipes] = useState<EquipeList[]>([]);
   const [modalTypesTaches, setModalTypesTaches] = useState<TypeTache[]>([]);
 
@@ -67,7 +74,11 @@ const InventoryDetailPage: React.FC = () => {
 
   // Fetch current user on mount
   useEffect(() => {
-    fetchCurrentUser().then(setCurrentUser).catch(console.error);
+    fetchCurrentUser()
+      .then(setCurrentUser)
+      .catch((err) =>
+        showToast(err?.message || "Erreur lors du chargement de l'utilisateur", 'error'),
+      );
   }, []);
 
   useEffect(() => {
@@ -90,7 +101,7 @@ const InventoryDetailPage: React.FC = () => {
             // Point: [lng, lat]
             coordinates = {
               lng: data.geometry.coordinates[0],
-              lat: data.geometry.coordinates[1]
+              lat: data.geometry.coordinates[1],
             };
           } else if (data.geometry.type === 'Polygon') {
             // Polygon: [[[lng, lat], ...]], take first point
@@ -98,7 +109,7 @@ const InventoryDetailPage: React.FC = () => {
             if (firstPoint) {
               coordinates = {
                 lng: firstPoint[0],
-                lat: firstPoint[1]
+                lat: firstPoint[1],
               };
             }
           } else if (data.geometry.type === 'LineString') {
@@ -107,7 +118,7 @@ const InventoryDetailPage: React.FC = () => {
             if (firstPoint) {
               coordinates = {
                 lng: firstPoint[0],
-                lat: firstPoint[1]
+                lat: firstPoint[1],
               };
             }
           }
@@ -118,7 +129,7 @@ const InventoryDetailPage: React.FC = () => {
 
         // Store the COMPLETE data object including GeoJSON properties
         // This allows getRelevantFields to access ALL backend attributes
-        const itemWithAllData = {
+        const itemWithAllData: InventoryDetailItem = {
           ...data,
           id: (data.id || props.id || objectId).toString(),
           name: props.nom || props.marque || `${objectType} ${data.id || objectId}`,
@@ -127,8 +138,7 @@ const InventoryDetailPage: React.FC = () => {
           coordinates,
           photos: props.photos || [],
         };
-        setItem(itemWithAllData as any);
-
+        setItem(itemWithAllData);
       } catch (err) {
         setError(err instanceof ApiError ? err.message : 'Erreur de chargement des données.');
       } finally {
@@ -150,7 +160,6 @@ const InventoryDetailPage: React.FC = () => {
         const response = await planningService.getTaches({ objet_id: parseInt(objectId, 10) });
         setTaches(response.results || []);
       } catch (err) {
-        console.error('Error loading tasks:', err);
         setTachesError('Erreur lors du chargement des tâches');
       } finally {
         setTachesLoading(false);
@@ -163,14 +172,21 @@ const InventoryDetailPage: React.FC = () => {
   // Préparer l'objet pré-sélectionné pour la modale de création de tâche
   const preSelectedObjects: InventoryObjectOption[] = useMemo(() => {
     if (!item || !objectType || !objectId) return [];
-    const props = (item as any).properties || item;
-    return [{
-      id: parseInt(objectId, 10),
-      type: objectType.charAt(0).toUpperCase() + objectType.slice(1),
-      nom: item.name,
-      site: props.site_nom || '',
-      soussite: props.sous_site_nom || ''
-    }];
+    const props = (item.properties ?? (item as unknown as Record<string, unknown>)) as Record<
+      string,
+      unknown
+    >;
+    const siteNom = typeof props.site_nom === 'string' ? props.site_nom : '';
+    const sousSiteNom = typeof props.sous_site_nom === 'string' ? props.sous_site_nom : '';
+    return [
+      {
+        id: parseInt(objectId, 10),
+        type: objectType.charAt(0).toUpperCase() + objectType.slice(1),
+        nom: item.name,
+        site: siteNom,
+        soussite: sousSiteNom,
+      },
+    ];
   }, [item, objectType, objectId]);
 
   // Ouvrir la modale de création de tâche
@@ -179,14 +195,15 @@ const InventoryDetailPage: React.FC = () => {
       // Charger les équipes et types de tâches en parallèle
       const [equipesData, typesTachesData] = await Promise.all([
         fetchEquipes(),
-        planningService.getApplicableTypesTaches([objectType ? objectType.charAt(0).toUpperCase() + objectType.slice(1) : ''])
+        planningService.getApplicableTypesTaches([
+          objectType ? objectType.charAt(0).toUpperCase() + objectType.slice(1) : '',
+        ]),
       ]);
 
       setModalEquipes(equipesData.results || []);
       setModalTypesTaches(typesTachesData.types_taches || []);
-      setShowTaskModal(true);
+      taskModal.open();
     } catch (err) {
-      console.error('Error loading task modal data:', err);
       showToast('Erreur lors du chargement des données', 'error');
     }
   };
@@ -196,11 +213,10 @@ const InventoryDetailPage: React.FC = () => {
     try {
       await planningService.createTache(data);
       showToast('Tâche créée avec succès', 'success');
-      setShowTaskModal(false);
+      taskModal.close();
       // Rafraîchir l'historique des tâches
-      setRefreshKey(prev => prev + 1);
+      setRefreshKey((prev) => prev + 1);
     } catch (err) {
-      console.error('Error creating task:', err);
       showToast('Erreur lors de la création de la tâche', 'error');
     }
   };
@@ -214,7 +230,10 @@ const InventoryDetailPage: React.FC = () => {
       {/* Header */}
       <header className="flex-shrink-0 bg-white border-b border-slate-200 p-4 flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <Link to="/inventory" className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-500 hover:text-slate-700">
+          <Link
+            to="/inventory"
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-500 hover:text-slate-700"
+          >
             <ChevronLeft className="w-6 h-6" />
           </Link>
           <div>
@@ -237,7 +256,7 @@ const InventoryDetailPage: React.FC = () => {
               Créer une tâche
             </button>
             <button
-              onClick={() => setIsEditModalOpen(true)}
+              onClick={editModal.open}
               className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors font-medium"
             >
               <Edit className="w-4 h-4" />
@@ -251,7 +270,10 @@ const InventoryDetailPage: React.FC = () => {
       <main className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6 p-6 overflow-y-auto">
         {/* Left Column - Details */}
         <div className="md:col-span-2 bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
-          <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2"><Info className="w-5 h-5 text-emerald-600" />Informations Générales</h2>
+          <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+            <Info className="w-5 h-5 text-emerald-600" />
+            Informations Générales
+          </h2>
           <dl className="grid grid-cols-2 gap-4">
             {getRelevantFields(item, objectType || '').map((field) => (
               <div key={field.label} className="p-4 bg-slate-50 rounded-lg border border-slate-100">
@@ -306,7 +328,9 @@ const InventoryDetailPage: React.FC = () => {
                         <span className="font-semibold text-slate-800 truncate">
                           {tache.type_tache_detail?.nom_tache || 'Tâche'}
                         </span>
-                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${STATUT_TACHE_COLORS[tache.statut]?.bg || 'bg-slate-100'} ${STATUT_TACHE_COLORS[tache.statut]?.text || 'text-slate-600'}`}>
+                        <span
+                          className={`px-2 py-0.5 text-xs font-medium rounded-full ${STATUT_TACHE_COLORS[tache.statut]?.bg || 'bg-slate-100'} ${STATUT_TACHE_COLORS[tache.statut]?.text || 'text-slate-600'}`}
+                        >
                           {STATUT_TACHE_LABELS[tache.statut] || tache.statut}
                         </span>
                       </div>
@@ -317,12 +341,14 @@ const InventoryDetailPage: React.FC = () => {
                         </span>
                         {tache.equipes_detail && tache.equipes_detail.length > 0 && (
                           <span className="truncate">
-                            {tache.equipes_detail.map(e => e.nom).join(', ')}
+                            {tache.equipes_detail.map((e) => e.nomEquipe).join(', ')}
                           </span>
                         )}
                       </div>
                       {tache.commentaires && (
-                        <p className="mt-1 text-xs text-slate-500 line-clamp-1">{tache.commentaires}</p>
+                        <p className="mt-1 text-xs text-slate-500 line-clamp-1">
+                          {tache.commentaires}
+                        </p>
                       )}
                     </div>
                     {tache.date_fin_reelle && (
@@ -341,18 +367,24 @@ const InventoryDetailPage: React.FC = () => {
         {/* Right Column - Map and Photos */}
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2"><MapPin className="w-5 h-5 text-emerald-600" />Localisation</h2>
-            <div className="h-64 rounded-lg cursor-pointer" title="Cliquer pour voir sur la grande carte">
+            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-emerald-600" />
+              Localisation
+            </h2>
+            <div
+              className="h-64 rounded-lg cursor-pointer"
+              title="Cliquer pour voir sur la grande carte"
+            >
               <OLMap
                 isMiniMap={true}
                 activeLayer={MAP_LAYERS.SATELLITE}
                 targetLocation={{ coordinates: item.coordinates, zoom: 18 }}
-                highlightedGeometry={(item as any).geometry} // Pass full geometry for highlighting
+                highlightedGeometry={item.geometry ?? undefined}
                 searchResult={{
                   name: item.name,
                   coordinates: item.coordinates,
                   description: '',
-                  zoom: 18
+                  zoom: 18,
                 }}
                 onObjectClick={() => {
                   // Navigate to main Map page with object coordinates
@@ -360,38 +392,37 @@ const InventoryDetailPage: React.FC = () => {
                     state: {
                       targetLocation: {
                         coordinates: item.coordinates,
-                        zoom: 18
-                      }
-                    }
+                        zoom: 18,
+                      },
+                    },
                   });
                 }}
               />
             </div>
           </div>
-
         </div>
       </main>
 
       {/* Edit Modal */}
       <EditObjectModal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
+        isOpen={editModal.isOpen}
+        onClose={editModal.close}
         objectType={objectType || ''}
         objectId={objectId || ''}
         currentData={item}
         onSuccess={() => {
           // Trigger reload by incrementing refreshKey
-          setRefreshKey(prev => prev + 1);
+          setRefreshKey((prev) => prev + 1);
         }}
       />
 
       {/* Task Creation Modal */}
-      {showTaskModal && (
+      {taskModal.isOpen && (
         <TaskFormModal
           equipes={modalEquipes}
           typesTaches={modalTypesTaches}
           preSelectedObjects={preSelectedObjects}
-          onClose={() => setShowTaskModal(false)}
+          onClose={taskModal.close}
           onSubmit={handleTaskSubmit}
         />
       )}
@@ -402,12 +433,17 @@ const InventoryDetailPage: React.FC = () => {
 // Helper function to get relevant fields based on object type
 // Based on actual Django model fields from backend/api/models.py
 // Shows ALL available attributes for each type
-function getRelevantFields(item: InventoryItem, objectType: string): Array<{ label: string; value: string | number | undefined }> {
+function getRelevantFields(
+  item: InventoryDetailItem,
+  objectType: string,
+): Array<{ label: string; value: string | number | undefined }> {
   const fields: Array<{ label: string; value: string | number | undefined }> = [];
 
   // Extract properties from API response (GeoJSON format)
-  const data = item as any;
-  const props = data.properties || data;
+  const props = (item.properties ?? (item as unknown as Record<string, unknown>)) as Record<
+    string,
+    string | number | undefined
+  >;
 
   // Common fields from Objet base class
   if (props.nom || item.name) {
@@ -450,11 +486,21 @@ function getRelevantFields(item: InventoryItem, objectType: string): Array<{ lab
   // Gazon: nom, famille, observation, last_intervention_date, area_sqm
   if (type === 'gazon') {
     if (props.famille) fields.push({ label: 'Famille', value: props.famille });
-    if (props.area_sqm) fields.push({ label: 'Surface (m²)', value: props.area_sqm });
+    if (props.area_sqm)
+      fields.push({
+        label: 'Surface (m²)',
+        value: Number(props.area_sqm).toLocaleString('fr-FR', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
+      });
     if (props.superficie_calculee) {
       fields.push({
         label: 'Superficie calculée (m²)',
-        value: Number(props.superficie_calculee).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        value: Number(props.superficie_calculee).toLocaleString('fr-FR', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
       });
     }
   }
@@ -462,12 +508,15 @@ function getRelevantFields(item: InventoryItem, objectType: string): Array<{ lab
   // Arbuste: nom, famille, observation, last_intervention_date, densite, symbole
   if (type === 'arbuste') {
     if (props.famille) fields.push({ label: 'Famille', value: props.famille });
-    if (props.densite) fields.push({ label: 'Densité', value: props.densite });
+    if (props.densite != null) fields.push({ label: 'Densité', value: props.densite });
     if (props.symbole) fields.push({ label: 'Symbole', value: props.symbole });
     if (props.superficie_calculee) {
       fields.push({
         label: 'Superficie calculée (m²)',
-        value: Number(props.superficie_calculee).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        value: Number(props.superficie_calculee).toLocaleString('fr-FR', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
       });
     }
   }
@@ -475,11 +524,14 @@ function getRelevantFields(item: InventoryItem, objectType: string): Array<{ lab
   // Vivace: nom, famille, observation, last_intervention_date, densite
   if (type === 'vivace') {
     if (props.famille) fields.push({ label: 'Famille', value: props.famille });
-    if (props.densite) fields.push({ label: 'Densité', value: props.densite });
+    if (props.densite != null) fields.push({ label: 'Densité', value: props.densite });
     if (props.superficie_calculee) {
       fields.push({
         label: 'Superficie calculée (m²)',
-        value: Number(props.superficie_calculee).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        value: Number(props.superficie_calculee).toLocaleString('fr-FR', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
       });
     }
   }
@@ -487,11 +539,14 @@ function getRelevantFields(item: InventoryItem, objectType: string): Array<{ lab
   // Cactus: nom, famille, observation, last_intervention_date, densite
   if (type === 'cactus') {
     if (props.famille) fields.push({ label: 'Famille', value: props.famille });
-    if (props.densite) fields.push({ label: 'Densité', value: props.densite });
+    if (props.densite != null) fields.push({ label: 'Densité', value: props.densite });
     if (props.superficie_calculee) {
       fields.push({
         label: 'Superficie calculée (m²)',
-        value: Number(props.superficie_calculee).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        value: Number(props.superficie_calculee).toLocaleString('fr-FR', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
       });
     }
   }
@@ -499,12 +554,15 @@ function getRelevantFields(item: InventoryItem, objectType: string): Array<{ lab
   // Graminee: nom, famille, observation, last_intervention_date, densite, symbole
   if (type === 'graminee') {
     if (props.famille) fields.push({ label: 'Famille', value: props.famille });
-    if (props.densite) fields.push({ label: 'Densité', value: props.densite });
+    if (props.densite != null) fields.push({ label: 'Densité', value: props.densite });
     if (props.symbole) fields.push({ label: 'Symbole', value: props.symbole });
     if (props.superficie_calculee) {
       fields.push({
         label: 'Superficie calculée (m²)',
-        value: Number(props.superficie_calculee).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        value: Number(props.superficie_calculee).toLocaleString('fr-FR', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
       });
     }
   }
@@ -515,8 +573,10 @@ function getRelevantFields(item: InventoryItem, objectType: string): Array<{ lab
   if (type === 'puit') {
     if (props.profondeur) fields.push({ label: 'Profondeur (m)', value: props.profondeur });
     if (props.diametre) fields.push({ label: 'Diamètre (mm)', value: props.diametre });
-    if (props.niveau_statique) fields.push({ label: 'Niveau statique (m)', value: props.niveau_statique });
-    if (props.niveau_dynamique) fields.push({ label: 'Niveau dynamique (m)', value: props.niveau_dynamique });
+    if (props.niveau_statique)
+      fields.push({ label: 'Niveau statique (m)', value: props.niveau_statique });
+    if (props.niveau_dynamique)
+      fields.push({ label: 'Niveau dynamique (m)', value: props.niveau_dynamique });
     if (props.symbole) fields.push({ label: 'Symbole', value: props.symbole });
   }
 
@@ -592,7 +652,7 @@ function getRelevantFields(item: InventoryItem, objectType: string): Array<{ lab
   if (props.last_intervention_date) {
     fields.push({
       label: 'Dernière intervention',
-      value: new Date(props.last_intervention_date).toLocaleDateString('fr-FR')
+      value: new Date(props.last_intervention_date).toLocaleDateString('fr-FR'),
     });
   }
 
@@ -605,7 +665,7 @@ function getRelevantFields(item: InventoryItem, objectType: string): Array<{ lab
   if (item.coordinates) {
     fields.push({
       label: 'Coordonnées',
-      value: `${item.coordinates.lat.toFixed(6)}, ${item.coordinates.lng.toFixed(6)}`
+      value: `${item.coordinates.lat.toFixed(6)}, ${item.coordinates.lng.toFixed(6)}`,
     });
   }
 

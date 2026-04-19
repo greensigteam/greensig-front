@@ -19,27 +19,27 @@ export interface AdvancedFilters {
   site?: number | number[];
   zone?: string | string[];
   state?: StateType[];
-  
+
   // Filtres par plages numériques
   surfaceRange?: [number, number];
   diameterRange?: [number, number];
   depthRange?: [number, number];
   densityRange?: [number, number];
-  
+
   // Filtres par date
   lastInterventionStart?: Date | null;
   lastInterventionEnd?: Date | null;
   neverIntervened?: boolean;
   urgentMaintenance?: boolean; // > 6 mois
-  
+
   // Filtres spécifiques végétaux
   family?: string | string[];
   size?: SizeType[];
-  
+
   // Filtres spécifiques hydraulique
   material?: string | string[];
   equipmentType?: string | string[];
-  
+
   // Recherche textuelle
   search?: string;
 }
@@ -150,10 +150,7 @@ export interface UseAdvancedFiltersReturn {
   filterOptions: FilterOptions | null;
   isLoading: boolean;
   resultCount: number;
-  updateFilter: <K extends keyof AdvancedFilters>(
-    key: K,
-    value: AdvancedFilters[K]
-  ) => void;
+  updateFilter: <K extends keyof AdvancedFilters>(key: K, value: AdvancedFilters[K]) => void;
   removeFilter: (key: keyof AdvancedFilters) => void;
   resetFilters: () => void;
   applyFilters: () => void;
@@ -185,16 +182,12 @@ export function filtersToQueryParams(filters: AdvancedFilters): Record<string, s
 
   // Site
   if (filters.site !== undefined) {
-    params.site = isArray(filters.site) 
-      ? filters.site.join(',') 
-      : filters.site.toString();
+    params.site = isArray(filters.site) ? filters.site.join(',') : filters.site.toString();
   }
 
   // Zone
   if (filters.zone !== undefined) {
-    params.zone = isArray(filters.zone) 
-      ? filters.zone.join(',') 
-      : filters.zone;
+    params.zone = isArray(filters.zone) ? filters.zone.join(',') : filters.zone;
   }
 
   // État
@@ -225,11 +218,11 @@ export function filtersToQueryParams(filters: AdvancedFilters): Record<string, s
 
   // Dates
   if (filters.lastInterventionStart) {
-    params.last_intervention_start = filters.lastInterventionStart.toISOString().split('T')[0];
+    params.last_intervention_start = filters.lastInterventionStart.toISOString().split('T')[0]!;
   }
 
   if (filters.lastInterventionEnd) {
-    params.last_intervention_end = filters.lastInterventionEnd.toISOString().split('T')[0];
+    params.last_intervention_end = filters.lastInterventionEnd.toISOString().split('T')[0]!;
   }
 
   if (filters.neverIntervened) {
@@ -242,9 +235,7 @@ export function filtersToQueryParams(filters: AdvancedFilters): Record<string, s
 
   // Famille
   if (filters.family !== undefined) {
-    params.family = isArray(filters.family) 
-      ? filters.family.join(',') 
-      : filters.family;
+    params.family = isArray(filters.family) ? filters.family.join(',') : filters.family;
   }
 
   // Taille
@@ -254,15 +245,13 @@ export function filtersToQueryParams(filters: AdvancedFilters): Record<string, s
 
   // Matériau
   if (filters.material !== undefined) {
-    params.material = isArray(filters.material) 
-      ? filters.material.join(',') 
-      : filters.material;
+    params.material = isArray(filters.material) ? filters.material.join(',') : filters.material;
   }
 
   // Type d'équipement
   if (filters.equipmentType !== undefined) {
-    params.equipment_type = isArray(filters.equipmentType) 
-      ? filters.equipmentType.join(',') 
+    params.equipment_type = isArray(filters.equipmentType)
+      ? filters.equipmentType.join(',')
       : filters.equipmentType;
   }
 

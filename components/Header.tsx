@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { User, ViewState, MapSearchResult, SearchSuggestion, TargetLocation } from '../types';
-import { X, Search, Loader2, MapPin, ChevronRight, Command, Clock, Menu } from 'lucide-react';
+import { User, ViewState } from '../types';
+import { X, Search, Loader2, Clock, Menu } from 'lucide-react';
 import { useSearch } from '../contexts/SearchContext';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -14,22 +14,22 @@ interface HeaderProps {
 }
 
 const VIEW_TITLES: Record<ViewState, string> = {
-  'LOGIN': 'Connexion',
-  'DASHBOARD': 'Tableau de Bord',
-  'MAP': 'Système d\'Information Géographique',
-  'INVENTORY': 'Inventaire',
-  'PLANNING': 'Planning',
-  'INTERVENTIONS': 'Rapports Terrain',
-  'CLAIMS': 'Signalements',
-  'TEAMS': 'Ressources Humaines',
-  'USERS': 'Utilisateurs',
-  'REPORTING': 'Statistiques',
-  'CLIENT_PORTAL': 'Espace Client',
-  'PRODUCTS': 'Gestion des Produits',
-  'SITES': 'Gestion des Sites',
-  'CLIENTS': 'Clients',
-  'SUIVI_TACHES': 'Suivi des Tâches',
-  'PARAMETRES': 'Paramètres'
+  LOGIN: 'Connexion',
+  DASHBOARD: 'Tableau de Bord',
+  MAP: "Système d'Information Géographique",
+  INVENTORY: 'Inventaire',
+  PLANNING: 'Planning',
+  INTERVENTIONS: 'Rapports Terrain',
+  CLAIMS: 'Signalements',
+  TEAMS: 'Ressources Humaines',
+  USERS: 'Utilisateurs',
+  REPORTING: 'Statistiques',
+  CLIENT_PORTAL: 'Espace Client',
+  PRODUCTS: 'Gestion des Produits',
+  SITES: 'Gestion des Sites',
+  CLIENTS: 'Clients',
+  SUIVI_TACHES: 'Suivi des Tâches',
+  PARAMETRES: 'Paramètres',
 };
 
 const PATH_TO_VIEW: Record<string, ViewState> = {
@@ -49,17 +49,12 @@ const PATH_TO_VIEW: Record<string, ViewState> = {
   '/clients': 'CLIENTS',
   '/structures': 'CLIENTS',
   '/suivi-taches': 'SUIVI_TACHES',
-  '/parametres': 'PARAMETRES'
+  '/parametres': 'PARAMETRES',
 };
 
 const Header: React.FC<HeaderProps> = ({ user, onToggleMobileSidebar }) => {
   const location = useLocation();
-  const {
-    searchQuery,
-    setSearchQuery,
-    placeholder,
-    isSearching,
-  } = useSearch();
+  const { searchQuery, setSearchQuery, placeholder, isSearching } = useSearch();
 
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -78,9 +73,9 @@ const Header: React.FC<HeaderProps> = ({ user, onToggleMobileSidebar }) => {
 
   // Determine current view from path
   const currentPath = location.pathname;
-  const currentView = Object.keys(PATH_TO_VIEW).find(path => currentPath.startsWith(path))
-                      ? PATH_TO_VIEW[Object.keys(PATH_TO_VIEW).find(path => currentPath.startsWith(path))!]
-                      : 'DASHBOARD';
+  const currentView = Object.keys(PATH_TO_VIEW).find((path) => currentPath.startsWith(path))
+    ? PATH_TO_VIEW[Object.keys(PATH_TO_VIEW).find((path) => currentPath.startsWith(path))!]
+    : 'DASHBOARD';
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -112,7 +107,10 @@ const Header: React.FC<HeaderProps> = ({ user, onToggleMobileSidebar }) => {
 
   // Ne pas afficher la barre de recherche sur certaines pages
   // Note: /client/ pour le portail client, mais pas /clients pour la page de gestion
-  const hideSearch = currentPath.startsWith('/map') || currentPath === '/client' || currentPath.startsWith('/client/');
+  const hideSearch =
+    currentPath.startsWith('/map') ||
+    currentPath === '/client' ||
+    currentPath.startsWith('/client/');
 
   const handleClearSearch = () => {
     setSearchQuery('');
@@ -121,7 +119,6 @@ const Header: React.FC<HeaderProps> = ({ user, onToggleMobileSidebar }) => {
 
   return (
     <header className="h-16 md:h-20 bg-white/80 backdrop-blur-md border-b border-slate-200/60 shadow-sm flex items-center justify-between px-3 md:px-6 z-20 shrink-0 transition-all duration-300 sticky top-0">
-
       {/* LEFT: Hamburger (mobile only) + Title & Breadcrumbs */}
       <div className="flex items-center gap-2 min-w-0 shrink-0">
         {onToggleMobileSidebar && (
@@ -132,34 +129,42 @@ const Header: React.FC<HeaderProps> = ({ user, onToggleMobileSidebar }) => {
             <Menu className="w-5 h-5" />
           </button>
         )}
-      <div className="flex flex-col justify-center min-w-0">
-        <h2 className="text-sm md:text-lg font-bold text-slate-800 tracking-tight truncate leading-tight">
-          {VIEW_TITLES[currentView] || 'GreenSIG'}
-        </h2>
-        <div className="hidden sm:flex items-center gap-1.5 text-[10px] md:text-xs text-slate-500 truncate">
-          <span className="text-slate-400">GreenSIG</span>
-          <span className="text-slate-300">/</span>
-          <span className="font-medium text-emerald-600 truncate">
-            {currentView ? (currentView.charAt(0) + currentView.slice(1).toLowerCase()) : ''}
-          </span>
+        <div className="flex flex-col justify-center min-w-0">
+          <h2 className="text-sm md:text-lg font-bold text-slate-800 tracking-tight truncate leading-tight">
+            {(currentView && VIEW_TITLES[currentView]) || 'GreenSIG'}
+          </h2>
+          <div className="hidden sm:flex items-center gap-1.5 text-[10px] md:text-xs text-slate-500 truncate">
+            <span className="text-slate-400">GreenSIG</span>
+            <span className="text-slate-300">/</span>
+            <span className="font-medium text-emerald-600 truncate">
+              {currentView ? currentView.charAt(0) + currentView.slice(1).toLowerCase() : ''}
+            </span>
+          </div>
         </div>
-      </div>
       </div>
 
       {/* CENTER: Search Bar - Hidden on small screens, shown on md+ */}
       <div className="hidden md:flex flex-1 justify-center max-w-2xl px-4">
         {!hideSearch && (
-          <div className={`relative w-full group transition-all duration-300 ease-out ${isFocused ? 'scale-[1.02] -translate-y-0.5' : ''}`}>
-            <div className={`absolute inset-0 bg-emerald-500/5 rounded-xl blur-sm transition-opacity duration-300 ${isFocused ? 'opacity-100' : 'opacity-0'}`}></div>
-            <div className={`relative flex items-center w-full bg-slate-100/50 border border-slate-200 rounded-xl overflow-hidden transition-all duration-200 ${isFocused ? 'bg-white border-emerald-500/50 shadow-lg ring-4 ring-emerald-500/10' : 'hover:border-slate-300 hover:bg-white'}`}>
+          <div
+            className={`relative w-full group transition-all duration-300 ease-out ${isFocused ? 'scale-[1.02] -translate-y-0.5' : ''}`}
+          >
+            <div
+              className={`absolute inset-0 bg-emerald-500/5 rounded-xl blur-sm transition-opacity duration-300 ${isFocused ? 'opacity-100' : 'opacity-0'}`}
+            ></div>
+            <div
+              className={`relative flex items-center w-full bg-slate-100/50 border border-slate-200 rounded-xl overflow-hidden transition-all duration-200 ${isFocused ? 'bg-white border-emerald-500/50 shadow-lg ring-4 ring-emerald-500/10' : 'hover:border-slate-300 hover:bg-white'}`}
+            >
               <div className="pl-4 pr-3 text-slate-400 group-hover:text-slate-500 transition-colors">
                 {isSearching ? (
                   <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
                 ) : (
-                  <Search className={`w-5 h-5 transition-colors ${isFocused ? 'text-emerald-600' : ''}`} />
+                  <Search
+                    className={`w-5 h-5 transition-colors ${isFocused ? 'text-emerald-600' : ''}`}
+                  />
                 )}
               </div>
-              
+
               <input
                 ref={desktopInputRef}
                 type="text"
@@ -172,7 +177,7 @@ const Header: React.FC<HeaderProps> = ({ user, onToggleMobileSidebar }) => {
               />
 
               {searchQuery && (
-                <button 
+                <button
                   onClick={handleClearSearch}
                   className="p-1.5 mr-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
                 >
@@ -221,8 +226,12 @@ const Header: React.FC<HeaderProps> = ({ user, onToggleMobileSidebar }) => {
 
         <div className="flex items-center gap-2 md:gap-3 pl-2 md:pl-4 border-l border-slate-200/60 h-10">
           <div className="hidden md:flex flex-col items-end">
-            <span className="text-xs font-bold text-slate-700 leading-none mb-0.5">{user.name}</span>
-            <span className="text-[10px] font-medium text-emerald-600 uppercase tracking-wide bg-emerald-50 px-2 py-0.5 rounded-full">{user.role}</span>
+            <span className="text-xs font-bold text-slate-700 leading-none mb-0.5">
+              {user.name}
+            </span>
+            <span className="text-[10px] font-medium text-emerald-600 uppercase tracking-wide bg-emerald-50 px-2 py-0.5 rounded-full">
+              {user.role}
+            </span>
           </div>
           <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center text-white font-bold shadow-md shadow-emerald-500/20 ring-2 ring-white text-xs md:text-sm cursor-pointer hover:scale-105 transition-transform duration-200">
             {user.avatar || (user.name ? user.name.charAt(0) : '')}

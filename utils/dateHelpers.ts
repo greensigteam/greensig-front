@@ -69,8 +69,8 @@ export function formatLocalDate(
     month: '2-digit',
     year: 'numeric',
     hour: '2-digit',
-    minute: '2-digit'
-  }
+    minute: '2-digit',
+  },
 ): string {
   if (!utcDate) return '-';
 
@@ -97,13 +97,29 @@ export function getCurrentLocalDateTimeForInput(): string {
  * @param date2 - Deuxième date
  * @returns Nombre d'heures de différence
  */
-export function getHoursDifference(
-  date1: string | Date,
-  date2: string | Date
-): number {
+export function getHoursDifference(date1: string | Date, date2: string | Date): number {
   const d1 = typeof date1 === 'string' ? new Date(date1) : date1;
   const d2 = typeof date2 === 'string' ? new Date(date2) : date2;
 
   const diffMs = Math.abs(d2.getTime() - d1.getTime());
   return Math.floor(diffMs / (1000 * 60 * 60));
+}
+
+/**
+ * Compare deux dates au jour près (ignore heures/minutes/timezone).
+ *
+ * Retourne true si `end` tombe AVANT `start` strictement.
+ * Utile pour valider qu'un intervalle de tâche est bien ordonné.
+ *
+ * Bug historique (avant cette fonction) : l'ancien code comparait
+ * `end.getDate() < start.getDate()`, ce qui ne regarde que le jour du mois.
+ * Une tâche du 30 avril au 1er mai était donc faussement signalée invalide
+ * (1 < 30). Cette fonction compare les timestamps à minuit.
+ */
+export function isEndBeforeStartDay(start: string | Date, end: string | Date): boolean {
+  const startDate = typeof start === 'string' ? new Date(start) : new Date(start);
+  const endDate = typeof end === 'string' ? new Date(end) : new Date(end);
+  startDate.setHours(0, 0, 0, 0);
+  endDate.setHours(0, 0, 0, 0);
+  return endDate.getTime() < startDate.getTime();
 }

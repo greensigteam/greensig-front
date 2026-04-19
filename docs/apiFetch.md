@@ -1,4 +1,3 @@
-
 # Documentation : apiFetch.ts (Front-end)
 
 > **Note historique** :
@@ -23,7 +22,7 @@ Le module `apiFetch.ts` centralise toutes les requêtes HTTP du front-end vers l
 ## Exemple d’utilisation
 
 ```typescript
-import { apiFetch } from '../services/apiFetch';
+import { apiFetch } from '../services/api';
 
 // Exemple : récupérer le profil utilisateur connecté
 const response = await apiFetch('/api/users/me/');

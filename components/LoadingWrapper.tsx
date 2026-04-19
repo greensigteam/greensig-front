@@ -3,7 +3,7 @@ import LoadingScreen from './LoadingScreen';
 
 interface LoadingWrapperProps {
   isLoading: boolean;
-  children: React.ReactNode;
+  children?: React.ReactNode;
   fullScreen?: boolean; // Si true, utilise fixed inset-0, sinon relatif au parent
   minDuration?: number;
 }
@@ -20,11 +20,11 @@ const LoadingWrapper: React.FC<LoadingWrapperProps> = ({
   isLoading,
   children,
   fullScreen = true,
-  minDuration = 0
+  minDuration = 0,
 }) => {
   if (isLoading) {
     return (
-      <div className={fullScreen ? "fixed inset-0 z-50" : "absolute inset-0 z-50"}>
+      <div className={fullScreen ? 'fixed inset-0 z-50' : 'absolute inset-0 z-50'}>
         <LoadingScreen isLoading={true} loop={true} minDuration={minDuration} />
       </div>
     );

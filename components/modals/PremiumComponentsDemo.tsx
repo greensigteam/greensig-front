@@ -4,8 +4,13 @@
  */
 
 import React, { useState } from 'react';
-import { Mail, Lock, User, Phone, Search, DollarSign, Calendar, MessageSquare } from 'lucide-react';
-import { PremiumInput, PremiumSelect, PremiumTextarea, PremiumButton } from './PremiumFormComponents';
+import { Mail, Lock, User, Phone, Search, DollarSign, Calendar } from 'lucide-react';
+import {
+  PremiumInput,
+  PremiumSelect,
+  PremiumTextarea,
+  PremiumButton,
+} from './PremiumFormComponents';
 
 export const PremiumComponentsDemo: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -360,7 +365,11 @@ export const PremiumComponentsDemo: React.FC = () => {
               <PremiumButton variant="primary" size="md" icon={<Mail className="w-4 h-4" />}>
                 Avec icône
               </PremiumButton>
-              <PremiumButton variant="secondary" size="md" iconRight={<Calendar className="w-4 h-4" />}>
+              <PremiumButton
+                variant="secondary"
+                size="md"
+                iconRight={<Calendar className="w-4 h-4" />}
+              >
                 Icône à droite
               </PremiumButton>
               <PremiumButton

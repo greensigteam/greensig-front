@@ -36,7 +36,13 @@ export interface UseMapHoverTooltipReturn {
  * @returns Hover overlay ref and hovered site ID state
  */
 export function useMapHoverTooltip(options: UseMapHoverTooltipOptions): UseMapHoverTooltipReturn {
-  const { mapInstance, sitesLayerRef, dataLayerRef, mapReady = false, isMeasuring = false } = options;
+  const {
+    mapInstance,
+    sitesLayerRef,
+    dataLayerRef,
+    mapReady = false,
+    isMeasuring = false,
+  } = options;
 
   const { isSelectionMode } = useSelection();
 
@@ -74,7 +80,7 @@ export function useMapHoverTooltip(options: UseMapHoverTooltipOptions): UseMapHo
       element: hoverTooltip,
       positioning: 'bottom-center',
       offset: [0, -15],
-      stopEvent: false
+      stopEvent: false,
     });
     hoverOverlayRef.current = hoverOverlay;
     map.addOverlay(hoverOverlay);
@@ -82,7 +88,7 @@ export function useMapHoverTooltip(options: UseMapHoverTooltipOptions): UseMapHo
     let lastHoveredFeature: Feature | null = null;
 
     // Pointer move event for hover effect on sites and objects
-    const pointerMoveHandler = (evt: MapBrowserEvent<UIEvent>) => {
+    const pointerMoveHandler = (evt: MapBrowserEvent) => {
       // ✅ Don't show tooltip if measuring
       if (isMeasuring) {
         // Hide tooltip and reset cursor
@@ -143,7 +149,7 @@ export function useMapHoverTooltip(options: UseMapHoverTooltipOptions): UseMapHo
       } else {
         // 2. Check for site feature only if no object found (fallback to polygons)
         const siteFeature = map.forEachFeatureAtPixel(pixel, (feat) => feat as Feature, {
-          layerFilter: (l) => l === sitesLayerRef.current
+          layerFilter: (l) => l === sitesLayerRef.current,
         });
 
         if (siteFeature && siteFeature.get('object_type') === 'Site') {
@@ -171,8 +177,23 @@ export function useMapHoverTooltip(options: UseMapHoverTooltipOptions): UseMapHo
           const siteId = currentHoveredFeature.get('site_id');
           featureId = siteId;
 
-          const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
-          const colorIndex = siteId ? Math.abs(String(siteId).split('').reduce((a: number, b: string) => a + b.charCodeAt(0), 0)) % colors.length : 0;
+          const colors = [
+            '#3b82f6',
+            '#10b981',
+            '#f59e0b',
+            '#ef4444',
+            '#8b5cf6',
+            '#ec4899',
+            '#06b6d4',
+            '#84cc16',
+          ];
+          const colorIndex = siteId
+            ? Math.abs(
+                String(siteId)
+                  .split('')
+                  .reduce((a: number, b: string) => a + b.charCodeAt(0), 0),
+              ) % colors.length
+            : 0;
           const color = colors[colorIndex];
 
           tooltipContent = `
@@ -193,9 +214,13 @@ export function useMapHoverTooltip(options: UseMapHoverTooltipOptions): UseMapHo
                 <div style="font-size: 11px; color: ${color}; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
                   ${code || ''}
                 </div>
-                ${superficie ? `<div style="font-size: 12px; color: #6b7280; line-height: 1.4;">
+                ${
+                  superficie
+                    ? `<div style="font-size: 12px; color: #6b7280; line-height: 1.4;">
                   Surface: ${Number(superficie).toLocaleString('fr-FR')} m²
-                </div>` : ''}
+                </div>`
+                    : ''
+                }
               </div>
             </div>
           `;
@@ -214,10 +239,10 @@ export function useMapHoverTooltip(options: UseMapHoverTooltipOptions): UseMapHo
 
           // Object type colors - Built from VEG_LEGEND and HYDRO_LEGEND constants
           const objectColors: Record<string, string> = {};
-          VEG_LEGEND.forEach(item => {
+          VEG_LEGEND.forEach((item) => {
             objectColors[item.type] = item.color;
           });
-          HYDRO_LEGEND.forEach(item => {
+          HYDRO_LEGEND.forEach((item) => {
             objectColors[item.type] = item.color;
           });
           const color = objectColors[objectType] || '#10b981';
@@ -230,7 +255,6 @@ export function useMapHoverTooltip(options: UseMapHoverTooltipOptions): UseMapHo
           const capacite = currentHoveredFeature.get('capacite');
           const longueur = currentHoveredFeature.get('longueur');
           const portee = currentHoveredFeature.get('portee');
-          const lastIntervention = currentHoveredFeature.get('last_intervention_date');
 
           // Build details array based on object type
           const details: string[] = [];
@@ -238,7 +262,7 @@ export function useMapHoverTooltip(options: UseMapHoverTooltipOptions): UseMapHo
           // Vegetation properties
           if (famille) details.push(`Famille: ${famille}`);
           if (taille) details.push(`Taille: ${taille}`);
-          if (densite) details.push(`Densité: ${densite}`);
+          if (densite != null) details.push(`Densité: ${densite}`);
 
           // Hydraulic properties
           if (marque) details.push(`Marque: ${marque}`);
@@ -272,13 +296,24 @@ export function useMapHoverTooltip(options: UseMapHoverTooltipOptions): UseMapHo
                 <div style="font-size: 11px; color: ${color}; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
                   ${objectType}
                 </div>
-                ${siteName ? `<div style="font-size: 11px; color: #9ca3af; margin-bottom: 4px;">
+                ${
+                  siteName
+                    ? `<div style="font-size: 11px; color: #9ca3af; margin-bottom: 4px;">
                   📍 ${siteName}
-                </div>` : ''}
-                ${details.length > 0 ? `<div style="font-size: 11px; color: #6b7280; line-height: 1.6; margin-top: 4px;">
-                  ${details.slice(0, 5).map(d => `<div style="padding: 2px 0;">• ${d}</div>`).join('')}
+                </div>`
+                    : ''
+                }
+                ${
+                  details.length > 0
+                    ? `<div style="font-size: 11px; color: #6b7280; line-height: 1.6; margin-top: 4px;">
+                  ${details
+                    .slice(0, 5)
+                    .map((d) => `<div style="padding: 2px 0;">• ${d}</div>`)
+                    .join('')}
                   ${details.length > 5 ? `<div style="color: #9ca3af; font-style: italic; margin-top: 2px;">+${details.length - 5} autre${details.length - 5 > 1 ? 's' : ''}...</div>` : ''}
-                </div>` : ''}
+                </div>`
+                    : ''
+                }
               </div>
             </div>
           `;
@@ -343,6 +378,6 @@ export function useMapHoverTooltip(options: UseMapHoverTooltipOptions): UseMapHo
 
   return {
     hoverOverlayRef,
-    hoveredSiteId
+    hoveredSiteId,
   };
 }

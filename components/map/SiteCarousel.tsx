@@ -1,5 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronUp, ChevronDown, Plus, MapPin, Building2, Home, Hotel, Stethoscope, FlaskConical, MoreVertical, Edit2, Trash2, Eye } from 'lucide-react';
+import {
+  ChevronUp,
+  ChevronDown,
+  MapPin,
+  Building2,
+  Home,
+  Hotel,
+  Stethoscope,
+  FlaskConical,
+  MoreVertical,
+  Edit2,
+  Eye,
+} from 'lucide-react';
 import { SiteFrontend } from '../../services/api';
 
 interface SiteCarouselProps {
@@ -16,7 +28,7 @@ interface SiteCarouselProps {
 
 // Icon based on category
 const getCategoryIcon = (category: string) => {
-  const iconClass = "w-6 h-6";
+  const iconClass = 'w-6 h-6';
   switch (category) {
     case 'RECHERCHE':
       return <FlaskConical className={iconClass} />;
@@ -57,7 +69,7 @@ export const SiteCarousel: React.FC<SiteCarouselProps> = ({
   isSidebarCollapsed = false,
   onSiteHover,
   onSiteSelect,
-  onCreateSite,
+  onCreateSite: _onCreateSite,
   onEditSite,
   onViewSite,
   onToggle,
@@ -81,8 +93,9 @@ export const SiteCarousel: React.FC<SiteCarouselProps> = ({
 
   return (
     <div
-      className={`absolute bottom-0 right-0 bg-emerald-950 shadow-[0_-4px_20px_rgba(0,0,0,0.3)] z-[400] transition-all duration-300 ease-out pointer-events-auto ${isOpen ? 'translate-y-0' : 'translate-y-full'
-        }`}
+      className={`absolute bottom-0 right-0 bg-emerald-950 shadow-[0_-4px_20px_rgba(0,0,0,0.3)] z-[400] transition-all duration-300 ease-out pointer-events-auto ${
+        isOpen ? 'translate-y-0' : 'translate-y-full'
+      }`}
       style={{ left: leftOffset }}
     >
       {/* Toggle Button - Always visible */}
@@ -90,11 +103,7 @@ export const SiteCarousel: React.FC<SiteCarouselProps> = ({
         onClick={toggle}
         className="absolute -top-9 left-1/2 -translate-x-1/2 bg-emerald-950 border-none rounded-t-xl px-5 py-1.5 shadow-[0_-4px_12px_rgba(0,0,0,0.2)] cursor-pointer flex items-center gap-2 text-emerald-200 text-sm font-medium h-9 hover:bg-emerald-900 hover:text-white transition-colors"
       >
-        {isOpen ? (
-          <ChevronDown className="w-5 h-5" />
-        ) : (
-          <ChevronUp className="w-5 h-5" />
-        )}
+        {isOpen ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
         <span>{isOpen ? 'Masquer' : 'Explorer les sites'}</span>
       </button>
 
@@ -211,12 +220,8 @@ export const SiteCarousel: React.FC<SiteCarouselProps> = ({
                 )}
 
                 {/* Image/Icon Placeholder */}
-                <div
-                  className="flex-1 rounded-t-xl flex items-center justify-center bg-emerald-800/40 transition-colors group-hover:bg-emerald-800/60"
-                >
-                  <div
-                    className="transition-transform group-hover:scale-110 text-emerald-400 group-hover:text-emerald-300"
-                  >
+                <div className="flex-1 rounded-t-xl flex items-center justify-center bg-emerald-800/40 transition-colors group-hover:bg-emerald-800/60">
+                  <div className="transition-transform group-hover:scale-110 text-emerald-400 group-hover:text-emerald-300">
                     {getCategoryIcon(site.category)}
                   </div>
                 </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, Trash2, Download, AlertTriangle, Check } from 'lucide-react';
+import { Calendar, Trash2, Download, AlertTriangle, Check } from 'lucide-react';
 import { api } from '@/services/api';
 import { useToast } from '../contexts/ToastContext';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
@@ -73,7 +73,7 @@ const JoursFeriesConfig: React.FC<{ triggerCreate?: number }> = ({ triggerCreate
       const response = await api.get('/api/users/jours-feries/');
       setJoursFeries(response.data.results || response.data);
     } catch (error) {
-      console.error('Erreur chargement jours fériés:', error);
+      showToast('Erreur lors du chargement des jours fériés', 'error');
     } finally {
       setLoading(false);
     }
@@ -123,8 +123,12 @@ const JoursFeriesConfig: React.FC<{ triggerCreate?: number }> = ({ triggerCreate
       setShowModal(false);
       loadJoursFeries();
     } catch (error: any) {
-      console.error('Erreur sauvegarde jour férié:', error);
-      showToast(error.response?.data?.error || error.response?.data?.non_field_errors?.[0] || 'Erreur lors de la sauvegarde', 'error');
+      showToast(
+        error.response?.data?.error ||
+          error.response?.data?.non_field_errors?.[0] ||
+          'Erreur lors de la sauvegarde',
+        'error',
+      );
     } finally {
       setLoading(false);
     }
@@ -142,7 +146,6 @@ const JoursFeriesConfig: React.FC<{ triggerCreate?: number }> = ({ triggerCreate
       showToast('Jour férié supprimé avec succès', 'success');
       loadJoursFeries();
     } catch (error) {
-      console.error('Erreur suppression:', error);
       showToast('Erreur lors de la suppression', 'error');
     } finally {
       setDeletingJourId(null);
@@ -158,12 +161,13 @@ const JoursFeriesConfig: React.FC<{ triggerCreate?: number }> = ({ triggerCreate
 
     setLoading(true);
     try {
-      const response = await api.post('/api/users/jours-feries/importer_feries_maroc/', { annee: importConfirmAnnee });
+      const response = await api.post('/api/users/jours-feries/importer_feries_maroc/', {
+        annee: importConfirmAnnee,
+      });
       showToast(response.data.message, 'success');
       loadJoursFeries();
     } catch (error: any) {
-      console.error('Erreur import:', error);
-      showToast(error.response?.data?.error || 'Erreur lors de l\'import', 'error');
+      showToast(error.response?.data?.error || "Erreur lors de l'import", 'error');
     } finally {
       setLoading(false);
       setImportConfirmAnnee(null);
@@ -171,18 +175,25 @@ const JoursFeriesConfig: React.FC<{ triggerCreate?: number }> = ({ triggerCreate
   };
 
   const getTypeColor = (type: string) => {
-    return TYPE_FERIE_OPTIONS.find(opt => opt.value === type)?.color || 'bg-gray-100 text-gray-800';
+    return (
+      TYPE_FERIE_OPTIONS.find((opt) => opt.value === type)?.color || 'bg-gray-100 text-gray-800'
+    );
   };
 
   // Grouper par année
-  const joursFeriesParAnnee = joursFeries.reduce((acc, jour) => {
-    const annee = new Date(jour.date).getFullYear();
-    if (!acc[annee]) acc[annee] = [];
-    acc[annee].push(jour);
-    return acc;
-  }, {} as Record<number, JourFerie[]>);
+  const joursFeriesParAnnee = joursFeries.reduce(
+    (acc, jour) => {
+      const annee = new Date(jour.date).getFullYear();
+      if (!acc[annee]) acc[annee] = [];
+      acc[annee].push(jour);
+      return acc;
+    },
+    {} as Record<number, JourFerie[]>,
+  );
 
-  const annees = Object.keys(joursFeriesParAnnee).map(Number).sort((a, b) => b - a);
+  const annees = Object.keys(joursFeriesParAnnee)
+    .map(Number)
+    .sort((a, b) => b - a);
   const anneeActuelle = new Date().getFullYear();
 
   return (
@@ -191,7 +202,8 @@ const JoursFeriesConfig: React.FC<{ triggerCreate?: number }> = ({ triggerCreate
       <div className="flex items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-slate-100">
         <div className="flex items-center gap-3">
           <span className="text-sm text-slate-500">
-            {joursFeries.length} jour{joursFeries.length > 1 ? 's' : ''} férié{joursFeries.length > 1 ? 's' : ''}
+            {joursFeries.length} jour{joursFeries.length > 1 ? 's' : ''} férié
+            {joursFeries.length > 1 ? 's' : ''}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -209,7 +221,8 @@ const JoursFeriesConfig: React.FC<{ triggerCreate?: number }> = ({ triggerCreate
       {/* Info banner */}
       <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-lg text-sm border border-amber-200">
         <AlertTriangle className="w-4 h-4" />
-        Les jours fériés actifs sont automatiquement skippés lors de la génération de tâches récurrentes.
+        Les jours fériés actifs sont automatiquement skippés lors de la génération de tâches
+        récurrentes.
       </div>
 
       {/* Liste des jours fériés par année */}
@@ -222,22 +235,23 @@ const JoursFeriesConfig: React.FC<{ triggerCreate?: number }> = ({ triggerCreate
           <div className="p-12 text-center text-slate-500">
             <Calendar className="w-12 h-12 mx-auto mb-3 text-slate-300" />
             <p className="text-lg font-medium">Aucun jour férié configuré</p>
-            <p className="text-sm mt-1">
-              Importez les jours fériés ou ajoutez-les manuellement
-            </p>
+            <p className="text-sm mt-1">Importez les jours fériés ou ajoutez-les manuellement</p>
           </div>
         ) : (
           <div className="divide-y divide-slate-200">
-            {annees.map(annee => (
+            {annees.map((annee) => (
               <div key={annee}>
                 <div className="bg-slate-50 px-6 py-3 border-b border-slate-200">
                   <h3 className="font-semibold text-slate-800">Année {annee}</h3>
                 </div>
                 <div className="divide-y divide-slate-100">
-                  {joursFeriesParAnnee[annee]
+                  {(joursFeriesParAnnee[annee] ?? [])
                     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                    .map(jour => (
-                      <div key={jour.id} className="px-6 py-4 hover:bg-slate-50 transition-colors flex items-center justify-between">
+                    .map((jour) => (
+                      <div
+                        key={jour.id}
+                        className="px-6 py-4 hover:bg-slate-50 transition-colors flex items-center justify-between"
+                      >
                         <div className="flex items-center gap-4 flex-1">
                           <div className="w-16 text-center">
                             <div className="text-2xl font-bold text-slate-800">
@@ -263,7 +277,9 @@ const JoursFeriesConfig: React.FC<{ triggerCreate?: number }> = ({ triggerCreate
                               )}
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className={`px-2 py-0.5 text-xs rounded font-medium ${getTypeColor(jour.type_ferie)}`}>
+                              <span
+                                className={`px-2 py-0.5 text-xs rounded font-medium ${getTypeColor(jour.type_ferie)}`}
+                              >
                                 {jour.type_ferie_display}
                               </span>
                               {jour.description && (
@@ -341,15 +357,13 @@ const JoursFeriesConfig: React.FC<{ triggerCreate?: number }> = ({ triggerCreate
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Type
-                </label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
                 <select
                   value={formData.type_ferie}
                   onChange={(e) => setFormData({ ...formData, type_ferie: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 >
-                  {TYPE_FERIE_OPTIONS.map(option => (
+                  {TYPE_FERIE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>

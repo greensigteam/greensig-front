@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useToast } from '../../contexts/ToastContext';
 import {
   X,
   Mail,
@@ -15,15 +16,9 @@ import {
   CreditCard,
   Users,
   Edit2,
-  ExternalLink
+  ExternalLink,
 } from 'lucide-react';
-import {
-  Utilisateur,
-  Client,
-  NomRole,
-  NOM_ROLE_LABELS,
-  getBadgeColors
-} from '../../types/users';
+import { Utilisateur, Client, NOM_ROLE_LABELS } from '../../types/users';
 import { fetchClientByUserId } from '../../services/usersApi';
 
 // ============================================================================
@@ -53,7 +48,7 @@ export const AdminDetailModal: React.FC<AdminDetailModalProps> = ({
   user,
   onClose,
   onEdit,
-  onToggleActive
+  onToggleActive,
 }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -90,9 +85,11 @@ export const AdminDetailModal: React.FC<AdminDetailModalProps> = ({
               <div>
                 <label className="text-xs font-medium text-gray-500">Statut</label>
                 <p className="mt-1">
-                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                    user.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                      user.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}
+                  >
                     {user.actif ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
                     {user.actif ? 'Actif' : 'Inactif'}
                   </span>
@@ -110,8 +107,7 @@ export const AdminDetailModal: React.FC<AdminDetailModalProps> = ({
                 <p className="text-gray-900">
                   {user.derniereConnexion
                     ? new Date(user.derniereConnexion).toLocaleString('fr-FR')
-                    : 'Jamais'
-                  }
+                    : 'Jamais'}
                 </p>
               </div>
             </div>
@@ -176,10 +172,7 @@ export const AdminDetailModal: React.FC<AdminDetailModalProps> = ({
             {user.actif ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
             {user.actif ? 'Désactiver' : 'Réactiver'}
           </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200"
-          >
+          <button onClick={onClose} className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">
             Fermer
           </button>
         </div>
@@ -197,8 +190,9 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   onClose,
   onEdit,
   onToggleActive,
-  clientData: initialClientData
+  clientData: initialClientData,
 }) => {
+  const { showToast } = useToast();
   const [clientData, setClientData] = useState<Client | undefined>(initialClientData);
   const [loading, setLoading] = useState(!initialClientData);
 
@@ -213,7 +207,7 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
             setClientData(data);
           }
         } catch (error) {
-          console.error('Erreur chargement client:', error);
+          showToast('Erreur lors du chargement des données client', 'error');
         } finally {
           setLoading(false);
         }
@@ -263,9 +257,11 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   <div>
                     <label className="text-xs font-medium text-gray-500">Statut</label>
                     <p className="mt-1">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                        user.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          user.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}
+                      >
                         {user.actif ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
                         {user.actif ? 'Actif' : 'Inactif'}
                       </span>
@@ -283,8 +279,7 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                     <p className="text-gray-900">
                       {user.derniereConnexion
                         ? new Date(user.derniereConnexion).toLocaleString('fr-FR')
-                        : 'Jamais'
-                      }
+                        : 'Jamais'}
                     </p>
                   </div>
                 </div>
@@ -300,8 +295,12 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <label className="text-xs font-medium text-gray-500">Nom de l'organisation</label>
-                        <p className="text-gray-900 font-semibold text-lg">{clientData.structure.nom}</p>
+                        <label className="text-xs font-medium text-gray-500">
+                          Nom de l'organisation
+                        </label>
+                        <p className="text-gray-900 font-semibold text-lg">
+                          {clientData.structure.nom}
+                        </p>
                       </div>
                       {clientData.structure.id && (
                         <Link
@@ -332,14 +331,20 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="text-xs font-medium text-gray-500">Contact principal</label>
-                        <p className="text-gray-900">{clientData.structure.contactPrincipal || '-'}</p>
+                        <label className="text-xs font-medium text-gray-500">
+                          Contact principal
+                        </label>
+                        <p className="text-gray-900">
+                          {clientData.structure.contactPrincipal || '-'}
+                        </p>
                       </div>
                       <div>
                         <label className="text-xs font-medium text-gray-500 flex items-center gap-1">
                           <CreditCard className="w-3 h-3" /> Email facturation
                         </label>
-                        <p className="text-gray-900">{clientData.structure.emailFacturation || '-'}</p>
+                        <p className="text-gray-900">
+                          {clientData.structure.emailFacturation || '-'}
+                        </p>
                       </div>
                     </div>
 
@@ -363,8 +368,8 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                   <p className="text-sm text-orange-700 font-medium">Utilisateur orphelin</p>
                   <p className="text-sm text-orange-600 mt-1">
-                    Ce client n'est associé à aucune organisation.
-                    Vous pouvez l'affecter depuis la page de détail d'une organisation.
+                    Ce client n'est associé à aucune organisation. Vous pouvez l'affecter depuis la
+                    page de détail d'une organisation.
                   </p>
                 </div>
               ) : (
@@ -385,7 +390,11 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       key={role}
                       className="px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-sm font-medium flex items-center gap-1"
                     >
-                      {role === 'CLIENT' ? <Building2 className="w-3 h-3" /> : <Award className="w-3 h-3" />}
+                      {role === 'CLIENT' ? (
+                        <Building2 className="w-3 h-3" />
+                      ) : (
+                        <Award className="w-3 h-3" />
+                      )}
                       {NOM_ROLE_LABELS[role]}
                     </span>
                   ))}
@@ -415,10 +424,7 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
             {user.actif ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
             {user.actif ? 'Désactiver' : 'Réactiver'}
           </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200"
-          >
+          <button onClick={onClose} className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">
             Fermer
           </button>
         </div>
@@ -435,7 +441,7 @@ export const ChefEquipeDetailModal: React.FC<ChefEquipeDetailModalProps> = ({
   user,
   onClose,
   onEdit,
-  onToggleActive
+  onToggleActive,
 }) => {
   // Note: Les SUPERVISEUR sont des utilisateurs avec compte, pas des opérateurs.
   // Les opérateurs sont des données RH standalone sans compte utilisateur.
@@ -483,9 +489,11 @@ export const ChefEquipeDetailModal: React.FC<ChefEquipeDetailModalProps> = ({
                   <div>
                     <label className="text-xs font-medium text-gray-500">Statut</label>
                     <p className="mt-1">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                        user.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          user.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}
+                      >
                         {user.actif ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
                         {user.actif ? 'Actif' : 'Inactif'}
                       </span>
@@ -503,8 +511,7 @@ export const ChefEquipeDetailModal: React.FC<ChefEquipeDetailModalProps> = ({
                     <p className="text-gray-900">
                       {user.derniereConnexion
                         ? new Date(user.derniereConnexion).toLocaleString('fr-FR')
-                        : 'Jamais'
-                      }
+                        : 'Jamais'}
                     </p>
                   </div>
                 </div>
@@ -514,8 +521,8 @@ export const ChefEquipeDetailModal: React.FC<ChefEquipeDetailModalProps> = ({
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                 <h4 className="text-sm font-semibold text-yellow-800 mb-2">Rôle Superviseur</h4>
                 <p className="text-sm text-yellow-700">
-                  Ce superviseur gère les équipes et le planning depuis le bureau.
-                  Il peut superviser les opérateurs terrain.
+                  Ce superviseur gère les équipes et le planning depuis le bureau. Il peut
+                  superviser les opérateurs terrain.
                 </p>
               </div>
 
@@ -531,7 +538,11 @@ export const ChefEquipeDetailModal: React.FC<ChefEquipeDetailModalProps> = ({
                       key={role}
                       className="px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded-full text-sm font-medium flex items-center gap-1"
                     >
-                      {role === 'SUPERVISEUR' ? <Award className="w-3 h-3" /> : <UserCheck className="w-3 h-3" />}
+                      {role === 'SUPERVISEUR' ? (
+                        <Award className="w-3 h-3" />
+                      ) : (
+                        <UserCheck className="w-3 h-3" />
+                      )}
                       {NOM_ROLE_LABELS[role]}
                     </span>
                   ))}
@@ -561,10 +572,7 @@ export const ChefEquipeDetailModal: React.FC<ChefEquipeDetailModalProps> = ({
             {user.actif ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
             {user.actif ? 'Désactiver' : 'Réactiver'}
           </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200"
-          >
+          <button onClick={onClose} className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">
             Fermer
           </button>
         </div>
@@ -590,7 +598,7 @@ export const UserDetailModalSelector: React.FC<UserDetailModalSelectorProps> = (
   clients,
   onClose,
   onEdit,
-  onToggleActive
+  onToggleActive,
 }) => {
   // Déterminer le type principal de l'utilisateur
   // Priorité: ADMIN > SUPERVISEUR > CLIENT
@@ -617,7 +625,7 @@ export const UserDetailModalSelector: React.FC<UserDetailModalSelectorProps> = (
   }
 
   if (user.roles.includes('CLIENT')) {
-    const clientData = clients.find(c => c.utilisateur === user.id);
+    const clientData = clients.find((c) => c.utilisateur === user.id);
     return (
       <ClientDetailModal
         user={user}

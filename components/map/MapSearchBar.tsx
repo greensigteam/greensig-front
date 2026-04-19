@@ -1,5 +1,14 @@
 import React from 'react';
-import { Search, Navigation, Locate, Loader2, Map as MapIcon, ChevronRight, Trees, X } from 'lucide-react';
+import {
+  Search,
+  Navigation,
+  Locate,
+  Loader2,
+  Map as MapIcon,
+  ChevronRight,
+  Trees,
+  X,
+} from 'lucide-react';
 import type { Coordinates, MapSearchResult } from '../../types';
 
 interface SiteSuggestion {
@@ -19,7 +28,7 @@ interface MapSearchBarProps {
   setShowSuggestions: (show: boolean) => void;
   onSuggestionClick: (suggestion: SiteSuggestion) => void;
   onGeolocation: () => void;
-  searchContainerRef: React.RefObject<HTMLDivElement>;
+  searchContainerRef: React.RefObject<HTMLDivElement | null>;
   searchResult: MapSearchResult | null;
   setSearchResult: (result: MapSearchResult | null) => void;
   isSidebarCollapsed: boolean;
@@ -49,7 +58,7 @@ const MapSearchBarComponent: React.FC<MapSearchBarProps> = ({
   searchContainerRef,
   searchResult,
   setSearchResult,
-  isSidebarCollapsed
+  isSidebarCollapsed,
 }) => {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -71,7 +80,11 @@ const MapSearchBarComponent: React.FC<MapSearchBarProps> = ({
         <div className="flex-1 relative">
           <div className="bg-white/90 backdrop-blur-md shadow-xl rounded-xl flex items-center p-1 border border-white/20 ring-1 ring-black/5 transition-all focus-within:ring-2 focus-within:ring-emerald-600/50">
             <div className="p-2.5 text-slate-400">
-              {isSearching ? <Loader2 className="w-5 h-5 animate-spin text-emerald-600" /> : <Search className="w-5 h-5" />}
+              {isSearching ? (
+                <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
+              ) : (
+                <Search className="w-5 h-5" />
+              )}
             </div>
             <input
               type="text"
@@ -127,9 +140,7 @@ const MapSearchBarComponent: React.FC<MapSearchBarProps> = ({
                     <div className="font-medium text-sm text-slate-800 truncate">
                       {suggestion.name}
                     </div>
-                    <div className="text-xs text-slate-500">
-                      {suggestion.type}
-                    </div>
+                    <div className="text-xs text-slate-500">{suggestion.type}</div>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0" />
                 </button>
@@ -166,9 +177,14 @@ const MapSearchBarComponent: React.FC<MapSearchBarProps> = ({
                 <Navigation className="w-3 h-3 text-emerald-600" />
                 {searchResult.name}
               </h3>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">{searchResult.description}</p>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                {searchResult.description}
+              </p>
             </div>
-            <button onClick={() => setSearchResult(null)} className="text-slate-400 hover:text-slate-600 ml-2">
+            <button
+              onClick={() => setSearchResult(null)}
+              className="text-slate-400 hover:text-slate-600 ml-2"
+            >
               <span className="sr-only">Fermer</span>
               <X className="w-4 h-4" />
             </button>

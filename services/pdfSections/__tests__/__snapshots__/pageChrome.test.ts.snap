@@ -1,0 +1,348 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`paintMonthlyContentChrome — snapshot > paints header + footer fallback + page numbers on content pages only 1`] = `
+[
+  {
+    "args": [
+      "PNG",
+      20,
+      5,
+      25,
+      10,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      243,
+      244,
+      246,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.3,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      20,
+      18,
+      190,
+      18,
+    ],
+    "op": "line",
+  },
+  {
+    "args": [
+      243,
+      244,
+      246,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.3,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      20,
+      275,
+      190,
+      275,
+    ],
+    "op": "line",
+  },
+  {
+    "args": [
+      5.5,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      120,
+      120,
+      120,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "EXPERT NETTOYAGE & JARDINAGE RHAMNA SARL au capital social : 100 000,00DH",
+      105,
+      279,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Siège social : Hay Massira N° 22 BENGUERIR - Email : enjr.contact@gmail.com  IF : 51685065  ICE : 002948885000033  Patente : 45404667  RC : 3051",
+      105,
+      283,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      7,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      120,
+      120,
+      120,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "Page 1 / 2",
+      190,
+      291,
+      {
+        "align": "right",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "PNG",
+      20,
+      5,
+      25,
+      10,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      243,
+      244,
+      246,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.3,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      20,
+      18,
+      190,
+      18,
+    ],
+    "op": "line",
+  },
+  {
+    "args": [
+      243,
+      244,
+      246,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.3,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      20,
+      275,
+      190,
+      275,
+    ],
+    "op": "line",
+  },
+  {
+    "args": [
+      5.5,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      120,
+      120,
+      120,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "EXPERT NETTOYAGE & JARDINAGE RHAMNA SARL au capital social : 100 000,00DH",
+      105,
+      279,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Siège social : Hay Massira N° 22 BENGUERIR - Email : enjr.contact@gmail.com  IF : 51685065  ICE : 002948885000033  Patente : 45404667  RC : 3051",
+      105,
+      283,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      7,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      120,
+      120,
+      120,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "Page 2 / 2",
+      190,
+      291,
+      {
+        "align": "right",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+]
+`;
+
+exports[`paintMonthlyContentChrome — snapshot > uses the footer image when provided 1`] = `
+[
+  {
+    "args": [
+      "PNG",
+      20,
+      5,
+      25,
+      10,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      243,
+      244,
+      246,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.3,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      20,
+      18,
+      190,
+      18,
+    ],
+    "op": "line",
+  },
+  {
+    "args": [
+      "JPEG",
+      20,
+      275,
+      170,
+      12,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      7,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      120,
+      120,
+      120,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "Page 1 / 1",
+      190,
+      291,
+      {
+        "align": "right",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+]
+`;

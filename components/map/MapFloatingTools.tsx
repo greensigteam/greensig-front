@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState } from 'react';
 import {
   Layers,
   Loader2,
@@ -208,8 +208,6 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
     <div className="absolute top-16 md:top-24 right-2 md:right-4 pointer-events-auto flex flex-col gap-2 z-50 items-end">
       {/* Main button bar */}
       <div className="bg-white/90 backdrop-blur-md shadow-xl rounded-xl border border-white/20 overflow-hidden flex flex-col ring-1 ring-black/5 w-12">
-
-
         {/* Layers Toggle */}
         <button
           onClick={toggleLayersPanel}
@@ -269,9 +267,13 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
           onClick={onExportPDF}
           disabled={isExporting}
           className={`p-3 transition-colors ${isExporting ? 'bg-emerald-600 text-white cursor-wait' : 'hover:bg-slate-50 text-slate-600'}`}
-          title={isExporting ? "Export en cours..." : "Exporter en PDF"}
+          title={isExporting ? 'Export en cours...' : 'Exporter en PDF'}
         >
-          {isExporting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Printer className="w-5 h-5" />}
+          {isExporting ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            <Printer className="w-5 h-5" />
+          )}
         </button>
 
         {/* Report Problem Button */}
@@ -302,17 +304,16 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
             </button>
           </div>
 
-          <p className="text-xs text-slate-500 mb-3">
-            Délimitez la zone affectée sur la carte :
-          </p>
+          <p className="text-xs text-slate-500 mb-3">Délimitez la zone affectée sur la carte :</p>
 
           <div className="flex gap-1 bg-slate-50 rounded-lg p-1 mb-3">
             <button
               onClick={() => onStartReportDrawing('point')}
-              className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${reportDrawingMode === 'point'
-                ? 'bg-orange-500 text-white shadow-md'
-                : 'hover:bg-white text-slate-600 hover:shadow-sm'
-                }`}
+              className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${
+                reportDrawingMode === 'point'
+                  ? 'bg-orange-500 text-white shadow-md'
+                  : 'hover:bg-white text-slate-600 hover:shadow-sm'
+              }`}
               title="Pointer un lieu précis"
             >
               <Target className="w-4 h-4" />
@@ -320,10 +321,11 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
             </button>
             <button
               onClick={() => onStartReportDrawing('circle')}
-              className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${reportDrawingMode === 'circle'
-                ? 'bg-orange-500 text-white shadow-md'
-                : 'hover:bg-white text-slate-600 hover:shadow-sm'
-                }`}
+              className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${
+                reportDrawingMode === 'circle'
+                  ? 'bg-orange-500 text-white shadow-md'
+                  : 'hover:bg-white text-slate-600 hover:shadow-sm'
+              }`}
               title="Dessiner un cercle"
             >
               <Circle className="w-4 h-4" />
@@ -331,10 +333,11 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
             </button>
             <button
               onClick={() => onStartReportDrawing('polygon')}
-              className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${reportDrawingMode === 'polygon'
-                ? 'bg-orange-500 text-white shadow-md'
-                : 'hover:bg-white text-slate-600 hover:shadow-sm'
-                }`}
+              className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${
+                reportDrawingMode === 'polygon'
+                  ? 'bg-orange-500 text-white shadow-md'
+                  : 'hover:bg-white text-slate-600 hover:shadow-sm'
+              }`}
               title="Dessiner une zone libre"
             >
               <Pentagon className="w-4 h-4" />
@@ -344,9 +347,10 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
 
           {reportDrawingMode !== 'none' && (
             <div className="text-xs text-orange-600 bg-orange-50 rounded-lg p-2 border border-orange-100">
-              {reportDrawingMode === 'point' && "Cliquez sur la carte pour placer le point"}
-              {reportDrawingMode === 'circle' && "Cliquez et glissez pour dessiner le cercle"}
-              {reportDrawingMode === 'polygon' && "Cliquez pour ajouter des points, double-cliquez pour terminer"}
+              {reportDrawingMode === 'point' && 'Cliquez sur la carte pour placer le point'}
+              {reportDrawingMode === 'circle' && 'Cliquez et glissez pour dessiner le cercle'}
+              {reportDrawingMode === 'polygon' &&
+                'Cliquez pour ajouter des points, double-cliquez pour terminer'}
             </div>
           )}
         </div>
@@ -365,8 +369,11 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
           {showTypeSelector && pendingDrawingMode && (
             <ObjectTypeSelector
               geometryType={
-                pendingDrawingMode === 'point' ? 'Point' :
-                  pendingDrawingMode === 'line' ? 'LineString' : 'Polygon'
+                pendingDrawingMode === 'point'
+                  ? 'Point'
+                  : pendingDrawingMode === 'line'
+                    ? 'LineString'
+                    : 'Polygon'
               }
               onSelect={handleTypeSelect}
               onClose={() => {
@@ -377,14 +384,17 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
           )}
 
           <div className="mb-3">
-            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Dessiner</div>
+            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+              Dessiner
+            </div>
             <div className="flex gap-1 bg-slate-50 rounded-lg p-1">
               <button
                 onClick={() => handleDrawingModeClick('point')}
-                className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${drawingMode === 'point'
-                  ? 'bg-emerald-600 text-white shadow-md'
-                  : 'hover:bg-white text-slate-600 hover:shadow-sm'
-                  }`}
+                className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${
+                  drawingMode === 'point'
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'hover:bg-white text-slate-600 hover:shadow-sm'
+                }`}
                 title="Dessiner un point"
               >
                 <Circle className="w-4 h-4" />
@@ -392,10 +402,11 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
               </button>
               <button
                 onClick={() => handleDrawingModeClick('line')}
-                className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${drawingMode === 'line'
-                  ? 'bg-emerald-600 text-white shadow-md'
-                  : 'hover:bg-white text-slate-600 hover:shadow-sm'
-                  }`}
+                className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${
+                  drawingMode === 'line'
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'hover:bg-white text-slate-600 hover:shadow-sm'
+                }`}
                 title="Dessiner une ligne"
               >
                 <Minus className="w-4 h-4" />
@@ -403,10 +414,11 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
               </button>
               <button
                 onClick={() => handleDrawingModeClick('polygon')}
-                className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${drawingMode === 'polygon'
-                  ? 'bg-emerald-600 text-white shadow-md'
-                  : 'hover:bg-white text-slate-600 hover:shadow-sm'
-                  }`}
+                className={`flex-1 p-2 rounded-md transition-all flex flex-col items-center gap-0.5 ${
+                  drawingMode === 'polygon'
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'hover:bg-white text-slate-600 hover:shadow-sm'
+                }`}
                 title="Dessiner un polygone"
               >
                 <Pentagon className="w-4 h-4" />
@@ -418,7 +430,9 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
           {/* Section Données - visible uniquement si l'utilisateur a au moins une permission */}
           {(permissions.canImport || permissions.canExport) && (
             <div className="mb-3">
-              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Données</div>
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                Données
+              </div>
               <div className="flex gap-2">
                 {/* Import button - ADMIN only */}
                 {permissions.canImport && (
@@ -447,15 +461,18 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
           )}
 
           <div className="mb-3">
-            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Historique</div>
+            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+              Historique
+            </div>
             <div className="flex gap-2">
               <button
                 onClick={undo}
                 disabled={!canUndo}
-                className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium ${canUndo
-                  ? 'bg-slate-50 hover:bg-slate-100 text-slate-600'
-                  : 'bg-slate-50 text-slate-300 cursor-not-allowed'
-                  }`}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium ${
+                  canUndo
+                    ? 'bg-slate-50 hover:bg-slate-100 text-slate-600'
+                    : 'bg-slate-50 text-slate-300 cursor-not-allowed'
+                }`}
                 title="Annuler (Ctrl+Z)"
               >
                 <Undo2 className="w-3.5 h-3.5" />
@@ -464,10 +481,11 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
               <button
                 onClick={redo}
                 disabled={!canRedo}
-                className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium ${canRedo
-                  ? 'bg-slate-50 hover:bg-slate-100 text-slate-600'
-                  : 'bg-slate-50 text-slate-300 cursor-not-allowed'
-                  }`}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium ${
+                  canRedo
+                    ? 'bg-slate-50 hover:bg-slate-100 text-slate-600'
+                    : 'bg-slate-50 text-slate-300 cursor-not-allowed'
+                }`}
                 title="Rétablir (Ctrl+Y)"
               >
                 <Redo2 className="w-3.5 h-3.5" />
@@ -478,7 +496,9 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
 
           {(isDrawing || currentGeometry) && (
             <div className="border-t border-slate-100 pt-3">
-              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">En cours</div>
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                En cours
+              </div>
 
               {selectedTypeInfo && (
                 <div className="flex items-center gap-2 mb-2 bg-slate-50 rounded-lg px-2 py-1.5">
@@ -570,7 +590,9 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
 
           <p className="text-[10px] text-slate-500 mb-3 italic">
             {isMeasuring
-              ? (measurementType === 'distance' ? 'Cliquez pour placer des points. Double-cliquez pour terminer.' : 'Cliquez pour dessiner un polygone. Double-cliquez pour terminer.')
+              ? measurementType === 'distance'
+                ? 'Cliquez pour placer des points. Double-cliquez pour terminer.'
+                : 'Cliquez pour dessiner un polygone. Double-cliquez pour terminer.'
               : 'Sélectionnez un outil pour commencer.'}
           </p>
 
@@ -578,19 +600,29 @@ export const MapFloatingTools: React.FC<MapFloatingToolsProps> = ({
             <div className="border-t border-slate-100 pt-3">
               {currentMeasurement && (
                 <div className="mb-2 bg-emerald-50 p-2 rounded border border-emerald-100">
-                  <div className="text-[10px] uppercase font-bold text-emerald-600 mb-0.5">En cours</div>
-                  <div className="font-mono font-bold text-emerald-800 text-lg leading-none">{currentMeasurement.value}</div>
+                  <div className="text-[10px] uppercase font-bold text-emerald-600 mb-0.5">
+                    En cours
+                  </div>
+                  <div className="font-mono font-bold text-emerald-800 text-lg leading-none">
+                    {currentMeasurement.value}
+                  </div>
                 </div>
               )}
 
               {measurements.map((m, i) => (
-                <div key={m.id || i} className="flex items-center justify-between py-1.5 border-b border-slate-50 last:border-0">
+                <div
+                  key={m.id || i}
+                  className="flex items-center justify-between py-1.5 border-b border-slate-50 last:border-0"
+                >
                   <div className="flex items-center gap-2">
                     <span className="text-xs">{m.type === 'distance' ? '📏' : '📐'}</span>
                     <span className="font-mono text-sm font-medium text-slate-700">{m.value}</span>
                   </div>
                   {onRemoveMeasurement && (
-                    <button onClick={() => onRemoveMeasurement(m.id)} className="text-slate-300 hover:text-red-500">
+                    <button
+                      onClick={() => onRemoveMeasurement(m.id)}
+                      className="text-slate-300 hover:text-red-500"
+                    >
                       <X className="w-3 h-3" />
                     </button>
                   )}

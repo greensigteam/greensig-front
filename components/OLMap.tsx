@@ -8,16 +8,33 @@ import XYZ from 'ol/source/XYZ';
 import VectorSource from 'ol/source/Vector';
 import Cluster from 'ol/source/Cluster';
 import { fromLonLat, toLonLat, transformExtent } from 'ol/proj';
-import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
 import GeoJSON from 'ol/format/GeoJSON';
 import Overlay from 'ol/Overlay';
 import { Feature } from 'ol';
-import { Point } from 'ol/geom';
 import { defaults as defaultControls, ScaleLine } from 'ol/control';
 
-import { LayerConfig, Coordinates, MapSearchResult, UserLocation, MapObjectDetail, OverlayState, MapHandle, Measurement, MeasurementType } from "../types";
-import { INITIAL_POSITION, VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND, RECLAMATION_STATUS_COLORS } from "../constants";
-import { OBJECT_COLORS, TYPE_TO_API } from '../utils/mapHelpers';
+import {
+  LayerConfig,
+  Coordinates,
+  MapSearchResult,
+  UserLocation,
+  MapObjectDetail,
+  OverlayState,
+  MapHandle,
+  Measurement,
+  MeasurementType,
+  GeoJSONGeometry,
+} from '../types';
+import { INITIAL_POSITION, VEG_LEGEND, HYDRO_LEGEND, SITE_LEGEND } from '../constants';
+import { TYPE_TO_API } from '../utils/mapHelpers';
+import {
+  SELECTION_STYLE,
+  createClusterStyleForType,
+  getReclamationStyle,
+  createSiteStyle,
+} from '../utils/mapStyles';
+import { exportMapCanvas } from '../utils/mapExport';
+import { updateClusteredFeatures, updateNonClusteredFeatures } from '../utils/mapClustering';
 import { useSearchHighlight } from '../hooks/useSearchHighlight';
 import { useUserLocationDisplay } from '../hooks/useUserLocationDisplay';
 import { useMapHoverTooltip } from '../hooks/useMapHoverTooltip';
@@ -26,30 +43,13 @@ import { useMeasurementTools } from '../hooks/useMeasurementTools';
 import { useDrawingTools } from '../hooks/useDrawingTools';
 import { useBoxSelection } from '../hooks/useBoxSelection';
 import { useMapContext } from '../contexts/MapContext';
+import { useMapSelectionLayer } from '../hooks/useMapSelectionLayer';
+import { useHighlightedGeometry } from '../hooks/useHighlightedGeometry';
 import { useSelection } from '../contexts/SelectionContext';
 import { useDrawing } from '../contexts/DrawingContext';
 import logger from '../services/logger';
 import { fetchMapData } from '../services/api';
 import { fetchReclamationsForMap } from '../services/reclamationsApi';
-
-
-
-// ✅ SELECTION VISUAL STYLE (Yellow Highlight)
-const SELECTION_STYLE = new Style({
-  stroke: new Stroke({
-    color: '#FFD700', // Gold/Yellow
-    width: 2, // Thicker border
-  }),
-  fill: new Fill({
-    color: 'rgba(255, 215, 0, 0.2)', // Transparent Gold
-  }),
-  image: new CircleStyle({
-    radius: 2,
-    fill: new Fill({ color: 'rgba(255, 215, 0, 0.5)' }),
-    stroke: new Stroke({ color: '#FFD700', width: 2 }),
-  }),
-  zIndex: 1000 // Always on top
-});
 
 interface OLMapProps {
   activeLayer: LayerConfig;
@@ -69,7 +69,15 @@ interface OLMapProps {
   onMeasurementComplete?: (measurement: Measurement) => void;
   onMeasurementUpdate?: (measurement: Measurement | null) => void;
   isMiniMap?: boolean; // New prop for mini-map mode
-  highlightedGeometry?: any; // New prop for detailed object highlight (GeoJSON/Geometry)
+  /**
+   * Détail page : géométrie à mettre en surbrillance.
+   * Accepte une géométrie GeoJSON brute ou une Feature complète.
+   * Le type est large pour rester compatible avec les payloads de l'API.
+   */
+  highlightedGeometry?:
+    | GeoJSONGeometry
+    | { type: 'Feature'; geometry: GeoJSONGeometry; properties?: Record<string, unknown> }
+    | null;
   // Editing callbacks
   onObjectModify?: (objectId: string, newGeometry: any, objectType: string) => void;
   onObjectDelete?: (objectId: string, objectType: string) => void;
@@ -98,7 +106,14 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
   // ✅ USE MAP CONTEXT - Replaces window communication
   const mapContext = useMapContext();
   const { selectedObjects, isBoxSelectionMode, addMultipleToSelection } = useSelection();
-  const { drawingMode, editingMode, isDrawing, setCurrentGeometry, setCalculatedMetrics, finishDrawing } = useDrawing();
+  const {
+    drawingMode,
+    editingMode,
+    isDrawing,
+    setCurrentGeometry,
+    setCalculatedMetrics,
+    finishDrawing,
+  } = useDrawing();
 
   // Map and layer refs
   const innerMapRef = useRef<HTMLDivElement>(null);
@@ -131,7 +146,7 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
   // State
   const [mapReady, setMapReady] = useState(false); // ✅ Flag to trigger hooks after map creation
   const [visibleLayers, setVisibleLayers] = useState<string[]>(() =>
-    [...SITE_LEGEND, ...VEG_LEGEND, ...HYDRO_LEGEND].map(item => item.type)
+    [...SITE_LEGEND, ...VEG_LEGEND, ...HYDRO_LEGEND].map((item) => item.type),
   );
 
   // ✅ WEB WORKER REF
@@ -152,30 +167,35 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     isMeasuring,
     measurementType,
     onMeasurementComplete,
-    onMeasurementUpdate
+    onMeasurementUpdate,
   });
 
   const searchHighlight = useSearchHighlight({
     mapInstance,
     vectorSourceRef,
     sitesSourceRef,
-    searchResult
+    searchResult,
   });
 
   const userLocationDisplay = useUserLocationDisplay({
     mapInstance,
-    userLocation
+    userLocation,
   });
 
   // ✅ Disable interactions when in any tool mode (measuring, drawing, editing, box selection)
-  const isToolActive = isMeasuring || isDrawing || drawingMode !== 'none' || editingMode !== 'none' || isBoxSelectionMode;
+  const isToolActive =
+    isMeasuring ||
+    isDrawing ||
+    drawingMode !== 'none' ||
+    editingMode !== 'none' ||
+    isBoxSelectionMode;
 
   useMapHoverTooltip({
     mapInstance,
     sitesLayerRef,
     dataLayerRef,
     mapReady, // ✅ Trigger hook when map is ready
-    isMeasuring: isToolActive // ✅ Disable hover when any tool is active
+    isMeasuring: isToolActive, // ✅ Disable hover when any tool is active
   });
 
   useMapClickHandler({
@@ -185,7 +205,7 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     popupOverlayRef: popupOverlay,
     onObjectClick,
     mapReady, // ✅ Trigger hook when map is ready
-    isMeasuring: isToolActive // ✅ Disable clicks when any tool is active
+    isMeasuring: isToolActive, // ✅ Disable clicks when any tool is active
   });
 
   // ✅ DRAWING TOOLS HOOK
@@ -196,7 +216,6 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     isDrawing,
     selectedObjects,
     onDrawEnd: (geometry, metrics) => {
-      console.log('Draw completed:', geometry, metrics);
       // Update context with the drawn geometry - this triggers the form modal in MapPage
       setCurrentGeometry(geometry);
       setCalculatedMetrics(metrics);
@@ -207,21 +226,18 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
       setCalculatedMetrics(metrics);
     },
     onModifyEnd: (geometry, featureId, objectType) => {
-      console.log('Modify completed:', featureId, objectType, geometry);
       // Notify parent component about the modification (don't set currentGeometry - that's for new objects)
       if (onObjectModify) {
         onObjectModify(featureId, geometry, objectType);
       }
     },
     onMoveEnd: (geometry, featureId, objectType) => {
-      console.log('Move completed:', featureId, objectType, geometry);
       // Notify parent component about the move (don't set currentGeometry - that's for new objects)
       if (onObjectModify) {
         onObjectModify(featureId, geometry, objectType);
       }
     },
     onDeleteClick: (featureId, objectType) => {
-      console.log('Delete requested:', featureId, objectType);
       // Notify parent component about the delete request
       if (onObjectDelete) {
         onObjectDelete(featureId, objectType);
@@ -234,7 +250,6 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     mapInstance,
     isBoxSelectionActive: isBoxSelectionMode,
     onFeaturesSelected: (features) => {
-      console.log('[OLMap] Box selection completed:', features.length, 'features');
       addMultipleToSelection(features);
     },
     mapReady,
@@ -268,66 +283,10 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
       return innerMapRef.current;
     },
     exportCanvas: (): Promise<string> => {
-      return new Promise((resolve, reject) => {
-        if (!mapInstance.current) {
-          reject(new Error('Map not initialized'));
-          return;
-        }
-
-        const map = mapInstance.current;
-
-        map.once('rendercomplete', () => {
-          try {
-            const mapCanvas = document.createElement('canvas');
-            const size = map.getSize();
-            if (!size) {
-              reject(new Error('Map size not available'));
-              return;
-            }
-
-            mapCanvas.width = size[0] || 0;
-            mapCanvas.height = size[1] || 0;
-            const mapContext = mapCanvas.getContext('2d');
-
-            if (!mapContext) {
-              reject(new Error('Could not get canvas context'));
-              return;
-            }
-
-            const mapViewport = map.getViewport();
-            const canvases = mapViewport.querySelectorAll('canvas');
-
-            canvases.forEach((canvas) => {
-              if (canvas.width > 0) {
-                const opacity = (canvas.parentNode as HTMLElement)?.style?.opacity || '1';
-                mapContext.globalAlpha = parseFloat(opacity);
-
-                const transform = canvas.style.transform;
-                const matrix = transform
-                  .match(/matrix\(([^)]+)\)/)?.[1]
-                  ?.split(',')
-                  .map(Number) || [1, 0, 0, 1, 0, 0];
-
-                mapContext.setTransform(
-                  matrix[0] || 1, matrix[1] || 0, matrix[2] || 0,
-                  matrix[3] || 1, matrix[4] || 0, matrix[5] || 0
-                );
-
-                mapContext.drawImage(canvas, 0, 0);
-              }
-            });
-
-            mapContext.globalAlpha = 1;
-            mapContext.setTransform(1, 0, 0, 1, 0, 0);
-
-            resolve(mapCanvas.toDataURL('image/png'));
-          } catch (err) {
-            reject(err);
-          }
-        });
-
-        map.renderSync();
-      });
+      if (!mapInstance.current) {
+        return Promise.reject(new Error('Map not initialized'));
+      }
+      return exportMapCanvas(mapInstance.current);
     },
     invalidateSize: () => {
       mapInstance.current?.updateSize();
@@ -336,10 +295,10 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
       mapInstance.current?.getView().animate({
         center: fromLonLat([lng, lat]),
         zoom: zoom,
-        duration: 1500
+        duration: 1500,
       });
     },
-    clearMeasurements: measurementTools.clearMeasurements
+    clearMeasurements: measurementTools.clearMeasurements,
   }));
 
   // Initialize Map
@@ -348,7 +307,6 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
 
     // ✅ Prevent re-creating map in React 19 Strict Mode (double render)
     if (mapInstance.current) {
-      console.log('Map already exists, skipping recreation');
       return;
     }
 
@@ -357,16 +315,16 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
         url: activeLayer.url,
         maxZoom: activeLayer.maxNativeZoom || 19,
         attributions: activeLayer.attribution,
-        crossOrigin: 'anonymous'
-      })
+        crossOrigin: 'anonymous',
+      }),
     });
 
     // Create popup overlay
     const overlay = new Overlay({
       element: popupRef.current!,
       autoPan: {
-        animation: { duration: 250 }
-      }
+        animation: { duration: 250 },
+      },
     });
     popupOverlay.current = overlay;
 
@@ -377,27 +335,7 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     const sitesLayer = new VectorLayer({
       source: sitesSource,
       zIndex: 1,
-      style: (feature) => {
-        const type = feature.get('object_type');
-        if (type !== 'Site') return undefined;
-
-        const siteId = feature.get('site_id');
-        const isHovered = feature.get('hovered') === true;
-
-        const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
-        const colorIndex = siteId ? Math.abs(String(siteId).split('').reduce((a: number, b: string) => a + b.charCodeAt(0), 0)) % colors.length : 0;
-        const color = colors[colorIndex];
-
-        return new Style({
-          fill: new Fill({
-            color: isHovered ? `${color}33` : `${color}1A`
-          }),
-          stroke: new Stroke({
-            color: color,
-            width: isHovered ? 3 : 2
-          })
-        });
-      }
+      style: (feature) => createSiteStyle(feature as Feature),
     });
     sitesLayerRef.current = sitesLayer;
 
@@ -406,55 +344,13 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
       source: new VectorSource(),
       style: SELECTION_STYLE,
       zIndex: 1000,
-      visible: true
+      visible: true,
     });
     selectionLayerRef.current = selectionLayer;
 
     // Objects Layer - NO CLUSTERING INITIALLY (will be set up dynamically)
     const vectorSource = new VectorSource();
     vectorSourceRef.current = vectorSource;
-
-    // Helper function to create cluster style for a specific type
-    const createClusterStyleForType = (feature: Feature, objectType: string): Style => {
-      const features = feature.get('features');
-      const size = features ? features.length : 1;
-      const color = OBJECT_COLORS[objectType] || '#10b981';
-
-      if (size > 1) {
-        // Cluster bubble with type-specific color
-        return new Style({
-          image: new CircleStyle({
-            radius: Math.min(15 + size * 2, 30),
-            fill: new Fill({ color: `${color}CC` }), // Type color with opacity
-            stroke: new Stroke({ color: '#fff', width: 3 })
-          }),
-          text: new Text({
-            text: size.toString(),
-            fill: new Fill({ color: '#fff' }),
-            font: 'bold 14px sans-serif'
-          })
-        });
-      }
-
-      // Single feature - normal styled marker
-      const singleFeature = features ? features[0] : feature;
-      const geom = singleFeature.getGeometry();
-
-      if (geom instanceof Point) {
-        return new Style({
-          image: new CircleStyle({
-            radius: 6,
-            fill: new Fill({ color: color }),
-            stroke: new Stroke({ color: '#fff', width: 2 })
-          })
-        });
-      } else {
-        return new Style({
-          fill: new Fill({ color: `${color}66` }),
-          stroke: new Stroke({ color: color, width: 2 })
-        });
-      }
-    };
 
     // Single non-clustered data layer (will be used when clustering disabled)
     const dataLayer = new VectorLayer({
@@ -464,7 +360,7 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
         const props = feature.getProperties();
         const type = props.object_type;
         return createClusterStyleForType(feature as Feature, type);
-      }
+      },
     });
     dataLayerRef.current = dataLayer;
 
@@ -472,46 +368,11 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     const reclamationsSource = new VectorSource();
     reclamationsSourceRef.current = reclamationsSource;
 
-    // Style function for reclamations (used by both layers)
-    const getReclamationStyle = (feature: Feature): Style | Style[] => {
-      const props = feature.getProperties();
-      const statut = props.statut || 'NOUVELLE';
-      const color = RECLAMATION_STATUS_COLORS[statut] || '#ef4444';
-      const geomType = feature.getGeometry()?.getType();
-
-      // Point: cercle avec icône d'alerte
-      if (geomType === 'Point') {
-        return new Style({
-          image: new CircleStyle({
-            radius: 12,
-            fill: new Fill({ color: color }),
-            stroke: new Stroke({ color: '#ffffff', width: 3 })
-          }),
-          text: new Text({
-            text: '!',
-            font: 'bold 14px sans-serif',
-            fill: new Fill({ color: '#ffffff' }),
-            offsetY: 1
-          })
-        });
-      } else {
-        // Polygon/LineString/Circle/MultiPolygon: contour coloré avec remplissage semi-transparent
-        return new Style({
-          fill: new Fill({ color: `${color}40` }), // 25% opacity
-          stroke: new Stroke({
-            color: color,
-            width: 3,
-            lineDash: [8, 4] // Ligne pointillée pour différencier des objets normaux
-          })
-        });
-      }
-    };
-
     // Reclamations layer - renders all geometry types directly (no clustering)
     const reclamationsLayer = new VectorLayer({
       source: reclamationsSource,
       zIndex: 100, // Au-dessus des objets (50) et des clusters pour être toujours visibles
-      style: (feature) => getReclamationStyle(feature as Feature)
+      style: (feature) => getReclamationStyle(feature as Feature),
     });
     reclamationsLayerRef.current = reclamationsLayer;
 
@@ -524,11 +385,11 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
         center: fromLonLat([INITIAL_POSITION.lng, INITIAL_POSITION.lat]),
         zoom: INITIAL_POSITION.zoom,
         maxZoom: 22,
-        minZoom: 2
+        minZoom: 2,
       }),
       controls: defaultControls({ attribution: false, zoom: false }).extend([
-        scaleLineRef.current = new ScaleLine({ units: 'metric' })
-      ])
+        (scaleLineRef.current = new ScaleLine({ units: 'metric' })),
+      ]),
     });
 
     mapInstance.current = map;
@@ -606,8 +467,6 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
       return;
     }
 
-    console.log('=== fetchData START (UNIFIED ENDPOINT) ===');
-
     if (!mapInstance.current || !dataLayerRef.current || !sitesLayerRef.current) {
       return;
     }
@@ -618,7 +477,6 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
 
       // Skip if map size is invalid (not yet rendered)
       if (!mapSize || mapSize[0] === 0 || mapSize[1] === 0) {
-        console.log('⚠️ Map size invalid, skipping fetch');
         return;
       }
 
@@ -626,8 +484,12 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
       const [west, south, east, north] = transformExtent(extent, 'EPSG:3857', 'EPSG:4326');
 
       // Skip if bbox contains invalid values (NaN, Infinity)
-      if (!Number.isFinite(west) || !Number.isFinite(south) || !Number.isFinite(east) || !Number.isFinite(north)) {
-        console.log('⚠️ Invalid bbox coordinates, skipping fetch');
+      if (
+        !Number.isFinite(west) ||
+        !Number.isFinite(south) ||
+        !Number.isFinite(east) ||
+        !Number.isFinite(north)
+      ) {
         return;
       }
 
@@ -638,24 +500,19 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
 
       // ✅ Short-circuit: If no layers are visible, clear map and return
       if (currentVisibleLayers.length === 0) {
-        console.log('⚠️ No visible layers - clearing map data');
         sitesSourceRef.current?.clear();
         vectorSourceRef.current?.clear();
         // Clear all cluster sources
-        Object.values(clusterSourcesRef.current).forEach(cluster => cluster.getSource()?.clear());
+        Object.values(clusterSourcesRef.current).forEach((cluster) => cluster.getSource()?.clear());
         return;
       }
 
       const typesParam = currentVisibleLayers
-        .map(layerType => TYPE_TO_API[layerType] || layerType.toLowerCase())
+        .map((layerType) => TYPE_TO_API[layerType] || layerType.toLowerCase())
         .filter(Boolean)
         .join(',');
 
-      const data = await fetchMapData(
-        `${west},${south},${east},${north}`,
-        typesParam,
-        zoom
-      );
+      const data = await fetchMapData(`${west},${south},${east},${north}`, typesParam, zoom);
 
       if (data.type !== 'FeatureCollection') throw new Error('Invalid GeoJSON');
 
@@ -680,7 +537,7 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
       allFeatures.forEach((feat: any) => {
         const feature = geojsonFormat.readFeature(feat, {
           dataProjection: 'EPSG:4326',
-          featureProjection: 'EPSG:3857'
+          featureProjection: 'EPSG:3857',
         }) as Feature;
 
         const objectType = feature.get('object_type');
@@ -698,141 +555,19 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
       sitesSourceRef.current?.clear();
       sitesSourceRef.current?.addFeatures(siteFeatures);
 
-      // ✅ Update type-based clusters
+      const clusterRefs = {
+        clusterSourcesRef,
+        clusterLayersRef,
+        vectorSource: vectorSourceRef.current,
+        dataLayer: dataLayerRef.current,
+        map: mapInstance.current,
+      };
+
       if (clusteringEnabledRef.current) {
-        // Separate Point features (for clustering) from non-Point features (polygons, lines)
-        const pointFeaturesByType: Record<string, Feature[]> = {};
-        const nonPointFeatures: Feature[] = [];
-
-        Object.entries(featuresByType).forEach(([type, features]) => {
-          features.forEach(feature => {
-            const geom = feature.getGeometry();
-            if (geom?.getType() === 'Point') {
-              if (!pointFeaturesByType[type]) {
-                pointFeaturesByType[type] = [];
-              }
-              pointFeaturesByType[type].push(feature);
-            } else {
-              // Polygons, LineStrings, etc. - keep in dataLayer
-              nonPointFeatures.push(feature);
-            }
-          });
-        });
-
-        // Update vectorSource with non-Point features (always visible)
-        vectorSourceRef.current?.clear();
-        vectorSourceRef.current?.addFeatures(nonPointFeatures);
-
-        // Create/update cluster layers for Point features only
-        Object.entries(pointFeaturesByType).forEach(([type, features]) => {
-          // Get or create cluster source for this type
-          if (!clusterSourcesRef.current[type]) {
-            const typeSource = new VectorSource();
-            const typeCluster = new Cluster({
-              distance: 50,
-              // minDistance: 20, // REMOVED: Potentially causing instability
-              source: typeSource,
-              geometryFunction: (feature) => {
-                const geom = feature.getGeometry();
-                return (geom?.getType() === 'Point' ? geom : null) as Point;
-              }
-            });
-            clusterSourcesRef.current[type] = typeCluster;
-
-            // Create cluster layer for this type
-            const typeColor = OBJECT_COLORS[type] || '#10b981';
-            const clusterLayer = new VectorLayer({
-              source: typeCluster,
-              zIndex: 50 + Object.keys(clusterSourcesRef.current).indexOf(type),
-              style: (feature) => {
-                const features = feature.get('features');
-                const size = features ? features.length : 1;
-
-                if (size > 1) {
-                  return new Style({
-                    image: new CircleStyle({
-                      radius: Math.min(15 + size * 2, 30),
-                      fill: new Fill({ color: `${typeColor}CC` }),
-                      stroke: new Stroke({ color: '#fff', width: 3 })
-                    }),
-                    text: new Text({
-                      text: size.toString(),
-                      fill: new Fill({ color: '#fff' }),
-                      font: 'bold 14px sans-serif'
-                    })
-                  });
-                }
-
-                const singleFeature = features ? features[0] : feature;
-                const geom = singleFeature.getGeometry();
-                if (geom instanceof Point) {
-                  return new Style({
-                    image: new CircleStyle({
-                      radius: 6,
-                      fill: new Fill({ color: typeColor }),
-                      stroke: new Stroke({ color: '#fff', width: 2 })
-                    })
-                  });
-                } else {
-                  return new Style({
-                    fill: new Fill({ color: `${typeColor}66` }),
-                    stroke: new Stroke({ color: typeColor, width: 2 })
-                  });
-                }
-              }
-            });
-
-            clusterLayersRef.current[type] = clusterLayer;
-            mapInstance.current?.addLayer(clusterLayer);
-          }
-
-          // Update features for this type's cluster
-          const typeSource = clusterSourcesRef.current[type].getSource();
-          if (typeSource) {
-            typeSource.clear();
-            if (features.length > 0) {
-              typeSource.addFeatures(features);
-            }
-          }
-          // Force redraw of the layer to ensure cluster calculation updates
-          clusterLayersRef.current[type]?.changed();
-        });
-
-        // Remove clusters for types that no longer have Point features
-        Object.keys(clusterSourcesRef.current).forEach(type => {
-          if (!pointFeaturesByType[type]) {
-            const clusterLayer = clusterLayersRef.current[type];
-            if (clusterLayer) {
-              mapInstance.current?.removeLayer(clusterLayer);
-              delete clusterLayersRef.current[type];
-            }
-            delete clusterSourcesRef.current[type];
-          }
-        });
-
-        // Keep dataLayer visible for non-Point features
-        dataLayerRef.current?.setVisible(true);
+        updateClusteredFeatures(featuresByType, clusterRefs);
       } else {
-        // Non-clustered mode - use single layer
-        const allObjects = Object.values(featuresByType).flat();
-        vectorSourceRef.current?.clear();
-        vectorSourceRef.current?.addFeatures(allObjects);
-
-        // Hide all cluster layers - Force REMOVE to ensure they are gone
-        Object.keys(clusterLayersRef.current).forEach(type => {
-          const layer = clusterLayersRef.current[type];
-          if (layer) {
-            mapInstance.current?.removeLayer(layer);
-          }
-        });
-        clusterLayersRef.current = {}; // Reset tracking
-        clusterSourcesRef.current = {};
-
-        dataLayerRef.current?.setVisible(true);
+        updateNonClusteredFeatures(featuresByType, clusterRefs);
       }
-
-      const totalObjects = Object.values(featuresByType).reduce((sum, arr) => sum + arr.length, 0);
-      console.log(`✅ Loaded ${siteFeatures.length} sites, ${totalObjects} objects (${Object.keys(featuresByType).length} types)`);
     } catch (err) {
       logger.error('Error in fetchData:', err);
     }
@@ -863,12 +598,17 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
       const [west, south, east, north] = transformExtent(extent, 'EPSG:3857', 'EPSG:4326');
 
       // Skip if bbox contains invalid values (NaN, Infinity)
-      if (!Number.isFinite(west) || !Number.isFinite(south) || !Number.isFinite(east) || !Number.isFinite(north)) {
+      if (
+        !Number.isFinite(west) ||
+        !Number.isFinite(south) ||
+        !Number.isFinite(east) ||
+        !Number.isFinite(north)
+      ) {
         return;
       }
 
       const data = await fetchReclamationsForMap({
-        bbox: `${west},${south},${east},${north}`
+        bbox: `${west},${south},${east},${north}`,
       });
 
       if (data.type !== 'FeatureCollection') {
@@ -881,7 +621,7 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
       data.features.forEach((feat) => {
         const feature = geojsonFormat.readFeature(feat, {
           dataProjection: 'EPSG:4326',
-          featureProjection: 'EPSG:3857'
+          featureProjection: 'EPSG:3857',
         }) as Feature;
 
         // Copier les propriétés importantes
@@ -905,8 +645,6 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
 
       reclamationsSourceRef.current.clear();
       reclamationsSourceRef.current.addFeatures(features);
-
-      console.log(`✅ Loaded ${features.length} reclamations on map`);
     } catch (err) {
       logger.error('Error fetching reclamations:', err);
     }
@@ -934,147 +672,24 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
 
     const view = mapInstance.current.getView();
     view.animate({
-      center: fromLonLat([targetLocation.coordinates.lng || 0, targetLocation.coordinates.lat || 0]),
+      center: fromLonLat([
+        targetLocation.coordinates.lng || 0,
+        targetLocation.coordinates.lat || 0,
+      ]),
       zoom: targetLocation.zoom || 18,
-      duration: 1500
+      duration: 1500,
     });
   }, [targetLocation]);
 
-  // ✅ Update Selection Layer based on selectedObjects
-  useEffect(() => {
-    if (!selectionLayerRef.current || !mapInstance.current) return;
-
-    const source = selectionLayerRef.current.getSource();
-    if (!source) return;
-
-    source.clear();
-
-    if (selectedObjects.length === 0) return;
-
-    // Helper to find feature by ID
-    const findFeatureById = (id: string): Feature | undefined => {
-      // 1. Check Data Layer (non-clustered)
-      if (dataLayerRef.current) {
-        const dSource = dataLayerRef.current.getSource();
-        if (dSource) {
-          const feat = dSource.getFeatureById(id);
-          if (feat) return feat as Feature;
-
-          const features = dSource.getFeatures();
-          const found = features.find(f => f.get('id') === id || f.getId() === id);
-          if (found) return found as Feature;
-        }
-      }
-
-      // 2. Check Vector Source (original points)
-      if (vectorSourceRef.current) {
-        const feat = vectorSourceRef.current.getFeatureById(id);
-        if (feat) return feat as Feature;
-
-        const features = vectorSourceRef.current.getFeatures();
-        const found = features.find(f => f.get('id') === id || f.getId() === id);
-        if (found) return found as Feature;
-      }
-
-      // 3. Check Sites Source
-      if (sitesSourceRef.current) {
-        const feat = sitesSourceRef.current.getFeatureById(id);
-        if (feat) return feat as Feature;
-
-        const features = sitesSourceRef.current.getFeatures();
-        const found = features.find(f => f.get('id') === id || f.getId() === id || (f.get('object_type') === 'Site' && f.get('site_id') === id));
-        if (found) return found as Feature;
-      }
-
-      return undefined;
-    };
-
-    selectedObjects.forEach(obj => {
-      const originalFeature = findFeatureById(obj.id);
-
-      if (originalFeature) {
-        const clonedFeature = originalFeature.clone();
-        clonedFeature.setId(obj.id);
-
-        const geom = clonedFeature.getGeometry();
-
-        // Handling Points (Sites, Trees, Furniture) differently to keep icon visible
-        if (geom && geom instanceof Point) {
-          // Highlight circle centered on the geometry point
-          const highlightStyle = new Style({
-            image: new CircleStyle({
-              radius: 12,
-              fill: new Fill({ color: 'rgba(255, 215, 0, 0.35)' }),
-              stroke: new Stroke({ color: '#FFD700', width: 2 })
-            }),
-            zIndex: 999
-          });
-
-          clonedFeature.setStyle(highlightStyle);
-
-        } else {
-          // Polygons / Lines
-          clonedFeature.setStyle(SELECTION_STYLE);
-        }
-
-        source.addFeature(clonedFeature);
-      } else if (obj.geometry) {
-        // Feature not found in existing layers, but object has geometry
-        // Create a new feature from the geometry (for objects coming from inventory)
-        try {
-          const type = obj.type as string;
-          // Normalize type for color lookup (inventory sends lowercase, OBJECT_COLORS uses PascalCase)
-          const normalizedType = type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
-          const color = OBJECT_COLORS[normalizedType] || OBJECT_COLORS[type] || '#10b981';
-
-          let newFeature: Feature;
-
-          if (obj.geometry.type === 'Point') {
-            const coords = obj.geometry.coordinates as [number, number];
-            newFeature = new Feature({
-              geometry: new Point(fromLonLat(coords)),
-              id: obj.id,
-              object_type: type,
-              title: obj.title
-            });
-            newFeature.setId(obj.id);
-
-            // Highlight circle centered on the geometry point
-            const highlightStyle = new Style({
-              image: new CircleStyle({
-                radius: 10,
-                fill: new Fill({ color: 'rgba(255, 215, 0, 0.35)' }),
-                stroke: new Stroke({ color: '#FFD700', width: 2 })
-              }),
-              zIndex: 999
-            });
-
-            newFeature.setStyle(highlightStyle);
-            source.addFeature(newFeature);
-          } else {
-            // For Polygon/LineString geometries from inventory
-            const geoJsonFormat = new GeoJSON();
-            const geojsonFeature = {
-              type: 'Feature',
-              geometry: obj.geometry,
-              properties: { id: obj.id, object_type: type }
-            };
-            newFeature = geoJsonFormat.readFeature(geojsonFeature, {
-              featureProjection: 'EPSG:3857'
-            }) as Feature;
-            newFeature.setId(obj.id);
-            newFeature.setStyle(SELECTION_STYLE);
-            source.addFeature(newFeature);
-          }
-
-          logger.debug(`Created selection feature from geometry for object ${obj.id} (${type})`);
-        } catch (error) {
-          logger.error(`Failed to create selection feature from geometry for object ${obj.id}:`, error);
-        }
-      }
-    });
-
-  }, [selectedObjects, mapReady, clusteringEnabled]);
+  useMapSelectionLayer({
+    selectionLayerRef,
+    dataLayerRef,
+    vectorSourceRef,
+    sitesSourceRef: sitesSourceRef as any,
+    selectedObjects,
+    mapReady,
+    clusteringEnabled: clusteringEnabled ?? false,
+  });
 
   // ✅ Sync visibleLayers to ref (for moveend callback to access current value)
   useEffect(() => {
@@ -1106,7 +721,6 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
   // Listen for refresh-map-data event (triggered after object modification/deletion)
   useEffect(() => {
     const handleRefreshMapData = () => {
-      console.log('[OLMap] Received refresh-map-data event');
       if (mapReady && mapInstance.current) {
         fetchData();
       }
@@ -1121,7 +735,6 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
   // ✅ Listen for refresh-reclamations event (triggered after reclamation creation/update)
   useEffect(() => {
     const handleRefreshReclamations = () => {
-      console.log('[OLMap] Received refresh-reclamations event');
       if (mapReady && mapInstance.current && overlays?.reclamations) {
         fetchReclamations();
       }
@@ -1133,83 +746,11 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     };
   }, [mapReady, overlays?.reclamations]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ✅ New Effect: Handle specific highlightedGeometry (from Detail Page)
-  useEffect(() => {
-    if (!mapReady || !selectionLayerRef.current) return;
-
-    // Clear previous selection if new highlight is provided or emptied
-    const source = selectionLayerRef.current.getSource();
-    if (!source) return;
-
-    // We only clear if we are in "detail mode" (highlightedGeometry is present)
-    // to avoid conflicting with global selection context
-    if (highlightedGeometry) {
-      source.clear();
-
-      try {
-        const geojsonFormat = new GeoJSON();
-        // If it's a raw geometry object (coordinates, type), wrap in Feature
-        // If it's already a Feature, read it directly
-        let feature;
-
-        if (highlightedGeometry.type === 'Feature') {
-          feature = geojsonFormat.readFeature(highlightedGeometry, {
-            dataProjection: 'EPSG:4326',
-            featureProjection: 'EPSG:3857'
-          });
-        } else {
-          // Assume it's a raw geometry or property object mimicking a feature
-          feature = new Feature({
-            geometry: new GeoJSON().readGeometry(highlightedGeometry, {
-              dataProjection: 'EPSG:4326',
-              featureProjection: 'EPSG:3857'
-            })
-          });
-        }
-
-        if (feature) {
-          // Get custom color from feature properties or use default cyan
-          const properties = feature.getProperties();
-          const customColor = properties?.couleur_statut || properties?.color || '#00ffff';
-
-          // Convert HEX to RGBA with opacity
-          const hexToRgba = (hex: string, alpha: number = 0.2): string => {
-            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-            return result
-              ? `rgba(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}, ${alpha})`
-              : `rgba(0, 255, 255, ${alpha})`;
-          };
-
-          // Create a STRONG highlight style with custom color
-          const highlightStyle = new Style({
-            stroke: new Stroke({
-              color: customColor,
-              width: 5,
-            }),
-            fill: new Fill({
-              color: hexToRgba(customColor, 0.2),
-            }),
-            image: new CircleStyle({
-              radius: 12,
-              fill: new Fill({ color: customColor }),
-              stroke: new Stroke({ color: '#fff', width: 3 }),
-            }),
-            zIndex: 10000
-          });
-
-          if (!Array.isArray(feature)) { // Ensure it's a single feature
-            feature.setStyle(highlightStyle);
-            source.addFeature(feature);
-          }
-
-          // Centre map if not already handled by targetLocation
-          // optional: mapInstance.current?.getView().fit(source.getExtent(), { padding: [50, 50, 50, 50], maxZoom: 20 });
-        }
-      } catch (e) {
-        console.error("Error adding highlighted geometry:", e);
-      }
-    }
-  }, [highlightedGeometry, mapReady]);
+  useHighlightedGeometry({
+    selectionLayerRef,
+    highlightedGeometry,
+    mapReady,
+  });
 
   // Clustering is now handled in fetchData function with type-based clusters
 
@@ -1245,7 +786,6 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     }
   }, [mapReady, editingMode, selectedObjects.length, drawingTools.editingLayerRef]);
 
-
   // ✅ Sync local layer visibility with MapContext when changed externally
   useEffect(() => {
     const contextVisibleLayers = mapContext.getVisibleLayers();
@@ -1256,16 +796,24 @@ const OLMapInternal = (props: OLMapProps, ref: React.ForwardedRef<MapHandle>) =>
     setVisibleLayers(layersList);
   }, [mapContext.visibleLayers]);
 
-
   return (
     <div className="h-full w-full relative">
       <div ref={innerMapRef} className="h-full w-full bg-slate-100" />
 
-      <div ref={popupRef} className="ol-popup bg-white p-2 rounded shadow-lg border border-gray-200 min-w-[150px]">
-        <a href="#" className="ol-popup-closer absolute top-1 right-2 text-gray-500 font-bold" onClick={(e) => {
-          e.preventDefault();
-          popupOverlay.current?.setPosition(undefined);
-        }}>✖</a>
+      <div
+        ref={popupRef}
+        className="ol-popup bg-white p-2 rounded shadow-lg border border-gray-200 min-w-[150px]"
+      >
+        <a
+          href="#"
+          className="ol-popup-closer absolute top-1 right-2 text-gray-500 font-bold"
+          onClick={(e) => {
+            e.preventDefault();
+            popupOverlay.current?.setPosition(undefined);
+          }}
+        >
+          ✖
+        </a>
         <div id="popup-content"></div>
       </div>
     </div>

@@ -22,7 +22,7 @@ export interface FormModalProps {
   title: string;
 
   /** Sous-titre optionnel */
-  subtitle?: string;
+  subtitle?: React.ReactNode;
 
   /** Icône du header */
   icon?: React.ReactNode;
@@ -125,7 +125,7 @@ export const FormModal: React.FC<FormModalProps> = ({
   showSummary = false,
   summaryContent,
   useGradientHeader = false,
-  animationVariant = 'zoom',
+  animationVariant: _animationVariant = 'zoom',
 }) => {
   // ============================================================================
   // HANDLERS
@@ -164,11 +164,16 @@ export const FormModal: React.FC<FormModalProps> = ({
       <form onSubmit={handleSubmit} className={`flex flex-col h-full min-h-0 ${formClassName}`}>
         {/* Header */}
         {useGradientHeader ? (
-          <div className={`px-6 py-3 border-b flex items-center justify-between flex-shrink-0 ${MODAL_DESIGN_TOKENS.colors.gradients.header
-            } ${MODAL_DESIGN_TOKENS.colors.borders.emerald}`}>
+          <div
+            className={`px-6 py-3 border-b flex items-center justify-between flex-shrink-0 ${
+              MODAL_DESIGN_TOKENS.colors.gradients.header
+            } ${MODAL_DESIGN_TOKENS.colors.borders.emerald}`}
+          >
             <div className="flex items-center gap-3">
               {icon && (
-                <div className={`w-8 h-8 ${MODAL_DESIGN_TOKENS.colors.backgrounds.emerald100} ${MODAL_DESIGN_TOKENS.borderRadius.lg} flex items-center justify-center`}>
+                <div
+                  className={`w-8 h-8 ${MODAL_DESIGN_TOKENS.colors.backgrounds.emerald100} ${MODAL_DESIGN_TOKENS.borderRadius.lg} flex items-center justify-center`}
+                >
                   {icon}
                 </div>
               )}
@@ -222,17 +227,25 @@ export const FormModal: React.FC<FormModalProps> = ({
         {showSummary && summaryContent ? (
           <div className="flex-1 flex overflow-hidden min-h-0">
             {/* Main Content */}
-            <div className={`flex-1 overflow-y-auto p-6 ${loading ? 'opacity-60 pointer-events-none transition-opacity' : 'transition-opacity'}`}>
+            <div
+              className={`flex-1 overflow-y-auto p-6 ${loading ? 'opacity-60 pointer-events-none transition-opacity' : 'transition-opacity'}`}
+            >
               {children}
             </div>
 
             {/* Summary Sidebar */}
-            <div className={`${MODAL_DESIGN_TOKENS.spacing.sidebarWidth} border-l ${MODAL_DESIGN_TOKENS.colors.borders.default} ${MODAL_DESIGN_TOKENS.colors.gradients.sidebar} overflow-y-auto flex-shrink-0`}>
+            <div
+              className={`${MODAL_DESIGN_TOKENS.spacing.sidebarWidth} border-l ${MODAL_DESIGN_TOKENS.colors.borders.default} ${MODAL_DESIGN_TOKENS.colors.gradients.sidebar} overflow-y-auto flex-shrink-0`}
+            >
               {summaryContent}
             </div>
           </div>
         ) : (
-          <ModalBody className={loading ? 'opacity-60 pointer-events-none transition-opacity' : 'transition-opacity'}>
+          <ModalBody
+            className={
+              loading ? 'opacity-60 pointer-events-none transition-opacity' : 'transition-opacity'
+            }
+          >
             {children}
           </ModalBody>
         )}
@@ -242,9 +255,7 @@ export const FormModal: React.FC<FormModalProps> = ({
           <ModalFooter>
             {/* Additional Actions (left side) */}
             {additionalActions && (
-              <div className="flex-1 flex items-center gap-2">
-                {additionalActions}
-              </div>
+              <div className="flex-1 flex items-center gap-2">{additionalActions}</div>
             )}
 
             {/* Spacer if no additional actions */}
@@ -309,12 +320,14 @@ export const FormField: React.FC<{
     <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
       {icon && <span className="text-slate-400">{icon}</span>}
       {label}
-      {required && <span className="text-red-500 ml-0.5" title="Champ obligatoire">*</span>}
+      {required && (
+        <span className="text-red-500 ml-0.5" title="Champ obligatoire">
+          *
+        </span>
+      )}
     </label>
     {children}
-    {hint && !error && (
-      <p className="text-xs text-slate-500">{hint}</p>
-    )}
+    {hint && !error && <p className="text-xs text-slate-500">{hint}</p>}
     {error && (
       <p className="text-xs text-red-600 flex items-center gap-1 animate-in slide-in-from-top-1">
         <AlertCircle className="w-3 h-3" />
@@ -338,11 +351,7 @@ export const FormGrid: React.FC<{
     3: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
   }[columns];
 
-  return (
-    <div className={`grid ${gridClass} gap-4 ${className}`}>
-      {children}
-    </div>
-  );
+  return <div className={`grid ${gridClass} gap-4 ${className}`}>{children}</div>;
 };
 
 /**
@@ -351,15 +360,17 @@ export const FormGrid: React.FC<{
 export const FormSection: React.FC<{
   title: string;
   description?: string;
+  icon?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
-}> = ({ title, description, children, className = '' }) => (
+}> = ({ title, description, icon, children, className = '' }) => (
   <div className={`space-y-4 ${className}`}>
     <div className="border-b border-slate-200 pb-3">
-      <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-      {description && (
-        <p className="text-sm text-slate-500 mt-1">{description}</p>
-      )}
+      <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+        {icon}
+        {title}
+      </h3>
+      {description && <p className="text-sm text-slate-500 mt-1">{description}</p>}
     </div>
     {children}
   </div>
@@ -376,7 +387,9 @@ export const FormCheckbox: React.FC<{
   hint?: string;
   className?: string;
 }> = ({ label, checked, onChange, disabled, hint, className = '' }) => (
-  <div className={`flex items-start gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors ${className}`}>
+  <div
+    className={`flex items-start gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors ${className}`}
+  >
     <div className="flex items-center h-5">
       <input
         type="checkbox"
@@ -387,12 +400,8 @@ export const FormCheckbox: React.FC<{
       />
     </div>
     <div className="flex-1 text-sm">
-      <label className="font-medium text-slate-700 cursor-pointer select-none">
-        {label}
-      </label>
-      {hint && (
-        <p className="text-slate-500 mt-0.5">{hint}</p>
-      )}
+      <label className="font-medium text-slate-700 cursor-pointer select-none">{label}</label>
+      {hint && <p className="text-slate-500 mt-0.5">{hint}</p>}
     </div>
   </div>
 );
@@ -401,7 +410,16 @@ export const FormCheckbox: React.FC<{
  * Input standard
  */
 export const FormInput: React.FC<{
-  type?: 'text' | 'email' | 'password' | 'number' | 'tel' | 'url' | 'date' | 'datetime-local' | 'time';
+  type?:
+    | 'text'
+    | 'email'
+    | 'password'
+    | 'number'
+    | 'tel'
+    | 'url'
+    | 'date'
+    | 'datetime-local'
+    | 'time';
   value: string | number;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -423,17 +441,17 @@ export const FormInput: React.FC<{
   step,
   className = '',
 }) => (
-    <input
-      type={type}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      disabled={disabled}
-      required={required}
-      min={min}
-      max={max}
-      step={step}
-      className={`
+  <input
+    type={type}
+    value={value}
+    onChange={(e) => onChange(e.target.value)}
+    placeholder={placeholder}
+    disabled={disabled}
+    required={required}
+    min={min}
+    max={max}
+    step={step}
+    className={`
       w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900
       placeholder:text-slate-400
       focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500
@@ -442,8 +460,8 @@ export const FormInput: React.FC<{
       shadow-sm hover:border-slate-400
       ${className}
     `}
-    />
-  );
+  />
+);
 
 /**
  * Textarea standard
@@ -456,23 +474,15 @@ export const FormTextarea: React.FC<{
   required?: boolean;
   rows?: number;
   className?: string;
-}> = ({
-  value,
-  onChange,
-  placeholder,
-  disabled,
-  required,
-  rows = 4,
-  className = '',
-}) => (
-    <textarea
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      disabled={disabled}
-      required={required}
-      rows={rows}
-      className={`
+}> = ({ value, onChange, placeholder, disabled, required, rows = 4, className = '' }) => (
+  <textarea
+    value={value}
+    onChange={(e) => onChange(e.target.value)}
+    placeholder={placeholder}
+    disabled={disabled}
+    required={required}
+    rows={rows}
+    className={`
       w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900
       placeholder:text-slate-400
       focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500
@@ -482,8 +492,8 @@ export const FormTextarea: React.FC<{
       resize-none
       ${className}
     `}
-    />
-  );
+  />
+);
 
 /**
  * Select standard
@@ -496,22 +506,14 @@ export const FormSelect: React.FC<{
   disabled?: boolean;
   required?: boolean;
   className?: string;
-}> = ({
-  value,
-  onChange,
-  options,
-  placeholder,
-  disabled,
-  required,
-  className = '',
-}) => (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        required={required}
-        className={`
+}> = ({ value, onChange, options, placeholder, disabled, required, className = '' }) => (
+  <div className="relative">
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
+      required={required}
+      className={`
         w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900
         focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500
         disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed
@@ -520,25 +522,25 @@ export const FormSelect: React.FC<{
         appearance-none
         ${className}
       `}
-      >
-        {placeholder && (
-          <option value="" disabled>
-            {placeholder}
-          </option>
-        )}
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-        <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-        </svg>
-      </div>
+    >
+      {placeholder && (
+        <option value="" disabled>
+          {placeholder}
+        </option>
+      )}
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+    <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+      </svg>
     </div>
-  );
+  </div>
+);
 
 // ============================================================================
 // EXPORT

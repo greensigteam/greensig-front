@@ -1,0 +1,1034 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`drawMonthlyPhotos — snapshot > paginates between two groups when the second does not fit 1`] = `
+{
+  "finalY": 115,
+  "trace": [
+    {
+      "op": "addPage",
+    },
+    {
+      "args": [
+        16,
+        185,
+        129,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        33,
+        6,
+        12,
+        "F",
+      ],
+      "op": "rect",
+    },
+    {
+      "args": [
+        16,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "6. PHOTOS AVANT/APRÈS",
+        30,
+        41,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        11,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "Groupe 1",
+        20,
+        53,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        9,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        107,
+        114,
+        128,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "AVANT",
+        57.5,
+        59,
+        {
+          "align": "center",
+          "isInputVisual": true,
+        },
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "APRÈS",
+        142.5,
+        59,
+        {
+          "align": "center",
+          "isInputVisual": true,
+        },
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "JPEG",
+        20,
+        63,
+        75,
+        55,
+      ],
+      "op": "addImage",
+    },
+    {
+      "args": [
+        "JPEG",
+        105,
+        63,
+        75,
+        55,
+      ],
+      "op": "addImage",
+    },
+    {
+      "op": "addPage",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        11,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "Groupe 2",
+        20,
+        38,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        9,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        107,
+        114,
+        128,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "AVANT",
+        57.5,
+        44,
+        {
+          "align": "center",
+          "isInputVisual": true,
+        },
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "APRÈS",
+        142.5,
+        44,
+        {
+          "align": "center",
+          "isInputVisual": true,
+        },
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "JPEG",
+        20,
+        48,
+        75,
+        55,
+      ],
+      "op": "addImage",
+    },
+    {
+      "args": [
+        "JPEG",
+        105,
+        48,
+        75,
+        55,
+      ],
+      "op": "addImage",
+    },
+  ],
+}
+`;
+
+exports[`drawMonthlyPhotos — snapshot > renders both images present 1`] = `
+{
+  "finalY": 130,
+  "trace": [
+    {
+      "op": "addPage",
+    },
+    {
+      "args": [
+        16,
+        185,
+        129,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        33,
+        6,
+        12,
+        "F",
+      ],
+      "op": "rect",
+    },
+    {
+      "args": [
+        16,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "6. PHOTOS AVANT/APRÈS",
+        30,
+        41,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        11,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "Tonte gazon",
+        20,
+        53,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        9,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        107,
+        114,
+        128,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "AVANT",
+        57.5,
+        59,
+        {
+          "align": "center",
+          "isInputVisual": true,
+        },
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "APRÈS",
+        142.5,
+        59,
+        {
+          "align": "center",
+          "isInputVisual": true,
+        },
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "JPEG",
+        20,
+        63,
+        75,
+        55,
+      ],
+      "op": "addImage",
+    },
+    {
+      "args": [
+        "JPEG",
+        105,
+        63,
+        75,
+        55,
+      ],
+      "op": "addImage",
+    },
+  ],
+}
+`;
+
+exports[`drawMonthlyPhotos — snapshot > renders placeholders when images are missing 1`] = `
+{
+  "finalY": 130,
+  "trace": [
+    {
+      "op": "addPage",
+    },
+    {
+      "args": [
+        16,
+        185,
+        129,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        33,
+        6,
+        12,
+        "F",
+      ],
+      "op": "rect",
+    },
+    {
+      "args": [
+        16,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "6. PHOTOS AVANT/APRÈS",
+        30,
+        41,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        11,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "Élagage",
+        20,
+        53,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        9,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        107,
+        114,
+        128,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "AVANT",
+        57.5,
+        59,
+        {
+          "align": "center",
+          "isInputVisual": true,
+        },
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "APRÈS",
+        142.5,
+        59,
+        {
+          "align": "center",
+          "isInputVisual": true,
+        },
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        243,
+        244,
+        246,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        63,
+        75,
+        55,
+        2,
+        2,
+        "F",
+      ],
+      "op": "roundedRect",
+    },
+    {
+      "args": [
+        8,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        150,
+        150,
+        150,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "Image non disponible",
+        57.5,
+        90.5,
+        {
+          "align": "center",
+          "isInputVisual": true,
+        },
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        243,
+        244,
+        246,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        105,
+        63,
+        75,
+        55,
+        2,
+        2,
+        "F",
+      ],
+      "op": "roundedRect",
+    },
+    {
+      "args": [
+        8,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        150,
+        150,
+        150,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "Image non disponible",
+        142.5,
+        90.5,
+        {
+          "align": "center",
+          "isInputVisual": true,
+        },
+      ],
+      "op": "text",
+    },
+  ],
+}
+`;
+
+exports[`drawMonthlyPhotosMulti — snapshot > renders one banner per non-empty site, skipping empty ones 1`] = `
+{
+  "finalY": 233,
+  "trace": [
+    {
+      "op": "addPage",
+    },
+    {
+      "args": [
+        16,
+        185,
+        129,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        33,
+        6,
+        12,
+        "F",
+      ],
+      "op": "rect",
+    },
+    {
+      "args": [
+        16,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "6. PHOTOS AVANT/APRÈS",
+        30,
+        41,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        50,
+        50,
+        50,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        50,
+        170,
+        12,
+        2,
+        2,
+        "F",
+      ],
+      "op": "roundedRect",
+    },
+    {
+      "args": [
+        11,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        255,
+        255,
+        255,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "Site A",
+        25,
+        58,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        10,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "Tonte",
+        20,
+        68,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        8,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        107,
+        114,
+        128,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "AVANT",
+        57.5,
+        74,
+        {
+          "align": "center",
+          "isInputVisual": true,
+        },
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "APRÈS",
+        142.5,
+        74,
+        {
+          "align": "center",
+          "isInputVisual": true,
+        },
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "JPEG",
+        20,
+        78,
+        75,
+        55,
+      ],
+      "op": "addImage",
+    },
+    {
+      "args": [
+        "JPEG",
+        105,
+        78,
+        75,
+        55,
+      ],
+      "op": "addImage",
+    },
+    {
+      "args": [
+        50,
+        50,
+        50,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        140,
+        170,
+        12,
+        2,
+        2,
+        "F",
+      ],
+      "op": "roundedRect",
+    },
+    {
+      "args": [
+        11,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        255,
+        255,
+        255,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "Site C",
+        25,
+        148,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        10,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "Élagage",
+        20,
+        158,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        8,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        107,
+        114,
+        128,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "AVANT",
+        57.5,
+        164,
+        {
+          "align": "center",
+          "isInputVisual": true,
+        },
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "APRÈS",
+        142.5,
+        164,
+        {
+          "align": "center",
+          "isInputVisual": true,
+        },
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        243,
+        244,
+        246,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        168,
+        75,
+        55,
+        2,
+        2,
+        "F",
+      ],
+      "op": "roundedRect",
+    },
+    {
+      "args": [
+        8,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        150,
+        150,
+        150,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "Image non disponible",
+        57.5,
+        195.5,
+        {
+          "align": "center",
+          "isInputVisual": true,
+        },
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "JPEG",
+        105,
+        168,
+        75,
+        55,
+      ],
+      "op": "addImage",
+    },
+  ],
+}
+`;

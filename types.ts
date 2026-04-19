@@ -1,6 +1,21 @@
-
 export type Role = 'ADMIN' | 'SUPERVISEUR' | 'CLIENT';
-export type ViewState = 'LOGIN' | 'DASHBOARD' | 'MAP' | 'INVENTORY' | 'PLANNING' | 'INTERVENTIONS' | 'CLAIMS' | 'TEAMS' | 'USERS' | 'REPORTING' | 'CLIENT_PORTAL' | 'PRODUCTS' | 'SITES' | 'CLIENTS' | 'SUIVI_TACHES' | 'PARAMETRES';
+export type ViewState =
+  | 'LOGIN'
+  | 'DASHBOARD'
+  | 'MAP'
+  | 'INVENTORY'
+  | 'PLANNING'
+  | 'INTERVENTIONS'
+  | 'CLAIMS'
+  | 'TEAMS'
+  | 'USERS'
+  | 'REPORTING'
+  | 'CLIENT_PORTAL'
+  | 'PRODUCTS'
+  | 'SITES'
+  | 'CLIENTS'
+  | 'SUIVI_TACHES'
+  | 'PARAMETRES';
 
 export interface User {
   id: string;
@@ -8,6 +23,10 @@ export interface User {
   email: string;
   role: Role;
   avatar?: string;
+  /** Profil métier renvoyé par /api/users/me/ pour les utilisateurs SUPERVISEUR. */
+  superviseur_id?: number | null;
+  /** Profil métier renvoyé par /api/users/me/ pour les utilisateurs CLIENT. */
+  client_structure_id?: number | null;
 }
 
 export interface InventoryItem {
@@ -72,7 +91,7 @@ export enum MapLayerType {
   PLAN = 'PLAN',
   SATELLITE = 'SATELLITE',
   TERRAIN = 'TERRAIN',
-  NAVIGATION = 'NAVIGATION'
+  NAVIGATION = 'NAVIGATION',
 }
 
 export interface LayerConfig {
@@ -268,12 +287,7 @@ export type {
   UseAdvancedFiltersReturn,
   UseSavedFiltersReturn,
   StateType,
-  SizeType
+  SizeType,
 } from './types/filters';
 
-export {
-  filtersToQueryParams,
-  countActiveFilters,
-  getFilterLabel,
-  isArray
-} from './types/filters';
+export { filtersToQueryParams, countActiveFilters, getFilterLabel, isArray } from './types/filters';

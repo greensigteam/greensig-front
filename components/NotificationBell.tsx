@@ -17,7 +17,7 @@ import {
   autoUpdate,
   FloatingPortal,
   useDismiss,
-  useInteractions
+  useInteractions,
 } from '@floating-ui/react';
 import { useNotificationContext, Notification } from '../contexts/NotificationContext';
 import { formatDistanceToNow } from 'date-fns';
@@ -35,13 +35,8 @@ export default function NotificationBell({ className = '' }: NotificationBellPro
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
 
-  const {
-    notifications,
-    unreadCount,
-    isConnected,
-    markAsRead,
-    markAllAsRead,
-  } = useNotificationContext();
+  const { notifications, unreadCount, isConnected, markAsRead, markAllAsRead } =
+    useNotificationContext();
 
   // Floating UI pour popover
   const { refs, floatingStyles, context } = useFloating({
@@ -49,7 +44,7 @@ export default function NotificationBell({ className = '' }: NotificationBellPro
     onOpenChange: setIsOpen,
     placement: 'bottom-end',
     middleware: [offset(8), flip(), shift({ padding: 10 })],
-    whileElementsMounted: autoUpdate
+    whileElementsMounted: autoUpdate,
   });
 
   const dismiss = useDismiss(context, { outsidePress: true, escapeKey: true });
@@ -66,7 +61,7 @@ export default function NotificationBell({ className = '' }: NotificationBellPro
     const data = notification.data;
 
     if (data.tache_id) {
-      navigate(`/planning?tache=${data.tache_id}`);
+      navigate(`/suivi-taches?task_id=${data.tache_id}`);
     } else if (data.reclamation_id) {
       navigate(`/reclamations/${data.reclamation_id}`);
     } else if (data.absence_id) {
@@ -81,11 +76,16 @@ export default function NotificationBell({ className = '' }: NotificationBellPro
   // Couleur selon priorite
   const getPriorityColor = (priorite: string) => {
     switch (priorite) {
-      case 'urgent': return 'text-red-600 bg-red-50';
-      case 'high': return 'text-orange-600 bg-orange-50';
-      case 'normal': return 'text-emerald-600 bg-emerald-50';
-      case 'low': return 'text-slate-500 bg-slate-50';
-      default: return 'text-slate-600 bg-slate-50';
+      case 'urgent':
+        return 'text-red-600 bg-red-50';
+      case 'high':
+        return 'text-orange-600 bg-orange-50';
+      case 'normal':
+        return 'text-emerald-600 bg-emerald-50';
+      case 'low':
+        return 'text-slate-500 bg-slate-50';
+      default:
+        return 'text-slate-600 bg-slate-50';
     }
   };
 
@@ -123,7 +123,10 @@ export default function NotificationBell({ className = '' }: NotificationBellPro
 
         {/* Indicateur connexion */}
         {!isConnected && (
-          <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-amber-400 border border-white" title="Hors ligne" />
+          <span
+            className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-amber-400 border border-white"
+            title="Hors ligne"
+          />
         )}
       </button>
 
@@ -174,19 +177,24 @@ export default function NotificationBell({ className = '' }: NotificationBellPro
                     <div
                       key={notification.id}
                       onClick={() => handleNotificationClick(notification)}
-                      className={`px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors ${!notification.lu ? 'bg-emerald-50/50' : ''
-                        }`}
+                      className={`px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors ${
+                        !notification.lu ? 'bg-emerald-50/50' : ''
+                      }`}
                     >
                       <div className="flex gap-3">
                         {/* Icone type */}
-                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${getPriorityColor(notification.priorite)}`}>
+                        <div
+                          className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${getPriorityColor(notification.priorite)}`}
+                        >
                           {getTypeIcon(notification.type)}
                         </div>
 
                         {/* Contenu */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
-                            <p className={`text-sm font-medium truncate ${!notification.lu ? 'text-slate-900' : 'text-slate-600'}`}>
+                            <p
+                              className={`text-sm font-medium truncate ${!notification.lu ? 'text-slate-900' : 'text-slate-600'}`}
+                            >
                               {notification.titre}
                             </p>
                             {!notification.lu && (

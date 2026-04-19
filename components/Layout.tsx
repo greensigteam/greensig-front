@@ -1,10 +1,11 @@
-
 import React from 'react';
-import { useLocation, Outlet } from 'react-router-dom';
-import { Menu } from 'lucide-react';
+import { useLocation, Outlet, ScrollRestoration } from 'react-router-dom';
+
+import { Menu, Loader2 } from 'lucide-react';
 import Sidebar from './Sidebar';
 import Header from './Header';
-import { ViewState, User, MapSearchResult, SearchSuggestion, TargetLocation } from '../types';
+import { User, MapSearchResult, SearchSuggestion, TargetLocation } from '../types';
+import { useExport } from '../contexts/ExportContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -31,7 +32,7 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({
-  children,
+  children: _children,
   mapComponent,
   mapControls,
   user,
@@ -43,22 +44,24 @@ const Layout: React.FC<LayoutProps> = ({
   onCloseMobileSidebar,
 }) => {
   const location = useLocation();
+  const { activeJobs, hasActiveJobs } = useExport();
   const isMapView = location.pathname === '/map' || location.pathname === '/';
   const panelOpen = !isMapView;
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-emerald-950 font-sans">
+      <ScrollRestoration />
 
       {/* LAYER 0: Persistent Map Background (z-0) - always there but interactive only on map view */}
-      <div className={`absolute inset-0 z-0 ${isMapView ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+      <div
+        className={`absolute inset-0 z-0 ${isMapView ? 'pointer-events-auto' : 'pointer-events-none'}`}
+      >
         {mapComponent}
       </div>
 
       {/* LAYER 2: Map Controls (z-600) - visible only on map view */}
       {isMapView && (
-        <div className="absolute inset-0 z-[600] pointer-events-none">
-          {mapControls}
-        </div>
+        <div className="absolute inset-0 z-[600] pointer-events-none">{mapControls}</div>
       )}
 
       {/* Mobile sidebar backdrop */}
@@ -107,10 +110,12 @@ const Layout: React.FC<LayoutProps> = ({
           bg-white/95 backdrop-blur-xl shadow-2xl
           md:rounded-2xl md:border md:border-white/20
           transition-all duration-300 ease-[cubic-bezier(0.25,0.8,0.25,1)] flex flex-col overflow-hidden
-          ${isMobile ? '' : (isSidebarCollapsed ? 'md:left-[88px]' : 'md:left-[276px]')}
-          ${panelOpen
-            ? 'z-[500] translate-x-0 opacity-100 scale-100'
-            : 'invisible -z-10 pointer-events-none translate-x-[20px] opacity-0 scale-95'}
+          ${isMobile ? '' : isSidebarCollapsed ? 'md:left-[88px]' : 'md:left-[276px]'}
+          ${
+            panelOpen
+              ? 'z-[500] translate-x-0 opacity-100 scale-100'
+              : 'invisible -z-10 pointer-events-none translate-x-[20px] opacity-0 scale-95'
+          }
         `}
       >
         {/* Panel Header */}
@@ -131,6 +136,14 @@ const Layout: React.FC<LayoutProps> = ({
           </>
         )}
       </div>
+
+      {/* Bannière export global — visible sur toutes les pages pendant un export */}
+      {hasActiveJobs && (
+        <div className="fixed bottom-4 right-4 z-[800] bg-emerald-800 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+          <span>{activeJobs[0]?.label} en cours…</span>
+        </div>
+      )}
     </div>
   );
 };

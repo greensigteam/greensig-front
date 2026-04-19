@@ -9,47 +9,47 @@ import type { Client } from '../types/users';
  * Format UTF-8 avec BOM pour compatibilité Excel
  */
 export function exportClientsToCSV(clients: Client[]): void {
-    const headers = [
-        'ID',
-        'Nom Structure',
-        'Contact (Nom)',
-        'Contact (Prénom)',
-        'Email',
-        'Téléphone',
-        'Adresse',
-        'Contact Principal',
-        'Email Facturation',
-        'Statut',
-        'Dernière Connexion'
-    ];
+  const headers = [
+    'ID',
+    'Nom Structure',
+    'Contact (Nom)',
+    'Contact (Prénom)',
+    'Email',
+    'Téléphone',
+    'Adresse',
+    'Contact Principal',
+    'Email Facturation',
+    'Statut',
+    'Dernière Connexion',
+  ];
 
-    const rows = clients.map(client => [
-        client.utilisateur.toString(),
-        client.structure?.nom || client.nomStructure,
-        client.nom,
-        client.prenom,
-        client.email,
-        client.structure?.telephone || client.telephone || '',
-        client.structure?.adresse || client.adresse || '',
-        client.structure?.contactPrincipal || client.contactPrincipal || '',
-        client.structure?.emailFacturation || client.emailFacturation || '',
-        client.actif ? 'Actif' : 'Inactif',
-        client.utilisateurDetail?.derniereConnexion
-            ? new Date(client.utilisateurDetail.derniereConnexion).toLocaleDateString('fr-FR')
-            : 'Jamais'
-    ]);
+  const rows = clients.map((client) => [
+    client.utilisateur.toString(),
+    client.structure?.nom || client.nomStructure,
+    client.nom,
+    client.prenom,
+    client.email,
+    client.structure?.telephone || client.telephone || '',
+    client.structure?.adresse || client.adresse || '',
+    client.structure?.contactPrincipal || client.contactPrincipal || '',
+    client.structure?.emailFacturation || client.emailFacturation || '',
+    client.actif ? 'Actif' : 'Inactif',
+    client.utilisateurDetail?.derniereConnexion
+      ? new Date(client.utilisateurDetail.derniereConnexion).toLocaleDateString('fr-FR')
+      : 'Jamais',
+  ]);
 
-    // Créer le contenu CSV
-    const csvContent = [
-        headers.join(','),
-        ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-    ].join('\n');
+  // Créer le contenu CSV
+  const csvContent = [
+    headers.join(','),
+    ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
+  ].join('\n');
 
-    // Ajouter BOM UTF-8 pour Excel
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  // Ajouter BOM UTF-8 pour Excel
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
 
-    // Télécharger
-    downloadBlob(blob, `clients_${getTimestamp()}.csv`);
+  // Télécharger
+  downloadBlob(blob, `clients_${getTimestamp()}.csv`);
 }
 
 /**
@@ -57,7 +57,9 @@ export function exportClientsToCSV(clients: Client[]): void {
  * Format compatible avec Excel via MIME type application/vnd.ms-excel
  */
 export async function exportClientsToExcel(clients: Client[]): Promise<void> {
-    const tableRows = clients.map(client => `
+  const tableRows = clients
+    .map(
+      (client) => `
         <tr>
             <td>${client.utilisateur}</td>
             <td>${escapeHtml(client.structure?.nom || client.nomStructure)}</td>
@@ -70,17 +72,19 @@ export async function exportClientsToExcel(clients: Client[]): Promise<void> {
             <td>${escapeHtml(client.structure?.emailFacturation || client.emailFacturation || '')}</td>
             <td>${client.actif ? 'Actif' : 'Inactif'}</td>
             <td>${
-                client.utilisateurDetail?.derniereConnexion
-                    ? new Date(client.utilisateurDetail.derniereConnexion).toLocaleDateString('fr-FR')
-                    : 'Jamais'
+              client.utilisateurDetail?.derniereConnexion
+                ? new Date(client.utilisateurDetail.derniereConnexion).toLocaleDateString('fr-FR')
+                : 'Jamais'
             }</td>
         </tr>
-    `).join('');
+    `,
+    )
+    .join('');
 
-    // Récupérer le logo en base64
-    const logoBase64 = await getLogoAsBase64();
+  // Récupérer le logo en base64
+  const logoBase64 = await getLogoAsBase64();
 
-    const html = `
+  const html = `
         <html>
             <head>
                 <meta charset="utf-8">
@@ -153,8 +157,8 @@ export async function exportClientsToExcel(clients: Client[]): Promise<void> {
         </html>
     `;
 
-    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
-    downloadBlob(blob, `clients_${getTimestamp()}.xls`);
+  const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+  downloadBlob(blob, `clients_${getTimestamp()}.xls`);
 }
 
 // ============================================================================
@@ -165,36 +169,35 @@ export async function exportClientsToExcel(clients: Client[]): Promise<void> {
  * Récupère le logo GreenSIG encodé en base64 pour l'inclure dans les exports
  */
 async function getLogoAsBase64(): Promise<string | null> {
-    try {
-        const response = await fetch('/logofinal.png');
-        if (!response.ok) return null;
+  try {
+    const response = await fetch('/logofinal.png');
+    if (!response.ok) return null;
 
-        const blob = await response.blob();
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
-    } catch (error) {
-        console.error('Erreur lors du chargement du logo:', error);
-        return null;
-    }
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Télécharge un Blob avec un nom de fichier donné
  */
 function downloadBlob(blob: Blob, filename: string): void {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 /**
@@ -202,21 +205,21 @@ function downloadBlob(blob: Blob, filename: string): void {
  * Format: YYYYMMDD_HHMMSS
  */
 function getTimestamp(): string {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const seconds = String(now.getSeconds()).padStart(2, '0');
-    return `${year}${month}${day}_${hours}${minutes}${seconds}`;
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  return `${year}${month}${day}_${hours}${minutes}${seconds}`;
 }
 
 /**
  * Échappe les caractères HTML pour éviter les injections
  */
 function escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }

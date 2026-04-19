@@ -8,6 +8,7 @@ import type Map from 'ol/Map';
 import type { Feature } from 'ol';
 import type { MapObjectDetail, MapBrowserEvent, GeoJSONGeometry } from '../types';
 import { useSelection } from '../contexts/SelectionContext';
+import logger from '../services/logger';
 import { useDrawing } from '../contexts/DrawingContext';
 
 export interface UseMapClickHandlerOptions {
@@ -44,7 +45,7 @@ export function useMapClickHandler(options: UseMapClickHandlerOptions): void {
     onObjectClick,
     onSiteClick, // Added this
     mapReady = false,
-    isMeasuring = false
+    isMeasuring = false,
   } = options;
 
   // ✅ Call useSelection at hook level, NOT inside useEffect
@@ -66,7 +67,7 @@ export function useMapClickHandler(options: UseMapClickHandlerOptions): void {
         dataProjection: 'EPSG:4326',
       }) as GeoJSONGeometry;
     } catch (e) {
-      console.error('Error extracting geometry:', e);
+      logger.error('Error extracting geometry:', e);
       return undefined;
     }
   };
@@ -86,7 +87,7 @@ export function useMapClickHandler(options: UseMapClickHandlerOptions): void {
       return;
     }
 
-    const handleMapClick = (evt: MapBrowserEvent<UIEvent>) => {
+    const handleMapClick = (evt: MapBrowserEvent) => {
       // Close popup on any click first
       popupOverlayRef.current?.setPosition(undefined);
 
@@ -119,7 +120,7 @@ export function useMapClickHandler(options: UseMapClickHandlerOptions): void {
               view.animate({
                 center: (feature.getGeometry() as Point).getCoordinates(),
                 zoom: view.getZoom()! + 2,
-                duration: 500
+                duration: 500,
               });
             }
           } else {
@@ -136,7 +137,7 @@ export function useMapClickHandler(options: UseMapClickHandlerOptions): void {
                 title: name,
                 subtitle: props.site_nom || '',
                 attributes: props,
-                geometry: extractGeometry(singleFeature)
+                geometry: extractGeometry(singleFeature),
               });
               return; // Don't show modal
             }
@@ -149,7 +150,7 @@ export function useMapClickHandler(options: UseMapClickHandlerOptions): void {
                 type: props.object_type,
                 title: name,
                 subtitle: props.site_nom || '',
-                attributes: props
+                attributes: props,
               });
             }
           }
@@ -170,7 +171,7 @@ export function useMapClickHandler(options: UseMapClickHandlerOptions): void {
                 title: name,
                 subtitle: props.site_nom || '',
                 attributes: props,
-                geometry: extractGeometry(feature)
+                geometry: extractGeometry(feature),
               });
               return; // Don't show modal
             }
@@ -183,7 +184,7 @@ export function useMapClickHandler(options: UseMapClickHandlerOptions): void {
                 type: type,
                 title: name,
                 subtitle: props.site_nom || '',
-                attributes: props
+                attributes: props,
               });
             }
             return; // Object found, don't check sites
@@ -209,13 +210,15 @@ export function useMapClickHandler(options: UseMapClickHandlerOptions): void {
             title: props.nom_site || 'Site',
             subtitle: props.code_site || '',
             attributes: {
-              'Code': props.code_site,
-              'Adresse': props.adresse || '-',
-              'Surface totale': props.superficie_totale ? `${Number(props.superficie_totale).toLocaleString('fr-FR')} m²` : '-',
+              Code: props.code_site,
+              Adresse: props.adresse || '-',
+              'Surface totale': props.superficie_totale
+                ? `${Number(props.superficie_totale).toLocaleString('fr-FR')} m²`
+                : '-',
               'Date début contrat': props.date_debut_contrat || '-',
               'Date fin contrat': props.date_fin_contrat || '-',
-              'Actif': props.actif ? 'Oui' : 'Non'
-            }
+              Actif: props.actif ? 'Oui' : 'Non',
+            },
           });
         }
         return;
@@ -233,5 +236,16 @@ export function useMapClickHandler(options: UseMapClickHandlerOptions): void {
     return () => {
       map.un('click', handleMapClick);
     };
-  }, [mapInstance, dataLayerRef, sitesLayerRef, popupOverlayRef, onObjectClick, onSiteClick, mapReady, isMeasuring, isSelectionMode, toggleObjectSelection]);
+  }, [
+    mapInstance,
+    dataLayerRef,
+    sitesLayerRef,
+    popupOverlayRef,
+    onObjectClick,
+    onSiteClick,
+    mapReady,
+    isMeasuring,
+    isSelectionMode,
+    toggleObjectSelection,
+  ]);
 }

@@ -1,5 +1,13 @@
-import React, { useState, useMemo } from 'react';
-import { Search, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, X, Plus } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import {
+  Search,
+  ChevronRight,
+  ChevronLeft,
+  ChevronsRight,
+  ChevronsLeft,
+  X,
+  Plus,
+} from 'lucide-react';
 import { PremiumInput } from './modals/PremiumFormComponents';
 
 /**
@@ -15,14 +23,14 @@ import { PremiumInput } from './modals/PremiumFormComponents';
 
 export interface TransferListProps<T> {
   // Données
-  available: T[];           // Items disponibles
-  selected: T[];            // Items sélectionnés
-  onChange: (selected: T[]) => void;  // Callback quand la sélection change
+  available: T[]; // Items disponibles
+  selected: T[]; // Items sélectionnés
+  onChange: (selected: T[]) => void; // Callback quand la sélection change
 
   // Configuration
-  getItemId: (item: T) => string | number;  // Fonction pour obtenir l'ID unique d'un item
-  getItemLabel: (item: T) => string;        // Fonction pour obtenir le label d'affichage
-  getItemSubtitle?: (item: T) => string;    // Fonction optionnelle pour obtenir un sous-titre
+  getItemId: (item: T) => string | number; // Fonction pour obtenir l'ID unique d'un item
+  getItemLabel: (item: T) => string; // Fonction pour obtenir le label d'affichage
+  getItemSubtitle?: (item: T) => string; // Fonction optionnelle pour obtenir un sous-titre
 
   // Labels
   availableLabel?: string;
@@ -32,10 +40,10 @@ export interface TransferListProps<T> {
   emptySelectedMessage?: string;
 
   // Actions
-  onAddNew?: () => void;  // Callback pour créer un nouvel élément
+  onAddNew?: () => void; // Callback pour créer un nouvel élément
 
   // Style
-  height?: string;  // Hauteur des listes (default: '300px')
+  height?: string; // Hauteur des listes (default: '300px')
 }
 
 export function TransferList<T>({
@@ -51,7 +59,7 @@ export function TransferList<T>({
   emptyAvailableMessage = 'Aucun élément disponible',
   emptySelectedMessage = 'Aucun élément sélectionné',
   onAddNew,
-  height = '300px'
+  height = '300px',
 }: TransferListProps<T>) {
   const [searchQuery, setSearchQuery] = useState('');
   const [hoveredAvailable, setHoveredAvailable] = useState<string | number | null>(null);
@@ -60,7 +68,7 @@ export function TransferList<T>({
   // Filtrer les items disponibles (exclure ceux déjà sélectionnés)
   const availableItems = useMemo(() => {
     const selectedIds = new Set(selected.map(getItemId));
-    return available.filter(item => !selectedIds.has(getItemId(item)));
+    return available.filter((item) => !selectedIds.has(getItemId(item)));
   }, [available, selected, getItemId]);
 
   // Appliquer la recherche sur les items disponibles
@@ -68,7 +76,7 @@ export function TransferList<T>({
     if (!searchQuery.trim()) return availableItems;
 
     const query = searchQuery.toLowerCase();
-    return availableItems.filter(item => {
+    return availableItems.filter((item) => {
       const label = getItemLabel(item).toLowerCase();
       const subtitle = getItemSubtitle?.(item)?.toLowerCase() || '';
       return label.includes(query) || subtitle.includes(query);
@@ -81,7 +89,7 @@ export function TransferList<T>({
   };
 
   const removeItem = (item: T) => {
-    onChange(selected.filter(s => getItemId(s) !== getItemId(item)));
+    onChange(selected.filter((s) => getItemId(s) !== getItemId(item)));
   };
 
   const addAll = () => {
@@ -99,9 +107,7 @@ export function TransferList<T>({
         {/* Header */}
         <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">
-              {availableLabel}
-            </span>
+            <span className="text-sm font-medium text-gray-700">{availableLabel}</span>
             <div className="flex items-center gap-2">
               {onAddNew && (
                 <button
@@ -149,7 +155,7 @@ export function TransferList<T>({
             </div>
           ) : (
             <div className="p-0.5">
-              {filteredAvailable.map(item => {
+              {filteredAvailable.map((item) => {
                 const id = getItemId(item);
                 const isHovered = hoveredAvailable === id;
 
@@ -213,12 +219,8 @@ export function TransferList<T>({
         {/* Header */}
         <div className="px-3 py-2 bg-emerald-50 border-b border-emerald-200">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-emerald-800">
-              {selectedLabel}
-            </span>
-            <span className="text-xs text-emerald-600 font-semibold">
-              {selected.length}
-            </span>
+            <span className="text-sm font-medium text-emerald-800">{selectedLabel}</span>
+            <span className="text-xs text-emerald-600 font-semibold">{selected.length}</span>
           </div>
         </div>
 
@@ -230,7 +232,7 @@ export function TransferList<T>({
             </div>
           ) : (
             <div className="p-0.5">
-              {selected.map(item => {
+              {selected.map((item) => {
                 const id = getItemId(item);
                 const isHovered = hoveredSelected === id;
 

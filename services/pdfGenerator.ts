@@ -9,6 +9,16 @@
  */
 
 import { jsPDF } from 'jspdf';
+import {
+  computeBBox,
+  padBBox,
+  findOptimalZoom,
+  computeTileGrid,
+  loadAndCompositeTiles,
+  makeGeoToPixel,
+  drawPolygonRing,
+  cropCanvas,
+} from './mapTileUtils';
 
 // Types
 export interface PDFColors {
@@ -33,9 +43,9 @@ export interface PDFGeneratorOptions {
 
 // Constantes par défaut
 const DEFAULT_COLORS: PDFColors = {
-  primary: [16, 185, 129],    // emerald-500
-  dark: [17, 24, 39],         // gray-900
-  gray: [107, 114, 128],      // gray-500
+  primary: [16, 185, 129], // emerald-500
+  dark: [17, 24, 39], // gray-900
+  gray: [107, 114, 128], // gray-500
   lightGray: [243, 244, 246], // gray-100
   white: [255, 255, 255],
 };
@@ -47,16 +57,39 @@ const DEFAULT_MARGINS = {
   right: 20,
 };
 
-const HEADER_HEIGHT = 15;  // Hauteur réservée pour le header
-const FOOTER_HEIGHT = 12;  // Hauteur réservée pour le footer
+const HEADER_HEIGHT = 15; // Hauteur réservée pour le header
+const FOOTER_HEIGHT = 12; // Hauteur réservée pour le footer
+
+import { PDF_IMAGE_LOAD_TIMEOUT_MS } from '../constants';
 
 /**
- * Charge une image en base64
+ * Charge une image en base64. Résout à `null` après `timeoutMs` si le réseau
+ * est bloqué (ni `onload` ni `onerror` ne sont appelés) — évite que la
+ * génération PDF ne reste suspendue indéfiniment sur une tuile indisponible.
  */
-export const loadImageAsBase64 = (url: string, keepTransparency = false): Promise<string | null> => {
+export const loadImageAsBase64 = (
+  url: string,
+  keepTransparency = false,
+  timeoutMs: number = PDF_IMAGE_LOAD_TIMEOUT_MS,
+): Promise<string | null> => {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
+
+    let settled = false;
+    const settle = (value: string | null) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      resolve(value);
+    };
+
+    const timeoutId: ReturnType<typeof setTimeout> = setTimeout(() => {
+      // Détacher la source pour annuler la requête en cours côté navigateur.
+      img.src = '';
+      settle(null);
+    }, timeoutMs);
+
     img.onload = () => {
       try {
         const canvas = document.createElement('canvas');
@@ -69,23 +102,22 @@ export const loadImageAsBase64 = (url: string, keepTransparency = false): Promis
             ctx.fillRect(0, 0, canvas.width, canvas.height);
           }
           ctx.drawImage(img, 0, 0);
-          resolve(canvas.toDataURL(keepTransparency ? 'image/png' : 'image/jpeg', 0.8));
+          settle(canvas.toDataURL(keepTransparency ? 'image/png' : 'image/jpeg', 0.8));
         } else {
-          resolve(null);
+          settle(null);
         }
       } catch {
-        resolve(null);
+        settle(null);
       }
     };
-    img.onerror = () => resolve(null);
+    img.onerror = () => settle(null);
 
     // Construire l'URL complète si c'est une URL relative
     let fullUrl = url;
     if (url && url.startsWith('/')) {
       const apiUrl = import.meta.env.VITE_API_BASE_URL || '';
-      const backendUrl = apiUrl === '/api' || apiUrl === ''
-        ? window.location.origin
-        : apiUrl.replace('/api', '');
+      const backendUrl =
+        apiUrl === '/api' || apiUrl === '' ? window.location.origin : apiUrl.replace('/api', '');
       fullUrl = backendUrl + url;
     }
     img.src = fullUrl + (fullUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
@@ -160,7 +192,8 @@ export class PDFGenerator {
       pageWidth: this.pageWidth,
       pageHeight: this.pageHeight,
       contentWidth: this.pageWidth - this.margins.left - this.margins.right,
-      contentHeight: this.pageHeight - this.margins.top - this.margins.bottom - HEADER_HEIGHT - FOOTER_HEIGHT,
+      contentHeight:
+        this.pageHeight - this.margins.top - this.margins.bottom - HEADER_HEIGHT - FOOTER_HEIGHT,
       margins: this.margins,
     };
   }
@@ -204,9 +237,10 @@ export class PDFGenerator {
    * Calcule la zone de contenu disponible (en tenant compte du header/footer)
    */
   getContentArea() {
-    const startY = this.isFirstPage && !this.showHeaderOnCover
-      ? this.margins.top
-      : this.margins.top + HEADER_HEIGHT;
+    const startY =
+      this.isFirstPage && !this.showHeaderOnCover
+        ? this.margins.top
+        : this.margins.top + HEADER_HEIGHT;
     const endY = this.pageHeight - this.margins.bottom - FOOTER_HEIGHT;
     return { startY, endY, height: endY - startY };
   }
@@ -248,14 +282,7 @@ export class PDFGenerator {
       // Logo petit en haut à gauche
       const logoWidth = 25;
       const logoHeight = 8;
-      this.doc.addImage(
-        this.logoBase64,
-        'PNG',
-        this.margins.left,
-        5,
-        logoWidth,
-        logoHeight
-      );
+      this.doc.addImage(this.logoBase64, 'PNG', this.margins.left, 5, logoWidth, logoHeight);
     } else {
       // Texte de remplacement
       this.doc.setFontSize(10);
@@ -271,7 +298,7 @@ export class PDFGenerator {
       this.margins.left,
       this.margins.top + HEADER_HEIGHT - 3,
       this.pageWidth - this.margins.right,
-      this.margins.top + HEADER_HEIGHT - 3
+      this.margins.top + HEADER_HEIGHT - 3,
     );
   }
 
@@ -298,7 +325,7 @@ export class PDFGenerator {
         this.margins.left,
         this.pageHeight - this.margins.bottom - FOOTER_HEIGHT + 2,
         this.pageWidth - this.margins.right,
-        this.pageHeight - this.margins.bottom - FOOTER_HEIGHT + 2
+        this.pageHeight - this.margins.bottom - FOOTER_HEIGHT + 2,
       );
 
       // Numéro de page
@@ -309,7 +336,7 @@ export class PDFGenerator {
         `Page ${pageNum} / ${contentPages}`,
         this.pageWidth / 2,
         this.pageHeight - this.margins.bottom,
-        { align: 'center' }
+        { align: 'center' },
       );
     }
   }
@@ -361,7 +388,9 @@ export class PDFGenerator {
       this.currentY - 2,
       this.pageWidth - this.margins.left - this.margins.right,
       10,
-      2, 2, 'F'
+      2,
+      2,
+      'F',
     );
 
     this.doc.setFontSize(12);
@@ -393,12 +422,15 @@ export class PDFGenerator {
   /**
    * Ajoute du texte simple
    */
-  addText(text: string, options?: {
-    fontSize?: number;
-    color?: [number, number, number];
-    bold?: boolean;
-    align?: 'left' | 'center' | 'right';
-  }): number {
+  addText(
+    text: string,
+    options?: {
+      fontSize?: number;
+      color?: [number, number, number];
+      bold?: boolean;
+      align?: 'left' | 'center' | 'right';
+    },
+  ): number {
     const fontSize = options?.fontSize || 10;
     const color = options?.color || this.colors.dark;
     const align = options?.align || 'left';
@@ -443,7 +475,7 @@ export class PDFGenerator {
       this.margins.left,
       this.currentY,
       this.pageWidth - this.margins.right,
-      this.currentY
+      this.currentY,
     );
     this.currentY += 3;
     return this.currentY;
@@ -459,163 +491,32 @@ export class PDFGenerator {
  */
 export async function renderSitePolygonMap(
   geometry: { type: string; coordinates: number[][][] } | null | undefined,
-  canvasWidth = 800
+  canvasWidth = 800,
 ): Promise<string | null> {
-  if (!geometry || !geometry.coordinates || geometry.coordinates.length === 0) {
-    return null;
-  }
+  if (!geometry || !geometry.coordinates || geometry.coordinates.length === 0) return null;
 
   try {
-    // 1. Extraire l'anneau extérieur
     const ring = geometry.coordinates[0];
     if (!ring || ring.length < 3) return null;
 
-    // 2. Calculer la bounding box
-    let minLng = Infinity, maxLng = -Infinity;
-    let minLat = Infinity, maxLat = -Infinity;
-    for (const coord of ring) {
-      const lng = coord[0]!;
-      const lat = coord[1]!;
-      if (lng < minLng) minLng = lng;
-      if (lng > maxLng) maxLng = lng;
-      if (lat < minLat) minLat = lat;
-      if (lat > maxLat) maxLat = lat;
-    }
+    const bbox = computeBBox([ring]);
+    if (!bbox) return null;
 
-    // 3. Ajouter ~30% de padding
-    const lngPad = (maxLng - minLng) * 0.3;
-    const latPad = (maxLat - minLat) * 0.3;
-    const padMinLng = minLng - lngPad;
-    const padMaxLng = maxLng + lngPad;
-    const padMinLat = minLat - latPad;
-    const padMaxLat = maxLat + latPad;
+    const padded = padBBox(bbox);
+    const zoom = findOptimalZoom(padded, canvasWidth);
+    const grid = computeTileGrid(padded, zoom);
 
-    // Conversion helpers
-    const lngToTileX = (lng: number, z: number) => ((lng + 180) / 360) * Math.pow(2, z);
-    const latToTileY = (lat: number, z: number) => {
-      const latRad = (lat * Math.PI) / 180;
-      return ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * Math.pow(2, z);
-    };
+    if (grid.tilesX * grid.tilesY > 36) return null;
 
-    // 4. Trouver le zoom optimal pour que la bbox tienne dans canvasWidth
-    let zoom = 18;
-    for (let z = 18; z >= 1; z--) {
-      const tileXMin = lngToTileX(padMinLng, z);
-      const tileXMax = lngToTileX(padMaxLng, z);
-      const widthInTiles = tileXMax - tileXMin;
-      const widthInPx = widthInTiles * 256;
-      if (widthInPx <= canvasWidth * 1.5) {
-        zoom = z;
-        break;
-      }
-    }
+    const canvas = await loadAndCompositeTiles(grid, zoom);
+    if (!canvas) return null;
 
-    // 5. Calculer la grille de tuiles couvrant la bbox paddée
-    const tileXMinF = lngToTileX(padMinLng, zoom);
-    const tileXMaxF = lngToTileX(padMaxLng, zoom);
-    const tileYMinF = latToTileY(padMaxLat, zoom); // Note: lat plus haute → Y plus petit
-    const tileYMaxF = latToTileY(padMinLat, zoom);
+    const geoToPixel = makeGeoToPixel(zoom, grid.tileXMin, grid.tileYMin);
+    const ctx = canvas.getContext('2d')!;
+    drawPolygonRing(ctx, ring, geoToPixel);
 
-    const tileXMin = Math.floor(tileXMinF);
-    const tileXMax = Math.floor(tileXMaxF);
-    const tileYMin = Math.floor(tileYMinF);
-    const tileYMax = Math.floor(tileYMaxF);
-
-    const tilesX = tileXMax - tileXMin + 1;
-    const tilesY = tileYMax - tileYMin + 1;
-
-    // Limiter le nombre de tuiles pour éviter les abus
-    if (tilesX * tilesY > 36) {
-      console.warn('Trop de tuiles requises, fallback');
-      return null;
-    }
-
-    // 6. Charger toutes les tuiles en parallèle
-    const loadTile = (tx: number, ty: number): Promise<HTMLImageElement | null> => {
-      return new Promise((resolve) => {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${ty}/${tx}`;
-        img.onload = () => resolve(img);
-        img.onerror = () => resolve(null);
-        img.src = url;
-      });
-    };
-
-    const tilePromises: Promise<{ img: HTMLImageElement | null; tx: number; ty: number }>[] = [];
-    for (let tx = tileXMin; tx <= tileXMax; tx++) {
-      for (let ty = tileYMin; ty <= tileYMax; ty++) {
-        tilePromises.push(
-          loadTile(tx, ty).then((img) => ({ img, tx, ty }))
-        );
-      }
-    }
-
-    const tiles = await Promise.all(tilePromises);
-
-    // 7. Composite les tuiles sur un canvas
-    const fullWidth = tilesX * 256;
-    const fullHeight = tilesY * 256;
-    const canvas = document.createElement('canvas');
-    canvas.width = fullWidth;
-    canvas.height = fullHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-
-    for (const tile of tiles) {
-      if (tile.img) {
-        const x = (tile.tx - tileXMin) * 256;
-        const y = (tile.ty - tileYMin) * 256;
-        ctx.drawImage(tile.img, x, y, 256, 256);
-      }
-    }
-
-    // 8. Convertir les coordonnées géo → pixels sur le canvas
-    const geoToPixel = (lng: number, lat: number): [number, number] => {
-      const px = (lngToTileX(lng, zoom) - tileXMin) * 256;
-      const py = (latToTileY(lat, zoom) - tileYMin) * 256;
-      return [px, py];
-    };
-
-    // 9. Dessiner le polygone
-    ctx.beginPath();
-    const [startX, startY] = geoToPixel(ring[0]![0]!, ring[0]![1]!);
-    ctx.moveTo(startX, startY);
-    for (let i = 1; i < ring.length; i++) {
-      const [px, py] = geoToPixel(ring[i]![0]!, ring[i]![1]!);
-      ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-
-    // Remplissage semi-transparent emerald
-    ctx.fillStyle = 'rgba(16, 185, 129, 0.25)';
-    ctx.fill();
-
-    // Bordure solide emerald
-    ctx.strokeStyle = 'rgba(16, 185, 129, 0.9)';
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    // 10. Recadrer sur la zone utile (bbox paddée)
-    const [cropX1, cropY1] = geoToPixel(padMinLng, padMaxLat);
-    const [cropX2, cropY2] = geoToPixel(padMaxLng, padMinLat);
-    const cropX = Math.max(0, Math.floor(cropX1));
-    const cropY = Math.max(0, Math.floor(cropY1));
-    const cropW = Math.min(fullWidth - cropX, Math.ceil(cropX2 - cropX1));
-    const cropH = Math.min(fullHeight - cropY, Math.ceil(cropY2 - cropY1));
-
-    if (cropW <= 0 || cropH <= 0) return null;
-
-    const croppedCanvas = document.createElement('canvas');
-    croppedCanvas.width = cropW;
-    croppedCanvas.height = cropH;
-    const croppedCtx = croppedCanvas.getContext('2d');
-    if (!croppedCtx) return null;
-    croppedCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-
-    return croppedCanvas.toDataURL('image/jpeg', 0.85);
-  } catch (err) {
-    console.error('renderSitePolygonMap error:', err);
+    return cropCanvas(canvas, geoToPixel, padded);
+  } catch {
     return null;
   }
 }
@@ -624,7 +525,10 @@ export async function renderSitePolygonMap(
  * Charge un asset statique Vite (depuis public/) en base64.
  * N'utilise PAS le backend URL - sert directement via Vite dev server.
  */
-export const loadStaticAsset = (path: string, format: 'png' | 'jpeg' = 'png'): Promise<string | null> => {
+export const loadStaticAsset = (
+  path: string,
+  format: 'png' | 'jpeg' = 'png',
+): Promise<string | null> => {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -653,168 +557,42 @@ export const loadStaticAsset = (path: string, format: 'png' | 'jpeg' = 'png'): P
  */
 export async function renderMultiSitePolygonMap(
   geometries: Array<{ type: string; coordinates: number[][][] } | null | undefined>,
-  canvasWidth = 800
+  canvasWidth = 800,
 ): Promise<string | null> {
   const validGeometries = geometries.filter(
     (g): g is { type: string; coordinates: number[][][] } =>
-      !!g && !!g.coordinates && g.coordinates.length > 0
+      !!g && !!g.coordinates && g.coordinates.length > 0,
   );
   if (validGeometries.length === 0) return null;
 
   try {
-    // 1. Collecter tous les anneaux et calculer la bounding box globale
     const allRings: number[][][] = [];
-    let minLng = Infinity, maxLng = -Infinity;
-    let minLat = Infinity, maxLat = -Infinity;
-
     for (const geometry of validGeometries) {
       const ring = geometry.coordinates[0];
-      if (!ring || ring.length < 3) continue;
-      allRings.push(ring);
-
-      for (const coord of ring) {
-        const lng = coord[0]!;
-        const lat = coord[1]!;
-        if (lng < minLng) minLng = lng;
-        if (lng > maxLng) maxLng = lng;
-        if (lat < minLat) minLat = lat;
-        if (lat > maxLat) maxLat = lat;
-      }
+      if (ring && ring.length >= 3) allRings.push(ring);
     }
-
     if (allRings.length === 0) return null;
 
-    // 2. Padding ~30%
-    const lngPad = (maxLng - minLng) * 0.3 || 0.001;
-    const latPad = (maxLat - minLat) * 0.3 || 0.001;
-    const padMinLng = minLng - lngPad;
-    const padMaxLng = maxLng + lngPad;
-    const padMinLat = minLat - latPad;
-    const padMaxLat = maxLat + latPad;
+    const bbox = computeBBox(allRings);
+    if (!bbox) return null;
 
-    // Helpers
-    const lngToTileX = (lng: number, z: number) => ((lng + 180) / 360) * Math.pow(2, z);
-    const latToTileY = (lat: number, z: number) => {
-      const latRad = (lat * Math.PI) / 180;
-      return ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * Math.pow(2, z);
-    };
+    const padded = padBBox(bbox);
+    const zoom = findOptimalZoom(padded, canvasWidth);
+    const grid = computeTileGrid(padded, zoom);
 
-    // 3. Zoom optimal
-    let zoom = 18;
-    for (let z = 18; z >= 1; z--) {
-      const tileXMin = lngToTileX(padMinLng, z);
-      const tileXMax = lngToTileX(padMaxLng, z);
-      const widthInTiles = tileXMax - tileXMin;
-      const widthInPx = widthInTiles * 256;
-      if (widthInPx <= canvasWidth * 1.5) {
-        zoom = z;
-        break;
-      }
-    }
+    if (grid.tilesX * grid.tilesY > 64) return null;
 
-    // 4. Grille de tuiles
-    const tileXMinF = lngToTileX(padMinLng, zoom);
-    const tileXMaxF = lngToTileX(padMaxLng, zoom);
-    const tileYMinF = latToTileY(padMaxLat, zoom);
-    const tileYMaxF = latToTileY(padMinLat, zoom);
+    const canvas = await loadAndCompositeTiles(grid, zoom);
+    if (!canvas) return null;
 
-    const tileXMin = Math.floor(tileXMinF);
-    const tileXMax = Math.floor(tileXMaxF);
-    const tileYMin = Math.floor(tileYMinF);
-    const tileYMax = Math.floor(tileYMaxF);
-
-    const tilesX = tileXMax - tileXMin + 1;
-    const tilesY = tileYMax - tileYMin + 1;
-
-    if (tilesX * tilesY > 64) {
-      console.warn('Trop de tuiles requises pour multi-site, fallback');
-      return null;
-    }
-
-    // 5. Charger les tuiles
-    const loadTile = (tx: number, ty: number): Promise<HTMLImageElement | null> => {
-      return new Promise((resolve) => {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${ty}/${tx}`;
-        img.onload = () => resolve(img);
-        img.onerror = () => resolve(null);
-        img.src = url;
-      });
-    };
-
-    const tilePromises: Promise<{ img: HTMLImageElement | null; tx: number; ty: number }>[] = [];
-    for (let tx = tileXMin; tx <= tileXMax; tx++) {
-      for (let ty = tileYMin; ty <= tileYMax; ty++) {
-        tilePromises.push(loadTile(tx, ty).then((img) => ({ img, tx, ty })));
-      }
-    }
-
-    const tiles = await Promise.all(tilePromises);
-
-    // 6. Composite
-    const fullWidth = tilesX * 256;
-    const fullHeight = tilesY * 256;
-    const canvas = document.createElement('canvas');
-    canvas.width = fullWidth;
-    canvas.height = fullHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-
-    for (const tile of tiles) {
-      if (tile.img) {
-        const x = (tile.tx - tileXMin) * 256;
-        const y = (tile.ty - tileYMin) * 256;
-        ctx.drawImage(tile.img, x, y, 256, 256);
-      }
-    }
-
-    // 7. Coordonnées géo → pixels
-    const geoToPixel = (lng: number, lat: number): [number, number] => {
-      const px = (lngToTileX(lng, zoom) - tileXMin) * 256;
-      const py = (latToTileY(lat, zoom) - tileYMin) * 256;
-      return [px, py];
-    };
-
-    // 8. Dessiner TOUS les polygones
+    const geoToPixel = makeGeoToPixel(zoom, grid.tileXMin, grid.tileYMin);
+    const ctx = canvas.getContext('2d')!;
     for (const ring of allRings) {
-      ctx.beginPath();
-      const [startX, startY] = geoToPixel(ring[0]![0]!, ring[0]![1]!);
-      ctx.moveTo(startX, startY);
-      for (let i = 1; i < ring.length; i++) {
-        const [px, py] = geoToPixel(ring[i]![0]!, ring[i]![1]!);
-        ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-
-      ctx.fillStyle = 'rgba(16, 185, 129, 0.25)';
-      ctx.fill();
-
-      ctx.strokeStyle = 'rgba(16, 185, 129, 0.9)';
-      ctx.lineWidth = 3;
-      ctx.stroke();
+      drawPolygonRing(ctx, ring, geoToPixel);
     }
 
-    // 9. Recadrer
-    const [cropX1, cropY1] = geoToPixel(padMinLng, padMaxLat);
-    const [cropX2, cropY2] = geoToPixel(padMaxLng, padMinLat);
-    const cropX = Math.max(0, Math.floor(cropX1));
-    const cropY = Math.max(0, Math.floor(cropY1));
-    const cropW = Math.min(fullWidth - cropX, Math.ceil(cropX2 - cropX1));
-    const cropH = Math.min(fullHeight - cropY, Math.ceil(cropY2 - cropY1));
-
-    if (cropW <= 0 || cropH <= 0) return null;
-
-    const croppedCanvas = document.createElement('canvas');
-    croppedCanvas.width = cropW;
-    croppedCanvas.height = cropH;
-    const croppedCtx = croppedCanvas.getContext('2d');
-    if (!croppedCtx) return null;
-    croppedCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-
-    return croppedCanvas.toDataURL('image/jpeg', 0.85);
-  } catch (err) {
-    console.error('renderMultiSitePolygonMap error:', err);
+    return cropCanvas(canvas, geoToPixel, padded);
+  } catch {
     return null;
   }
 }

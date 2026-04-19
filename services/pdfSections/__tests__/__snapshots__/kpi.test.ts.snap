@@ -1,0 +1,10165 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`drawMonthlyKpiSection > renders only the fallback message when kpis is null 1`] = `
+{
+  "finalY": 68,
+  "trace": [
+    {
+      "args": [
+        16,
+        185,
+        129,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        33,
+        6,
+        12,
+        "F",
+      ],
+      "op": "rect",
+    },
+    {
+      "args": [
+        16,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "3. INDICATEURS DE PERFORMANCE",
+        30,
+        41,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        10,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "Données KPI non disponibles pour cette période.",
+        20,
+        53,
+      ],
+      "op": "text",
+    },
+  ],
+}
+`;
+
+exports[`drawMonthlyKpiSection > renders the full KPI tables with every statut color path covered > kpi-full-trace 1`] = `
+[
+  {
+    "args": [
+      16,
+      185,
+      129,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      33,
+      6,
+      12,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      16,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "3. INDICATEURS DE PERFORMANCE",
+      30,
+      41,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      75,
+      85,
+      99,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      [
+        "Dans le but de suivre le déroulement des activités, les indicateurs de performance du mois de avril 2026 sont présentés",
+        "ci-après.",
+      ],
+      20,
+      53,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#4a5462",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#495361",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      16,
+      185,
+      129,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#0fba82",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      69,
+      70,
+      11.65125,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Indicateur",
+      ],
+      24,
+      75.69875,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      16,
+      185,
+      129,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#0fba82",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      90,
+      69,
+      35,
+      11.65125,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Valeur",
+      ],
+      94,
+      75.69875,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      16,
+      185,
+      129,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#0fba82",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      125,
+      69,
+      30,
+      11.65125,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Seuil",
+      ],
+      129,
+      75.69875,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      16,
+      185,
+      129,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#0fba82",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      155,
+      69,
+      30,
+      11.65125,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Statut",
+      ],
+      159,
+      75.69875,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#495361",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      80.65125,
+      70,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Respect du planning",
+      ],
+      24,
+      87.35000000000001,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      90,
+      80.65125,
+      35,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "92.5%",
+      103.02325,
+      87.35000000000001,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      125,
+      80.65125,
+      30,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "90%",
+      136.840875,
+      87.35000000000001,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      22,
+      163,
+      74,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      155,
+      80.65125,
+      30,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "Conforme",
+      162.522875,
+      87.35000000000001,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      92.30250000000001,
+      70,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Qualité de service",
+      ],
+      24,
+      99.00125000000001,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      90,
+      92.30250000000001,
+      35,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "74.0%",
+      103.02325,
+      99.00125000000001,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      125,
+      92.30250000000001,
+      30,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "80%",
+      136.840875,
+      99.00125000000001,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      217,
+      119,
+      6,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      155,
+      92.30250000000001,
+      30,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "Attention",
+      163.062625,
+      99.00125000000001,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      103.95375000000001,
+      70,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Taux de traitement des réclamations",
+      ],
+      24,
+      110.65250000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      90,
+      103.95375000000001,
+      35,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "45.2%",
+      103.02325,
+      110.65250000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      125,
+      103.95375000000001,
+      30,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "70%",
+      136.840875,
+      110.65250000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      220,
+      38,
+      38,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      155,
+      103.95375000000001,
+      30,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "Non conforme",
+      159.26850000000002,
+      110.65250000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      115.60500000000002,
+      70,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Temps moyen traitement réclamations",
+      ],
+      24,
+      122.30375000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      90,
+      115.60500000000002,
+      35,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "12.3h",
+      103.563,
+      122.30375000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      125,
+      115.60500000000002,
+      30,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "24h",
+      137.380625,
+      122.30375000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      22,
+      163,
+      74,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      155,
+      115.60500000000002,
+      30,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "Conforme",
+      162.522875,
+      122.30375000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      127.25625000000002,
+      70,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Temps total de travail",
+      ],
+      24,
+      133.955,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      90,
+      127.25625000000002,
+      35,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "180h",
+      104.0075,
+      133.955,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      125,
+      127.25625000000002,
+      30,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "-",
+      139.476125,
+      133.955,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      155,
+      127.25625000000002,
+      30,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "-",
+      169.476125,
+      133.955,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#495361",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#495361",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#495361",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "italic",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      75,
+      85,
+      99,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      [
+        "Afin de fournir une vue plus détaillée, le temps moyen de traitement des réclamations est ventilé par type de réclamation :",
+      ],
+      20,
+      153.90750000000003,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "italic",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#4a5462",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "italic",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#495361",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      245,
+      158,
+      11,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#f49e0a",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      162.90750000000003,
+      80,
+      9.65125,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Type de réclamation",
+      ],
+      23,
+      168.60625000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      245,
+      158,
+      11,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#f49e0a",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      100,
+      162.90750000000003,
+      55,
+      9.65125,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Temps moyen de traitement",
+      ],
+      103,
+      168.60625000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      245,
+      158,
+      11,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#f49e0a",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      155,
+      162.90750000000003,
+      35,
+      9.65125,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Nb réclamations",
+      ],
+      158,
+      168.60625000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "italic",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#495361",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      172.55875000000003,
+      80,
+      9.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Arbre cassé",
+      ],
+      23,
+      178.25750000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      100,
+      172.55875000000003,
+      55,
+      9.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "18.0 h",
+      123.1185,
+      178.25750000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      155,
+      172.55875000000003,
+      35,
+      9.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "3",
+      171.626875,
+      178.25750000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      182.21000000000004,
+      80,
+      9.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Puit bouché",
+      ],
+      23,
+      187.90875000000003,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      100,
+      182.21000000000004,
+      55,
+      9.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "9.0 h",
+      123.991625,
+      187.90875000000003,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      155,
+      182.21000000000004,
+      35,
+      9.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "5",
+      171.626875,
+      187.90875000000003,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "italic",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#495361",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "italic",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "italic",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#495361",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "italic",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#495361",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "italic",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      75,
+      85,
+      99,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      [
+        "En complément des indicateurs figurant dans le tableau, le temps de réalisation par tâche, avec le nombre d'interventions",
+        "associées à chaque tâche, est présenté ci-après :",
+      ],
+      20,
+      201.86125000000004,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "italic",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#4a5462",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "italic",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#495361",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      16,
+      185,
+      129,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#0fba82",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      215.86125000000004,
+      80,
+      9.65125,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Type de tâche",
+      ],
+      23,
+      221.56000000000003,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      16,
+      185,
+      129,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#0fba82",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      100,
+      215.86125000000004,
+      55,
+      9.65125,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Temps de réalisation (h)",
+      ],
+      103,
+      221.56000000000003,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      16,
+      185,
+      129,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#0fba82",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      155,
+      215.86125000000004,
+      35,
+      9.65125,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Nb interventions",
+      ],
+      158,
+      221.56000000000003,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "italic",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#495361",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      225.51250000000005,
+      80,
+      9.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Tonte",
+      ],
+      23,
+      231.21125000000004,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      100,
+      225.51250000000005,
+      55,
+      9.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "60.0 h",
+      123.1185,
+      231.21125000000004,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      155,
+      225.51250000000005,
+      35,
+      9.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "15",
+      170.75375,
+      231.21125000000004,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      235.16375000000005,
+      80,
+      9.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Élagage",
+      ],
+      23,
+      240.86250000000004,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      100,
+      235.16375000000005,
+      55,
+      9.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "15.0 h",
+      123.1185,
+      240.86250000000004,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      155,
+      235.16375000000005,
+      35,
+      9.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "3",
+      171.626875,
+      240.86250000000004,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "italic",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#495361",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "italic",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "italic",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#495361",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "italic",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#495361",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "op": "addPage",
+  },
+  {
+    "args": [
+      10,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "Temps de réalisation des tâches par type et par site",
+      20,
+      38,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      10,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#111727",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      10,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#111627",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      16,
+      185,
+      129,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#0fba82",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      46,
+      60,
+      9.245555555555555,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Type de tâche",
+      ],
+      23,
+      51.39888888888889,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      16,
+      185,
+      129,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#0fba82",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      46,
+      60,
+      9.245555555555555,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Site",
+      ],
+      83,
+      51.39888888888889,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      16,
+      185,
+      129,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#0fba82",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      140,
+      46,
+      30,
+      9.245555555555555,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Temps (h)",
+      ],
+      143,
+      51.39888888888889,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      16,
+      185,
+      129,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#0fba82",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      170,
+      46,
+      30,
+      9.245555555555555,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Nb interventions",
+      ],
+      173,
+      51.39888888888889,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      10,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#111627",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      245,
+      245,
+      245,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#f4f4f4",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      55.245555555555555,
+      60,
+      9.245555555555555,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Élagage",
+      ],
+      23,
+      60.644444444444446,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      245,
+      245,
+      245,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#f4f4f4",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      55.245555555555555,
+      60,
+      9.245555555555555,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Site A",
+      ],
+      83,
+      60.644444444444446,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      245,
+      245,
+      245,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#f4f4f4",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      140,
+      55.245555555555555,
+      30,
+      9.245555555555555,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "15.0 h",
+      151.10533333333333,
+      60.644444444444446,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      245,
+      245,
+      245,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#f4f4f4",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      170,
+      55.245555555555555,
+      30,
+      9.245555555555555,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "3",
+      184.2238888888889,
+      60.644444444444446,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      64.49111111111111,
+      60,
+      9.245555555555555,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Tonte",
+      ],
+      23,
+      69.89,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      64.49111111111111,
+      60,
+      9.245555555555555,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Site A",
+      ],
+      83,
+      69.89,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      140,
+      64.49111111111111,
+      30,
+      9.245555555555555,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "40.0 h",
+      151.10533333333333,
+      69.89,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      170,
+      64.49111111111111,
+      30,
+      9.245555555555555,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "10",
+      183.4477777777778,
+      69.89,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      245,
+      245,
+      245,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#f4f4f4",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      73.73666666666666,
+      60,
+      9.245555555555555,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Tonte",
+      ],
+      23,
+      79.13555555555556,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      245,
+      245,
+      245,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#f4f4f4",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      73.73666666666666,
+      60,
+      9.245555555555555,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Site B",
+      ],
+      83,
+      79.13555555555556,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      245,
+      245,
+      245,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#f4f4f4",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      140,
+      73.73666666666666,
+      30,
+      9.245555555555555,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "20.0 h",
+      151.10533333333333,
+      79.13555555555556,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      245,
+      245,
+      245,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#f4f4f4",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      170,
+      73.73666666666666,
+      30,
+      9.245555555555555,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "5",
+      184.2238888888889,
+      79.13555555555556,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      10,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#111627",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      10,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#111627",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      10,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#111627",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+]
+`;
+
+exports[`drawMonthlyKpiSection > skips KPI4/5 tables when their source data is empty > kpi-minimal-trace 1`] = `
+[
+  {
+    "args": [
+      16,
+      185,
+      129,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      33,
+      6,
+      12,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      16,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "3. INDICATEURS DE PERFORMANCE",
+      30,
+      41,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      75,
+      85,
+      99,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      [
+        "Dans le but de suivre le déroulement des activités, les indicateurs de performance du mois de avril 2026 sont présentés",
+        "ci-après.",
+      ],
+      20,
+      53,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#4a5462",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#495361",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      16,
+      185,
+      129,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#0fba82",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      69,
+      70,
+      11.65125,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Indicateur",
+      ],
+      24,
+      75.69875,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      16,
+      185,
+      129,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#0fba82",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      90,
+      69,
+      35,
+      11.65125,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Valeur",
+      ],
+      94,
+      75.69875,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      16,
+      185,
+      129,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#0fba82",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      125,
+      69,
+      30,
+      11.65125,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Seuil",
+      ],
+      129,
+      75.69875,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      16,
+      185,
+      129,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#0fba82",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      155,
+      69,
+      30,
+      11.65125,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Statut",
+      ],
+      159,
+      75.69875,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#495361",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      80.65125,
+      70,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Respect du planning",
+      ],
+      24,
+      87.35000000000001,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      90,
+      80.65125,
+      35,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "92.5%",
+      103.02325,
+      87.35000000000001,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      125,
+      80.65125,
+      30,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "90%",
+      136.840875,
+      87.35000000000001,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      22,
+      163,
+      74,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      155,
+      80.65125,
+      30,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "Conforme",
+      162.522875,
+      87.35000000000001,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      92.30250000000001,
+      70,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Qualité de service",
+      ],
+      24,
+      99.00125000000001,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      90,
+      92.30250000000001,
+      35,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "-",
+      106.976125,
+      99.00125000000001,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      125,
+      92.30250000000001,
+      30,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "-",
+      139.476125,
+      99.00125000000001,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      155,
+      92.30250000000001,
+      30,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "-",
+      169.476125,
+      99.00125000000001,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      103.95375000000001,
+      70,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Taux de traitement des réclamations",
+      ],
+      24,
+      110.65250000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      90,
+      103.95375000000001,
+      35,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "-",
+      106.976125,
+      110.65250000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      125,
+      103.95375000000001,
+      30,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "-",
+      139.476125,
+      110.65250000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      155,
+      103.95375000000001,
+      30,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "-",
+      169.476125,
+      110.65250000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      115.60500000000002,
+      70,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Temps moyen traitement réclamations",
+      ],
+      24,
+      122.30375000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      90,
+      115.60500000000002,
+      35,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "-",
+      106.976125,
+      122.30375000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      125,
+      115.60500000000002,
+      30,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "-",
+      139.476125,
+      122.30375000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      155,
+      115.60500000000002,
+      30,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "-",
+      169.476125,
+      122.30375000000002,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      127.25625000000002,
+      70,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      [
+        "Temps total de travail",
+      ],
+      24,
+      133.955,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      90,
+      127.25625000000002,
+      35,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "-",
+      106.976125,
+      133.955,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      125,
+      127.25625000000002,
+      30,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "-",
+      139.476125,
+      133.955,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      80,
+      80,
+      80,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.1,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "#ffffff",
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      155,
+      127.25625000000002,
+      30,
+      11.65125,
+      "DF",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      "-",
+      169.476125,
+      133.955,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#495361",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      200,
+      200,
+      200,
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#495361",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      "#495361",
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "#000000",
+    ],
+    "op": "setDrawColor",
+  },
+  {
+    "args": [
+      0.200025,
+    ],
+    "op": "setLineWidth",
+  },
+]
+`;

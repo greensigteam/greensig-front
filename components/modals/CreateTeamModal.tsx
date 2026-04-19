@@ -6,6 +6,7 @@ import { fetchAllSites, SiteFrontend } from '../../services/api';
 import TransferList from '../TransferList';
 import { PremiumInput, PremiumSelect } from '../modals/PremiumFormComponents';
 import CreateOperateurModal from './CreateOperateurModal';
+import { useToast } from '../../contexts/ToastContext';
 
 interface CreateTeamModalProps {
   onClose: () => void;
@@ -18,12 +19,13 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
   onClose,
   onCreated,
   chefsPotentiels,
-  operateursSansEquipe
+  operateursSansEquipe,
 }) => {
+  const { showToast } = useToast();
   const [formData, setFormData] = useState({
     nomEquipe: '',
     chefEquipe: null as number | null,
-    sitePrincipal: null as number | null
+    sitePrincipal: null as number | null,
   });
   const [selectedMembres, setSelectedMembres] = useState<OperateurList[]>([]);
   const [sites, setSites] = useState<SiteFrontend[]>([]);
@@ -33,16 +35,17 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
 
   // État pour la modale de création d'opérateur
   const [showCreateOperateur, setShowCreateOperateur] = useState(false);
-  const [availableOperateurs, setAvailableOperateurs] = useState<OperateurList[]>(operateursSansEquipe);
+  const [availableOperateurs, setAvailableOperateurs] =
+    useState<OperateurList[]>(operateursSansEquipe);
 
   // Rafraîchir la liste des opérateurs disponibles
   const refreshOperateurs = async () => {
     try {
       const response = await fetchOperateurs({ pageSize: 1000 });
-      const sansEquipe = response.results.filter(op => !op.equipe);
+      const sansEquipe = response.results.filter((op) => !op.equipe);
       setAvailableOperateurs(sansEquipe);
     } catch (error) {
-      console.error('Erreur rafraîchissement opérateurs:', error);
+      showToast('Erreur lors du rafraîchissement des opérateurs', 'error');
     }
   };
 
@@ -56,9 +59,9 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
       setLoadingSites(true);
       try {
         const sitesData = await fetchAllSites();
-        setSites(sitesData.filter(s => s.actif !== false));
+        setSites(sitesData.filter((s) => s.actif !== false));
       } catch (error) {
-        console.error('Erreur chargement sites:', error);
+        showToast('Erreur lors du chargement des sites', 'error');
       } finally {
         setLoadingSites(false);
       }
@@ -77,13 +80,13 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
 
     setLoading(true);
     try {
-      const membresIds = selectedMembres.map(op => op.id);
+      const membresIds = selectedMembres.map((op) => op.id);
 
       const equipe = await createEquipe({
         nomEquipe: formData.nomEquipe,
         chefEquipe: formData.chefEquipe || undefined,
         sitePrincipal: formData.sitePrincipal || undefined,
-        membres: membresIds.length > 0 ? membresIds : undefined
+        membres: membresIds.length > 0 ? membresIds : undefined,
       });
 
       if (membresIds.length > 0) {
@@ -93,7 +96,6 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
       onCreated();
       onClose();
     } catch (error: any) {
-      console.error('Erreur creation equipe:', error);
       // Extraire le message d'erreur du backend
       if (error.data) {
         const messages: string[] = [];
@@ -104,9 +106,11 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
             messages.push(value);
           }
         }
-        setError(messages.length > 0 ? messages.join('\n') : error.message || 'Erreur lors de la creation');
+        setError(
+          messages.length > 0 ? messages.join('\n') : error.message || 'Erreur lors de la creation',
+        );
       } else {
-        setError(error.message || 'Erreur lors de la creation de l\'equipe');
+        setError(error.message || "Erreur lors de la creation de l'equipe");
       }
     } finally {
       setLoading(false);
@@ -153,33 +157,35 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Nom de l'équipe */}
-              <PremiumInput
-                type="text"
-                value={formData.nomEquipe}
-                onChange={(value) => setFormData({ ...formData, nomEquipe: value })}
-                label="Nom de l'équipe"
-                placeholder="Ex: Équipe C - Irrigation"
-                icon={<UsersIcon className="w-4 h-4" />}
-                required
-                variant="outlined"
-                size="md"
-              />
+                {/* Nom de l'équipe */}
+                <PremiumInput
+                  type="text"
+                  value={formData.nomEquipe}
+                  onChange={(value) => setFormData({ ...formData, nomEquipe: value })}
+                  label="Nom de l'équipe"
+                  placeholder="Ex: Équipe C - Irrigation"
+                  icon={<UsersIcon className="w-4 h-4" />}
+                  required
+                  variant="outlined"
+                  size="md"
+                />
 
-              {/* Chef d'équipe */}
-              <PremiumSelect
-                value={formData.chefEquipe?.toString() || ''}
-                onChange={(value) => setFormData({ ...formData, chefEquipe: value ? Number(value) : null })}
-                options={chefsPotentiels.map((op) => ({
-                  value: op.id.toString(),
-                  label: `${op.fullName} (${op.numeroImmatriculation})`
-                }))}
-                label="Chef d'équipe (optionnel)"
-                placeholder="Sélectionner un chef"
-                icon={<UsersIcon className="w-4 h-4" />}
-                variant="outlined"
-                size="md"
-              />
+                {/* Chef d'équipe */}
+                <PremiumSelect
+                  value={formData.chefEquipe?.toString() || ''}
+                  onChange={(value) =>
+                    setFormData({ ...formData, chefEquipe: value ? Number(value) : null })
+                  }
+                  options={chefsPotentiels.map((op) => ({
+                    value: op.id.toString(),
+                    label: `${op.fullName} (${op.numeroImmatriculation})`,
+                  }))}
+                  label="Chef d'équipe (optionnel)"
+                  placeholder="Sélectionner un chef"
+                  icon={<UsersIcon className="w-4 h-4" />}
+                  variant="outlined"
+                  size="md"
+                />
               </div>
             </div>
 
@@ -198,10 +204,12 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
               ) : (
                 <PremiumSelect
                   value={formData.sitePrincipal?.toString() || ''}
-                  onChange={(value) => setFormData({ ...formData, sitePrincipal: value ? Number(value) : null })}
+                  onChange={(value) =>
+                    setFormData({ ...formData, sitePrincipal: value ? Number(value) : null })
+                  }
                   options={sites.map((site) => ({
                     value: site.id,
-                    label: `${site.name}${site.code_site ? ` (${site.code_site})` : ''}`
+                    label: `${site.name}${site.code_site ? ` (${site.code_site})` : ''}`,
                   }))}
                   label="Site principal (optionnel)"
                   placeholder="Sélectionner un site"
@@ -222,7 +230,8 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
 
               <div className="space-y-2">
                 <p className="text-xs text-slate-500">
-                  {availableOperateurs.length} opérateur{availableOperateurs.length > 1 ? 's' : ''} disponible{availableOperateurs.length > 1 ? 's' : ''}
+                  {availableOperateurs.length} opérateur{availableOperateurs.length > 1 ? 's' : ''}{' '}
+                  disponible{availableOperateurs.length > 1 ? 's' : ''}
                 </p>
                 <TransferList
                   available={availableOperateurs}
@@ -230,7 +239,9 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
                   onChange={setSelectedMembres}
                   getItemId={(op) => op.id}
                   getItemLabel={(op) => op.fullName || `${op.nom} ${op.prenom}`}
-                  getItemSubtitle={(op) => `${op.numeroImmatriculation}${op.equipeNom ? ` • ${op.equipeNom}` : ''}`}
+                  getItemSubtitle={(op) =>
+                    `${op.numeroImmatriculation}${op.equipeNom ? ` • ${op.equipeNom}` : ''}`
+                  }
                   availableLabel="Opérateurs disponibles"
                   selectedLabel="Membres de l'équipe"
                   searchPlaceholder="Rechercher (nom, matricule)..."
@@ -257,7 +268,9 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
               disabled={loading}
               className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium shadow-sm"
             >
-              {loading ? 'Création...' : `Créer l'équipe ${selectedMembres.length > 0 ? `(${selectedMembres.length} membre${selectedMembres.length > 1 ? 's' : ''})` : ''}`}
+              {loading
+                ? 'Création...'
+                : `Créer l'équipe ${selectedMembres.length > 0 ? `(${selectedMembres.length} membre${selectedMembres.length > 1 ? 's' : ''})` : ''}`}
             </button>
           </div>
         </form>

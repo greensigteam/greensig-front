@@ -1,11 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { planningService } from '../../services/planningService';
-import { queryKeys } from '../../lib/queryKeys';
+import { queryKeys, invalidateResource } from '../../lib/queryKeys';
 import {
-    createPhoto,
-    deletePhoto,
-    createConsommation,
-    deleteConsommation,
+  createPhoto,
+  deletePhoto,
+  createConsommation,
+  deleteConsommation,
 } from '../../services/suiviTachesApi';
 import { Tache, TacheUpdate } from '../../types/planning';
 
@@ -14,56 +14,47 @@ import { Tache, TacheUpdate } from '../../types/planning';
 // ============================================================================
 
 interface UpdateTaskVariables {
-    taskId: number;
-    data: TacheUpdate;
+  taskId: number;
+  data: TacheUpdate;
 }
 
 export function useUpdateTask() {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: async ({ taskId, data }: UpdateTaskVariables) => {
-            return planningService.updateTache(taskId, data);
-        },
+  return useMutation({
+    mutationFn: async ({ taskId, data }: UpdateTaskVariables) => {
+      return planningService.updateTache(taskId, data);
+    },
 
-        onMutate: async ({ taskId, data }) => {
-            await queryClient.cancelQueries({
-                queryKey: queryKeys.taches.detail(taskId),
-            });
+    onMutate: async ({ taskId, data }) => {
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.taches.detail(taskId),
+      });
 
-            const previousTache = queryClient.getQueryData<Tache>(
-                queryKeys.taches.detail(taskId)
-            );
+      const previousTache = queryClient.getQueryData<Tache>(queryKeys.taches.detail(taskId));
 
-            // Optimistic update
-            if (previousTache) {
-                queryClient.setQueryData<Tache>(
-                    queryKeys.taches.detail(taskId),
-                    { ...previousTache, ...data }
-                );
-            }
+      // Optimistic update
+      if (previousTache) {
+        queryClient.setQueryData<Tache>(queryKeys.taches.detail(taskId), {
+          ...previousTache,
+          ...data,
+        });
+      }
 
-            return { previousTache };
-        },
+      return { previousTache };
+    },
 
-        onError: (_error, { taskId }, context) => {
-            if (context?.previousTache) {
-                queryClient.setQueryData(
-                    queryKeys.taches.detail(taskId),
-                    context.previousTache
-                );
-            }
-        },
+    onSuccess: (data: Tache, { taskId }) => {
+      queryClient.setQueryData(queryKeys.taches.detail(taskId), data);
+      invalidateResource(queryClient, 'taches', taskId);
+    },
 
-        onSettled: (_data, _error, { taskId }) => {
-            queryClient.invalidateQueries({
-                queryKey: queryKeys.taches.detail(taskId),
-            });
-            queryClient.invalidateQueries({
-                queryKey: queryKeys.taches.lists(),
-            });
-        },
-    });
+    onError: (_error, { taskId }, context) => {
+      if (context?.previousTache) {
+        queryClient.setQueryData(queryKeys.taches.detail(taskId), context.previousTache);
+      }
+    },
+  });
 }
 
 // ============================================================================
@@ -71,28 +62,23 @@ export function useUpdateTask() {
 // ============================================================================
 
 interface DeleteTaskVariables {
-    taskId: number;
+  taskId: number;
 }
 
 export function useDeleteTask() {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: async ({ taskId }: DeleteTaskVariables) => {
-            return planningService.deleteTache(taskId);
-        },
+  return useMutation({
+    mutationFn: async ({ taskId }: DeleteTaskVariables) => {
+      return planningService.deleteTache(taskId);
+    },
 
-        onSettled: (_data, _error, { taskId }) => {
-            // Invalider toutes les listes pour refetch avec données fraîches du serveur
-            queryClient.invalidateQueries({
-                queryKey: queryKeys.taches.all,
-            });
-            // Nettoyer le cache détail de la tâche supprimée
-            queryClient.removeQueries({
-                queryKey: queryKeys.taches.detail(taskId),
-            });
-        },
-    });
+    onSuccess: (_data, { taskId }) => {
+      queryClient.removeQueries({ queryKey: queryKeys.taches.detail(taskId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.taches.lists() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.distributions.all });
+    },
+  });
 }
 
 // ============================================================================
@@ -100,28 +86,26 @@ export function useDeleteTask() {
 // ============================================================================
 
 interface ValidateTaskVariables {
-    taskId: number;
-    etat: 'VALIDEE' | 'REJETEE';
-    commentaire?: string;
+  taskId: number;
+  etat: 'VALIDEE' | 'REJETEE';
+  commentaire?: string;
 }
 
 export function useValidateTask() {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: async ({ taskId, etat, commentaire }: ValidateTaskVariables) => {
-            return planningService.validerTache(taskId, etat, commentaire);
-        },
+  return useMutation({
+    mutationFn: async ({ taskId, etat, commentaire }: ValidateTaskVariables) => {
+      return planningService.validerTache(taskId, etat, commentaire);
+    },
 
-        onSettled: (_data, _error, { taskId }) => {
-            queryClient.invalidateQueries({
-                queryKey: queryKeys.taches.detail(taskId),
-            });
-            queryClient.invalidateQueries({
-                queryKey: queryKeys.taches.lists(),
-            });
-        },
-    });
+    onSuccess: (data, { taskId }) => {
+      if (data?.tache) {
+        queryClient.setQueryData(queryKeys.taches.detail(taskId), data.tache);
+      }
+      invalidateResource(queryClient, 'taches', taskId);
+    },
+  });
 }
 
 // ============================================================================
@@ -129,56 +113,48 @@ export function useValidateTask() {
 // ============================================================================
 
 interface ChangeStatusVariables {
-    taskId: number;
-    nouveauStatut: 'EN_COURS' | 'TERMINEE' | 'ANNULEE' | 'PLANIFIEE';
+  taskId: number;
+  nouveauStatut: 'EN_COURS' | 'TERMINEE' | 'ANNULEE' | 'PLANIFIEE';
 }
 
 export function useChangeTaskStatus() {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: async ({ taskId, nouveauStatut }: ChangeStatusVariables) => {
-            return planningService.changeStatut(taskId, nouveauStatut);
-        },
+  return useMutation({
+    mutationFn: async ({ taskId, nouveauStatut }: ChangeStatusVariables) => {
+      return planningService.changeStatut(taskId, nouveauStatut);
+    },
 
-        onMutate: async ({ taskId, nouveauStatut }) => {
-            await queryClient.cancelQueries({
-                queryKey: queryKeys.taches.detail(taskId),
-            });
+    onMutate: async ({ taskId, nouveauStatut }) => {
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.taches.detail(taskId),
+      });
 
-            const previousTache = queryClient.getQueryData<Tache>(
-                queryKeys.taches.detail(taskId)
-            );
+      const previousTache = queryClient.getQueryData<Tache>(queryKeys.taches.detail(taskId));
 
-            // Optimistic update
-            if (previousTache) {
-                queryClient.setQueryData<Tache>(
-                    queryKeys.taches.detail(taskId),
-                    { ...previousTache, statut: nouveauStatut }
-                );
-            }
+      // Optimistic update
+      if (previousTache) {
+        queryClient.setQueryData<Tache>(queryKeys.taches.detail(taskId), {
+          ...previousTache,
+          statut: nouveauStatut,
+        });
+      }
 
-            return { previousTache };
-        },
+      return { previousTache };
+    },
 
-        onError: (_error, { taskId }, context) => {
-            if (context?.previousTache) {
-                queryClient.setQueryData(
-                    queryKeys.taches.detail(taskId),
-                    context.previousTache
-                );
-            }
-        },
+    onSuccess: (data: Tache, { taskId }) => {
+      queryClient.setQueryData(queryKeys.taches.detail(taskId), data);
+      invalidateResource(queryClient, 'taches', taskId);
+      queryClient.invalidateQueries({ queryKey: queryKeys.distributions.all });
+    },
 
-        onSettled: (_data, _error, { taskId }) => {
-            queryClient.invalidateQueries({
-                queryKey: queryKeys.taches.detail(taskId),
-            });
-            queryClient.invalidateQueries({
-                queryKey: queryKeys.taches.lists(),
-            });
-        },
-    });
+    onError: (_error, { taskId }, context) => {
+      if (context?.previousTache) {
+        queryClient.setQueryData(queryKeys.taches.detail(taskId), context.previousTache);
+      }
+    },
+  });
 }
 
 // ============================================================================
@@ -186,29 +162,25 @@ export function useChangeTaskStatus() {
 // ============================================================================
 
 interface AssignEquipeVariables {
-    taskId: number;
-    equipeIds: number[];
+  taskId: number;
+  equipeIds: number[];
 }
 
 export function useAssignEquipe() {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: async ({ taskId, equipeIds }: AssignEquipeVariables) => {
-            return planningService.updateTache(taskId, {
-                equipes_ids: equipeIds,
-            } as any);
-        },
+  return useMutation({
+    mutationFn: async ({ taskId, equipeIds }: AssignEquipeVariables) => {
+      return planningService.updateTache(taskId, {
+        equipes_ids: equipeIds,
+      });
+    },
 
-        onSettled: (_data, _error, { taskId }) => {
-            queryClient.invalidateQueries({
-                queryKey: queryKeys.taches.detail(taskId),
-            });
-            queryClient.invalidateQueries({
-                queryKey: queryKeys.taches.lists(),
-            });
-        },
-    });
+    onSuccess: (data: Tache, { taskId }) => {
+      queryClient.setQueryData(queryKeys.taches.detail(taskId), data);
+      invalidateResource(queryClient, 'taches', taskId);
+    },
+  });
 }
 
 // ============================================================================
@@ -216,51 +188,53 @@ export function useAssignEquipe() {
 // ============================================================================
 
 interface UploadPhotoVariables {
-    taskId: number;
-    file: File;
-    type_photo: 'AVANT' | 'APRES';
+  taskId: number;
+  file: File;
+  type_photo: 'AVANT' | 'APRES';
 }
 
 export function useUploadPhoto() {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: async ({ taskId, file, type_photo }: UploadPhotoVariables) => {
-            return createPhoto({
-                fichier: file,
-                type_photo,
-                tache: taskId,
-                legende: file.name,
-            });
-        },
+  return useMutation({
+    mutationFn: async ({ taskId, file, type_photo }: UploadPhotoVariables) => {
+      return createPhoto({
+        fichier: file,
+        type_photo,
+        tache: taskId,
+        legende: file.name,
+      });
+    },
 
-        onSettled: (_data, _error, { taskId }) => {
-            queryClient.invalidateQueries({
-                queryKey: queryKeys.taskDetails.photos(taskId),
-            });
-        },
-    });
+    onSuccess: (_data, { taskId }) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.taskDetails.photos(taskId),
+      });
+      invalidateResource(queryClient, 'taches', taskId);
+    },
+  });
 }
 
 interface DeletePhotoVariables {
-    photoId: number;
-    taskId: number;
+  photoId: number;
+  taskId: number;
 }
 
 export function useDeletePhoto() {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: async ({ photoId }: DeletePhotoVariables) => {
-            return deletePhoto(photoId);
-        },
+  return useMutation({
+    mutationFn: async ({ photoId }: DeletePhotoVariables) => {
+      return deletePhoto(photoId);
+    },
 
-        onSettled: (_data, _error, { taskId }) => {
-            queryClient.invalidateQueries({
-                queryKey: queryKeys.taskDetails.photos(taskId),
-            });
-        },
-    });
+    onSuccess: (_data, { taskId }) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.taskDetails.photos(taskId),
+      });
+      invalidateResource(queryClient, 'taches', taskId);
+    },
+  });
 }
 
 // ============================================================================
@@ -268,56 +242,58 @@ export function useDeletePhoto() {
 // ============================================================================
 
 interface AddConsommationVariables {
-    taskId: number;
-    data: {
-        produit: number;
-        quantite: number;
-        unite: string;
-        commentaire: string;
-    };
+  taskId: number;
+  data: {
+    produit: number;
+    quantite: number;
+    unite: string;
+    commentaire: string;
+  };
 }
 
 export function useAddConsommation() {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: async ({ taskId, data }: AddConsommationVariables) => {
-            return createConsommation({
-                tache: taskId,
-                produit: data.produit,
-                quantite_utilisee: data.quantite,
-                unite: data.unite,
-                commentaire: data.commentaire,
-            });
-        },
+  return useMutation({
+    mutationFn: async ({ taskId, data }: AddConsommationVariables) => {
+      return createConsommation({
+        tache: taskId,
+        produit: data.produit,
+        quantite_utilisee: data.quantite,
+        unite: data.unite,
+        commentaire: data.commentaire,
+      });
+    },
 
-        onSettled: (_data, _error, { taskId }) => {
-            queryClient.invalidateQueries({
-                queryKey: queryKeys.taskDetails.consommations(taskId),
-            });
-        },
-    });
+    onSuccess: (_data, { taskId }) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.taskDetails.consommations(taskId),
+      });
+      invalidateResource(queryClient, 'taches', taskId);
+    },
+  });
 }
 
 interface DeleteConsommationVariables {
-    consommationId: number;
-    taskId: number;
+  consommationId: number;
+  taskId: number;
 }
 
 export function useDeleteConsommation() {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: async ({ consommationId }: DeleteConsommationVariables) => {
-            return deleteConsommation(consommationId);
-        },
+  return useMutation({
+    mutationFn: async ({ consommationId }: DeleteConsommationVariables) => {
+      return deleteConsommation(consommationId);
+    },
 
-        onSettled: (_data, _error, { taskId }) => {
-            queryClient.invalidateQueries({
-                queryKey: queryKeys.taskDetails.consommations(taskId),
-            });
-        },
-    });
+    onSuccess: (_data, { taskId }) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.taskDetails.consommations(taskId),
+      });
+      invalidateResource(queryClient, 'taches', taskId);
+    },
+  });
 }
 
 // ============================================================================
@@ -325,37 +301,37 @@ export function useDeleteConsommation() {
 // ============================================================================
 
 export function useTaskActions() {
-    const updateTask = useUpdateTask();
-    const deleteTask = useDeleteTask();
-    const validateTask = useValidateTask();
-    const changeStatus = useChangeTaskStatus();
-    const assignEquipe = useAssignEquipe();
-    const uploadPhoto = useUploadPhoto();
-    const deletePhotoMutation = useDeletePhoto();
-    const addConsommation = useAddConsommation();
-    const deleteConsommationMutation = useDeleteConsommation();
+  const updateTask = useUpdateTask();
+  const deleteTask = useDeleteTask();
+  const validateTask = useValidateTask();
+  const changeStatus = useChangeTaskStatus();
+  const assignEquipe = useAssignEquipe();
+  const uploadPhoto = useUploadPhoto();
+  const deletePhotoMutation = useDeletePhoto();
+  const addConsommation = useAddConsommation();
+  const deleteConsommationMutation = useDeleteConsommation();
 
-    const isLoading =
-        updateTask.isPending ||
-        deleteTask.isPending ||
-        validateTask.isPending ||
-        changeStatus.isPending ||
-        assignEquipe.isPending ||
-        uploadPhoto.isPending ||
-        deletePhotoMutation.isPending ||
-        addConsommation.isPending ||
-        deleteConsommationMutation.isPending;
+  const isLoading =
+    updateTask.isPending ||
+    deleteTask.isPending ||
+    validateTask.isPending ||
+    changeStatus.isPending ||
+    assignEquipe.isPending ||
+    uploadPhoto.isPending ||
+    deletePhotoMutation.isPending ||
+    addConsommation.isPending ||
+    deleteConsommationMutation.isPending;
 
-    return {
-        updateTask,
-        deleteTask,
-        validateTask,
-        changeStatus,
-        assignEquipe,
-        uploadPhoto,
-        deletePhoto: deletePhotoMutation,
-        addConsommation,
-        deleteConsommation: deleteConsommationMutation,
-        isLoading,
-    };
+  return {
+    updateTask,
+    deleteTask,
+    validateTask,
+    changeStatus,
+    assignEquipe,
+    uploadPhoto,
+    deletePhoto: deletePhotoMutation,
+    addConsommation,
+    deleteConsommation: deleteConsommationMutation,
+    isLoading,
+  };
 }

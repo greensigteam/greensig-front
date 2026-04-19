@@ -8,7 +8,7 @@ import {
   TypeTache,
   UNITE_MESURE_LABELS,
   TYPES_OBJETS,
-  UniteMesure
+  UniteMesure,
 } from '../../types/planning';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -35,7 +35,7 @@ const RatioFormModal: React.FC<RatioFormModalProps> = ({
   ratio,
   typesTaches,
   onClose,
-  onSubmit
+  onSubmit,
 }) => {
   const { showToast } = useToast();
 
@@ -46,7 +46,7 @@ const RatioFormModal: React.FC<RatioFormModalProps> = ({
     unite_mesure: ratio?.unite_mesure || 'unite',
     ratio: ratio?.ratio || 1,
     description: ratio?.description || '',
-    actif: ratio?.actif ?? true
+    actif: ratio?.actif ?? true,
   });
 
   // UI state
@@ -58,23 +58,22 @@ const RatioFormModal: React.FC<RatioFormModalProps> = ({
   // ============================================================================
 
   // Get compatible objects for selected task type
-  const selectedTypeTache = typesTaches.find(t => t.id === formData.id_type_tache);
-  const compatibleObjects = selectedTypeTache?.objets_compatibles || TYPES_OBJETS;
+  const compatibleObjects: readonly string[] = TYPES_OBJETS;
 
   // Build options for selects
   const typeTacheOptions = [
     { value: 0, label: 'Sélectionner un type de tâche' },
-    ...typesTaches.map(t => ({ value: t.id, label: t.nom_tache }))
+    ...typesTaches.map((t: TypeTache) => ({ value: t.id, label: t.nom_tache })),
   ];
 
   const typeObjetOptions = [
-    { value: '', label: 'Sélectionner un type d\'objet' },
-    ...compatibleObjects.map(t => ({ value: t, label: t }))
+    { value: '', label: "Sélectionner un type d'objet" },
+    ...compatibleObjects.map((t: string) => ({ value: t, label: t })),
   ];
 
   const uniteMesureOptions = Object.entries(UNITE_MESURE_LABELS).map(([key, label]) => ({
     value: key,
-    label: label
+    label: label,
   }));
 
   // ============================================================================
@@ -92,7 +91,7 @@ const RatioFormModal: React.FC<RatioFormModalProps> = ({
     }
 
     if (!formData.type_objet) {
-      setError('Veuillez sélectionner un type d\'objet');
+      setError("Veuillez sélectionner un type d'objet");
       return;
     }
 
@@ -104,14 +103,10 @@ const RatioFormModal: React.FC<RatioFormModalProps> = ({
     setLoading(true);
     try {
       await onSubmit(formData);
-      showToast(
-        ratio ? 'Ratio modifié avec succès' : 'Ratio créé avec succès',
-        'success'
-      );
+      showToast(ratio ? 'Ratio modifié avec succès' : 'Ratio créé avec succès', 'success');
       onClose();
     } catch (err: any) {
-      console.error('Erreur ratio:', err);
-      const errorMessage = err?.message || 'Erreur lors de l\'enregistrement';
+      const errorMessage = err?.message || "Erreur lors de l'enregistrement";
       setError(errorMessage);
       showToast(errorMessage, 'error');
     } finally {
@@ -121,11 +116,11 @@ const RatioFormModal: React.FC<RatioFormModalProps> = ({
 
   const handleTypeTacheChange = (value: string) => {
     const newTypeTacheId = Number(value);
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       id_type_tache: newTypeTacheId,
       // Reset type_objet if it's not compatible with new task type
-      type_objet: ''
+      type_objet: '',
     }));
   };
 
@@ -139,7 +134,9 @@ const RatioFormModal: React.FC<RatioFormModalProps> = ({
       onClose={onClose}
       onSubmit={handleSubmit}
       title={ratio ? 'Modifier le ratio' : 'Nouveau ratio de productivité'}
-      subtitle={ratio ? `${ratio.type_tache_nom} - ${ratio.type_objet}` : 'Définir un ratio de productivité'}
+      subtitle={
+        ratio ? `${ratio.type_tache_nom} - ${ratio.type_objet}` : 'Définir un ratio de productivité'
+      }
       icon={<Gauge className="w-5 h-5 text-emerald-600" />}
       size="md"
       loading={loading}
@@ -175,16 +172,13 @@ const RatioFormModal: React.FC<RatioFormModalProps> = ({
             required
             variant="outlined"
             size="md"
-            hint={!formData.id_type_tache ? 'Sélectionnez d\'abord un type de tâche' : undefined}
+            hint={!formData.id_type_tache ? "Sélectionnez d'abord un type de tâche" : undefined}
           />
         </FormGrid>
       </FormSection>
 
       {/* Section: Valeur du ratio */}
-      <FormSection
-        title="Valeur du ratio"
-        description="Définissez la productivité horaire"
-      >
+      <FormSection title="Valeur du ratio" description="Définissez la productivité horaire">
         <FormGrid columns={2}>
           <PremiumInput
             type="number"
@@ -218,17 +212,18 @@ const RatioFormModal: React.FC<RatioFormModalProps> = ({
           <div>
             <span className="font-medium">Interprétation :</span> Un opérateur peut traiter{' '}
             <strong>{formData.ratio || 0}</strong>{' '}
-            {formData.unite_mesure === 'm2' ? 'm²' : formData.unite_mesure === 'ml' ? 'mètres linéaires' : 'unités'}{' '}
+            {formData.unite_mesure === 'm2'
+              ? 'm²'
+              : formData.unite_mesure === 'ml'
+                ? 'mètres linéaires'
+                : 'unités'}{' '}
             par heure.
           </div>
         </div>
       </FormSection>
 
       {/* Section: Options */}
-      <FormSection
-        title="Options"
-        description="Description et statut du ratio"
-      >
+      <FormSection title="Options" description="Description et statut du ratio">
         <FormGrid columns={1}>
           <PremiumTextarea
             value={formData.description || ''}

@@ -7,7 +7,6 @@
 // ENUMERATIONS
 // ============================================================================
 
-
 export type StatutOperateur = 'ACTIF' | 'INACTIF' | 'EN_CONGE';
 
 export type CategorieCompetence = 'TECHNIQUE' | 'ORGANISATIONNELLE';
@@ -26,49 +25,48 @@ export type NomRole = 'ADMIN' | 'CLIENT' | 'SUPERVISEUR';
 // LABELS POUR L'AFFICHAGE
 // ============================================================================
 
-
 export const STATUT_OPERATEUR_LABELS: Record<StatutOperateur, string> = {
   ACTIF: 'Actif',
   INACTIF: 'Inactif',
-  EN_CONGE: 'En conge'
+  EN_CONGE: 'En conge',
 };
 
 export const CATEGORIE_COMPETENCE_LABELS: Record<CategorieCompetence, string> = {
   TECHNIQUE: 'Techniques et operationnelles',
-  ORGANISATIONNELLE: 'Organisationnelles et humaines'
+  ORGANISATIONNELLE: 'Organisationnelles et humaines',
 };
 
 export const NIVEAU_COMPETENCE_LABELS: Record<NiveauCompetence, string> = {
   NON: 'Non maitrise',
   DEBUTANT: 'Debutant',
   INTERMEDIAIRE: 'Intermediaire',
-  EXPERT: 'Expert'
+  EXPERT: 'Expert',
 };
 
 export const TYPE_ABSENCE_LABELS: Record<TypeAbsence, string> = {
   CONGE: 'Conge',
   MALADIE: 'Maladie',
   FORMATION: 'Formation',
-  AUTRE: 'Autre'
+  AUTRE: 'Autre',
 };
 
 export const STATUT_ABSENCE_LABELS: Record<StatutAbsence, string> = {
   DEMANDEE: 'Demandee',
   VALIDEE: 'Validee',
   REFUSEE: 'Refusee',
-  ANNULEE: 'Annulee'
+  ANNULEE: 'Annulee',
 };
 
 export const STATUT_EQUIPE_LABELS: Record<StatutEquipe, string> = {
   COMPLETE: 'Complete',
   PARTIELLE: 'Partiellement disponible',
-  INDISPONIBLE: 'Non disponible'
+  INDISPONIBLE: 'Non disponible',
 };
 
 export const NOM_ROLE_LABELS: Record<NomRole, string> = {
   ADMIN: 'Administrateur',
   CLIENT: 'Client',
-  SUPERVISEUR: 'Superviseur'
+  SUPERVISEUR: 'Superviseur',
 };
 
 // ============================================================================
@@ -85,6 +83,11 @@ export interface Utilisateur {
   actif: boolean;
   derniereConnexion: string | null;
   roles: NomRole[];
+  // Champs additionnels exposés par /api/users/me/ selon le rôle
+  superviseur_id?: number | null;
+  client_id?: number | null;
+  client_structure_id?: number | null;
+  equipes_gerees?: { id: number; nom_equipe: string }[];
 }
 
 export interface UtilisateurCreate {
@@ -143,13 +146,13 @@ export interface StructureClient {
   telephone: string;
   contactPrincipal: string;
   emailFacturation: string;
-  logo: string | null;        // Fichier uploadé (chemin relatif)
-  logoUrl: string | null;     // URL externe
+  logo: string | null; // Fichier uploadé (chemin relatif)
+  logoUrl: string | null; // URL externe
   logoDisplay: string | null; // URL finale à afficher (fichier ou URL)
   actif: boolean;
   dateCreation: string;
-  utilisateursCount: number;  // Transformé en camelCase par le frontend
-  sitesCount: number;         // Transformé en camelCase par le frontend
+  utilisateursCount: number; // Transformé en camelCase par le frontend
+  sitesCount: number; // Transformé en camelCase par le frontend
 }
 
 export interface StructureClientDetail extends StructureClient {
@@ -162,8 +165,8 @@ export interface StructureClientCreate {
   telephone?: string;
   contactPrincipal?: string;
   emailFacturation?: string;
-  logo?: File | null;        // Fichier uploadé
-  logoUrl?: string | null;   // URL externe
+  logo?: File | null; // Fichier uploadé
+  logoUrl?: string | null; // URL externe
   actif?: boolean;
 }
 
@@ -173,8 +176,8 @@ export interface StructureClientUpdate {
   telephone?: string;
   contactPrincipal?: string;
   emailFacturation?: string;
-  logo?: File | null;        // Fichier uploadé
-  logoUrl?: string | null;   // URL externe
+  logo?: File | null; // Fichier uploadé
+  logoUrl?: string | null; // URL externe
   actif?: boolean;
 }
 
@@ -220,7 +223,7 @@ export interface ClientCreate {
   nom: string;
   prenom: string;
   password: string;
-  structureId: number;  // Structure obligatoire
+  structureId: number; // Structure obligatoire
 }
 
 // Création d'un client avec nouvelle structure (backward compatible)
@@ -665,34 +668,34 @@ export interface HistoriqueRHFilters {
 export const STATUT_OPERATEUR_COLORS: Record<StatutOperateur, { bg: string; text: string }> = {
   ACTIF: { bg: 'bg-green-100', text: 'text-green-800' },
   INACTIF: { bg: 'bg-gray-100', text: 'text-gray-800' },
-  EN_CONGE: { bg: 'bg-yellow-100', text: 'text-yellow-800' }
+  EN_CONGE: { bg: 'bg-yellow-100', text: 'text-yellow-800' },
 };
 
 export const STATUT_ABSENCE_COLORS: Record<StatutAbsence, { bg: string; text: string }> = {
   DEMANDEE: { bg: 'bg-blue-100', text: 'text-blue-800' },
   VALIDEE: { bg: 'bg-green-100', text: 'text-green-800' },
   REFUSEE: { bg: 'bg-red-100', text: 'text-red-800' },
-  ANNULEE: { bg: 'bg-gray-100', text: 'text-gray-800' }
+  ANNULEE: { bg: 'bg-gray-100', text: 'text-gray-800' },
 };
 
 export const STATUT_EQUIPE_COLORS: Record<StatutEquipe, { bg: string; text: string }> = {
   COMPLETE: { bg: 'bg-green-100', text: 'text-green-800' },
   PARTIELLE: { bg: 'bg-orange-100', text: 'text-orange-800' },
-  INDISPONIBLE: { bg: 'bg-red-100', text: 'text-red-800' }
+  INDISPONIBLE: { bg: 'bg-red-100', text: 'text-red-800' },
 };
 
 export const NIVEAU_COMPETENCE_COLORS: Record<NiveauCompetence, { bg: string; text: string }> = {
   NON: { bg: 'bg-gray-100', text: 'text-gray-500' },
   DEBUTANT: { bg: 'bg-blue-100', text: 'text-blue-700' },
   INTERMEDIAIRE: { bg: 'bg-yellow-100', text: 'text-yellow-700' },
-  EXPERT: { bg: 'bg-green-100', text: 'text-green-700' }
+  EXPERT: { bg: 'bg-green-100', text: 'text-green-700' },
 };
 
 export const TYPE_ABSENCE_COLORS: Record<TypeAbsence, { bg: string; text: string }> = {
   CONGE: { bg: 'bg-blue-100', text: 'text-blue-800' },
   MALADIE: { bg: 'bg-red-100', text: 'text-red-800' },
   FORMATION: { bg: 'bg-purple-100', text: 'text-purple-800' },
-  AUTRE: { bg: 'bg-gray-100', text: 'text-gray-800' }
+  AUTRE: { bg: 'bg-gray-100', text: 'text-gray-800' },
 };
 
 // Valeur par défaut utilisée par les badges lorsque la clé est absente
@@ -702,10 +705,11 @@ export const DEFAULT_BADGE = { bg: 'bg-gray-100', text: 'text-gray-800' };
 // Si `key` est indéfini ou non présent dans `map`, retourne `DEFAULT_BADGE`.
 export function getBadgeColors<T extends string>(
   map: Record<T, { bg: string; text: string }>,
-  key?: T | null
+  key?: T | null,
 ): { bg: string; text: string } {
-  if (key && (map as any)[key]) {
-    return (map as any)[key];
+  if (key) {
+    const entry = map[key];
+    if (entry) return entry;
   }
   return DEFAULT_BADGE;
 }

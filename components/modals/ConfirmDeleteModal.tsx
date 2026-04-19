@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertCircle, X } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 
 interface ConfirmDeleteModalProps {
   isOpen?: boolean;
@@ -34,7 +34,7 @@ const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
   onCancel,
   onClose,
   confirmText = 'Supprimer',
-  cancelText = 'Annuler'
+  cancelText = 'Annuler',
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +53,6 @@ const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
       await onConfirm();
       handleClose(); // Fermer la modale après succès
     } catch (err: any) {
-      console.error('Erreur lors de la suppression:', err);
       setError(err?.message || 'Erreur lors de la suppression');
     } finally {
       setLoading(false);

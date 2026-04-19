@@ -1,58 +1,58 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
-  TrendingUp, TrendingDown, Minus, Calendar, AlertTriangle, AlertCircle,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Calendar,
+  AlertTriangle,
+  AlertCircle,
 } from 'lucide-react';
 import { fetchStatistics, type Statistics } from '../services/api';
-import { planningService } from '../services/planningService';
-import { fetchReclamations } from '../services/reclamationsApi';
 import { Tache } from '../types/planning';
 import { Reclamation } from '../types/reclamations';
+import { useTaches } from '../hooks/queries';
+import { useReclamations } from '../hooks/queries/useReclamations';
+import { getEquipeName, formatEquipesList } from '../utils/equipeHelpers';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
 
-  // États pour Vue Générale
-  const [statistics, setStatistics] = useState<Statistics | null>(null);
-  const [isLoadingStats, setIsLoadingStats] = useState(true);
-  const [statsError, setStatsError] = useState<string | null>(null);
-  const [recentTasks, setRecentTasks] = useState<Tache[]>([]);
-  const [recentReclamations, setRecentReclamations] = useState<Reclamation[]>([]);
-  const [isLoadingData, setIsLoadingData] = useState(true);
+  // Statistiques globales (KPIs de la page d'accueil)
+  const {
+    data: statistics,
+    isLoading: statsLoading,
+    error: statsErrorObj,
+  } = useQuery({
+    queryKey: ['statistics'],
+    queryFn: fetchStatistics,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  // Charger les données générales
-  useEffect(() => {
-    const loadDashboardData = async () => {
-      try {
-        setIsLoadingStats(true);
-        setIsLoadingData(true);
-        setStatsError(null);
+  // Tâches — fenêtre -30/+90 j appliquée automatiquement par useTaches
+  const { data: tachesData = [], isLoading: tachesLoading } = useTaches();
 
-        const [statsData, tasksData, reclamationsData] = await Promise.all([
-          fetchStatistics(),
-          planningService.getTaches({ page: 1 }),
-          fetchReclamations()
-        ]);
-
-        setStatistics(statsData);
-
-        const tasks = Array.isArray(tasksData) ? tasksData : (tasksData.results || []);
-        setRecentTasks(tasks.slice(0, 10));
-
-        const recls = Array.isArray(reclamationsData) ? reclamationsData : (reclamationsData || []);
-        setRecentReclamations(recls.slice(0, 10));
-
-      } catch (error) {
-        console.error('Erreur lors du chargement des données:', error);
-        setStatsError(error instanceof Error ? error.message : 'Erreur de chargement');
-      } finally {
-        setIsLoadingStats(false);
-        setIsLoadingData(false);
-      }
-    };
-
-    loadDashboardData();
+  // Réclamations — 30 derniers jours pour le dashboard
+  const reclaStart = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().slice(0, 10);
   }, []);
+  const { data: reclamationsRaw = [] } = useReclamations({ date_debut: reclaStart });
+
+  const isLoadingStats = statsLoading;
+  const isLoadingData = tachesLoading;
+  const statsError = statsErrorObj ? (statsErrorObj as Error).message : null;
+
+  const recentTasks: Tache[] = useMemo(
+    () => (Array.isArray(tachesData) ? tachesData : []).slice(0, 10),
+    [tachesData],
+  );
+  const recentReclamations: Reclamation[] = useMemo(
+    () => (Array.isArray(reclamationsRaw) ? reclamationsRaw : []).slice(0, 10),
+    [reclamationsRaw],
+  );
 
   // KPIs pour vue générale
   const generalKpis = useMemo(() => {
@@ -66,37 +66,62 @@ const Dashboard: React.FC = () => {
           value: stats.taches_today.toString(),
           change: 0,
           trend: 'neutral' as const,
-          icon: <Calendar className="w-5 h-5 text-blue-500" />
+          icon: <Calendar className="w-5 h-5 text-blue-500" />,
         },
         {
-          label: "Tâches En Cours",
+          label: 'Tâches En Cours',
           value: stats.taches_en_cours.toString(),
           change: 0,
           trend: 'neutral' as const,
-          icon: <TrendingUp className="w-5 h-5 text-emerald-500" />
+          icon: <TrendingUp className="w-5 h-5 text-emerald-500" />,
         },
         {
           label: "Absences (Aujourd'hui)",
           value: stats.absences_today.toString(),
           change: 0,
-          trend: stats.absences_today > 0 ? 'down' as const : 'neutral' as const,
-          icon: <AlertCircle className="w-5 h-5 text-orange-500" />
+          trend: stats.absences_today > 0 ? ('down' as const) : ('neutral' as const),
+          icon: <AlertCircle className="w-5 h-5 text-orange-500" />,
         },
         {
-          label: "Tâches Planifiées",
+          label: 'Tâches Planifiées',
           value: stats.taches_planifiees.toString(),
           change: 0,
           trend: 'neutral' as const,
-          icon: <Calendar className="w-5 h-5 text-indigo-500" />
-        }
+          icon: <Calendar className="w-5 h-5 text-indigo-500" />,
+        },
       ];
     }
 
+    const s = statistics as Statistics;
     return [
-      { label: "Total Objets", value: statistics.global.total_objets.toString(), change: 0, trend: 'neutral' as const, icon: undefined },
-      { label: "Végétation", value: statistics.global.total_vegetation.toString(), change: 0, trend: 'up' as const, icon: undefined },
-      { label: "Sites Actifs", value: statistics.hierarchy.active_sites.toString(), change: 0, trend: 'up' as const, icon: undefined },
-      { label: "Hydraulique", value: statistics.global.total_hydraulique.toString(), change: 0, trend: 'neutral' as const, icon: undefined },
+      {
+        label: 'Total Objets',
+        value: s.global.total_objets.toString(),
+        change: 0,
+        trend: 'neutral' as const,
+        icon: undefined,
+      },
+      {
+        label: 'Végétation',
+        value: s.global.total_vegetation.toString(),
+        change: 0,
+        trend: 'up' as const,
+        icon: undefined,
+      },
+      {
+        label: 'Sites Actifs',
+        value: s.hierarchy.active_sites.toString(),
+        change: 0,
+        trend: 'up' as const,
+        icon: undefined,
+      },
+      {
+        label: 'Hydraulique',
+        value: s.global.total_hydraulique.toString(),
+        change: 0,
+        trend: 'neutral' as const,
+        icon: undefined,
+      },
     ];
   }, [statistics]);
 
@@ -106,7 +131,10 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 flex-shrink-0">
         {isLoadingStats ? (
           Array.from({ length: 4 }).map((_, idx) => (
-            <div key={idx} className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm animate-pulse">
+            <div
+              key={idx}
+              className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm animate-pulse"
+            >
               <div className="h-4 bg-slate-200 rounded w-2/3 mb-3"></div>
               <div className="h-8 bg-slate-200 rounded w-1/2"></div>
             </div>
@@ -121,22 +149,35 @@ const Dashboard: React.FC = () => {
           </div>
         ) : (
           generalKpis.map((kpi, idx) => (
-            <div key={idx} className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+            <div
+              key={idx}
+              className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden"
+            >
               <div className="text-sm font-medium text-slate-500 mb-1">{kpi.label}</div>
               <div className="flex items-end justify-between relative z-10">
                 <div className="text-3xl font-bold text-slate-800">{kpi.value}</div>
-                <div className={`flex items-center text-sm font-bold ${kpi.trend === 'up' ? 'text-emerald-600' : kpi.trend === 'down' ? 'text-red-500' : 'text-slate-400'
-                  }`}>
-                  {kpi.trend === 'up' ? <TrendingUp className="w-4 h-4 mr-1" /> :
-                    kpi.trend === 'down' ? <TrendingDown className="w-4 h-4 mr-1" /> :
-                      <Minus className="w-4 h-4 mr-1" />}
-                  {kpi.change > 0 ? '+' : ''}{kpi.change}%
+                <div
+                  className={`flex items-center text-sm font-bold ${
+                    kpi.trend === 'up'
+                      ? 'text-emerald-600'
+                      : kpi.trend === 'down'
+                        ? 'text-red-500'
+                        : 'text-slate-400'
+                  }`}
+                >
+                  {kpi.trend === 'up' ? (
+                    <TrendingUp className="w-4 h-4 mr-1" />
+                  ) : kpi.trend === 'down' ? (
+                    <TrendingDown className="w-4 h-4 mr-1" />
+                  ) : (
+                    <Minus className="w-4 h-4 mr-1" />
+                  )}
+                  {kpi.change > 0 ? '+' : ''}
+                  {kpi.change}%
                 </div>
               </div>
-              {(kpi as any).icon && (
-                <div className="absolute top-4 right-4 p-2 bg-slate-50 rounded-lg">
-                  {(kpi as any).icon}
-                </div>
+              {kpi.icon && (
+                <div className="absolute top-4 right-4 p-2 bg-slate-50 rounded-lg">{kpi.icon}</div>
               )}
             </div>
           ))
@@ -163,7 +204,7 @@ const Dashboard: React.FC = () => {
           <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
             {isLoadingData ? (
               <div className="animate-pulse space-y-4">
-                {[1, 2, 3].map(i => (
+                {[1, 2, 3].map((i) => (
                   <div key={i} className="h-16 bg-slate-100 rounded"></div>
                 ))}
               </div>
@@ -174,23 +215,31 @@ const Dashboard: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-3">
-                {recentTasks.map(task => (
-                  <div key={task.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100 hover:border-emerald-200 transition-colors group">
+                {recentTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100 hover:border-emerald-200 transition-colors group"
+                  >
                     <div className="flex items-center gap-4 min-w-0">
-                      <div className={`w-1.5 h-10 rounded-full flex-shrink-0 ${task.statut === 'TERMINEE' ? 'bg-emerald-500' :
-                        task.statut === 'EN_COURS' ? 'bg-blue-500' : 'bg-slate-300'
-                        }`}></div>
+                      <div
+                        className={`w-1.5 h-10 rounded-full flex-shrink-0 ${
+                          task.statut === 'TERMINEE'
+                            ? 'bg-emerald-500'
+                            : task.statut === 'EN_COURS'
+                              ? 'bg-blue-500'
+                              : 'bg-slate-300'
+                        }`}
+                      ></div>
                       <div className="min-w-0">
                         <h3 className="font-bold text-slate-800 truncate">
                           {task.type_tache_detail?.nom_tache}
                         </h3>
                         <div className="text-xs text-slate-500 flex items-center gap-2 mt-1 truncate">
                           <span className="truncate">
-                            Équipe: {
-                              task.equipes_detail?.length > 0
-                                ? task.equipes_detail.map((e: any) => e.nom_equipe || e.nomEquipe).join(', ')
-                                : (task.equipe_detail as any)?.nom_equipe || task.equipe_detail?.nomEquipe || 'N/A'
-                            }
+                            Équipe:{' '}
+                            {task.equipes_detail?.length > 0
+                              ? formatEquipesList(task.equipes_detail, 'N/A')
+                              : getEquipeName(task.equipe_detail, 'N/A')}
                           </span>
                         </div>
                       </div>
@@ -199,9 +248,15 @@ const Dashboard: React.FC = () => {
                       <span className="text-xs font-bold text-slate-500">
                         {new Date(task.date_debut_planifiee).toLocaleDateString()}
                       </span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${task.statut === 'TERMINEE' ? 'bg-emerald-100 text-emerald-700' :
-                        task.statut === 'EN_COURS' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
-                        }`}>
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${
+                          task.statut === 'TERMINEE'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : task.statut === 'EN_COURS'
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
                         {task.statut?.replace('_', ' ')}
                       </span>
                     </div>
@@ -230,7 +285,7 @@ const Dashboard: React.FC = () => {
           <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
             {isLoadingData ? (
               <div className="animate-pulse space-y-4">
-                {[1, 2, 3].map(i => (
+                {[1, 2, 3].map((i) => (
                   <div key={i} className="h-16 bg-slate-100 rounded"></div>
                 ))}
               </div>
@@ -241,12 +296,20 @@ const Dashboard: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-3">
-                {recentReclamations.map(claim => (
-                  <div key={claim.id} className="p-4 border border-slate-100 rounded-lg hover:shadow-sm transition-shadow bg-white">
+                {recentReclamations.map((claim) => (
+                  <div
+                    key={claim.id}
+                    className="p-4 border border-slate-100 rounded-lg hover:shadow-sm transition-shadow bg-white"
+                  >
                     <div className="flex justify-between items-start mb-2">
                       {claim.urgence_niveau && (
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-slate-100 text-slate-700`}
-                          style={{ backgroundColor: claim.urgence_couleur + '20', color: claim.urgence_couleur }}>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-slate-100 text-slate-700`}
+                          style={{
+                            backgroundColor: claim.urgence_couleur + '20',
+                            color: claim.urgence_couleur,
+                          }}
+                        >
                           {claim.urgence_niveau}
                         </span>
                       )}
@@ -257,17 +320,25 @@ const Dashboard: React.FC = () => {
                     <h4 className="font-bold text-slate-800 text-sm mb-1 line-clamp-1">
                       {claim.type_reclamation_nom}
                     </h4>
-                    <p className="text-xs text-slate-500 mb-2 line-clamp-2">
-                      {claim.description}
-                    </p>
+                    <p className="text-xs text-slate-500 mb-2 line-clamp-2">{claim.description}</p>
                     <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-50 mt-2">
-                      <span className="text-slate-400 truncate max-w-[100px]" title={claim.client ? 'Client #' + claim.client : 'Interne'}>
+                      <span
+                        className="text-slate-400 truncate max-w-[100px]"
+                        title={claim.client ? 'Client #' + claim.client : 'Interne'}
+                      >
                         {claim.client ? 'Client #' + claim.client : 'Interne'}
                       </span>
-                      <span className={`px-2 py-0.5 rounded-full font-medium text-[10px] ${claim.statut === 'RESOLUE' || claim.statut === 'CLOTUREE' ? 'bg-green-100 text-green-700' :
-                        claim.statut === 'NOUVELLE' ? 'bg-red-100 text-red-700' :
-                        claim.statut === 'EN_COURS' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-700'
-                        }`}>
+                      <span
+                        className={`px-2 py-0.5 rounded-full font-medium text-[10px] ${
+                          claim.statut === 'RESOLUE' || claim.statut === 'CLOTUREE'
+                            ? 'bg-green-100 text-green-700'
+                            : claim.statut === 'NOUVELLE'
+                              ? 'bg-red-100 text-red-700'
+                              : claim.statut === 'EN_COURS'
+                                ? 'bg-orange-100 text-orange-700'
+                                : 'bg-gray-100 text-gray-700'
+                        }`}
+                      >
                         {claim.statut_display || claim.statut}
                       </span>
                     </div>

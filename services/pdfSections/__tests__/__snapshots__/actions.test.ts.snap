@@ -1,0 +1,413 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`drawMonthlyActions — snapshot > paginates when the content does not fit on the current page 1`] = `
+{
+  "finalY": 74,
+  "trace": [
+    {
+      "args": [
+        16,
+        185,
+        129,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        95,
+        6,
+        12,
+        "F",
+      ],
+      "op": "rect",
+    },
+    {
+      "args": [
+        16,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "2. ACTIONS MISES EN PLACE",
+        30,
+        103,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        10,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "op": "addPage",
+    },
+    {
+      "args": [
+        "Afin d'améliorer notre rendement, et éviter les éventuelles dérives de nos process, nous avons mis en place",
+        20,
+        38,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "plusieurs actions notamment :",
+        20,
+        43,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Instaurer une réunion hebdomadaire chaque lundi en présence de tous les responsables des sites",
+        25,
+        53,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Standardiser les méthodes de travail pour tous les sites : explications théoriques et suivi sur le terrain :",
+        25,
+        61,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "bordures du gazon, hauteur de taille, ...",
+        25,
+        66,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Augmenter la fréquence de nettoyage des ordures éventuelles à trois fois par jour",
+        25,
+        74,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Désinfecter systématiquement les outils de travail",
+        25,
+        82,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Nommer un caporal par site pour le suivi et l'exécution des travaux",
+        25,
+        90,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Programmer au minimum deux visites par jour du superviseur de tous les sites pour la planification des",
+        25,
+        98,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "actions et le suivi des réalisations",
+        25,
+        103,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Recueillir le besoin de chaque site en outillage et en consommable et distribuer le matériel nécessaire",
+        25,
+        111,
+      ],
+      "op": "text",
+    },
+    {
+      "op": "addPage",
+    },
+    {
+      "args": [
+        "selon les besoins (asperseurs, tuyaux, ...)",
+        25,
+        38,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Éditer une matrice de polyvalence pour connaître le niveau de compétence des techniques et la",
+        25,
+        46,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "maîtrise des outils de travail pour définir les affectations des jardiniers en fonction des spécificités de",
+        25,
+        51,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "chaque site",
+        25,
+        56,
+      ],
+      "op": "text",
+    },
+  ],
+}
+`;
+
+exports[`drawMonthlyActions — snapshot > renders the full bullet list on a single page 1`] = `
+{
+  "finalY": 167,
+  "trace": [
+    {
+      "args": [
+        16,
+        185,
+        129,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        33,
+        6,
+        12,
+        "F",
+      ],
+      "op": "rect",
+    },
+    {
+      "args": [
+        16,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "2. ACTIONS MISES EN PLACE",
+        30,
+        41,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        10,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "Afin d'améliorer notre rendement, et éviter les éventuelles dérives de nos process, nous avons mis en place",
+        20,
+        53,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "plusieurs actions notamment :",
+        20,
+        58,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Instaurer une réunion hebdomadaire chaque lundi en présence de tous les responsables des sites",
+        25,
+        68,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Standardiser les méthodes de travail pour tous les sites : explications théoriques et suivi sur le terrain :",
+        25,
+        76,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "bordures du gazon, hauteur de taille, ...",
+        25,
+        81,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Augmenter la fréquence de nettoyage des ordures éventuelles à trois fois par jour",
+        25,
+        89,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Désinfecter systématiquement les outils de travail",
+        25,
+        97,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Nommer un caporal par site pour le suivi et l'exécution des travaux",
+        25,
+        105,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Programmer au minimum deux visites par jour du superviseur de tous les sites pour la planification des",
+        25,
+        113,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "actions et le suivi des réalisations",
+        25,
+        118,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Recueillir le besoin de chaque site en outillage et en consommable et distribuer le matériel nécessaire",
+        25,
+        126,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "selon les besoins (asperseurs, tuyaux, ...)",
+        25,
+        131,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Éditer une matrice de polyvalence pour connaître le niveau de compétence des techniques et la",
+        25,
+        139,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "maîtrise des outils de travail pour définir les affectations des jardiniers en fonction des spécificités de",
+        25,
+        144,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "chaque site",
+        25,
+        149,
+      ],
+      "op": "text",
+    },
+  ],
+}
+`;

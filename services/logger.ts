@@ -1,11 +1,15 @@
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
+interface ImportMetaEnvLike {
+  env?: { MODE?: string };
+}
+
 let enabled = true;
 try {
-  const meta: any = (import.meta as any);
+  const meta = import.meta as ImportMetaEnvLike;
   const mode = meta?.env?.MODE;
   enabled = mode !== 'production';
-} catch (e) {
+} catch {
   enabled = true;
 }
 
@@ -13,23 +17,19 @@ function formatTimestamp() {
   return new Date().toISOString();
 }
 
-function output(level: LogLevel, namespace: string | undefined, args: any[]) {
+function output(level: LogLevel, namespace: string | undefined, args: unknown[]) {
   if (!enabled) return;
   const prefix = `[${formatTimestamp()}] [${level.toUpperCase()}]${namespace ? ` [${namespace}]` : ''}`;
-  const logger = console as any;
-  if (logger[level]) {
-    logger[level](prefix, ...args);
-  } else {
-    logger.log(prefix, ...args);
-  }
+  const fn = console[level] ?? console.log;
+  fn(prefix, ...args);
 }
 
 export function createLogger(namespace?: string) {
   return {
-    debug: (...args: any[]) => output('debug', namespace, args),
-    info: (...args: any[]) => output('info', namespace, args),
-    warn: (...args: any[]) => output('warn', namespace, args),
-    error: (...args: any[]) => output('error', namespace, args),
+    debug: (...args: unknown[]) => output('debug', namespace, args),
+    info: (...args: unknown[]) => output('info', namespace, args),
+    warn: (...args: unknown[]) => output('warn', namespace, args),
+    error: (...args: unknown[]) => output('error', namespace, args),
   };
 }
 

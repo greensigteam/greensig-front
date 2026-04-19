@@ -8,21 +8,10 @@ import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import LoadingScreen from '../components/LoadingScreen';
 
 // Types
-import {
-  Competence,
-  CategorieCompetence,
-  CATEGORIE_COMPETENCE_LABELS,
-  Utilisateur
-} from '../types/users';
+import { Competence, CATEGORIE_COMPETENCE_LABELS } from '../types/users';
 
 // API
-import {
-  fetchCompetences,
-  createCompetence,
-  updateCompetence,
-  deleteCompetence,
-  fetchCurrentUser
-} from '../services/usersApi';
+import { fetchCompetences, deleteCompetence } from '../services/usersApi';
 
 // ============================================================================
 // MAIN COMPONENT
@@ -83,7 +72,6 @@ const CompetencesConfig: React.FC<CompetencesConfigProps> = ({ triggerCreate }) 
       const competencesRes = await fetchCompetences();
       setCompetences(competencesRes);
     } catch (error) {
-      console.error('Erreur chargement compétences:', error);
       showToast('Erreur lors du chargement des compétences', 'error');
     } finally {
       setLoading(false);
@@ -92,23 +80,27 @@ const CompetencesConfig: React.FC<CompetencesConfigProps> = ({ triggerCreate }) 
 
   // Filter competences
   const filteredCompetences = useMemo(() => {
-    return competences.filter(c => {
-      // Filtre par recherche
-      if (debouncedSearchQuery) {
-        const query = debouncedSearchQuery.toLowerCase();
-        const matchNom = c.nomCompetence.toLowerCase().includes(query);
-        const matchDescription = c.description?.toLowerCase().includes(query);
-        const matchCategorie = CATEGORIE_COMPETENCE_LABELS[c.categorie]?.toLowerCase().includes(query);
-        if (!matchNom && !matchDescription && !matchCategorie) {
+    return competences
+      .filter((c) => {
+        // Filtre par recherche
+        if (debouncedSearchQuery) {
+          const query = debouncedSearchQuery.toLowerCase();
+          const matchNom = c.nomCompetence.toLowerCase().includes(query);
+          const matchDescription = c.description?.toLowerCase().includes(query);
+          const matchCategorie = CATEGORIE_COMPETENCE_LABELS[c.categorie]
+            ?.toLowerCase()
+            .includes(query);
+          if (!matchNom && !matchDescription && !matchCategorie) {
+            return false;
+          }
+        }
+        // Filtre par categorie
+        if (categoryFilter !== 'all' && c.categorie !== categoryFilter) {
           return false;
         }
-      }
-      // Filtre par categorie
-      if (categoryFilter !== 'all' && c.categorie !== categoryFilter) {
-        return false;
-      }
-      return true;
-    }).sort((a, b) => (a.ordreAffichage || 0) - (b.ordreAffichage || 0));
+        return true;
+      })
+      .sort((a, b) => (a.ordreAffichage || 0) - (b.ordreAffichage || 0));
   }, [competences, debouncedSearchQuery, categoryFilter]);
 
   // Count by category
@@ -130,7 +122,7 @@ const CompetencesConfig: React.FC<CompetencesConfigProps> = ({ triggerCreate }) 
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
           {c.categorieDisplay || c.categorie}
         </span>
-      )
+      ),
     },
     {
       key: 'description',
@@ -139,7 +131,7 @@ const CompetencesConfig: React.FC<CompetencesConfigProps> = ({ triggerCreate }) 
         <span className="text-sm text-gray-600 truncate max-w-xs block">
           {c.description || '-'}
         </span>
-      )
+      ),
     },
     {
       key: 'actions',
@@ -169,8 +161,8 @@ const CompetencesConfig: React.FC<CompetencesConfigProps> = ({ triggerCreate }) 
           </button>
         </div>
       ),
-      sortable: false
-    }
+      sortable: false,
+    },
   ];
 
   const handleDeleteCompetence = async () => {
@@ -181,7 +173,6 @@ const CompetencesConfig: React.FC<CompetencesConfigProps> = ({ triggerCreate }) 
       setDeleteCompetenceId(null);
       loadData();
     } catch (error) {
-      console.error('Erreur suppression compétence:', error);
       showToast('Erreur lors de la suppression de la compétence', 'error');
     }
   };
@@ -189,11 +180,13 @@ const CompetencesConfig: React.FC<CompetencesConfigProps> = ({ triggerCreate }) 
   const handleExportCSV = () => {
     const csvContent = [
       ['Compétence', 'Catégorie', 'Description'].join(','),
-      ...filteredCompetences.map(c => [
-        `"${c.nomCompetence}"`,
-        `"${c.categorieDisplay || c.categorie}"`,
-        `"${c.description || ''}"`
-      ].join(','))
+      ...filteredCompetences.map((c) =>
+        [
+          `"${c.nomCompetence}"`,
+          `"${c.categorieDisplay || c.categorie}"`,
+          `"${c.description || ''}"`,
+        ].join(','),
+      ),
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -284,9 +277,7 @@ const CompetencesConfig: React.FC<CompetencesConfigProps> = ({ triggerCreate }) 
             <Award className="w-12 h-12 mx-auto mb-3 text-slate-300" />
             <p className="text-lg font-medium">Aucune compétence trouvée</p>
             {(debouncedSearchQuery || categoryFilter !== 'all') && (
-              <p className="text-sm mt-1">
-                Essayez d'ajuster votre recherche ou vos filtres
-              </p>
+              <p className="text-sm mt-1">Essayez d'ajuster votre recherche ou vos filtres</p>
             )}
           </div>
         ) : (

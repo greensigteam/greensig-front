@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
-import { format } from 'date-fns';
 import { Calendar, User, FileText } from 'lucide-react';
-import {
-  TypeAbsence,
-  TYPE_ABSENCE_LABELS,
-  OperateurList
-} from '../types/users';
+import { TypeAbsence, TYPE_ABSENCE_LABELS, OperateurList } from '../types/users';
 import { createAbsence } from '../services/usersApi';
 import { FormModal, FormGrid } from '../components/FormModal';
-import { PremiumInput, PremiumSelect, PremiumTextarea } from '../components/modals/PremiumFormComponents';
+import {
+  PremiumInput,
+  PremiumSelect,
+  PremiumTextarea,
+} from '../components/modals/PremiumFormComponents';
 
 // ============================================================================
 // TYPES
@@ -29,7 +28,7 @@ const CreateAbsenceModal: React.FC<CreateAbsenceModalProps> = ({
   operateurs,
   onClose,
   onCreated,
-  preselectedOperateur
+  preselectedOperateur,
 }) => {
   // ============================================================================
   // STATE
@@ -40,7 +39,7 @@ const CreateAbsenceModal: React.FC<CreateAbsenceModalProps> = ({
     typeAbsence: '' as TypeAbsence | '',
     dateDebut: '',
     dateFin: '',
-    motif: ''
+    motif: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +49,7 @@ const CreateAbsenceModal: React.FC<CreateAbsenceModalProps> = ({
   // ============================================================================
 
   const handleChange = (field: keyof typeof form, value: string | number) => {
-    setForm(f => ({ ...f, [field]: value }));
+    setForm((f) => ({ ...f, [field]: value }));
   };
 
   const validateForm = (): string | null => {
@@ -94,12 +93,11 @@ const CreateAbsenceModal: React.FC<CreateAbsenceModalProps> = ({
         typeAbsence: form.typeAbsence as TypeAbsence,
         dateDebut: form.dateDebut,
         dateFin: form.dateFin,
-        motif: form.motif || undefined
+        motif: form.motif || undefined,
       });
       onCreated();
       onClose();
     } catch (err: any) {
-      console.error('Erreur création absence:', err);
       if (err.data) {
         const messages: string[] = [];
         for (const [field, value] of Object.entries(err.data)) {
@@ -109,7 +107,9 @@ const CreateAbsenceModal: React.FC<CreateAbsenceModalProps> = ({
             messages.push(value);
           }
         }
-        setError(messages.length > 0 ? messages.join('\n') : err.message || 'Erreur lors de la création');
+        setError(
+          messages.length > 0 ? messages.join('\n') : err.message || 'Erreur lors de la création',
+        );
       } else {
         setError(err.message || "Erreur lors de la création de l'absence");
       }
@@ -134,24 +134,6 @@ const CreateAbsenceModal: React.FC<CreateAbsenceModalProps> = ({
 
   const duration = calculateDuration();
 
-  const operateurOptions = [
-    { value: 0, label: 'Sélectionner un opérateur' },
-    ...operateurs
-      .filter(o => o.actif)
-      .map(op => ({
-        value: op.id,
-        label: `${op.fullName} (${op.numeroImmatriculation})`
-      }))
-  ];
-
-  const typeAbsenceOptions = [
-    { value: '', label: 'Sélectionner un type' },
-    ...(Object.keys(TYPE_ABSENCE_LABELS) as TypeAbsence[]).map(type => ({
-      value: type,
-      label: TYPE_ABSENCE_LABELS[type]
-    }))
-  ];
-
   // ============================================================================
   // RENDER
   // ============================================================================
@@ -175,10 +157,10 @@ const CreateAbsenceModal: React.FC<CreateAbsenceModalProps> = ({
           value={form.operateur ? form.operateur.toString() : ''}
           onChange={(value) => handleChange('operateur', Number(value))}
           options={operateurs
-            .filter(o => o.actif)
-            .map(op => ({
+            .filter((o) => o.actif)
+            .map((op) => ({
               value: op.id.toString(),
-              label: `${op.fullName} (${op.numeroImmatriculation})`
+              label: `${op.fullName} (${op.numeroImmatriculation})`,
             }))}
           label="Opérateur"
           placeholder="Sélectionner un opérateur"
@@ -192,9 +174,9 @@ const CreateAbsenceModal: React.FC<CreateAbsenceModalProps> = ({
         <PremiumSelect
           value={form.typeAbsence}
           onChange={(value) => handleChange('typeAbsence', value)}
-          options={(Object.keys(TYPE_ABSENCE_LABELS) as TypeAbsence[]).map(type => ({
+          options={(Object.keys(TYPE_ABSENCE_LABELS) as TypeAbsence[]).map((type) => ({
             value: type,
-            label: TYPE_ABSENCE_LABELS[type]
+            label: TYPE_ABSENCE_LABELS[type],
           }))}
           label="Type d'absence"
           placeholder="Sélectionner un type"
@@ -233,7 +215,10 @@ const CreateAbsenceModal: React.FC<CreateAbsenceModalProps> = ({
         {duration !== null && duration > 0 && (
           <div className="p-3 bg-blue-50 rounded-lg">
             <p className="text-sm text-blue-700">
-              Durée: <span className="font-semibold">{duration} jour{duration > 1 ? 's' : ''}</span>
+              Durée:{' '}
+              <span className="font-semibold">
+                {duration} jour{duration > 1 ? 's' : ''}
+              </span>
             </p>
           </div>
         )}

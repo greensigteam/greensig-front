@@ -1,0 +1,620 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`drawMonthlyAvantPropos — snapshot > renders multiple site names in sequence (multi-site flow) 1`] = `
+{
+  "finalY": 175,
+  "trace": [
+    {
+      "args": [
+        16,
+        185,
+        129,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        33,
+        6,
+        12,
+        "F",
+      ],
+      "op": "rect",
+    },
+    {
+      "args": [
+        16,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "1. AVANT-PROPOS",
+        30,
+        41,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        10,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "Grâce à nos experts éprouvés, nos techniques bien conçues, et nos méthodes convenablement exécutées,",
+        20,
+        53,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "la société ENJR a pour objectif principal la réussite de l'opération d'entretien et de jardinage et ce dans les",
+        20,
+        58,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "règles de l'art.",
+        20,
+        63,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "Ainsi, durant ce mois, nos équipes de jardiniers ont effectué les travaux d'entretien des espaces verts des",
+        20,
+        74,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "sites suivants :",
+        20,
+        79,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "•  Site A",
+        25,
+        88,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Site B",
+        25,
+        94,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Site C",
+        25,
+        100,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "L'encadrement d'ENJR met en œuvre toutes les dispositions nécessaires pour une amélioration continue des",
+        20,
+        110,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "conditions de travail de ce projet.",
+        20,
+        115,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "Aussi, nous supervisons de près toutes les actions opérationnelles afin d'avoir un livrable à la hauteur des",
+        20,
+        126,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "espérances de nos clients.",
+        20,
+        131,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "Grâce à toutes ces actions, nous constatons, indéniablement un changement favorable et motivant au niveau",
+        20,
+        142,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "de tous les sites.",
+        20,
+        147,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "Dans ce qui suit, les photos prises illustrent l'avancement et les situations de chaque site.",
+        20,
+        158,
+      ],
+      "op": "text",
+    },
+  ],
+}
+`;
+
+exports[`drawMonthlyAvantPropos — snapshot > renders the static text with the given site name 1`] = `
+{
+  "finalY": 163,
+  "trace": [
+    {
+      "args": [
+        16,
+        185,
+        129,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        33,
+        6,
+        12,
+        "F",
+      ],
+      "op": "rect",
+    },
+    {
+      "args": [
+        16,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "1. AVANT-PROPOS",
+        30,
+        41,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        10,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "Grâce à nos experts éprouvés, nos techniques bien conçues, et nos méthodes convenablement exécutées,",
+        20,
+        53,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "la société ENJR a pour objectif principal la réussite de l'opération d'entretien et de jardinage et ce dans les",
+        20,
+        58,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "règles de l'art.",
+        20,
+        63,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "Ainsi, durant ce mois, nos équipes de jardiniers ont effectué les travaux d'entretien des espaces verts des",
+        20,
+        74,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "sites suivants :",
+        20,
+        79,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "•  Site Test UM6P Benguerir",
+        25,
+        88,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "L'encadrement d'ENJR met en œuvre toutes les dispositions nécessaires pour une amélioration continue des",
+        20,
+        98,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "conditions de travail de ce projet.",
+        20,
+        103,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "Aussi, nous supervisons de près toutes les actions opérationnelles afin d'avoir un livrable à la hauteur des",
+        20,
+        114,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "espérances de nos clients.",
+        20,
+        119,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "Grâce à toutes ces actions, nous constatons, indéniablement un changement favorable et motivant au niveau",
+        20,
+        130,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "de tous les sites.",
+        20,
+        135,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "Dans ce qui suit, les photos prises illustrent l'avancement et les situations de chaque site.",
+        20,
+        146,
+      ],
+      "op": "text",
+    },
+  ],
+}
+`;
+
+exports[`drawMonthlyAvantPropos — snapshot > renders with a different site name (bullet line changes) 1`] = `
+{
+  "finalY": 163,
+  "trace": [
+    {
+      "args": [
+        16,
+        185,
+        129,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        33,
+        6,
+        12,
+        "F",
+      ],
+      "op": "rect",
+    },
+    {
+      "args": [
+        16,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "1. AVANT-PROPOS",
+        30,
+        41,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        10,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "Grâce à nos experts éprouvés, nos techniques bien conçues, et nos méthodes convenablement exécutées,",
+        20,
+        53,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "la société ENJR a pour objectif principal la réussite de l'opération d'entretien et de jardinage et ce dans les",
+        20,
+        58,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "règles de l'art.",
+        20,
+        63,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "Ainsi, durant ce mois, nos équipes de jardiniers ont effectué les travaux d'entretien des espaces verts des",
+        20,
+        74,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "sites suivants :",
+        20,
+        79,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "•  Campus Rabat",
+        25,
+        88,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "L'encadrement d'ENJR met en œuvre toutes les dispositions nécessaires pour une amélioration continue des",
+        20,
+        98,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "conditions de travail de ce projet.",
+        20,
+        103,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "Aussi, nous supervisons de près toutes les actions opérationnelles afin d'avoir un livrable à la hauteur des",
+        20,
+        114,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "espérances de nos clients.",
+        20,
+        119,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "Grâce à toutes ces actions, nous constatons, indéniablement un changement favorable et motivant au niveau",
+        20,
+        130,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "de tous les sites.",
+        20,
+        135,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "Dans ce qui suit, les photos prises illustrent l'avancement et les situations de chaque site.",
+        20,
+        146,
+      ],
+      "op": "text",
+    },
+  ],
+}
+`;

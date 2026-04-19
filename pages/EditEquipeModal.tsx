@@ -1,17 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { Users, UserPlus, UserMinus, AlertCircle, Save, UserCheck, Loader2, MapPin, Building2 } from 'lucide-react';
+import {
+  Users,
+  UserPlus,
+  UserMinus,
+  AlertCircle,
+  Save,
+  UserCheck,
+  Loader2,
+  MapPin,
+  Building2,
+} from 'lucide-react';
 import { EquipeList, EquipeUpdate, OperateurList } from '../types/users';
 import {
   updateEquipe,
   fetchEquipeMembres,
   fetchOperateurs,
   affecterMembres,
-  retirerMembre
+  retirerMembre,
 } from '../services/usersApi';
 import { invalidateCacheByPrefix } from '../hooks/useDataCache';
 import DetailModal from '../components/DetailModal';
 import { fetchAllSites, SiteFrontend } from '../services/api';
-import { PremiumInput, PremiumSelect, PremiumMultiSelect } from '../components/modals/PremiumFormComponents';
+import {
+  PremiumInput,
+  PremiumSelect,
+  PremiumMultiSelect,
+} from '../components/modals/PremiumFormComponents';
+import { useToast } from '../contexts/ToastContext';
 
 interface EditEquipeModalProps {
   equipe: EquipeList;
@@ -28,6 +43,7 @@ const cleanNumericValue = (value: number | null | undefined): number | null => {
 };
 
 const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSaved }) => {
+  const { showToast } = useToast();
   const [form, setForm] = useState<EquipeUpdate>({
     nomEquipe: equipe.nomEquipe,
     chefEquipe: cleanNumericValue(equipe.chefEquipe),
@@ -58,9 +74,9 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
     setLoadingSites(true);
     try {
       const sitesData = await fetchAllSites();
-      setSites(sitesData.filter(s => s.actif !== false));
+      setSites(sitesData.filter((s) => s.actif !== false));
     } catch (error) {
-      console.error('Erreur chargement sites:', error);
+      showToast('Erreur lors du chargement des sites', 'error');
     } finally {
       setLoadingSites(false);
     }
@@ -74,36 +90,32 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
 
       const [membresRes, operateursRes] = await Promise.all([
         fetchEquipeMembres(equipe.id),
-        fetchOperateurs({ sansEquipe: true })
+        fetchOperateurs({ sansEquipe: true }),
       ]);
       setMembres(membresRes);
       setAvailableOperateurs(operateursRes.results);
     } catch (err) {
-      console.error('Erreur chargement membres:', err);
+      showToast('Erreur lors du chargement des membres', 'error');
     } finally {
       setLoadingMembres(false);
     }
   };
 
   const handleChange = (field: string, value: any) => {
-    console.log(`[EditEquipeModal] handleChange: ${field} =`, value);
-    setForm(f => ({
+    setForm((f) => ({
       ...f,
-      [field]: value
+      [field]: value,
     }));
   };
 
   const handleSubmit = async () => {
     setLoading(true);
     setError(null);
-    console.log('[EditEquipeModal] Soumission du formulaire:', form);
-    console.log('[EditEquipeModal] Sites secondaires:', form.sitesSecondaires);
     try {
       await updateEquipe(equipe.id, form);
       onSaved();
       onClose();
     } catch (err: any) {
-      console.error('[EditEquipeModal] Erreur:', err);
       setError(err.message || 'Erreur lors de la modification');
     } finally {
       setLoading(false);
@@ -113,14 +125,15 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
   const handleAddMembre = async (operateurId: number) => {
     setMemberAction(`add-${operateurId}`);
     try {
-      const currentMemberIds = membres.map(m => m.id);
+      const currentMemberIds = membres.map((m) => m.id);
       await affecterMembres(equipe.id, { operateurs: [...currentMemberIds, operateurId] });
       await loadMembres();
     } catch (err: any) {
-      console.error('affecterMembres error:', err);
       // Prefer server-provided details when available
       const serverData = err?.data || err?.response || null;
-      setError(serverData ? JSON.stringify(serverData) : (err.message || "Erreur lors de l'ajout du membre"));
+      setError(
+        serverData ? JSON.stringify(serverData) : err.message || "Erreur lors de l'ajout du membre",
+      );
     } finally {
       setMemberAction(null);
     }
@@ -132,16 +145,17 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
       await retirerMembre(equipe.id, operateurId);
       await loadMembres();
     } catch (err: any) {
-      console.error('retirerMembre error:', err);
       const serverData = err?.data || err?.response || null;
-      setError(serverData ? JSON.stringify(serverData) : (err.message || 'Erreur lors du retrait du membre'));
+      setError(
+        serverData ? JSON.stringify(serverData) : err.message || 'Erreur lors du retrait du membre',
+      );
     } finally {
       setMemberAction(null);
     }
   };
 
   // Tout membre actif peut être nommé chef d'équipe
-  const membresActifs = membres.filter(m => m.statut === 'ACTIF');
+  const membresActifs = membres.filter((m) => m.statut === 'ACTIF');
 
   // Note: On n'utilise plus de tableaux pré-créés pour éviter les problèmes de clés React
 
@@ -170,12 +184,16 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
       <PremiumSelect
         value={form.chefEquipe?.toString() ?? ''}
         onChange={(value) => handleChange('chefEquipe', value ? parseInt(value) : null)}
-        options={membresActifs.map(op => ({
+        options={membresActifs.map((op) => ({
           value: op.id.toString(),
-          label: `${op.fullName} (${op.numeroImmatriculation})${op.id === equipe.chefEquipe ? ' (actuel)' : ''}`
+          label: `${op.fullName} (${op.numeroImmatriculation})${op.id === equipe.chefEquipe ? ' (actuel)' : ''}`,
         }))}
         label="Chef d'équipe sur le terrain"
-        placeholder={membresActifs.length === 0 ? "Aucun membre actif dans l'équipe" : "Sélectionner un chef d'équipe"}
+        placeholder={
+          membresActifs.length === 0
+            ? "Aucun membre actif dans l'équipe"
+            : "Sélectionner un chef d'équipe"
+        }
         icon={<UserCheck className="w-4 h-4" />}
         variant="outlined"
         size="md"
@@ -193,9 +211,9 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
           <PremiumSelect
             value={form.sitePrincipal?.toString() ?? ''}
             onChange={(value) => handleChange('sitePrincipal', value ? parseInt(value) : null)}
-            options={sites.map(site => ({
+            options={sites.map((site) => ({
               value: site.id,
-              label: `${site.name}${site.code_site ? ` (${site.code_site})` : ''}`
+              label: `${site.name}${site.code_site ? ` (${site.code_site})` : ''}`,
             }))}
             label="Site principal"
             placeholder="Sélectionner un site"
@@ -216,17 +234,16 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
           <PremiumMultiSelect
             values={(form.sitesSecondaires || []).map(String)}
             onChange={(values) => {
-              console.log('[EditEquipeModal] Sites secondaires sélectionnés:', values);
               handleChange('sitesSecondaires', values.map(Number));
             }}
             options={sites
-              .filter(site => {
+              .filter((site) => {
                 const siteIdNum = parseInt(site.id);
                 return form.sitePrincipal ? siteIdNum !== form.sitePrincipal : true;
               })
-              .map(site => ({
+              .map((site) => ({
                 value: site.id.toString(),
-                label: `${site.name}${site.code_site ? ` (${site.code_site})` : ''}`
+                label: `${site.name}${site.code_site ? ` (${site.code_site})` : ''}`,
               }))}
             label="Sites secondaires"
             placeholder="Sélectionner les sites"
@@ -243,12 +260,14 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
         <button
           type="button"
           onClick={() => setForm({ ...form, actif: !form.actif })}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.actif ? 'bg-emerald-600' : 'bg-gray-300'
-            }`}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+            form.actif ? 'bg-emerald-600' : 'bg-gray-300'
+          }`}
         >
           <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${form.actif ? 'translate-x-6' : 'translate-x-1'
-              }`}
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              form.actif ? 'translate-x-6' : 'translate-x-1'
+            }`}
           />
         </button>
         <span className={`text-sm ${form.actif ? 'text-emerald-600' : 'text-gray-500'}`}>
@@ -290,10 +309,11 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
                 className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
               >
                 <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${membre.id === equipe.chefEquipe
-                    ? 'bg-emerald-200'
-                    : 'bg-gray-200'
-                    }`}>
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      membre.id === equipe.chefEquipe ? 'bg-emerald-200' : 'bg-gray-200'
+                    }`}
+                  >
                     {membre.id === equipe.chefEquipe ? (
                       <UserCheck className="w-4 h-4 text-emerald-700" />
                     ) : (
@@ -378,32 +398,33 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
   );
 
   // Footer conditionnel (boutons visibles seulement sur onglet "info")
-  const actions = activeTab === 'info' ? (
-    <div className="flex gap-3 w-full">
-      <button
-        type="button"
-        onClick={onClose}
-        className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-      >
-        Annuler
-      </button>
-      <button
-        type="button"
-        onClick={handleSubmit}
-        disabled={loading}
-        className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
-      >
-        {loading ? (
-          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-        ) : (
-          <>
-            <Save className="w-4 h-4" />
-            Enregistrer
-          </>
-        )}
-      </button>
-    </div>
-  ) : null;
+  const actions =
+    activeTab === 'info' ? (
+      <div className="flex gap-3 w-full">
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+        >
+          Annuler
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={loading}
+          className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {loading ? (
+            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <>
+              <Save className="w-4 h-4" />
+              Enregistrer
+            </>
+          )}
+        </button>
+      </div>
+    ) : null;
 
   return (
     <DetailModal
@@ -415,10 +436,10 @@ const EditEquipeModal: React.FC<EditEquipeModalProps> = ({ equipe, onClose, onSa
       size="lg"
       tabs={[
         { key: 'info', label: 'Informations', content: infoContent },
-        { key: 'membres', label: `Membres (${membres.length})`, content: membresContent }
+        { key: 'membres', label: `Membres (${membres.length})`, content: membresContent },
       ]}
       defaultTab="info"
-      onTabChange={(key) => setActiveTab(key)}
+      onTabChange={(key) => setActiveTab(key as 'info' | 'membres')}
       actions={actions}
     />
   );

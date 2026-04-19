@@ -10,14 +10,29 @@ This is the frontend for **GreenSIG**, a green spaces management system (Systèm
 
 ```bash
 npm install          # Install dependencies
-npm run dev          # Start dev server (http://localhost:3000)
+npm run dev          # Start dev server (http://localhost:5173)
 npm run build        # Production build (runs TypeScript check - fails on type errors)
 npm run preview      # Preview production build
+
+# Testing
+npm run test         # Run all tests (vitest)
+npm run test:watch   # Watch mode
+npm run test:ui      # Vitest UI
+npm run test:coverage # Coverage report (v8)
+npm run e2e          # Playwright E2E tests
+npm run e2e:ui       # Playwright UI mode
+
+# Quality
+npm run typecheck    # tsc --noEmit
+npm run lint         # ESLint (--max-warnings 0)
+npm run lint:fix     # ESLint autofix
+npm run format       # Prettier
 ```
 
-**No lint or test commands are configured.** TypeScript strict mode is enabled with `noUncheckedIndexedAccess` - array/object access returns `T | undefined`.
+TypeScript strict mode is enabled with `noUncheckedIndexedAccess` - array/object access returns `T | undefined`.
 
 Environment variables (`.env`):
+
 - `VITE_API_BASE_URL` - Backend API URL (optional, Vite proxies `/api` to localhost:8000)
 - `VITE_USE_TUNNEL=true` - Enable Cloudflare tunnel mode (WSS on port 443)
 - `GEMINI_API_KEY` - Google Gemini AI API key (for AI features)
@@ -25,38 +40,45 @@ Environment variables (`.env`):
 ## Architecture
 
 ### File Structure
+
 Files are at the root level (no `src/` directory):
-- `App.tsx` - Main component with routing, global state (user, map state, search, overlays)
+
+- `App.tsx` - Main component with routing via `createBrowserRouter` (React Router data router), global state via `AppStateContext` (user, map state, search, overlays)
 - `index.tsx` - Application entry point
 - `types.ts` - TypeScript interfaces (User, Role, ViewState, MapLayerType, Coordinates, etc.)
 - `constants.ts` - Map layer configurations (PLAN, SATELLITE, TERRAIN tile URLs)
 - `store.ts` - Mock data for development
 
 ### Key Directories
+
 - `pages/` - Route components (Dashboard, MapPage, Inventory, Planning, Teams, Claims, Reclamations, Users, Sites, Reporting, ClientPortal, Login)
 - `components/` - Reusable UI components
 - `components/map/` - Map-specific components (MapFloatingTools, MapSearchBar, MapZoomControls, SelectionPanel, SiteCarousel)
 - `components/import/` - Import wizard components (ImportWizard, AttributeMapper, ImportPreview, ValidationResults)
 - `components/export/` - Export functionality (ExportPanel)
-- `contexts/` - React contexts (MapContext, SelectionContext, DrawingContext, ToastContext)
+- `contexts/` - React contexts (MapContext, SelectionContext, DrawingContext, ToastContext, SearchContext, NotificationContext, AppStateContext, ExportContext)
 - `hooks/` - Custom hooks for map interaction and business logic
 - `services/` - API clients and mock data
 
 ### Core Components
+
 - `OLMap.tsx` - OpenLayers map with clustering, overlays, measurement tools, drawing/editing
 - `Layout.tsx` - Main layout wrapper with sidebar and map
 - `DataTable.tsx` - Generic sortable/paginated table component
 - `Sidebar.tsx` - Navigation sidebar with role-based menu items
 
 ### Services Layer
-- `api.ts` - Main backend API client with JWT auth, caching (5-minute site cache)
-- `usersApi.ts` - User management endpoints
-- `planningService.ts` - Task planning endpoints
-- `reclamationsApi.ts` - Claims/complaints endpoints
-- `suiviTachesApi.ts` - Task tracking endpoints
-- `apiFetch.ts` - Fetch wrapper with auth token injection
+
+- `api.ts` - Unified HTTP client with JWT auth (token refresh, 403 events, logout). All services use `apiFetch()` from this file.
+- `usersApi.ts` - User management (CRUD, roles, structures, equipes, absences)
+- `planningService.ts` - Task planning (taches, types, distributions, ratios, duplication)
+- `reclamationsApi.ts` - Claims lifecycle (create, assign, close, reject, satisfaction)
+- `suiviTachesApi.ts` - Task tracking (produits, photos, fertilisants, ravageurs)
+- `kpiApi.ts` - KPI data and historical trends
+- `reportsApi.ts` - Monthly report data
 
 ### Custom Hooks
+
 - `useDrawingTools` - Drawing tool state and interactions
 - `useMeasurementTools` - Distance/area measurement on map
 - `useBoxSelection` - Multi-select via bounding box
@@ -69,10 +91,15 @@ Files are at the root level (no `src/` directory):
 - `useGeolocation` - GPS location tracking
 
 ### Context Providers
+
 - `MapProvider` - Map instance and state management
 - `SelectionProvider` - Multi-feature selection state
 - `DrawingProvider` - Drawing tool state (active tool, geometry type)
 - `ToastProvider` - User notifications
+- `SearchProvider` - Search state and debouncing
+- `NotificationProvider` - WebSocket real-time notifications
+- `AppStateContext` - All app-level state (user, map handlers, sidebar state) — shared with module-level route components to avoid prop drilling through data router
+- `ExportProvider` - Tracks in-progress/completed export jobs; `blocking` flag controls navigation guard via `useBlocker`
 
 ## Map Integration
 
@@ -85,6 +112,7 @@ Files are at the root level (no `src/` directory):
 ## Code Conventions
 
 ### TypeScript/React
+
 - Components: PascalCase, named exports (`export function DataTable()`)
 - Interfaces: PascalCase, no `I` prefix (`User` not `IUser`)
 - Props interfaces: `ComponentNameProps`
@@ -95,6 +123,7 @@ Files are at the root level (no `src/` directory):
 - Enums: PascalCase name, UPPER_CASE values
 
 ### Styling
+
 - Tailwind CSS for styling
 - Custom CSS in `styles/` directory when needed
 
@@ -104,31 +133,80 @@ Vite proxies `/api` and `/media` to `http://127.0.0.1:8000` (configured in `vite
 Path alias: `@/*` maps to project root (e.g., `import { api } from '@/services/api'`).
 
 ## User Roles (✅ Refactoring Complete)
+
 - `ADMIN` - Full access to all features
 - `SUPERVISEUR` - Manages teams, planning, and field operations (replaces CHEF_EQUIPE)
 - `CLIENT` - Client portal access only (redirected on login)
 
 **Former roles** (removed in refactoring):
+
 - ~~`CHEF_EQUIPE`~~ → Now `SUPERVISEUR` (user role for team management)
 - ~~`OPERATEUR`~~ → Now HR data only (operators don't log in)
 
-## Key Types (from types.ts) - ✅ Updated Phase 6
+## Key Types
 
 ```typescript
-// ✅ Updated: OPERATEUR and CHEF_EQUIPE removed, SUPERVISEUR added
 type Role = 'ADMIN' | 'SUPERVISEUR' | 'CLIENT';
 
-// Map types (unchanged)
-enum MapLayerType { PLAN, SATELLITE, TERRAIN, NAVIGATION }
-interface Coordinates { lat: number; lng: number; }
-interface User { id: string; name: string; email: string; role: Role; }
+enum MapLayerType {
+  PLAN,
+  SATELLITE,
+  TERRAIN,
+  NAVIGATION,
+}
+interface Coordinates {
+  lat: number;
+  lng: number;
+}
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+}
 
-// ✅ New interfaces (Phase 6)
-// See types/users.ts for:
-// - SuperviseurList, SuperviseurDetail, SuperviseurCreate, SuperviseurUpdate
-// - OperateurList (decoupled from Utilisateur - standalone HR data)
-// - EquipeList (now includes superviseur field)
+// See types/users.ts for user/HR types:
+// Utilisateur, SuperviseurList, OperateurList, EquipeList, Client, StructureClient
+// See types/planning.ts for task types:
+// Tache, TacheCreate, DistributionCharge, TypeTache, RatioProductivite
+// See types/reclamations.ts for claims types:
+// Reclamation, SatisfactionClient, TypeReclamation, Urgence
 ```
+
+## Testing
+
+**Stack**: Vitest + @testing-library/react + happy-dom + MSW + Playwright
+
+```bash
+npm run test                    # All unit/integration tests
+npm run test:coverage           # With v8 coverage report
+npm run e2e                     # Playwright E2E (requires dev server)
+```
+
+### Test Structure
+
+- `**/__tests__/*.test.{ts,tsx}` - Co-located unit tests
+- `tests/smoke/` - Smoke tests (app mounts, module imports)
+- `tests/e2e/` - Playwright E2E specs
+- `tests/mocks/handlers.ts` - MSW request handlers
+- `tests/utils/renderWithProviders.tsx` - Test wrapper with QueryClient + Router + Contexts
+
+### Testing Patterns
+
+- **Service tests**: Mock `apiFetch` via `vi.mock('../api')`, test URL construction, HTTP methods, error handling
+- **Component tests**: Use `@testing-library/react`, test rendering, user interactions, callbacks
+- **Hook tests**: Use `renderHook` with providers wrapper
+- **Coverage thresholds**: Lines 12%, Statements 12%, Functions 39%, Branches 79% (enforced in vitest.config.ts)
+
+### Key Test Files
+
+| File                                         | Tests                                                | Coverage             |
+| -------------------------------------------- | ---------------------------------------------------- | -------------------- |
+| `services/__tests__/apiFetch.test.ts`        | JWT injection, 401 refresh, 403 events, logout       | `api.ts` auth flow   |
+| `services/__tests__/planningService.test.ts` | CRUD, date validation, distributions, duplication    | `planningService.ts` |
+| `services/__tests__/reclamationsApi.test.ts` | Workflow actions, error formatting, export           | `reclamationsApi.ts` |
+| `services/__tests__/usersApi.test.ts`        | All CRUD, snake/camel conversion, superviseur merge  | `usersApi.ts`        |
+| `services/__tests__/suiviTachesApi.test.ts`  | Produits, photos pagination, fertilisants, ravageurs | `suiviTachesApi.ts`  |
 
 ## Related Documentation
 

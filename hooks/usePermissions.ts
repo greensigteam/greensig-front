@@ -68,12 +68,15 @@ export interface Permissions {
 
   // Reclamations
   canCreateReclamation: boolean;
-  canEditReclamation: (reclamation: { createur?: number | string; site?: SupervisedResource }) => boolean;
+  canEditReclamation: (reclamation: {
+    createur?: number | string;
+    site?: SupervisedResource;
+  }) => boolean;
   canDeleteReclamation: (reclamation: { createur?: number | string }) => boolean;
 
   // Absences
   canCreateAbsence: boolean;
-  canValidateAbsence: (absence: { operateur?: SupervisedResource }) => boolean;
+  canValidateAbsence: (absence: { operateur?: SupervisedResource | number | null }) => boolean;
 
   // Reporting
   canAccessReporting: boolean;
@@ -113,10 +116,7 @@ interface ExtendedUserInfo {
  * @param extendedInfo - Optional extended user info (superviseur_id, client_structure_id)
  * @returns Permissions object with role checks and action permissions
  */
-export function usePermissions(
-  user: User | null,
-  extendedInfo?: ExtendedUserInfo
-): Permissions {
+export function usePermissions(user: User | null, extendedInfo?: ExtendedUserInfo): Permissions {
   return useMemo(() => {
     const role = user?.role ?? null;
     const isAdmin = role === 'ADMIN';
@@ -127,13 +127,6 @@ export function usePermissions(
     const clientStructureId = extendedInfo?.client_structure_id;
 
     // Helper functions for ownership checks
-    const getSiteId = (site: SiteResource['site']): number | null => {
-      if (!site) return null;
-      if (typeof site === 'number') return site;
-      if (typeof site === 'object' && 'id' in site) return site.id;
-      return null;
-    };
-
     const ownsSite = (site: SupervisedResource): boolean => {
       if (!site) return false;
       if (isAdmin) return true;
@@ -186,7 +179,7 @@ export function usePermissions(
         if (isSuperviseur) return ownsSite(site);
         return false;
       },
-      canDeleteSite: (site) => {
+      canDeleteSite: (_site) => {
         if (isAdmin) return true;
         // SUPERVISEUR cannot delete sites, only ADMIN
         return false;
@@ -206,7 +199,7 @@ export function usePermissions(
         if (isSuperviseur) return ownsViaSupervision(team);
         return false;
       },
-      canDeleteTeam: (team) => {
+      canDeleteTeam: (_team) => {
         if (isAdmin) return true;
         return false;
       },
@@ -218,7 +211,7 @@ export function usePermissions(
         if (isSuperviseur) return ownsViaSupervision(operateur);
         return false;
       },
-      canDeleteOperateur: (operateur) => {
+      canDeleteOperateur: (_operateur) => {
         if (isAdmin) return true;
         return false;
       },
@@ -249,9 +242,10 @@ export function usePermissions(
         }
         // Creator can edit their own reclamation
         if (reclamation.createur && userId) {
-          const createurId = typeof reclamation.createur === 'string'
-            ? parseInt(reclamation.createur, 10)
-            : reclamation.createur;
+          const createurId =
+            typeof reclamation.createur === 'string'
+              ? parseInt(reclamation.createur, 10)
+              : reclamation.createur;
           return createurId === userId;
         }
         return false;
@@ -260,9 +254,10 @@ export function usePermissions(
         if (isAdmin) return true;
         // Only creator or admin can delete
         if (reclamation.createur && userId) {
-          const createurId = typeof reclamation.createur === 'string'
-            ? parseInt(reclamation.createur, 10)
-            : reclamation.createur;
+          const createurId =
+            typeof reclamation.createur === 'string'
+              ? parseInt(reclamation.createur, 10)
+              : reclamation.createur;
           return createurId === userId;
         }
         return false;
@@ -272,7 +267,7 @@ export function usePermissions(
       canCreateAbsence: isAdmin || isSuperviseur,
       canValidateAbsence: (absence) => {
         if (isAdmin) return true;
-        if (isSuperviseur && absence.operateur) {
+        if (isSuperviseur && absence.operateur && typeof absence.operateur === 'object') {
           return ownsViaSupervision(absence.operateur);
         }
         return false;
@@ -284,7 +279,7 @@ export function usePermissions(
 
       // Inventory
       canCreateInventoryItem: isAdmin || isSuperviseur,
-      canEditInventoryItem: (item) => {
+      canEditInventoryItem: (_item) => {
         if (isAdmin) return true;
         if (isSuperviseur) {
           // Would need to check site supervision
@@ -293,7 +288,7 @@ export function usePermissions(
         }
         return false;
       },
-      canDeleteInventoryItem: (item) => {
+      canDeleteInventoryItem: (_item) => {
         if (isAdmin) return true;
         if (isSuperviseur) return true;
         return false;

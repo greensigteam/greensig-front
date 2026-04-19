@@ -1,5 +1,15 @@
 import React, { useState, useMemo } from 'react';
-import { Calendar, X, CheckSquare, Clock, Settings2, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
+import {
+  Calendar,
+  X,
+  CheckSquare,
+  Clock,
+  Settings2,
+  AlertTriangle,
+  RefreshCw,
+  Loader2,
+} from 'lucide-react';
+import { useToast } from '../../contexts/ToastContext';
 import { DayPicker, Matcher } from 'react-day-picker';
 import { fr } from 'date-fns/locale/fr';
 import { format } from 'date-fns';
@@ -39,8 +49,9 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
   onCancel,
   initialSelection = [],
   protectedDates = [], // ✅ NOUVEAU: Dates protégées
-  existingDistributions = [] // ✅ NOUVEAU: Distributions existantes avec heures
+  existingDistributions = [], // ✅ NOUVEAU: Distributions existantes avec heures
 }) => {
+  const { showToast } = useToast();
   const [defaultHeureDebut, setDefaultHeureDebut] = useState('08:00');
   const [defaultHeureFin, setDefaultHeureFin] = useState('17:00');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -61,9 +72,7 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
     const endDate = new Date(dateFin);
 
     // Créer un map des distributions existantes pour un accès rapide
-    const existingDistMap = new Map(
-      existingDistributions.map(d => [d.date, d])
-    );
+    const existingDistMap = new Map(existingDistributions.map((d) => [d.date, d]));
 
     while (currentDate <= endDate) {
       const dateString = format(currentDate, 'yyyy-MM-dd');
@@ -78,7 +87,7 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
         // Utiliser les heures de la distribution existante si disponible, sinon '08:00' et '17:00' par défaut
         // Les horaires par défaut configurables sont appliqués uniquement lors de la sélection (handleSelect)
         heure_debut: existing?.heure_debut ?? '08:00',
-        heure_fin: existing?.heure_fin ?? '17:00'
+        heure_fin: existing?.heure_fin ?? '17:00',
       });
 
       currentDate.setDate(currentDate.getDate() + 1);
@@ -90,8 +99,8 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
 
   // ✅ Fonction pour appliquer les horaires par défaut à tous les jours sélectionnés (sauf les protégées)
   const appliquerHorairesParDefaut = () => {
-    setSelectedDays(prev =>
-      prev.map(day => {
+    setSelectedDays((prev) =>
+      prev.map((day) => {
         // Ne pas modifier les dates protégées (distributions existantes)
         if (protectedDates.includes(day.date)) {
           return day;
@@ -100,7 +109,7 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
         return day.selected
           ? { ...day, heure_debut: defaultHeureDebut, heure_fin: defaultHeureFin }
           : day;
-      })
+      }),
     );
   };
 
@@ -110,13 +119,11 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
   // 2. Manuellement via le bouton "Appliquer à la sélection"
 
   const selectedDates = useMemo(() => {
-    return selectedDays
-      .filter(d => d.selected)
-      .map(d => new Date(d.date + 'T00:00:00'));
+    return selectedDays.filter((d) => d.selected).map((d) => new Date(d.date + 'T00:00:00'));
   }, [selectedDays]);
 
   const stats = useMemo(() => {
-    const selected = selectedDays.filter(d => d.selected);
+    const selected = selectedDays.filter((d) => d.selected);
     const totalHeures = selected.reduce((sum, day) => {
       return sum + calculerHeures(day.heure_debut, day.heure_fin);
     }, 0);
@@ -125,16 +132,16 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
       count: selected.length,
       total: allDays.length,
       totalHeures: totalHeures.toFixed(2),
-      moyenneHeures: selected.length > 0 ? (totalHeures / selected.length).toFixed(2) : '0'
+      moyenneHeures: selected.length > 0 ? (totalHeures / selected.length).toFixed(2) : '0',
     };
   }, [selectedDays, allDays]);
 
   const handleSelect = (days: Date[] | undefined) => {
     const selectedDatesList = days || [];
-    const selectedDateStrings = selectedDatesList.map(d => format(d, 'yyyy-MM-dd'));
+    const selectedDateStrings = selectedDatesList.map((d) => format(d, 'yyyy-MM-dd'));
 
-    setSelectedDays(prev =>
-      prev.map(day => {
+    setSelectedDays((prev) =>
+      prev.map((day) => {
         const wasSelected = day.selected;
         const isNowSelected = selectedDateStrings.includes(day.date);
 
@@ -145,22 +152,22 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
             ...day,
             selected: true,
             heure_debut: defaultHeureDebut,
-            heure_fin: defaultHeureFin
+            heure_fin: defaultHeureFin,
           };
         }
 
         // Pour les autres cas (déjà sélectionné ou désélectionné), garder les horaires existants
         return {
           ...day,
-          selected: isNowSelected
+          selected: isNowSelected,
         };
-      })
+      }),
     );
   };
 
   const handleSelectJoursOuvres = () => {
-    setSelectedDays(prev =>
-      prev.map(day => {
+    setSelectedDays((prev) =>
+      prev.map((day) => {
         const shouldBeSelected = true; // Sélectionner tous les jours (y compris weekends)
         const wasSelected = day.selected;
 
@@ -170,22 +177,22 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
             ...day,
             selected: true,
             heure_debut: defaultHeureDebut,
-            heure_fin: defaultHeureFin
+            heure_fin: defaultHeureFin,
           };
         }
 
         // Sinon, garder les horaires existants
         return {
           ...day,
-          selected: shouldBeSelected
+          selected: shouldBeSelected,
         };
-      })
+      }),
     );
   };
 
   const handleSelectAll = () => {
-    setSelectedDays(prev =>
-      prev.map(day => {
+    setSelectedDays((prev) =>
+      prev.map((day) => {
         const shouldBeSelected = true; // Sélectionner tous les jours (y compris weekends)
         const wasSelected = day.selected;
 
@@ -195,37 +202,37 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
             ...day,
             selected: true,
             heure_debut: defaultHeureDebut,
-            heure_fin: defaultHeureFin
+            heure_fin: defaultHeureFin,
           };
         }
 
         // Sinon, garder les horaires existants
         return {
           ...day,
-          selected: shouldBeSelected
+          selected: shouldBeSelected,
         };
-      })
+      }),
     );
   };
 
   const handleDeselectAll = () => {
-    setSelectedDays(prev =>
-      prev.map(day => ({
+    setSelectedDays((prev) =>
+      prev.map((day) => ({
         ...day,
-        selected: false
-      }))
+        selected: false,
+      })),
     );
   };
 
   const handleConfirm = async () => {
-    const selected = selectedDays.filter(d => d.selected);
+    const selected = selectedDays.filter((d) => d.selected);
     setIsSubmitting(true);
     try {
       await onConfirm(selected);
       // Le parent gère la fermeture du modal en cas de succès
     } catch (error) {
       // En cas d'erreur, on reste sur le modal et on réinitialise l'état
-      console.error('Erreur lors de la confirmation:', error);
+      showToast('Erreur lors de la confirmation des jours sélectionnés', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -233,24 +240,25 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
 
   const handleToggle = (dateString: string) => {
     // ✅ NOUVEAU: Empêcher la désélection des dates protégées
-    if (protectedDates.includes(dateString) && selectedDays.find(d => d.date === dateString)?.selected) {
+    if (
+      protectedDates.includes(dateString) &&
+      selectedDays.find((d) => d.date === dateString)?.selected
+    ) {
       return; // Ignore la désélection si la date est protégée
     }
 
-    setSelectedDays(prev =>
-      prev.map(day =>
-        day.date === dateString ? { ...day, selected: !day.selected } : day
-      )
+    setSelectedDays((prev) =>
+      prev.map((day) => (day.date === dateString ? { ...day, selected: !day.selected } : day)),
     );
   };
 
   const modifiers: Record<string, Matcher> = {
     // ✅ MODIFIÉ: Suppression des contraintes weekend (sunday/saturday)
-    protected: (date: Date) => protectedDates.includes(format(date, 'yyyy-MM-dd'))
+    protected: (date: Date) => protectedDates.includes(format(date, 'yyyy-MM-dd')),
   };
 
   const modifiersClassNames = {
-    protected: 'rdp-day-protected'
+    protected: 'rdp-day-protected',
   };
 
   return (
@@ -272,7 +280,7 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
             onClick={onCancel}
             disabled={isSubmitting}
             className="p-2 hover:bg-slate-100 rounded-full transition-all duration-200 text-slate-400 hover:text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
-            title={isSubmitting ? "Ajout en cours..." : "Fermer"}
+            title={isSubmitting ? 'Ajout en cours...' : 'Fermer'}
           >
             <X className="w-5 h-5" />
           </button>
@@ -368,7 +376,9 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
 
         {/* Main Content */}
         <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
-          <div className={`flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto flex items-center justify-center ${isSubmitting ? 'pointer-events-none opacity-60' : ''}`}>
+          <div
+            className={`flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto flex items-center justify-center ${isSubmitting ? 'pointer-events-none opacity-60' : ''}`}
+          >
             <style>{`
               .rdp {
                 --rdp-cell-size: 40px;
@@ -547,7 +557,9 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
           </div>
 
           {/* PANNEAU LATÉRAL - Jours sélectionnés */}
-          <div className={`w-full md:w-96 border-t md:border-t-0 md:border-l border-slate-200 bg-slate-50 flex flex-col max-h-[40vh] md:max-h-none ${isSubmitting ? 'pointer-events-none opacity-60' : ''}`}>
+          <div
+            className={`w-full md:w-96 border-t md:border-t-0 md:border-l border-slate-200 bg-slate-50 flex flex-col max-h-[40vh] md:max-h-none ${isSubmitting ? 'pointer-events-none opacity-60' : ''}`}
+          >
             <div className="p-5 border-b border-slate-200 bg-white">
               <h3 className="font-bold text-slate-800 flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
@@ -558,7 +570,7 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {selectedDays.filter(d => d.selected).length === 0 ? (
+              {selectedDays.filter((d) => d.selected).length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-slate-400 py-8 px-4 text-center">
                   <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
                     <Calendar className="w-8 h-8 opacity-40" />
@@ -567,58 +579,68 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
                   <p className="text-xs mt-1">Cliquez sur le calendrier pour ajouter des jours</p>
                 </div>
               ) : (
-                selectedDays.filter(d => d.selected).map((day) => {
-                  const isProtected = protectedDates.includes(day.date);
-                  return (
-                    <div
-                      key={day.date}
-                      className={`p-4 rounded-xl border shadow-sm transition-shadow group ${isProtected
-                        ? 'bg-emerald-50/50 border-emerald-200 hover:shadow-none'
-                        : 'bg-white border-slate-200 hover:shadow-md'
+                selectedDays
+                  .filter((d) => d.selected)
+                  .map((day) => {
+                    const isProtected = protectedDates.includes(day.date);
+                    return (
+                      <div
+                        key={day.date}
+                        className={`p-4 rounded-xl border shadow-sm transition-shadow group ${
+                          isProtected
+                            ? 'bg-emerald-50/50 border-emerald-200 hover:shadow-none'
+                            : 'bg-white border-slate-200 hover:shadow-md'
                         }`}
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                            {new Date(day.date + 'T00:00:00').toLocaleDateString('fr-FR', {
-                              weekday: 'long',
-                              day: 'numeric',
-                              month: 'long'
-                            })}
-                            {isProtected && (
-                              <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                                🔒 Existante
-                              </span>
-                            )}
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                              {new Date(day.date + 'T00:00:00').toLocaleDateString('fr-FR', {
+                                weekday: 'long',
+                                day: 'numeric',
+                                month: 'long',
+                              })}
+                              {isProtected && (
+                                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                  🔒 Existante
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {!isProtected && (
+                            <button
+                              type="button"
+                              onClick={() => handleToggle(day.date)}
+                              className="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                              title="Désélectionner"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                        <div
+                          className={`flex items-center gap-3 p-2 rounded-lg ${
+                            isProtected ? 'bg-emerald-100/50' : 'bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                            <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>
+                              {day.heure_debut} - {day.heure_fin}
+                            </span>
+                          </div>
+                          <div className="ml-auto flex items-center gap-1">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold">
+                              Charge:
+                            </span>
+                            <span className="text-xs font-bold text-emerald-600">
+                              {calculerHeures(day.heure_debut, day.heure_fin).toFixed(1)}h
+                            </span>
                           </div>
                         </div>
-                        {!isProtected && (
-                          <button
-                            type="button"
-                            onClick={() => handleToggle(day.date)}
-                            className="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                            title="Désélectionner"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        )}
                       </div>
-                      <div className={`flex items-center gap-3 p-2 rounded-lg ${isProtected ? 'bg-emerald-100/50' : 'bg-slate-50'
-                        }`}>
-                        <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-                          <Clock className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>{day.heure_debut} - {day.heure_fin}</span>
-                        </div>
-                        <div className="ml-auto flex items-center gap-1">
-                          <span className="text-[10px] text-slate-400 uppercase font-bold">Charge:</span>
-                          <span className="text-xs font-bold text-emerald-600">
-                            {calculerHeures(day.heure_debut, day.heure_fin).toFixed(1)}h
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
+                    );
+                  })
               )}
             </div>
           </div>
@@ -634,7 +656,8 @@ const SelectDaysModal: React.FC<SelectDaysModalProps> = ({
               </span>
             ) : (
               <span className="text-slate-500 font-medium">
-                Période: <strong className="text-slate-800">{allDays.length} jours potentiels</strong>
+                Période:{' '}
+                <strong className="text-slate-800">{allDays.length} jours potentiels</strong>
               </span>
             )}
           </div>

@@ -1,0 +1,1638 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`drawWeeklyPhotos (mono) > renders placeholders when images are missing > weekly-photos-placeholder 1`] = `
+{
+  "finalY": 140,
+  "trace": [
+    {
+      "op": "addPage",
+    },
+    {
+      "args": [
+        16,
+        185,
+        129,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        33,
+        6,
+        12,
+        "F",
+      ],
+      "op": "rect",
+    },
+    {
+      "args": [
+        16,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "6. PHOTOS AVANT/APRÈS",
+        30,
+        41,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        11,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "Intervention",
+        20,
+        63,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        9,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        107,
+        114,
+        128,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "AVANT",
+        57.5,
+        69,
+        {
+          "align": "center",
+          "isInputVisual": true,
+        },
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "APRÈS",
+        142.5,
+        69,
+        {
+          "align": "center",
+          "isInputVisual": true,
+        },
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        243,
+        244,
+        246,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        73,
+        75,
+        55,
+        2,
+        2,
+        "F",
+      ],
+      "op": "roundedRect",
+    },
+    {
+      "args": [
+        8,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        150,
+        150,
+        150,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "Image non disponible",
+        57.5,
+        100.5,
+        {
+          "align": "center",
+          "isInputVisual": true,
+        },
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        243,
+        244,
+        246,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        105,
+        73,
+        75,
+        55,
+        2,
+        2,
+        "F",
+      ],
+      "op": "roundedRect",
+    },
+    {
+      "args": [
+        8,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        150,
+        150,
+        150,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "Image non disponible",
+        142.5,
+        100.5,
+        {
+          "align": "center",
+          "isInputVisual": true,
+        },
+      ],
+      "op": "text",
+    },
+  ],
+}
+`;
+
+exports[`drawWeeklyPhotos (mono) > renders up to maxGroups=6 + overflow hint > weekly-photos-overflow 1`] = `
+[
+  {
+    "op": "addPage",
+  },
+  {
+    "args": [
+      16,
+      185,
+      129,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      33,
+      6,
+      12,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      16,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "6. PHOTOS AVANT/APRÈS",
+      30,
+      41,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      11,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "Tâche 1",
+      20,
+      63,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      107,
+      114,
+      128,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "AVANT",
+      57.5,
+      69,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "APRÈS",
+      142.5,
+      69,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "JPEG",
+      20,
+      73,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      "JPEG",
+      105,
+      73,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      11,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "Tâche 2",
+      20,
+      140,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      107,
+      114,
+      128,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "AVANT",
+      57.5,
+      146,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "APRÈS",
+      142.5,
+      146,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "JPEG",
+      20,
+      150,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      "JPEG",
+      105,
+      150,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "op": "addPage",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      11,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "Tâche 3",
+      20,
+      38,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      107,
+      114,
+      128,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "AVANT",
+      57.5,
+      44,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "APRÈS",
+      142.5,
+      44,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "JPEG",
+      20,
+      48,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      "JPEG",
+      105,
+      48,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      11,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "Tâche 4",
+      20,
+      115,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      107,
+      114,
+      128,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "AVANT",
+      57.5,
+      121,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "APRÈS",
+      142.5,
+      121,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "JPEG",
+      20,
+      125,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      "JPEG",
+      105,
+      125,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "op": "addPage",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      11,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "Tâche 5",
+      20,
+      38,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      107,
+      114,
+      128,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "AVANT",
+      57.5,
+      44,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "APRÈS",
+      142.5,
+      44,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "JPEG",
+      20,
+      48,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      "JPEG",
+      105,
+      48,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      11,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "Tâche 6",
+      20,
+      115,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      107,
+      114,
+      128,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "AVANT",
+      57.5,
+      121,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "APRÈS",
+      142.5,
+      121,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "JPEG",
+      20,
+      125,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      "JPEG",
+      105,
+      125,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      107,
+      114,
+      128,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "+ 2 autre(s) groupe(s) de photos",
+      20,
+      192,
+    ],
+    "op": "text",
+  },
+]
+`;
+
+exports[`drawWeeklyPhotosMulti > caps each site to maxGroups=4 with overflow hint and skips empty sites > weekly-photos-multi-overflow 1`] = `
+[
+  {
+    "op": "addPage",
+  },
+  {
+    "args": [
+      16,
+      185,
+      129,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      33,
+      6,
+      12,
+      "F",
+    ],
+    "op": "rect",
+  },
+  {
+    "args": [
+      16,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "6. PHOTOS AVANT/APRÈS",
+      30,
+      41,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      50,
+      50,
+      50,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      50,
+      170,
+      12,
+      2,
+      2,
+      "F",
+    ],
+    "op": "roundedRect",
+  },
+  {
+    "args": [
+      11,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Site A",
+      25,
+      58,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      10,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "Task 1",
+      20,
+      68,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      107,
+      114,
+      128,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "AVANT",
+      57.5,
+      74,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "APRÈS",
+      142.5,
+      74,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "JPEG",
+      20,
+      78,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      "JPEG",
+      105,
+      78,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      10,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "Task 2",
+      20,
+      143,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      107,
+      114,
+      128,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "AVANT",
+      57.5,
+      149,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "APRÈS",
+      142.5,
+      149,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "JPEG",
+      20,
+      153,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      "JPEG",
+      105,
+      153,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "op": "addPage",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      10,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "Task 3",
+      20,
+      38,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      107,
+      114,
+      128,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "AVANT",
+      57.5,
+      44,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "APRÈS",
+      142.5,
+      44,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "JPEG",
+      20,
+      48,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      "JPEG",
+      105,
+      48,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      10,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "Task 4",
+      20,
+      113,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      107,
+      114,
+      128,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "AVANT",
+      57.5,
+      119,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "APRÈS",
+      142.5,
+      119,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "JPEG",
+      20,
+      123,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      "JPEG",
+      105,
+      123,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      9,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      107,
+      114,
+      128,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "+ 2 autre(s) groupe(s) de photos",
+      20,
+      188,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      50,
+      50,
+      50,
+    ],
+    "op": "setFillColor",
+  },
+  {
+    "args": [
+      20,
+      193,
+      170,
+      12,
+      2,
+      2,
+      "F",
+    ],
+    "op": "roundedRect",
+  },
+  {
+    "args": [
+      11,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      255,
+      255,
+      255,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "Site C",
+      25,
+      201,
+    ],
+    "op": "text",
+  },
+  {
+    "op": "addPage",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      10,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "Task 1",
+      20,
+      38,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      107,
+      114,
+      128,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "AVANT",
+      57.5,
+      44,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "APRÈS",
+      142.5,
+      44,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "JPEG",
+      20,
+      48,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      "JPEG",
+      105,
+      48,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      "helvetica",
+      "bold",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      10,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      17,
+      24,
+      39,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "Task 2",
+      20,
+      113,
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      8,
+    ],
+    "op": "setFontSize",
+  },
+  {
+    "args": [
+      107,
+      114,
+      128,
+    ],
+    "op": "setTextColor",
+  },
+  {
+    "args": [
+      "helvetica",
+      "normal",
+    ],
+    "op": "setFont",
+  },
+  {
+    "args": [
+      "AVANT",
+      57.5,
+      119,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "APRÈS",
+      142.5,
+      119,
+      {
+        "align": "center",
+        "isInputVisual": true,
+      },
+    ],
+    "op": "text",
+  },
+  {
+    "args": [
+      "JPEG",
+      20,
+      123,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+  {
+    "args": [
+      "JPEG",
+      105,
+      123,
+      75,
+      55,
+    ],
+    "op": "addImage",
+  },
+]
+`;

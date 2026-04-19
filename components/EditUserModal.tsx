@@ -1,40 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Edit2,
-  AlertCircle,
-  Mail,
-  UserCheck,
-  Building2,
-  Phone,
-  Hash
-} from 'lucide-react';
-import FormModal, { FormField, FormSection } from './FormModal';
+import { Edit2, Mail, UserCheck, Phone, Hash } from 'lucide-react';
+import FormModal, { FormSection } from './FormModal';
 import { PremiumInput, PremiumSelect } from './modals/PremiumFormComponents';
-import {
-  Utilisateur,
-  Client,
-  OperateurList,
-  NomRole,
-  Role,
-  ClientUpdate,
-  OperateurUpdate
-} from '../types/users';
+import { Utilisateur, Client, OperateurList, NomRole, Role, OperateurUpdate } from '../types/users';
 import {
   fetchRoles,
   updateUtilisateur,
-  updateClient,
   updateOperateur,
   attribuerRole,
-  retirerRole
+  retirerRole,
 } from '../services/usersApi';
-import { createOperateur, fetchOperateurById } from '../services/usersApi';
+import { createOperateur } from '../services/usersApi';
 import { fetchUtilisateurById } from '../services/usersApi';
 import {
   fetchCompetences,
   fetchCompetencesOperateur,
-  affecterCompetence
+  affecterCompetence,
 } from '../services/usersApi';
-import { Competence, CompetenceOperateur } from '../types/users';
+import { Competence, CompetenceOperateur, NiveauCompetence } from '../types/users';
+import { useToast } from '../contexts/ToastContext';
 
 interface EditUserModalProps {
   user: Utilisateur;
@@ -44,7 +28,14 @@ interface EditUserModalProps {
   onUpdated: () => void;
 }
 
-const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs, onClose, onUpdated }) => {
+const EditUserModal: React.FC<EditUserModalProps> = ({
+  user,
+  clients: _clients,
+  operateurs,
+  onClose,
+  onUpdated,
+}) => {
+  const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [roleLoading, setRoleLoading] = useState<string | null>(null);
@@ -77,7 +68,9 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
       try {
         const token = localStorage.getItem('token');
         if (!token) return;
-        const resp = await fetch('/api/users/me/', { headers: { Authorization: `Bearer ${token}` } });
+        const resp = await fetch('/api/users/me/', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (!resp.ok) return;
         const me = await resp.json();
         let roles: NomRole[] = [];
@@ -92,8 +85,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
     fetchAll();
   }, []);
 
-  const clientData = clients.find(c => c.utilisateur === user.id);
-  const initialOperateur = operateurs.find(o => o.id === user.id) || null;
+  const initialOperateur = operateurs.find((o) => o.id === user.id) || null;
   const [operateurInfo, setOperateurInfo] = useState<OperateurList | null>(initialOperateur);
 
   const [allCompetences, setAllCompetences] = useState<Competence[]>([]);
@@ -124,14 +116,12 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
     nom: user.nom,
     prenom: user.prenom,
     email: user.email,
-    actif: user.actif
+    actif: user.actif,
   });
-
-
 
   const [operateurFields, setOperateurFields] = useState({
     numeroImmatriculation: initialOperateur?.numeroImmatriculation || '',
-    telephone: initialOperateur?.telephone || ''
+    telephone: initialOperateur?.telephone || '',
   });
   const [creatingOperateur, setCreatingOperateur] = useState(false);
 
@@ -144,10 +134,8 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
         nom: formData.nom,
         prenom: formData.prenom,
         email: formData.email,
-        actif: formData.actif
+        actif: formData.actif,
       });
-
-
 
       if (userRoles && (userRoles.includes('SUPERVISEUR') || userRoles.includes('SUPERVISEUR'))) {
         // if operateur profile exists, update it; otherwise create one
@@ -157,7 +145,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
             prenom: formData.prenom,
             email: formData.email,
             numeroImmatriculation: operateurFields.numeroImmatriculation,
-            telephone: operateurFields.telephone
+            telephone: operateurFields.telephone,
           };
           await updateOperateur(operateurInfo.id, operateurUpdate);
         } else {
@@ -167,10 +155,9 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
               email: formData.email,
               nom: formData.nom,
               prenom: formData.prenom,
-              password: Math.random().toString(36).slice(-8),
               numeroImmatriculation: operateurFields.numeroImmatriculation || `OP-${user.id}`,
               dateEmbauche: new Date().toISOString().split('T')[0] as string,
-              telephone: operateurFields.telephone || ''
+              telephone: operateurFields.telephone || '',
             });
             setOperateurInfo(created as OperateurList);
           } catch (e) {
@@ -189,10 +176,15 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
   };
 
   // Determine icon color based on roles
-  const iconColor = userRoles.includes('ADMIN') ? 'text-purple-600' :
-    userRoles.includes('SUPERVISEUR') ? 'text-blue-600' :
-    userRoles.includes('SUPERVISEUR') ? 'text-yellow-600' :
-    userRoles.includes('CLIENT') ? 'text-green-600' : 'text-gray-600';
+  const iconColor = userRoles.includes('ADMIN')
+    ? 'text-purple-600'
+    : userRoles.includes('SUPERVISEUR')
+      ? 'text-blue-600'
+      : userRoles.includes('SUPERVISEUR')
+        ? 'text-yellow-600'
+        : userRoles.includes('CLIENT')
+          ? 'text-green-600'
+          : 'text-gray-600';
 
   const subtitleContent = (
     <span className="text-sm text-gray-500">{(userRoles || []).join(', ')}</span>
@@ -222,7 +214,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
           )}
           <div className="flex flex-wrap gap-2">
             {allRoles.map((roleObj) => {
-              const roleName = roleObj.nomRole as any;
+              const roleName = roleObj.nomRole;
               const hasRole = userRoles.includes(roleName);
               return (
                 <div key={roleObj.id} className="flex items-center gap-1 border rounded px-2 py-1">
@@ -244,7 +236,9 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
                           setRoleLoading(null);
                         }
                       }}
-                    >Retirer</button>
+                    >
+                      Retirer
+                    </button>
                   ) : (
                     <button
                       type="button"
@@ -262,7 +256,9 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
                           setRoleLoading(null);
                         }
                       }}
-                    >Ajouter</button>
+                    >
+                      Ajouter
+                    </button>
                   )}
                 </div>
               );
@@ -332,7 +328,6 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
         </div>
       </FormSection>
 
-
       {/* Informations opérateur (si SUPERVISEUR ou SUPERVISEUR) */}
       {(userRoles.includes('SUPERVISEUR') || userRoles.includes('SUPERVISEUR')) && (
         <FormSection title="Informations opérateur" icon={<UserCheck className="w-4 h-4" />}>
@@ -340,7 +335,9 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
             <PremiumInput
               type="text"
               value={operateurFields.numeroImmatriculation}
-              onChange={(value) => setOperateurFields({ ...operateurFields, numeroImmatriculation: value })}
+              onChange={(value) =>
+                setOperateurFields({ ...operateurFields, numeroImmatriculation: value })
+              }
               label="Matricule"
               placeholder="OP-2024-0001"
               icon={<Hash className="w-4 h-4" />}
@@ -376,26 +373,28 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
                       email: formData.email,
                       nom: formData.nom,
                       prenom: formData.prenom,
-                      password: Math.random().toString(36).slice(-8),
-                      numeroImmatriculation: operateurFields.numeroImmatriculation || `OP-${user.id}`,
+                      numeroImmatriculation:
+                        operateurFields.numeroImmatriculation || `OP-${user.id}`,
                       dateEmbauche: new Date().toISOString().split('T')[0] as string,
-                      telephone: operateurFields.telephone || ''
+                      telephone: operateurFields.telephone || '',
                     });
                     setOperateurInfo(created as OperateurList);
                     try {
-                      const refreshed = await fetchCompetencesOperateur((created as OperateurList).id);
+                      const refreshed = await fetchCompetencesOperateur(
+                        (created as OperateurList).id,
+                      );
                       setOperateurCompetences(refreshed);
                     } catch (e) {
                       // ignore
                     }
                   } catch (e) {
-                    console.error('Erreur création operateur', e);
+                    showToast('Erreur lors de la création du profil opérateur', 'error');
                   } finally {
                     setCreatingOperateur(false);
                   }
                 }}
               >
-                {creatingOperateur ? 'Création...' : "Créer profil opérateur"}
+                {creatingOperateur ? 'Création...' : 'Créer profil opérateur'}
               </button>
             </div>
           )}
@@ -413,26 +412,31 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
                       <div className="text-sm font-medium">
                         {c.competenceDetail?.nomCompetence || `#${c.competence}`}
                       </div>
-                      <div className="text-xs text-gray-500">{c.competenceDetail?.categorieDisplay}</div>
+                      <div className="text-xs text-gray-500">
+                        {c.competenceDetail?.categorieDisplay}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 w-48">
                       <PremiumSelect
                         value={c.niveau}
                         onChange={async (value) => {
-                          const niveau = value as any;
+                          const niveau = value as NiveauCompetence;
                           try {
-                            await affecterCompetence(c.operateur, { competenceId: c.competence, niveau });
+                            await affecterCompetence(c.operateur, {
+                              competenceId: c.competence,
+                              niveau,
+                            });
                             const refreshed = await fetchCompetencesOperateur(c.operateur);
                             setOperateurCompetences(refreshed);
                           } catch (err) {
-                            console.error('Erreur mise à jour competence', err);
+                            showToast('Erreur lors de la mise à jour de la compétence', 'error');
                           }
                         }}
                         options={[
                           { value: 'NON', label: 'Non maîtrisé' },
                           { value: 'DEBUTANT', label: 'Débutant' },
                           { value: 'INTERMEDIAIRE', label: 'Intermédiaire' },
-                          { value: 'EXPERT', label: 'Expert' }
+                          { value: 'EXPERT', label: 'Expert' },
                         ]}
                         placeholder="Niveau..."
                         variant="outlined"
@@ -456,7 +460,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
                       .filter((ac) => !operateurCompetences.some((oc) => oc.competence === ac.id))
                       .map((ac) => ({
                         value: ac.id.toString(),
-                        label: ac.nomCompetence
+                        label: ac.nomCompetence,
                       }))}
                     placeholder="-- Choisir --"
                     variant="outlined"
@@ -471,7 +475,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
                       { value: 'NON', label: 'Non maîtrisé' },
                       { value: 'DEBUTANT', label: 'Débutant' },
                       { value: 'INTERMEDIAIRE', label: 'Intermédiaire' },
-                      { value: 'EXPERT', label: 'Expert' }
+                      { value: 'EXPERT', label: 'Expert' },
                     ]}
                     placeholder="Niveau"
                     variant="outlined"
@@ -486,14 +490,14 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, clients, operateurs
                     try {
                       await affecterCompetence(operateurInfo.id, {
                         competenceId: Number(newCompetenceId),
-                        niveau: newCompetenceNiveau as any
+                        niveau: newCompetenceNiveau as NiveauCompetence,
                       });
                       const refreshed = await fetchCompetencesOperateur(operateurInfo.id);
                       setOperateurCompetences(refreshed);
                       setNewCompetenceId('');
                       setNewCompetenceNiveau('');
                     } catch (err) {
-                      console.error('Erreur ajout competence', err);
+                      showToast("Erreur lors de l'ajout de la compétence", 'error');
                     }
                   }}
                 >

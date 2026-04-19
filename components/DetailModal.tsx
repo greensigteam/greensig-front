@@ -104,7 +104,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
   // ============================================================================
 
   const [activeTab, setActiveTab] = useState<string>(
-    defaultTab || (tabs && tabs.length > 0 ? tabs[0].key : '')
+    defaultTab || (tabs && tabs.length > 0 ? (tabs[0]?.key ?? '') : ''),
   );
 
   // ============================================================================
@@ -130,10 +130,13 @@ export const DetailModal: React.FC<DetailModalProps> = ({
   return (
     <BaseModal isOpen={isOpen} onClose={onClose} size={size} showCloseButton={false}>
       {/* Header */}
-      <div className={`p-6 border-b flex items-start gap-4 ${useGradientHeader
-        ? `${MODAL_DESIGN_TOKENS.colors.gradients.header} ${MODAL_DESIGN_TOKENS.colors.borders.emerald}`
-        : 'border-gray-200'
-        }`}>
+      <div
+        className={`p-6 border-b flex items-start gap-4 ${
+          useGradientHeader
+            ? `${MODAL_DESIGN_TOKENS.colors.gradients.header} ${MODAL_DESIGN_TOKENS.colors.borders.emerald}`
+            : 'border-gray-200'
+        }`}
+      >
         {/* Avatar/Icon */}
         {(avatar || icon) && (
           <div className="flex-shrink-0">
@@ -141,11 +144,14 @@ export const DetailModal: React.FC<DetailModalProps> = ({
               <img
                 src={avatar}
                 alt={title}
-                className={`w-16 h-16 rounded-full object-cover ring-2 ${useGradientHeader ? 'ring-emerald-200' : 'ring-gray-200'
-                  }`}
+                className={`w-16 h-16 rounded-full object-cover ring-2 ${
+                  useGradientHeader ? 'ring-emerald-200' : 'ring-gray-200'
+                }`}
               />
             ) : (
-              <div className={`p-3 ${MODAL_DESIGN_TOKENS.borderRadius.full} ${MODAL_DESIGN_TOKENS.colors.backgrounds.emerald100}`}>
+              <div
+                className={`p-3 ${MODAL_DESIGN_TOKENS.borderRadius.full} ${MODAL_DESIGN_TOKENS.colors.backgrounds.emerald100}`}
+              >
                 {icon}
               </div>
             )}
@@ -155,9 +161,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
         {/* Title/Subtitle */}
         <div className="flex-1 min-w-0">
           <h2 className="text-xl font-bold text-gray-900 truncate">{title}</h2>
-          {subtitle && (
-            <p className="text-sm text-gray-500 mt-0.5 truncate">{subtitle}</p>
-          )}
+          {subtitle && <p className="text-sm text-gray-500 mt-0.5 truncate">{subtitle}</p>}
         </div>
 
         {/* Close button */}
@@ -184,9 +188,10 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                 className={`
                   relative flex items-center gap-2 px-6 py-3 text-sm font-medium whitespace-nowrap
                   border-b-2 -mb-px transition-all duration-200
-                  ${activeTab === tab.key
-                    ? 'border-emerald-500 text-emerald-600 bg-gradient-to-r from-emerald-50/50 to-transparent'
-                    : 'border-transparent text-gray-500 hover:text-emerald-600 hover:border-emerald-300'
+                  ${
+                    activeTab === tab.key
+                      ? 'border-emerald-500 text-emerald-600 bg-gradient-to-r from-emerald-50/50 to-transparent'
+                      : 'border-transparent text-gray-500 hover:text-emerald-600 hover:border-emerald-300'
                   }
                   ${tab.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                 `}
@@ -194,7 +199,9 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                 {tab.icon && <span className="flex-shrink-0">{tab.icon}</span>}
                 <span>{tab.label}</span>
                 {tab.badge !== undefined && tab.badge > 0 && (
-                  <span className={`ml-1 px-2 py-0.5 ${MODAL_DESIGN_TOKENS.badges.emerald} ${MODAL_DESIGN_TOKENS.borderRadius.full}`}>
+                  <span
+                    className={`ml-1 px-2 py-0.5 ${MODAL_DESIGN_TOKENS.badges.emerald} ${MODAL_DESIGN_TOKENS.borderRadius.full}`}
+                  >
                     {tab.badge > 99 ? '99+' : tab.badge}
                   </span>
                 )}
@@ -205,9 +212,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
       )}
 
       {/* Body */}
-      <ModalBody
-        className={`${loading ? 'opacity-60 pointer-events-none' : ''} ${bodyClassName}`}
-      >
+      <ModalBody className={`${loading ? 'opacity-60 pointer-events-none' : ''} ${bodyClassName}`}>
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="flex flex-col items-center gap-3">
@@ -221,9 +226,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
       </ModalBody>
 
       {/* Footer */}
-      {!hideFooter && actions && (
-        <ModalFooter>{actions}</ModalFooter>
-      )}
+      {!hideFooter && actions && <ModalFooter>{actions}</ModalFooter>}
     </BaseModal>
   );
 };
@@ -241,9 +244,7 @@ export const DetailSection: React.FC<{
   className?: string;
 }> = ({ title, children, className = '' }) => (
   <div className={`space-y-3 ${className}`}>
-    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">
-      {title}
-    </h3>
+    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">{title}</h3>
     <div className="space-y-2">{children}</div>
   </div>
 );
@@ -258,11 +259,7 @@ export const DetailRow: React.FC<{
   className?: string;
 }> = ({ label, value, icon, className = '' }) => (
   <div className={`flex items-start gap-3 ${className}`}>
-    {icon && (
-      <div className="flex-shrink-0 text-gray-400 mt-0.5">
-        {icon}
-      </div>
-    )}
+    {icon && <div className="flex-shrink-0 text-gray-400 mt-0.5">{icon}</div>}
     <div className="flex-1 min-w-0">
       <dt className="text-xs text-gray-500 font-medium">{label}</dt>
       <dd className="text-sm text-gray-900 mt-0.5">{value}</dd>
@@ -284,11 +281,7 @@ export const DetailGrid: React.FC<{
     3: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
   }[columns];
 
-  return (
-    <div className={`grid ${gridClass} gap-4 ${className}`}>
-      {children}
-    </div>
-  );
+  return <div className={`grid ${gridClass} gap-4 ${className}`}>{children}</div>;
 };
 
 /**
@@ -314,9 +307,7 @@ export const DetailCard: React.FC<{
       {(title || icon) && (
         <div className="flex items-center gap-2 mb-3">
           {icon && <div className="flex-shrink-0">{icon}</div>}
-          {title && (
-            <h4 className="text-sm font-semibold text-gray-900">{title}</h4>
-          )}
+          {title && <h4 className="text-sm font-semibold text-gray-900">{title}</h4>}
         </div>
       )}
       {children}
@@ -338,11 +329,7 @@ export const DetailList: React.FC<{
   <dl className={`divide-y divide-gray-200 ${className}`}>
     {items.map((item, index) => (
       <div key={index} className="py-3 flex items-start gap-3">
-        {item.icon && (
-          <div className="flex-shrink-0 text-gray-400 mt-0.5">
-            {item.icon}
-          </div>
-        )}
+        {item.icon && <div className="flex-shrink-0 text-gray-400 mt-0.5">{item.icon}</div>}
         <div className="flex-1 flex justify-between gap-4">
           <dt className="text-sm text-gray-500 font-medium">{item.label}</dt>
           <dd className="text-sm text-gray-900 text-right">{item.value}</dd>
@@ -409,10 +396,10 @@ export const DetailTimeline: React.FC<{
       return (
         <div key={index} className="flex gap-3">
           {/* Icon/Dot */}
-          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${variantClasses}`}>
-            {item.icon || (
-              <div className="w-2 h-2 rounded-full bg-current" />
-            )}
+          <div
+            className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${variantClasses}`}
+          >
+            {item.icon || <div className="w-2 h-2 rounded-full bg-current" />}
           </div>
 
           {/* Content */}
@@ -421,9 +408,7 @@ export const DetailTimeline: React.FC<{
               <h4 className="text-sm font-semibold text-gray-900">{item.title}</h4>
               <time className="text-xs text-gray-500 flex-shrink-0">{item.date}</time>
             </div>
-            {item.description && (
-              <p className="text-sm text-gray-600 mt-1">{item.description}</p>
-            )}
+            {item.description && <p className="text-sm text-gray-600 mt-1">{item.description}</p>}
           </div>
         </div>
       );
@@ -441,15 +426,9 @@ export const DetailEmptyState: React.FC<{
   action?: React.ReactNode;
 }> = ({ icon, title, description, action }) => (
   <div className="flex flex-col items-center justify-center py-12 text-center">
-    {icon && (
-      <div className="mb-4 p-4 bg-gray-100 rounded-full text-gray-400">
-        {icon}
-      </div>
-    )}
+    {icon && <div className="mb-4 p-4 bg-gray-100 rounded-full text-gray-400">{icon}</div>}
     <h3 className="text-lg font-semibold text-gray-900 mb-1">{title}</h3>
-    {description && (
-      <p className="text-sm text-gray-500 mb-4 max-w-sm">{description}</p>
-    )}
+    {description && <p className="text-sm text-gray-500 mb-4 max-w-sm">{description}</p>}
     {action}
   </div>
 );

@@ -1,0 +1,1192 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`drawMonthlyTravauxEffectues — snapshot > renders the empty-state message when no items 1`] = `
+{
+  "finalY": 79,
+  "trace": [
+    {
+      "args": [
+        16,
+        185,
+        129,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        33,
+        6,
+        12,
+        "F",
+      ],
+      "op": "rect",
+    },
+    {
+      "args": [
+        16,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "4. TRAVAUX EFFECTUÉS",
+        30,
+        41,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        9,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        75,
+        85,
+        99,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        [
+          "Dans le cadre du suivi des travaux, les tâches réalisées sont présentées ci-après :",
+        ],
+        20,
+        53,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        10,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "Aucun travail réalisé sur cette période.",
+        20,
+        64,
+      ],
+      "op": "text",
+    },
+  ],
+}
+`;
+
+exports[`drawMonthlyTravauxEffectues — snapshot > renders the site banner + deduplicated task types 1`] = `
+{
+  "finalY": 105,
+  "trace": [
+    {
+      "args": [
+        16,
+        185,
+        129,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        33,
+        6,
+        12,
+        "F",
+      ],
+      "op": "rect",
+    },
+    {
+      "args": [
+        16,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "4. TRAVAUX EFFECTUÉS",
+        30,
+        41,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        9,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        75,
+        85,
+        99,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        [
+          "Dans le cadre du suivi des travaux, les tâches réalisées sont présentées ci-après :",
+        ],
+        20,
+        53,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        50,
+        50,
+        50,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        61,
+        170,
+        12,
+        2,
+        2,
+        "F",
+      ],
+      "op": "roundedRect",
+    },
+    {
+      "args": [
+        11,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        255,
+        255,
+        255,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "Site Test UM6P Benguerir",
+        25,
+        69,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        10,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "•  Tonte gazon",
+        24,
+        79,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Élagage arbres",
+        24,
+        86,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Désherbage",
+        24,
+        93,
+      ],
+      "op": "text",
+    },
+  ],
+}
+`;
+
+exports[`drawMonthlyTravauxEffectuesMulti — snapshot > renders one banner per site, including empty ones 1`] = `
+{
+  "finalY": 150,
+  "trace": [
+    {
+      "args": [
+        16,
+        185,
+        129,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        33,
+        6,
+        12,
+        "F",
+      ],
+      "op": "rect",
+    },
+    {
+      "args": [
+        16,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "4. TRAVAUX EFFECTUÉS",
+        30,
+        41,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        9,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        75,
+        85,
+        99,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        [
+          "Dans le cadre du suivi des travaux, les tâches réalisées sont présentées ci-après :",
+        ],
+        20,
+        53,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        50,
+        50,
+        50,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        61,
+        170,
+        12,
+        2,
+        2,
+        "F",
+      ],
+      "op": "roundedRect",
+    },
+    {
+      "args": [
+        11,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        255,
+        255,
+        255,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "Site A",
+        25,
+        69,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        10,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "•  Tonte gazon",
+        24,
+        79,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Élagage",
+        24,
+        86,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        50,
+        50,
+        50,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        95,
+        170,
+        12,
+        2,
+        2,
+        "F",
+      ],
+      "op": "roundedRect",
+    },
+    {
+      "args": [
+        11,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        255,
+        255,
+        255,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "Site B",
+        25,
+        103,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        10,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "Aucun travail réalisé sur cette période.",
+        20,
+        113,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        50,
+        50,
+        50,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        120,
+        170,
+        12,
+        2,
+        2,
+        "F",
+      ],
+      "op": "roundedRect",
+    },
+    {
+      "args": [
+        11,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        255,
+        255,
+        255,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "Site C",
+        25,
+        128,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        10,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "•  Désherbage",
+        24,
+        138,
+      ],
+      "op": "text",
+    },
+  ],
+}
+`;
+
+exports[`drawMonthlyTravauxPlanifies — snapshot > renders the empty-state message when no items 1`] = `
+{
+  "finalY": 84,
+  "trace": [
+    {
+      "args": [
+        16,
+        185,
+        129,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        33,
+        6,
+        12,
+        "F",
+      ],
+      "op": "rect",
+    },
+    {
+      "args": [
+        16,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "5. TRAVAUX PLANIFIÉS",
+        30,
+        41,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        9,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        75,
+        85,
+        99,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        [
+          "Pour assurer la continuité des interventions, les travaux planifiés sont présentés ci-après. Le détail complet du planning",
+          "par site est présenté dans les annexes.",
+        ],
+        20,
+        53,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        10,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "Aucune intervention planifiée.",
+        20,
+        69,
+      ],
+      "op": "text",
+    },
+  ],
+}
+`;
+
+exports[`drawMonthlyTravauxPlanifies — snapshot > renders the site banner + deduplicated task types 1`] = `
+{
+  "finalY": 103,
+  "trace": [
+    {
+      "args": [
+        16,
+        185,
+        129,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        33,
+        6,
+        12,
+        "F",
+      ],
+      "op": "rect",
+    },
+    {
+      "args": [
+        16,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "5. TRAVAUX PLANIFIÉS",
+        30,
+        41,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        9,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        75,
+        85,
+        99,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        [
+          "Pour assurer la continuité des interventions, les travaux planifiés sont présentés ci-après. Le détail complet du planning",
+          "par site est présenté dans les annexes.",
+        ],
+        20,
+        53,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        50,
+        50,
+        50,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        66,
+        170,
+        12,
+        2,
+        2,
+        "F",
+      ],
+      "op": "roundedRect",
+    },
+    {
+      "args": [
+        11,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        255,
+        255,
+        255,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "Site Test UM6P Benguerir",
+        25,
+        74,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        10,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "•  Arrosage",
+        24,
+        84,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Taille haies",
+        24,
+        91,
+      ],
+      "op": "text",
+    },
+  ],
+}
+`;
+
+exports[`drawMonthlyTravauxPlanifiesMulti — snapshot > renders one banner per site, including empty ones 1`] = `
+{
+  "finalY": 128,
+  "trace": [
+    {
+      "args": [
+        16,
+        185,
+        129,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        33,
+        6,
+        12,
+        "F",
+      ],
+      "op": "rect",
+    },
+    {
+      "args": [
+        16,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "5. TRAVAUX PLANIFIÉS",
+        30,
+        41,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        9,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        75,
+        85,
+        99,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        [
+          "Pour assurer la continuité des interventions, les travaux planifiés sont présentés ci-après. Le détail complet du planning",
+          "par site est présenté dans les annexes.",
+        ],
+        20,
+        53,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        50,
+        50,
+        50,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        66,
+        170,
+        12,
+        2,
+        2,
+        "F",
+      ],
+      "op": "roundedRect",
+    },
+    {
+      "args": [
+        11,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        255,
+        255,
+        255,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "Site A",
+        25,
+        74,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        10,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "•  Arrosage",
+        24,
+        84,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        "•  Taille haies",
+        24,
+        91,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        50,
+        50,
+        50,
+      ],
+      "op": "setFillColor",
+    },
+    {
+      "args": [
+        20,
+        100,
+        170,
+        12,
+        2,
+        2,
+        "F",
+      ],
+      "op": "roundedRect",
+    },
+    {
+      "args": [
+        11,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        255,
+        255,
+        255,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "bold",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "Site B",
+        25,
+        108,
+      ],
+      "op": "text",
+    },
+    {
+      "args": [
+        10,
+      ],
+      "op": "setFontSize",
+    },
+    {
+      "args": [
+        17,
+        24,
+        39,
+      ],
+      "op": "setTextColor",
+    },
+    {
+      "args": [
+        "helvetica",
+        "normal",
+      ],
+      "op": "setFont",
+    },
+    {
+      "args": [
+        "Aucune intervention planifiée.",
+        20,
+        118,
+      ],
+      "op": "text",
+    },
+  ],
+}
+`;

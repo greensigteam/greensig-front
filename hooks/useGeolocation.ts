@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { Coordinates, UserLocation } from '../types';
+import type { Coordinates } from '../types';
 import logger from '../services/logger';
 
 export interface GeolocationResult {
@@ -51,7 +51,7 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
     timeout = 10000,
     maximumAge = 0,
     onSuccess,
-    onError
+    onError,
   } = options;
 
   const [isGeolocating, setIsGeolocating] = useState(false);
@@ -62,20 +62,20 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
     if (!('geolocation' in navigator)) {
       const err: GeolocationError = {
         code: 0,
-        message: "La géolocalisation n'est pas supportée par votre navigateur."
+        message: "La géolocalisation n'est pas supportée par votre navigateur.",
       };
       setError(err);
       if (onError) onError(err);
       return;
     }
 
-    console.log('🌍 Requesting geolocation...');
     setIsGeolocating(true);
     setError(null);
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const { latitude, longitude, accuracy, altitude, altitudeAccuracy, heading, speed } = position.coords;
+        const { latitude, longitude, accuracy, altitude, altitudeAccuracy, heading, speed } =
+          position.coords;
 
         const result: GeolocationResult = {
           coordinates: { lat: latitude, lng: longitude },
@@ -84,15 +84,8 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
           altitudeAccuracy: altitudeAccuracy ?? undefined,
           heading: heading ?? undefined,
           speed: speed ?? undefined,
-          timestamp: position.timestamp
+          timestamp: position.timestamp,
         };
-
-        console.log('✅ Geolocation success:', {
-          latitude,
-          longitude,
-          accuracy: `${accuracy.toFixed(2)}m`,
-          timestamp: new Date(position.timestamp).toLocaleString()
-        });
 
         setGeolocationResult(result);
         setIsGeolocating(false);
@@ -104,7 +97,7 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
 
         const geolocationError: GeolocationError = {
           code: err.code,
-          message: getErrorMessage(err.code)
+          message: getErrorMessage(err.code),
         };
 
         setError(geolocationError);
@@ -115,8 +108,8 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
       {
         enableHighAccuracy,
         timeout,
-        maximumAge
-      }
+        maximumAge,
+      },
     );
   }, [enableHighAccuracy, timeout, maximumAge, onSuccess, onError]);
 
@@ -130,7 +123,7 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
     geolocationResult,
     error,
     requestGeolocation,
-    clearGeolocation
+    clearGeolocation,
   };
 }
 
@@ -142,9 +135,9 @@ function getErrorMessage(code: number): string {
     case 1: // PERMISSION_DENIED
       return "Vous avez refusé l'accès à la géolocalisation. Veuillez autoriser l'accès dans les paramètres de votre navigateur.";
     case 2: // POSITION_UNAVAILABLE
-      return "Position GPS indisponible. Vérifiez que votre GPS est activé.";
+      return 'Position GPS indisponible. Vérifiez que votre GPS est activé.';
     case 3: // TIMEOUT
-      return "La demande de géolocalisation a expiré. Veuillez réessayer.";
+      return 'La demande de géolocalisation a expiré. Veuillez réessayer.';
     default:
       return "Impossible d'accéder à votre position GPS.";
   }

@@ -112,6 +112,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
         }
       };
     }
+    return undefined;
   }, [isOpen]);
 
   // ============================================================================
@@ -140,7 +141,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
 
     const modal = modalRef.current;
     const focusableElements = modal.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
     );
     const firstElement = focusableElements[0];
     const lastElement = focusableElements[focusableElements.length - 1];
@@ -182,7 +183,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
         onClose();
       }
     },
-    [closeOnOutsideClick, onClose]
+    [closeOnOutsideClick, onClose],
   );
 
   // ============================================================================
@@ -248,7 +249,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
  */
 export const ModalHeader: React.FC<{
   title: string;
-  subtitle?: string;
+  subtitle?: React.ReactNode;
   icon?: React.ReactNode;
   className?: string;
   onClose?: () => void;
@@ -256,16 +257,10 @@ export const ModalHeader: React.FC<{
 }> = ({ title, subtitle, icon, className = '', onClose, showCloseButton = true }) => (
   <div className={`p-6 border-b border-slate-200 flex items-center justify-between ${className}`}>
     <div className="flex items-center gap-3 flex-1 min-w-0">
-      {icon && (
-        <div className="p-3 rounded-full bg-emerald-100 flex-shrink-0">
-          {icon}
-        </div>
-      )}
+      {icon && <div className="p-3 rounded-full bg-emerald-100 flex-shrink-0">{icon}</div>}
       <div className="flex-1 min-w-0">
         <h2 className="text-xl font-bold text-slate-900 truncate">{title}</h2>
-        {subtitle && (
-          <p className="text-sm text-slate-500 mt-0.5 truncate">{subtitle}</p>
-        )}
+        {subtitle && <p className="text-sm text-slate-500 mt-0.5 truncate">{subtitle}</p>}
       </div>
     </div>
     {showCloseButton && onClose && (

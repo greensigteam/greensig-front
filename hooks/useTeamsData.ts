@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSearch } from '../contexts/SearchContext';
 import { useToast } from '../contexts/ToastContext';
 import { usePermissions } from './usePermissions';
@@ -15,26 +16,29 @@ import {
   Client,
   NiveauCompetence,
   TYPE_ABSENCE_LABELS,
-  STATUT_ABSENCE_LABELS
+  STATUT_ABSENCE_LABELS,
 } from '../types/users';
 
+import { fetchOperateurById, fetchEquipeById } from '../services/usersApi';
+
+import { useCurrentUser } from './queries/useReferenceData';
 import {
-  fetchOperateurs,
-  fetchOperateurById,
-  fetchEquipes,
-  fetchEquipeById,
-  fetchAbsences,
-  fetchAbsencesAValider,
-  fetchCompetences,
-  fetchChefsPotentiels,
-  validerAbsence,
-  refuserAbsence,
-  annulerAbsence,
-  fetchStatistiquesUtilisateurs,
-  deleteOperateur,
-  deleteEquipe,
-  fetchCurrentUser
-} from '../services/usersApi';
+  useOperateursQuery,
+  useChefsPotentielsQuery,
+  useEquipesRHQuery,
+  useAbsencesQuery,
+  useAbsencesAValiderQuery,
+  useCompetencesQuery,
+  useStatsUtilisateursQuery,
+} from './queries/useTeamsQueries';
+import {
+  useDeleteEquipe,
+  useDeleteOperateur,
+  useValiderAbsence,
+  useRefuserAbsence,
+  useAnnulerAbsence,
+} from './mutations/useTeamsMutations';
+import { queryKeys } from '../lib/queryKeys';
 
 // ============================================================================
 // TYPES
@@ -64,25 +68,19 @@ export interface OperateurFilters {
 }
 
 export interface UseTeamsDataReturn {
-  // Loading & Error
   loading: boolean;
 
-  // Current user & permissions
   currentUser: Utilisateur | null;
   permissions: ReturnType<typeof usePermissions>;
   isReadOnly: boolean;
 
-  // Stats
   stats: TeamsStats | null;
 
-  // Tab management
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
 
-  // Search
   debouncedSearchQuery: string;
 
-  // Data - Equipes
   equipes: EquipeList[];
   filteredEquipes: EquipeList[];
   equipesPage: number;
@@ -91,7 +89,6 @@ export interface UseTeamsDataReturn {
   chefsPotentiels: OperateurList[];
   operateursSansEquipe: OperateurList[];
 
-  // Data - Operateurs
   operateurs: OperateurList[];
   filteredOperateurs: OperateurList[];
   operateursPage: number;
@@ -102,7 +99,6 @@ export interface UseTeamsDataReturn {
   showOperateurFilters: boolean;
   setShowOperateurFilters: (show: boolean) => void;
 
-  // Data - Absences
   absences: Absence[];
   filteredAbsences: Absence[];
   absencesPage: number;
@@ -114,11 +110,9 @@ export interface UseTeamsDataReturn {
   showAbsenceFilters: boolean;
   setShowAbsenceFilters: (show: boolean) => void;
 
-  // Data - Competences
   competences: Competence[];
   competenceCategories: string[];
 
-  // Modals - Equipes
   showCreateTeam: boolean;
   setShowCreateTeam: (show: boolean) => void;
   selectedEquipe: EquipeDetail | null;
@@ -128,7 +122,6 @@ export interface UseTeamsDataReturn {
   deleteEquipeId: number | null;
   setDeleteEquipeId: (id: number | null) => void;
 
-  // Modals - Operateurs
   showCreateOperateur: boolean;
   setShowCreateOperateur: (show: boolean) => void;
   selectedOperateur: OperateurDetail | null;
@@ -138,7 +131,6 @@ export interface UseTeamsDataReturn {
   deleteOperateurId: number | null;
   setDeleteOperateurId: (id: number | null) => void;
 
-  // Modals - Absences
   showCreateAbsence: boolean;
   setShowCreateAbsence: (show: boolean) => void;
   selectedAbsence: Absence | null;
@@ -148,12 +140,10 @@ export interface UseTeamsDataReturn {
   deleteAbsenceId: number | null;
   setDeleteAbsenceId: (id: number | null) => void;
 
-  // Modals - Users
   editingUser: Utilisateur | null;
   setEditingUser: (user: Utilisateur | null) => void;
   clients: Client[];
 
-  // Competences view state
   matrixViewMode: 'cards' | 'table';
   setMatrixViewMode: (mode: 'cards' | 'table') => void;
   matrixEditMode: boolean;
@@ -163,7 +153,6 @@ export interface UseTeamsDataReturn {
   matrixCategorieFilter: string;
   setMatrixCategorieFilter: (cat: string) => void;
 
-  // Actions
   loadData: () => Promise<void>;
   loadEquipesData: (page?: number, forceRefresh?: boolean) => Promise<void>;
   loadOperateursData: (page?: number, filters?: OperateurFilters) => Promise<void>;
@@ -183,59 +172,39 @@ export interface UseTeamsDataReturn {
 // HOOK
 // ============================================================================
 
+const PAGE_SIZE = 50;
+
 export function useTeamsData(): UseTeamsDataReturn {
   const { searchQuery, setSearchQuery, setPlaceholder } = useSearch();
   const { showToast } = useToast();
+  const queryClient = useQueryClient();
 
-  // Loading
-  const [loading, setLoading] = useState(true);
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-
-  // Current user
-  const [currentUser, setCurrentUser] = useState<Utilisateur | null>(null);
-
-  // Stats
-  const [stats, setStats] = useState<TeamsStats | null>(null);
 
   // Tab
   const [activeTab, setActiveTab] = useState<TabType>('equipes');
 
-  // Data - Equipes
-  const [equipes, setEquipes] = useState<EquipeList[]>([]);
+  // Pagination
   const [equipesPage, setEquipesPage] = useState(1);
-  const [equipesTotal, setEquipesTotal] = useState(0);
-  const [chefsPotentiels, setChefsPotentiels] = useState<OperateurList[]>([]);
-
-  // Data - Operateurs
-  const [operateurs, setOperateurs] = useState<OperateurList[]>([]);
   const [operateursPage, setOperateursPage] = useState(1);
-  const [operateursTotal, setOperateursTotal] = useState(0);
+  const [absencesPage, setAbsencesPage] = useState(1);
+
+  // Filters
   const [operateurFilters, setOperateurFilters] = useState<OperateurFilters>({
     statut: '',
     equipe: '',
     estChef: '',
-    disponible: ''
+    disponible: '',
   });
   const [showOperateurFilters, setShowOperateurFilters] = useState(false);
 
-  // Data - Absences
-  const [absences, setAbsences] = useState<Absence[]>([]);
-  const [absencesPage, setAbsencesPage] = useState(1);
-  const [absencesTotal, setAbsencesTotal] = useState(0);
-  const [absencesAValider, setAbsencesAValider] = useState<Absence[]>([]);
   const [absenceFilters, setAbsenceFilters] = useState<AbsenceFilters>({
     statut: '',
     typeAbsence: '',
     dateDebut: '',
-    dateFin: ''
+    dateFin: '',
   });
   const [showAbsenceFilters, setShowAbsenceFilters] = useState(false);
-
-  // Data - Competences
-  const [competences, setCompetences] = useState<Competence[]>([]);
-
-  // Data - Clients (for user editing)
-  const [clients, setClients] = useState<Client[]>([]);
 
   // Modals - Equipes
   const [showCreateTeam, setShowCreateTeam] = useState(false);
@@ -257,42 +226,125 @@ export function useTeamsData(): UseTeamsDataReturn {
 
   // Modals - Users
   const [editingUser, setEditingUser] = useState<Utilisateur | null>(null);
+  const [clients] = useState<Client[]>([]);
 
-  // Competences view state
+  // Competences view
   const [matrixViewMode, setMatrixViewMode] = useState<'cards' | 'table'>('cards');
   const [matrixEditMode, setMatrixEditMode] = useState(false);
   const [matrixNiveauFilter, setMatrixNiveauFilter] = useState<NiveauCompetence | ''>('');
   const [matrixCategorieFilter, setMatrixCategorieFilter] = useState('');
 
-  // Permissions
+  // ========================================================================
+  // QUERIES (React Query)
+  // ========================================================================
+
+  const currentUserQuery = useCurrentUser();
+  const currentUser = currentUserQuery.data ?? null;
+
+  const statsQuery = useStatsUtilisateursQuery();
+
+  const equipesQuery = useEquipesRHQuery(
+    activeTab === 'equipes' ? { page: equipesPage, pageSize: PAGE_SIZE } : undefined,
+  );
+  const equipes = equipesQuery.data?.results ?? [];
+  const equipesTotal = equipesQuery.data?.count ?? 0;
+
+  const chefsPotentielsQuery = useChefsPotentielsQuery();
+  const chefsPotentiels = chefsPotentielsQuery.data ?? [];
+
+  // Construit les filtres pour l'API à partir des filtres UI.
+  const operateurApiFilters = useMemo(() => {
+    const apiFilters: Record<string, unknown> = { page: operateursPage, pageSize: PAGE_SIZE };
+    if (operateurFilters.statut) apiFilters.statut = operateurFilters.statut;
+    if (operateurFilters.equipe === 'sans_equipe') {
+      apiFilters.sansEquipe = true;
+    } else if (operateurFilters.equipe) {
+      apiFilters.equipe = parseInt(operateurFilters.equipe);
+    }
+    if (operateurFilters.estChef === 'true') apiFilters.estChef = true;
+    if (operateurFilters.estChef === 'false') apiFilters.estChef = false;
+    if (operateurFilters.disponible === 'true') apiFilters.disponible = true;
+    if (operateurFilters.disponible === 'false') apiFilters.disponible = false;
+    return apiFilters;
+  }, [operateursPage, operateurFilters]);
+
+  const operateursQuery = useOperateursQuery(
+    activeTab === 'operateurs' || activeTab === 'absences' || activeTab === 'competences'
+      ? operateurApiFilters
+      : undefined,
+  );
+  const operateurs = operateursQuery.data?.results ?? [];
+  const operateursTotal = operateursQuery.data?.count ?? 0;
+
+  const absencesQuery = useAbsencesQuery(
+    activeTab === 'absences' ? { page: absencesPage, pageSize: PAGE_SIZE } : undefined,
+  );
+  const absences = absencesQuery.data?.results ?? [];
+  const absencesTotal = absencesQuery.data?.count ?? 0;
+
+  const absencesAValiderQuery = useAbsencesAValiderQuery();
+  const absencesAValider = absencesAValiderQuery.data ?? [];
+
+  const competencesQuery = useCompetencesQuery();
+  const competences = competencesQuery.data ?? [];
+
+  const stats: TeamsStats | null = statsQuery.data
+    ? {
+        totalOperateurs: statsQuery.data.operateurs.total,
+        disponibles: statsQuery.data.operateurs.disponiblesAujourdhui,
+        totalEquipes: statsQuery.data.equipes.total,
+        absencesEnAttente: statsQuery.data.absences.enAttente,
+      }
+    : null;
+
+  const loading =
+    currentUserQuery.isLoading ||
+    statsQuery.isLoading ||
+    (activeTab === 'equipes' && equipesQuery.isLoading) ||
+    (activeTab === 'operateurs' && operateursQuery.isLoading) ||
+    (activeTab === 'absences' && (absencesQuery.isLoading || absencesAValiderQuery.isLoading)) ||
+    (activeTab === 'competences' && competencesQuery.isLoading);
+
+  // ========================================================================
+  // MUTATIONS (React Query)
+  // ========================================================================
+
+  const deleteEquipeMutation = useDeleteEquipe();
+  const deleteOperateurMutation = useDeleteOperateur();
+  const validerAbsenceMutation = useValiderAbsence();
+  const refuserAbsenceMutation = useRefuserAbsence();
+  const annulerAbsenceMutation = useAnnulerAbsence();
+
+  // ========================================================================
+  // PERMISSIONS
+  // ========================================================================
+
   const isReadOnly = !!currentUser?.roles?.includes('CLIENT');
-  const tempUser: User | null = currentUser ? {
-    id: String(currentUser.id),
-    name: currentUser.nom || '',
-    email: currentUser.email,
-    role: (currentUser.roles?.[0] || 'CLIENT') as Role
-  } : null;
+  const tempUser: User | null = currentUser
+    ? {
+        id: String(currentUser.id),
+        name: currentUser.nom || '',
+        email: currentUser.email,
+        role: (currentUser.roles?.[0] || 'CLIENT') as Role,
+      }
+    : null;
   const permissions = usePermissions(tempUser);
 
   // ========================================================================
-  // EFFECTS
+  // EFFECTS — search debounce + placeholder synchronisés sur l'onglet
   // ========================================================================
 
-  // Debounce search
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-    }, 300);
+    const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Update search placeholder based on tab
   useEffect(() => {
     const placeholders: Record<TabType, string> = {
       equipes: 'Rechercher une équipe...',
       operateurs: 'Rechercher un opérateur (nom, matricule)...',
       competences: 'Voir la matrice de compétences...',
-      absences: 'Rechercher une absence (opérateur, motif, type)...'
+      absences: 'Rechercher une absence (opérateur, motif, type)...',
     };
     setPlaceholder(placeholders[activeTab]);
     return () => {
@@ -301,304 +353,245 @@ export function useTeamsData(): UseTeamsDataReturn {
     };
   }, [activeTab, setPlaceholder, setSearchQuery]);
 
-  // Initial data load
-  useEffect(() => {
-    const initializeData = async () => {
-      setLoading(true);
-      try {
-        await loadStableData();
-        await loadTabData(activeTab);
-      } catch (error) {
-        console.error('Erreur initialisation:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    initializeData();
-  }, []);
-
-  // Load data when tab changes
-  useEffect(() => {
-    if (stats) {
-      loadTabData(activeTab);
-    }
-  }, [activeTab]);
-
   // ========================================================================
-  // DATA LOADING
+  // ACTIONS — wrappers conservés pour rétro-compatibilité avec Teams.tsx
   // ========================================================================
 
-  const loadStableData = async () => {
-    try {
-      const [currentUserRes, statsRes] = await Promise.all([
-        fetchCurrentUser(),
-        fetchStatistiquesUtilisateurs()
-      ]);
-      setCurrentUser(currentUserRes);
-      setStats({
-        totalOperateurs: statsRes.operateurs.total,
-        disponibles: statsRes.operateurs.disponiblesAujourdhui,
-        totalEquipes: statsRes.equipes.total,
-        absencesEnAttente: statsRes.absences.enAttente
-      });
-    } catch (error) {
-      console.error('Erreur chargement données stables:', error);
-    }
-  };
-
-  const loadTabData = async (tab: TabType) => {
-    setLoading(true);
-    try {
-      switch (tab) {
-        case 'equipes':
-          await loadEquipesData(equipesPage, true);
-          break;
-        case 'operateurs':
-          await loadOperateursData();
-          break;
-        case 'competences':
-          await loadCompetencesData();
-          break;
-        case 'absences':
-          await loadAbsencesData();
-          break;
-      }
-    } catch (error) {
-      console.error('Erreur chargement données:', error);
-      showToast('Erreur lors du chargement des données', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadEquipesData = useCallback(async (page: number = equipesPage, forceRefresh: boolean = false) => {
-    try {
-      const [equipesRes, chefsPotentielsRes] = await Promise.all([
-        fetchEquipes({ page, pageSize: 50 }),
-        chefsPotentiels.length === 0 ? fetchChefsPotentiels() : Promise.resolve(chefsPotentiels)
-      ]);
-      setEquipes(equipesRes.results);
-      setEquipesTotal(equipesRes.count || 0);
-      if (chefsPotentiels.length === 0) {
-        setChefsPotentiels(chefsPotentielsRes);
-      }
-    } catch (error) {
-      console.error('Erreur chargement équipes:', error);
-      showToast('Erreur lors du chargement des équipes', 'error');
-    }
-  }, [equipesPage, chefsPotentiels, showToast]);
-
-  const loadOperateursData = useCallback(async (page: number = operateursPage, filters = operateurFilters) => {
-    try {
-      const apiFilters: Record<string, unknown> = { page, pageSize: 50 };
-      if (filters.statut) apiFilters.statut = filters.statut;
-      if (filters.equipe === 'sans_equipe') {
-        apiFilters.sansEquipe = true;
-      } else if (filters.equipe) {
-        apiFilters.equipe = parseInt(filters.equipe);
-      }
-      if (filters.estChef === 'true') apiFilters.estChef = true;
-      if (filters.estChef === 'false') apiFilters.estChef = false;
-      if (filters.disponible === 'true') apiFilters.disponible = true;
-      if (filters.disponible === 'false') apiFilters.disponible = false;
-
-      const [operateursRes] = await Promise.all([
-        fetchOperateurs(apiFilters),
-        equipes.length === 0 ? fetchEquipes({ pageSize: 100 }).then(res => setEquipes(res.results)) : Promise.resolve()
-      ]);
-      setOperateurs(operateursRes.results);
-      setOperateursTotal(operateursRes.count || 0);
-    } catch (error) {
-      console.error('Erreur chargement opérateurs:', error);
-      showToast('Erreur lors du chargement des opérateurs', 'error');
-    }
-  }, [operateursPage, operateurFilters, equipes, showToast]);
-
-  const loadCompetencesData = useCallback(async () => {
-    if (competences.length > 0 && operateurs.length > 0) return;
-    const [competencesRes, operateursRes] = await Promise.all([
-      competences.length === 0 ? fetchCompetences() : Promise.resolve(competences),
-      operateurs.length === 0 ? fetchOperateurs({ pageSize: 200 }) : Promise.resolve({ results: operateurs })
-    ]);
-    if (competences.length === 0) {
-      setCompetences(competencesRes);
-    }
-    if (operateurs.length === 0) {
-      setOperateurs(operateursRes.results);
-    }
-  }, [competences, operateurs]);
-
-  const loadAbsencesData = useCallback(async (page: number = absencesPage) => {
-    const [absencesRes, absencesAValiderRes, operateursRes] = await Promise.all([
-      fetchAbsences({ page, pageSize: 50 }),
-      fetchAbsencesAValider(),
-      operateurs.length === 0 ? fetchOperateurs({ page: 1, pageSize: 100 }) : Promise.resolve({ results: operateurs })
-    ]);
-    setAbsences(absencesRes.results);
-    setAbsencesTotal(absencesRes.count || 0);
-    setAbsencesAValider(absencesAValiderRes);
-    if (operateurs.length === 0) {
-      setOperateurs(operateursRes.results);
-    }
-  }, [absencesPage, operateurs]);
-
+  /**
+   * loadData : force refresh des datasets visibles + stats.
+   * En mode React Query, c'est une invalidation explicite des clés concernées.
+   */
   const loadData = useCallback(async () => {
-    await loadTabData(activeTab);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.statsUtilisateurs.current }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.equipesRH.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.operateurs.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.absences.all }),
+    ]);
+  }, [queryClient]);
+
+  const loadEquipesData = useCallback(
+    async (_page?: number, _forceRefresh?: boolean) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.equipesRH.all });
+    },
+    [queryClient],
+  );
+
+  const loadOperateursData = useCallback(
+    async (_page?: number, _filters?: OperateurFilters) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.operateurs.all });
+    },
+    [queryClient],
+  );
+
+  const loadAbsencesData = useCallback(
+    async (_page?: number) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.absences.all });
+    },
+    [queryClient],
+  );
+
+  const handleViewOperateur = useCallback(
+    async (operateurId: number) => {
+      try {
+        const detail = await queryClient.fetchQuery({
+          queryKey: queryKeys.operateurs.detail(operateurId),
+          queryFn: () => fetchOperateurById(operateurId),
+        });
+        setSelectedOperateur(detail);
+      } catch (error) {
+        showToast("Erreur lors du chargement des détails de l'opérateur", 'error');
+      }
+    },
+    [queryClient, showToast],
+  );
+
+  const handleViewEquipe = useCallback(
+    async (equipeId: number) => {
+      try {
+        const detail = await queryClient.fetchQuery({
+          queryKey: queryKeys.equipesRH.detail(equipeId),
+          queryFn: () => fetchEquipeById(equipeId),
+        });
+        setSelectedEquipe(detail);
+      } catch (error) {
+        showToast("Erreur lors du chargement des détails de l'équipe", 'error');
+      }
+    },
+    [queryClient],
+  );
+
+  const handleValiderAbsence = useCallback(
+    async (absenceId: number) => {
+      try {
+        await validerAbsenceMutation.mutateAsync({ id: absenceId, motif: 'Approuve' });
+      } catch (error) {
+        showToast("Erreur lors de la validation de l'absence", 'error');
+      }
+    },
+    [validerAbsenceMutation, showToast],
+  );
+
+  const handleRefuserAbsence = useCallback(
+    async (absenceId: number) => {
+      try {
+        await refuserAbsenceMutation.mutateAsync({ id: absenceId, motif: 'Refuse' });
+      } catch (error) {
+        showToast("Erreur lors du refus de l'absence", 'error');
+      }
+    },
+    [refuserAbsenceMutation, showToast],
+  );
+
+  /**
+   * Charge les opérateurs si nécessaire avant d'ouvrir un modal qui en dépend.
+   * Avec React Query, on utilise `ensureQueryData` plutôt qu'un fetch manuel —
+   * il sert le cache si frais, refetch sinon.
+   */
+  const ensureOperateursLoaded = useCallback(async () => {
     try {
-      const statsRes = await fetchStatistiquesUtilisateurs();
-      setStats({
-        totalOperateurs: statsRes.operateurs.total,
-        disponibles: statsRes.operateurs.disponiblesAujourdhui,
-        totalEquipes: statsRes.equipes.total,
-        absencesEnAttente: statsRes.absences.enAttente
+      await queryClient.ensureQueryData({
+        queryKey: queryKeys.operateurs.list({ page: 1, pageSize: 200 }),
+        queryFn: () =>
+          import('../services/usersApi').then((m) => m.fetchOperateurs({ page: 1, pageSize: 200 })),
       });
     } catch (error) {
-      console.error('Erreur refresh stats:', error);
+      showToast('Erreur lors du chargement des opérateurs', 'error');
+      throw error;
     }
-  }, [activeTab]);
-
-  // ========================================================================
-  // HANDLERS
-  // ========================================================================
-
-  const handleViewOperateur = useCallback(async (operateurId: number) => {
-    try {
-      const detail = await fetchOperateurById(operateurId);
-      setSelectedOperateur(detail);
-    } catch (error) {
-      console.error('Erreur chargement opérateur:', error);
-      showToast('Erreur lors du chargement des détails de l\'opérateur', 'error');
-    }
-  }, [showToast]);
-
-  const handleViewEquipe = useCallback(async (equipeId: number) => {
-    try {
-      const detail = await fetchEquipeById(equipeId);
-      setSelectedEquipe(detail);
-    } catch (error) {
-      console.error('Erreur chargement equipe:', error);
-    }
-  }, []);
-
-  const handleValiderAbsence = useCallback(async (absenceId: number) => {
-    try {
-      await validerAbsence(absenceId, 'Approuve');
-      loadData();
-    } catch (error) {
-      console.error('Erreur validation absence:', error);
-    }
-  }, [loadData]);
-
-  const handleRefuserAbsence = useCallback(async (absenceId: number) => {
-    try {
-      await refuserAbsence(absenceId, 'Refuse');
-      loadData();
-    } catch (error) {
-      console.error('Erreur refus absence:', error);
-    }
-  }, [loadData]);
+  }, [queryClient, showToast]);
 
   const handleOpenCreateAbsence = useCallback(async () => {
-    if (operateurs.length === 0) {
-      try {
-        const operateursRes = await fetchOperateurs({ page: 1, pageSize: 200 });
-        setOperateurs(operateursRes.results);
-      } catch (error) {
-        console.error('Erreur chargement opérateurs:', error);
-        showToast('Erreur lors du chargement des opérateurs', 'error');
-        return;
-      }
+    try {
+      await ensureOperateursLoaded();
+      setShowCreateAbsence(true);
+    } catch {
+      // toast déjà émis
     }
-    setShowCreateAbsence(true);
-  }, [operateurs, showToast]);
+  }, [ensureOperateursLoaded]);
 
   const handleOpenCreateTeam = useCallback(async () => {
-    if (operateurs.length === 0) {
-      try {
-        const operateursRes = await fetchOperateurs({ page: 1, pageSize: 200 });
-        setOperateurs(operateursRes.results);
-      } catch (error) {
-        console.error('Erreur chargement opérateurs:', error);
-        showToast('Erreur lors du chargement des opérateurs', 'error');
-        return;
-      }
+    try {
+      await ensureOperateursLoaded();
+      setShowCreateTeam(true);
+    } catch {
+      // toast déjà émis
     }
-    setShowCreateTeam(true);
-  }, [operateurs, showToast]);
+  }, [ensureOperateursLoaded]);
 
-  const handleDeleteEquipe = useCallback(async (id: number) => {
-    await deleteEquipe(id);
-    showToast('Équipe supprimée avec succès', 'success');
-    loadData();
-    setDeleteEquipeId(null);
-  }, [loadData, showToast]);
+  const handleDeleteEquipe = useCallback(
+    async (id: number) => {
+      try {
+        await deleteEquipeMutation.mutateAsync(id);
+        showToast('Équipe supprimée avec succès', 'success');
+      } catch (error) {
+        showToast("Erreur lors de la suppression de l'équipe", 'error');
+      } finally {
+        setDeleteEquipeId(null);
+      }
+    },
+    [deleteEquipeMutation, showToast],
+  );
 
-  const handleDeleteOperateur = useCallback(async (id: number) => {
-    await deleteOperateur(id);
-    showToast('Opérateur supprimé avec succès', 'success');
-    loadData();
-    setDeleteOperateurId(null);
-  }, [loadData, showToast]);
+  const handleDeleteOperateur = useCallback(
+    async (id: number) => {
+      try {
+        await deleteOperateurMutation.mutateAsync(id);
+        showToast('Opérateur supprimé avec succès', 'success');
+      } catch (error) {
+        showToast("Erreur lors de la suppression de l'opérateur", 'error');
+      } finally {
+        setDeleteOperateurId(null);
+      }
+    },
+    [deleteOperateurMutation, showToast],
+  );
 
-  const handleAnnulerAbsence = useCallback(async (id: number) => {
-    await annulerAbsence(id);
-    showToast('Absence annulée avec succès', 'success');
-    loadData();
-    setDeleteAbsenceId(null);
-  }, [loadData, showToast]);
+  const handleAnnulerAbsence = useCallback(
+    async (id: number) => {
+      try {
+        await annulerAbsenceMutation.mutateAsync(id);
+        showToast('Absence annulée avec succès', 'success');
+      } catch (error) {
+        showToast("Erreur lors de l'annulation de l'absence", 'error');
+      } finally {
+        setDeleteAbsenceId(null);
+      }
+    },
+    [annulerAbsenceMutation, showToast],
+  );
 
   // ========================================================================
   // COMPUTED VALUES
   // ========================================================================
 
-  const filteredEquipes = useMemo(() => equipes
-    .filter(e => e.actif)
-    .filter(e =>
-      e.nomEquipe.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-      (e.chefEquipeNom || '').toLowerCase().includes(debouncedSearchQuery.toLowerCase())
-    ), [equipes, debouncedSearchQuery]);
+  const filteredEquipes = useMemo(
+    () =>
+      equipes
+        .filter((e) => e.actif)
+        .filter(
+          (e) =>
+            e.nomEquipe.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+            (e.chefEquipeNom || '').toLowerCase().includes(debouncedSearchQuery.toLowerCase()),
+        ),
+    [equipes, debouncedSearchQuery],
+  );
 
-  const filteredOperateurs = useMemo(() => operateurs.filter(o =>
-    (o.fullName || '').toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-    (o.numeroImmatriculation || '').toLowerCase().includes(debouncedSearchQuery.toLowerCase())
-  ), [operateurs, debouncedSearchQuery]);
+  const filteredOperateurs = useMemo(
+    () =>
+      operateurs.filter(
+        (o) =>
+          (o.fullName || '').toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+          (o.numeroImmatriculation || '')
+            .toLowerCase()
+            .includes(debouncedSearchQuery.toLowerCase()),
+      ),
+    [operateurs, debouncedSearchQuery],
+  );
 
-  const filteredAbsences = useMemo(() => absences.filter(a => {
-    if (debouncedSearchQuery) {
-      const query = debouncedSearchQuery.toLowerCase();
-      const matchOperateur = a.operateurNom.toLowerCase().includes(query);
-      const matchMotif = a.motif?.toLowerCase().includes(query);
-      const matchType = TYPE_ABSENCE_LABELS[a.typeAbsence]?.toLowerCase().includes(query);
-      const matchStatut = STATUT_ABSENCE_LABELS[a.statut]?.toLowerCase().includes(query);
-      if (!matchOperateur && !matchMotif && !matchType && !matchStatut) {
-        return false;
-      }
-    }
-    if (absenceFilters.statut && a.statut !== absenceFilters.statut) return false;
-    if (absenceFilters.typeAbsence && a.typeAbsence !== absenceFilters.typeAbsence) return false;
-    if (absenceFilters.dateDebut && new Date(a.dateDebut) < new Date(absenceFilters.dateDebut)) return false;
-    if (absenceFilters.dateFin && new Date(a.dateFin) > new Date(absenceFilters.dateFin)) return false;
-    return true;
-  }), [absences, debouncedSearchQuery, absenceFilters]);
+  const filteredAbsences = useMemo(
+    () =>
+      absences.filter((a) => {
+        if (debouncedSearchQuery) {
+          const query = debouncedSearchQuery.toLowerCase();
+          const matchOperateur = a.operateurNom.toLowerCase().includes(query);
+          const matchMotif = a.motif?.toLowerCase().includes(query);
+          const matchType = TYPE_ABSENCE_LABELS[a.typeAbsence]?.toLowerCase().includes(query);
+          const matchStatut = STATUT_ABSENCE_LABELS[a.statut]?.toLowerCase().includes(query);
+          if (!matchOperateur && !matchMotif && !matchType && !matchStatut) {
+            return false;
+          }
+        }
+        if (absenceFilters.statut && a.statut !== absenceFilters.statut) return false;
+        if (absenceFilters.typeAbsence && a.typeAbsence !== absenceFilters.typeAbsence)
+          return false;
+        if (absenceFilters.dateDebut && new Date(a.dateDebut) < new Date(absenceFilters.dateDebut))
+          return false;
+        if (absenceFilters.dateFin && new Date(a.dateFin) > new Date(absenceFilters.dateFin))
+          return false;
+        return true;
+      }),
+    [absences, debouncedSearchQuery, absenceFilters],
+  );
 
-  const operateursSansEquipe = useMemo(() => operateurs.filter(o => {
-    const estActif = o.actif === true || (o.actif === undefined && o.statut === 'ACTIF');
-    return estActif;
-  }), [operateurs]);
+  const operateursSansEquipe = useMemo(
+    () =>
+      operateurs.filter((o) => {
+        const estActif = o.actif === true || (o.actif === undefined && o.statut === 'ACTIF');
+        return estActif;
+      }),
+    [operateurs],
+  );
 
   const competenceCategories = useMemo(() => {
     const cats = new Set<string>();
-    competences.forEach(c => {
+    competences.forEach((c) => {
       if (c.categorieDisplay || c.categorie) {
         cats.add(c.categorieDisplay || c.categorie);
       }
     });
     return Array.from(cats);
   }, [competences]);
-
-  // ========================================================================
-  // RETURN
-  // ========================================================================
 
   return {
     loading,
@@ -610,7 +603,6 @@ export function useTeamsData(): UseTeamsDataReturn {
     setActiveTab,
     debouncedSearchQuery,
 
-    // Equipes
     equipes,
     filteredEquipes,
     equipesPage,
@@ -619,7 +611,6 @@ export function useTeamsData(): UseTeamsDataReturn {
     chefsPotentiels,
     operateursSansEquipe,
 
-    // Operateurs
     operateurs,
     filteredOperateurs,
     operateursPage,
@@ -630,7 +621,6 @@ export function useTeamsData(): UseTeamsDataReturn {
     showOperateurFilters,
     setShowOperateurFilters,
 
-    // Absences
     absences,
     filteredAbsences,
     absencesPage,
@@ -642,11 +632,9 @@ export function useTeamsData(): UseTeamsDataReturn {
     showAbsenceFilters,
     setShowAbsenceFilters,
 
-    // Competences
     competences,
     competenceCategories,
 
-    // Modals - Equipes
     showCreateTeam,
     setShowCreateTeam,
     selectedEquipe,
@@ -656,7 +644,6 @@ export function useTeamsData(): UseTeamsDataReturn {
     deleteEquipeId,
     setDeleteEquipeId,
 
-    // Modals - Operateurs
     showCreateOperateur,
     setShowCreateOperateur,
     selectedOperateur,
@@ -666,7 +653,6 @@ export function useTeamsData(): UseTeamsDataReturn {
     deleteOperateurId,
     setDeleteOperateurId,
 
-    // Modals - Absences
     showCreateAbsence,
     setShowCreateAbsence,
     selectedAbsence,
@@ -676,12 +662,10 @@ export function useTeamsData(): UseTeamsDataReturn {
     deleteAbsenceId,
     setDeleteAbsenceId,
 
-    // Modals - Users
     editingUser,
     setEditingUser,
     clients,
 
-    // Competences view
     matrixViewMode,
     setMatrixViewMode,
     matrixEditMode,
@@ -691,7 +675,6 @@ export function useTeamsData(): UseTeamsDataReturn {
     matrixCategorieFilter,
     setMatrixCategorieFilter,
 
-    // Actions
     loadData,
     loadEquipesData,
     loadOperateursData,
